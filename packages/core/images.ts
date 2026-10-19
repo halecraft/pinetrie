@@ -75,7 +75,7 @@ export const isBlobMime = (s: string): s is BlobMime =>
   isImageMime(s) || s === TEXT_MIME || s === OPAQUE_MIME
 
 /** What a blob is, read from its bytes when it was stored. */
-export type BlobKind = "image" | "text" | "opaque"
+type BlobKind = "image" | "text" | "opaque"
 
 /** An image in the store, as a message holds it: no bytes. */
 export interface ImageRef {
@@ -86,7 +86,7 @@ export interface ImageRef {
 }
 
 /** Text in the store: no dimensions. */
-export interface TextRef {
+interface TextRef {
   readonly sha256: Sha256
   readonly mimeType: typeof TEXT_MIME
   readonly width: null
@@ -94,7 +94,7 @@ export interface TextRef {
 }
 
 /** An opaque blob in the store: no dimensions. */
-export interface OpaqueRef {
+interface OpaqueRef {
   readonly sha256: Sha256
   readonly mimeType: typeof OPAQUE_MIME
   readonly width: null
@@ -105,7 +105,7 @@ export interface OpaqueRef {
 export type BlobRef = ImageRef | TextRef | OpaqueRef
 
 /** A stored blob's kind, from its tag. */
-export const kindOfMime = (mime: BlobMime): BlobKind =>
+const kindOfMime = (mime: BlobMime): BlobKind =>
   mime === TEXT_MIME ? "text" : mime === OPAQUE_MIME ? "opaque" : "image"
 
 export const blobKind = (ref: BlobRef): BlobKind => kindOfMime(ref.mimeType)
@@ -138,7 +138,7 @@ export interface StoredImage {
 }
 
 /** Text as it is stored: its UTF-8 bytes. */
-export interface StoredText {
+interface StoredText {
   readonly bytes: Uint8Array
   readonly mimeType: typeof TEXT_MIME
   readonly width: null
@@ -146,7 +146,7 @@ export interface StoredText {
 }
 
 /** An opaque blob as it is stored. */
-export interface StoredOpaque {
+interface StoredOpaque {
   readonly bytes: Uint8Array
   readonly mimeType: typeof OPAQUE_MIME
   readonly width: null

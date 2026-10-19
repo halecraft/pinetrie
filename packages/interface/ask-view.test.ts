@@ -1,13 +1,12 @@
 import {
-  type AgentMessageLike,
   type EntryId,
   entryId,
-  indexAsks,
   pointId,
   type RevisionRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { type AgentMessageLike, indexAsks } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { segmentPath } from "./ask-segments.ts"
 import {

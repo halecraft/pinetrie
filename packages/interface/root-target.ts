@@ -82,7 +82,7 @@ export function rootTargetOfElement(el: {
   return isCanvasId(list) ? { kind: "list", before: list } : null
 }
 
-export const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
+const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
   a.kind === "state"
     ? b.kind === "state" && a.state === b.state && a.before === b.before
     : b.kind === "list" && a.before === b.before
@@ -115,7 +115,7 @@ export function placeAfter<Z>(zones: readonly Z[], item: Z, end: Z): Z {
 }
 
 /** Where Move up or Move down puts an item: before `before`, or at the end. */
-export interface Step<T> {
+interface Step<T> {
   readonly before: T | null
 }
 

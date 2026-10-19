@@ -1,15 +1,13 @@
 // digest — a model's headline and few points for a long ask's work.
 
+import type { EntryId, RootId, ValueWrite } from "@pinetrie/core"
 import {
   type AskIndex,
-  type EntryId,
   isLongAsk,
   lastWord,
   projectTranscript,
-  type RootId,
   type TreeIndex,
-  type ValueWrite,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeRecord, entryKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"

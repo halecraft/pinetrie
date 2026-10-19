@@ -1,13 +1,14 @@
 // interface/perform — carry out the effects `planIntent` decided (`intent.ts`).
 // The shell: one port call per effect, and nothing decided here.
 
-import type { CardId, EntryId, Paste, Sha256 } from "@pinetrie/core"
+import type { EntryId, Sha256 } from "@pinetrie/core"
 import {
   AT_BOARD,
   type AttentionStore,
   type SessionClient,
   type Upload,
 } from "@pinetrie/session"
+import type { CardId, Paste } from "@pinetrie/threads"
 import { afterKeep } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import { type ColumnMotion, foldMotion } from "./column-motion.ts"

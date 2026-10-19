@@ -1,4 +1,4 @@
-import { cardIdOfKind } from "@pinetrie/core"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { imageSpot } from "./image-edge.ts"
 

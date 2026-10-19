@@ -10,7 +10,7 @@
 // card. A new card's box has no send: it releases its card when focus leaves
 // it.
 
-import type { CardRecord, TextCardId } from "@pinetrie/core"
+import type { CardRecord, TextCardId } from "@pinetrie/threads"
 import type { Pending, Prefill } from "./columns.ts"
 import { sendable } from "./send.ts"
 
@@ -62,7 +62,7 @@ export type EditorEvent =
  */
 type EditorAct = "create" | "attach" | "detach"
 
-export interface EditorStep {
+interface EditorStep {
   readonly state: EditorState
   /**
    * In order. A new card is created, then attached: bound first, the binding

@@ -8,7 +8,7 @@
 // next run plans from the tree alone: a steer placed counts there, and one
 // pi's abort dropped is told again.
 
-import { baseKnown, type PointId, type ThreadId } from "@pinetrie/core"
+import type { PointId, ThreadId } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -19,6 +19,7 @@ import {
 } from "@pinetrie/reads"
 import { type BehindMessage, encodeBehind, planBaseNews } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import { baseKnown } from "@pinetrie/threads"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import type { RunDocs } from "./runs.ts"
 

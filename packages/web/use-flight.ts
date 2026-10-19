@@ -5,8 +5,8 @@
 // as a ghost on the page instead (`Flight`), since the panel may still be
 // growing from its toggle. Under reduced motion it lands without flying.
 
-import type { CardId } from "@pinetrie/core"
 import type { Flight } from "@pinetrie/interface"
+import type { CardId } from "@pinetrie/threads"
 import { fixedCopy, layoutBox, reducedMotion, whenDrawn } from "./motion.ts"
 import { useStable } from "./use-stable.ts"
 

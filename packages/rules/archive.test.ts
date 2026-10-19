@@ -1,27 +1,29 @@
 import {
-  type ArchivedCanvas,
   type CanvasId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
-  type EntryLike,
   ERR,
   entryId,
-  type Gated,
-  indexTree,
-  type LaneView,
   pointId,
   type RevisionRecord,
   rootIdFor,
-  type Send,
   snapshotId,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import {
+  type ArchivedCanvas,
+  type CardRecord,
+  cardIdOfKind,
+  type EntryLike,
+  type Gated,
+  indexTree,
+  type LaneView,
+  type Send,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, planLanesGone, writesIn } from "./archive.ts"
 import { indexCanvases } from "./canvas-index.ts"

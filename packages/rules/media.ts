@@ -8,7 +8,7 @@ import type {
   ImageCard,
   ImageId,
   MediaId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { byOrder } from "./card.ts"
 import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"

@@ -7,8 +7,9 @@
 // only over the strip does it reorder. Elsewhere it lands as any card does
 // (`putLanding`).
 
-import type { CardId, Sha256, WorkflowStateId } from "@pinetrie/core"
+import type { Sha256, WorkflowStateId } from "@pinetrie/core"
 import { imagesIn } from "@pinetrie/rules"
+import type { CardId } from "@pinetrie/threads"
 import { type Landing, type PutHow, putLanding } from "./card-intents.ts"
 import type { IntentState } from "./effects.ts"
 import { imageSpot } from "./image-edge.ts"

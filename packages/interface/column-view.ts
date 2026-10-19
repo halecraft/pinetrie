@@ -2,38 +2,19 @@
 // it came from, and what became of its files.
 
 import {
-  type AskIndex,
-  ancestry,
   type CanvasId,
-  type CanvasPinnedView,
-  type CanvasView,
-  type CardRecord,
   type ConflictRecord,
-  cardCommand,
   type DiffSpan,
   type EntryId,
-  entryThread,
   firstLine,
   type LaneRecord,
-  type LaneView,
-  messageProposal,
-  messageText,
-  type PinnedCardRead,
-  type PinnedView,
   type PointId,
   type Position,
   type ProposedChangesRecord,
-  pinnedInView,
   type RevisionRecord,
-  type Role,
-  runPrompt,
   type StateRecord,
-  type TextPlace,
-  type ThreadFork,
   type ThreadId,
-  type ThreadLane,
   type ThreadName,
-  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -67,6 +48,27 @@ import {
   workStripView,
 } from "@pinetrie/rules"
 import type { ProposedChangesActing } from "@pinetrie/session"
+import {
+  type AskIndex,
+  ancestry,
+  type CanvasPinnedView,
+  type CanvasView,
+  type CardRecord,
+  cardCommand,
+  entryThread,
+  type LaneView,
+  messageProposal,
+  messageText,
+  type PinnedCardRead,
+  type PinnedView,
+  pinnedInView,
+  type Role,
+  runPrompt,
+  type TextPlace,
+  type ThreadFork,
+  type ThreadLane,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { type AccessView, accessView } from "./access-view.ts"
 import type { StandingRunEnd } from "./attention.ts"
 import { commandWords } from "./card-words.ts"
@@ -260,7 +262,7 @@ export type HeadOrigin =
   | { readonly kind: "none" }
 
 /** What a fork row needs to name a source in another canvas. */
-export interface OriginFacts {
+interface OriginFacts {
   /** The canvas the column is on; null for a new canvas. */
   readonly canvas: CanvasId | null
   readonly linkOf: (thread: ThreadId) => ThreadLink
@@ -276,7 +278,7 @@ export interface LaneJoin {
 }
 
 /** Proposed changes' words: its line, and a label for each button and menu row. */
-export interface WorkStripWords {
+interface WorkStripWords {
   readonly line: string
   /** What the line leaves out, as its title: jj's ids. Null for none. */
   readonly lineTitle: string | null

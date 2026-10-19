@@ -1,7 +1,8 @@
 // card-words — what a card says, read from where its kind keeps its words
 // (`cardTextSource`).
 
-import type { Sha256, TextCardId, TextSource } from "@pinetrie/core"
+import type { Sha256 } from "@pinetrie/core"
+import type { TextCardId, TextSource } from "@pinetrie/threads"
 import { factLine } from "./fact.ts"
 import { relayLine } from "./relay.ts"
 

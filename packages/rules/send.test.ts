@@ -2,20 +2,18 @@ import {
   canvasIdFor,
   ERR,
   entryId,
-  indexTree,
   rootIdFor,
-  type Send,
   type Sha256,
   TEXT_MIME,
-  type ThreadRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { indexTree, type Send, type ThreadRecord } from "@pinetrie/threads"
 import {
   fromParents,
   personMessage,
   threadOfEntry,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CommandSummary } from "./commands.ts"
 import {

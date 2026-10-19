@@ -7,7 +7,6 @@
 // strip has a card (`newPinPlace`), and in the strip after; the box it opens is
 // drawn last in the strip.
 
-import type { CardId, PinnedView, TextCard } from "@pinetrie/core"
 import {
   type CardFrameFacts,
   type ColumnAct,
@@ -20,6 +19,7 @@ import {
   type ReadOnly,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { CardId, PinnedView, TextCard } from "@pinetrie/threads"
 import type { ReactElement } from "react"
 import { Button } from "./button.tsx"
 import { PinnedCardEditor } from "./card-editor.tsx"

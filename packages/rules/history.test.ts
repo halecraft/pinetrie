@@ -5,10 +5,10 @@ import {
   commitId,
   entryId,
   type ThreadName,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { BEHIND } from "./behind.ts"
 import { CANVAS, CANVAS_FACT } from "./canvas.ts"

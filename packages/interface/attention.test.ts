@@ -7,9 +7,9 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { RunEndReport, RunEndReportRecord } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { OpenProposedChanges } from "./app-view.ts"
 import {

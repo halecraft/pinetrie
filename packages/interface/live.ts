@@ -6,8 +6,13 @@
 // tool's stream is drawn by its call's row, which stops drawing it once the row
 // has a result.
 
-import type { AgentRun, StreamId, StreamRecord, ToolCall } from "@pinetrie/core"
 import { isCurrentReply } from "@pinetrie/rules"
+import type {
+  AgentRun,
+  StreamId,
+  StreamRecord,
+  ToolCall,
+} from "@pinetrie/threads"
 
 export interface LiveWork {
   /** Each running lane's current reply: at most one per lane. */

@@ -1,4 +1,4 @@
-import { INVENTORY_GRID } from "@pinetrie/core"
+import { INVENTORY_GRID } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { type GridKeyState, gridKeyAct } from "./grid-keys.ts"
 import type { KeyLike } from "./page-keys.ts"

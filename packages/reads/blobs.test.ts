@@ -1,5 +1,6 @@
-import { NOBODY, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
+import { type Sha256, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeMessage } from "@pinetrie/rules"
+import { NOBODY } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
 

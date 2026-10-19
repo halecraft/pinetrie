@@ -1,18 +1,20 @@
 import {
-  type CanvasCard,
   type CanvasId,
-  type CardId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   ERR,
-  livePlace,
-  type WorkflowEdit,
   type WorkflowStateId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard } from "@pinetrie/core/fixtures"
+import {
+  type CanvasCard,
+  type CardId,
+  type CardRecord,
+  cardIdOfKind,
+  livePlace,
+  type WorkflowEdit,
+} from "@pinetrie/threads"
+import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   boardCanvases,

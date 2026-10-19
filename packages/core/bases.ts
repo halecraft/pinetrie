@@ -78,7 +78,7 @@ export type LatestFrom = ThreadBase | ParentThread
  * port carries (`LaneBase`) and for the commits jj reads in your repo
  * (`LaneBaseOf<CommitId>`).
  */
-export interface LaneBaseOf<P extends string> {
+interface LaneBaseOf<P extends string> {
   readonly base: ThreadBase
   /**
    * Where the lane's own work begins: the state of accepted work its base

@@ -311,7 +311,8 @@ export const mutations: readonly Mutation[] = [
     from: '    "@pinetrie/session": "workspace:*",\n',
     to: '    "@pinetrie/session": "workspace:*",\n    "react": "19.2.0",\n',
     command: workspace,
-    expect: "interface declares only core, protocol, reads, rules, schema",
+    expect:
+      "interface declares only core, threads, protocol, reads, rules, schema",
   },
   {
     name: "a package below the interface depends on it",
@@ -2662,8 +2663,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client view mints an entry id",
     file: "packages/interface/sidebar-view.ts",
-    from: 'import { PRODUCT_NAME } from "@pinetrie/core"',
-    to: 'import { entryId, PRODUCT_NAME } from "@pinetrie/core"',
+    from: "  type CanvasId,\n  PRODUCT_NAME,\n",
+    to: "  type CanvasId,\n  entryId,\n  PRODUCT_NAME,\n",
     command: [
       "pnpm",
       "exec",
@@ -4439,8 +4440,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a trash row warns from its last day, whatever the keep",
     file: "packages/interface/canvas-column-view.ts",
-    from: "  Math.min(DAY_MS, keepMs / 4)",
-    to: "  DAY_MS",
+    from: "=> Math.min(DAY_MS, keepMs / 4)",
+    to: "=> DAY_MS",
     command: unit,
     expect:
       "canvasTrash: a column whose deletion is close says when, by the keep it is given",

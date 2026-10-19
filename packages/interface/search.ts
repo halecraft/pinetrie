@@ -7,13 +7,8 @@
 // in JavaScript it knows only ASCII word characters, so it would find "rail"
 // in "éraile". The edges here are Unicode classes instead.
 
-import {
-  type CanvasId,
-  type EntryId,
-  entryMessage,
-  type RailRow,
-  type TreeIndex,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId } from "@pinetrie/core"
+import { entryMessage, type RailRow, type TreeIndex } from "@pinetrie/threads"
 import type { Here } from "./layout.ts"
 
 /** The search of the canvas you are on; null while the bar is closed. Never stored. */
@@ -141,7 +136,7 @@ export const searchCorpus = (
   })
 
 /** A match's place in its message's text, in UTF-16 units. */
-export interface Range {
+interface Range {
   readonly from: number
   readonly to: number
 }

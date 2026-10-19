@@ -2,13 +2,17 @@
 // moved your card.
 
 import {
+  type EntryId,
+  entryId,
+  isThreadId,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   asPlaceFields,
   type CardId,
   type CardPlace,
   type CardRecord,
-  type EntryId,
-  entryId,
-  isThreadId,
   keyOfFields,
   livePlace,
   ownerCard,
@@ -19,10 +23,8 @@ import {
   placeKey,
   sameKey,
   surfaceOwner,
-  type ThreadId,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { placeEnd } from "./card.ts"
 import { choiceSchema, decodeRecord, textKey } from "./decode.ts"
@@ -332,7 +334,7 @@ export type Cause =
   | { readonly kind: "host" }
 
 /** A write to one of the two records, or its removal. */
-export type RecordStep<R, K> =
+type RecordStep<R, K> =
   | { readonly kind: "set"; readonly record: R }
   | { readonly kind: "delete"; readonly key: K }
 
@@ -510,7 +512,7 @@ export function trashDeadline(
 }
 
 /** What the trash sweep deletes: the cards, and among them the threads, whose lanes go too. */
-export interface TrashSweep {
+interface TrashSweep {
   readonly cards: readonly CardId[]
   readonly threads: readonly ThreadId[]
 }

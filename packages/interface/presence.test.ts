@@ -1,10 +1,5 @@
-import {
-  type EntryId,
-  entryId,
-  indexTree,
-  type WriterId,
-  writerId,
-} from "@pinetrie/core"
+import { type EntryId, entryId, type WriterId, writerId } from "@pinetrie/core"
+import { indexTree } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { fromParents } from "./fixtures.ts"
 import { othersReading, othersWithValue, seenBy } from "./presence.ts"

@@ -1,19 +1,21 @@
 import {
-  addressUrl,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
   rootIdFor,
   type Sha256,
-  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { MoveAnswer, MoveHow } from "@pinetrie/session"
+import {
+  addressUrl,
+  type CardRecord,
+  cardIdOfKind,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test, vi } from "vitest"
 import type { Effect } from "./effects.ts"
 import { NEW_CANVAS } from "./fixtures.ts"

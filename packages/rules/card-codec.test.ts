@@ -1,17 +1,19 @@
 import {
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
-  makeCard,
-  NO_CONTENT,
-  type PlacedKind,
-  type RelayDetails,
   type Sha256,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  cardIdOfKind,
+  makeCard,
+  NO_CONTENT,
+  type PlacedKind,
+  type RelayDetails,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { CARD_CODEC, decodeCard, encodeCard } from "./card.ts"
 

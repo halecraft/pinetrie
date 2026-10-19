@@ -24,7 +24,7 @@ const SshFactSchema = Type.Object({
 })
 
 /** News that never starts a run, as the column and the lane keep it. */
-export type SshFact = Static<typeof SshFactSchema>
+type SshFact = Static<typeof SshFactSchema>
 
 /** The column draws an ssh fact as a fact row (`sshFactLine`). */
 export const SSH_FACT = historyMessage(SSH_FACT_TYPE, SshFactSchema)
@@ -67,7 +67,7 @@ function sshFactContent(fact: SshFact): string {
 }
 
 /** What news is delivered as: an allowance is the carry-on that wakes its lane; the rest are facts. */
-export type SshDelivery =
+type SshDelivery =
   | { readonly wakes: true; readonly message: CarryOnMessage }
   | { readonly wakes: false; readonly message: SshFactMessage }
 

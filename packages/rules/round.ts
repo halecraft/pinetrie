@@ -6,7 +6,7 @@ import type { ThreadId } from "@pinetrie/core"
 import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
 
 /** What the round's reply decides. */
-export type RoundNext =
+type RoundNext =
   | { readonly kind: "nothing" }
   /** Ask one member to answer what was said: a relay, as an agent's ask. */
   | { readonly kind: "ask"; readonly thread: ThreadId; readonly text: string }

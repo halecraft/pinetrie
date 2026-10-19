@@ -2,7 +2,6 @@
 // branched from.
 
 import {
-  ancestry,
   type BaseMerge,
   type CommitId,
   commitId,
@@ -11,23 +10,26 @@ import {
   type ErrCode,
   type FolderBaseRecord,
   type ForkStart,
-  forkParent,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type LaneBase,
-  laneFirstPrompt,
-  messageMerged,
-  nearestRevision,
   type ParentThread,
   type PointId,
-  pointConflicts,
   pointFromCommit,
   type RevisionRecord,
   type ThreadBase,
   type ThreadId,
   type ThreadName,
-  type TreeIndex,
 } from "@pinetrie/core"
+import {
+  ancestry,
+  forkParent,
+  laneFirstPrompt,
+  messageMerged,
+  nearestRevision,
+  pointConflicts,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
 import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
@@ -313,7 +315,7 @@ type UpdateFrom =
  * Why an update is refused: no line, or a WIP gone without landing; for a
  * catch-up with the parent, none, or its agent running.
  */
-export type UpdateRefusal =
+type UpdateRefusal =
   | typeof ERR.NOT_SET_UP
   | typeof ERR.BASE_GONE
   | typeof ERR.NO_PARENT

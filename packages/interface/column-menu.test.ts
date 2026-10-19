@@ -1,4 +1,5 @@
-import { type CardId, cardIdOfKind, threadIdFor } from "@pinetrie/core"
+import { threadIdFor } from "@pinetrie/core"
+import { type CardId, cardIdOfKind } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { columnHead } from "./column-menu.ts"
 import { foldToggle } from "./folded-column-view.ts"

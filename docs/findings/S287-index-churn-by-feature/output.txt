@@ -1,0 +1,17 @@
+
+== packages/core/index.ts: 152 edits (first 2026-09-21)
+  modules named per edit: {"0":10,"1":124,"2":11,"3":5,"5":1,"22":1}
+  edits that raced an earlier landing of this file: 9; same module's block: 8; the block beside it: 0; apart: 1
+    e.g. 1e984bc3 raced 1: asks
+    e.g. eafe48f7 raced 1: asks
+    e.g. cd133082 raced 2: asks
+    e.g. ed9dd2aa raced 3: asks
+
+== packages/rules/index.ts: 84 edits (first 2026-10-04)
+  modules named per edit: {"1":32,"2":14,"3":11,"4":7,"5":9,"6":3,"7":3,"8":1,"10":1,"19":2,"26":1}
+  edits that raced an earlier landing of this file: 3; same module's block: 1; the block beside it: 0; apart: 2
+    e.g. 61540f7b raced 2: board,move-history,root,task
+
+== packages/interface/index.ts: 74 edits (first 2026-10-05)
+  modules named per edit: {"1":32,"2":14,"3":6,"4":3,"5":3,"6":3,"7":1,"8":5,"10":3,"11":1,"15":1,"19":1,"60":1}
+  edits that raced an earlier landing of this file: 4; same module's block: 0; the block beside it: 0; apart: 4

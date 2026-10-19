@@ -1,12 +1,12 @@
 // context — the entries a run's context carries besides its conversation, in
 // one table: a thread's pinned cards, a canvas's, and its canvas list.
 
-import type { ContextInView } from "@pinetrie/core"
+import type { ContextInView } from "@pinetrie/threads"
 import { CANVAS_RULE, CANVAS_TYPE, decodeCanvas } from "./canvas.ts"
 import { CANVAS_PINNED_TYPE, decodeCanvasPinned } from "./canvas-pinned.ts"
 import { decodePinned, PINNED_RULE, PINNED_TYPE } from "./pinned.ts"
 
-export type ContextKind = "pinned-cards" | "canvas-pinned-cards" | "canvas"
+type ContextKind = "pinned-cards" | "canvas-pinned-cards" | "canvas"
 
 interface ContextSpec {
   readonly customType: string

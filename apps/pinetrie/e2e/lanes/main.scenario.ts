@@ -6,17 +6,12 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import {
-  ancestry,
   commitId,
   type EntryId,
   entryId,
   HOST_OPERATOR,
-  messageText,
-  nearestRevision,
-  projectTranscript,
   ROOT,
   type ThreadId,
-  treeRoot,
 } from "@pinetrie/core"
 import { DEFAULT_REPO, laneBase, startOfProposed } from "@pinetrie/jj"
 import { type Runner, run } from "@pinetrie/lanes"
@@ -35,6 +30,13 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
+import {
+  ancestry,
+  messageText,
+  nearestRevision,
+  projectTranscript,
+  treeRoot,
+} from "@pinetrie/threads"
 import { laneMachine, planStartSteps } from "../../host/start-checklist.ts"
 import { startStepWords } from "../../host/startup-lines.ts"
 import type { Checks } from "../checks.ts"

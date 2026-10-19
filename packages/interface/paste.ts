@@ -72,7 +72,7 @@ export function shareStatus(state: {
 }
 
 /** A shared file as its chip in a message reads. */
-export interface ShareChip {
+interface ShareChip {
   readonly name: string
   /** Its format and size: "PDF · 2.0 MB". */
   readonly meta: string

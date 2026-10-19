@@ -24,7 +24,7 @@ const UpdateDetailsSchema = Type.Object({
   by: WriterIdSchema,
 })
 
-export type UpdateDetails = Static<typeof UpdateDetailsSchema>
+type UpdateDetails = Static<typeof UpdateDetailsSchema>
 
 export const UPDATE = historyMessage("pinetrie.update", UpdateDetailsSchema)
 

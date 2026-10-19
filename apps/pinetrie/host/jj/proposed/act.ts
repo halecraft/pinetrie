@@ -8,7 +8,6 @@
 import {
   ERR,
   type ErrCode,
-  type ProposedChangesFact,
   type ProposedChangesSeen,
   type ThreadId,
   type WriterId,
@@ -21,6 +20,7 @@ import {
 } from "@pinetrie/jj"
 import { readThreadName } from "@pinetrie/reads"
 import { planProposedAct, shortId } from "@pinetrie/rules"
+import type { ProposedChangesFact } from "@pinetrie/threads"
 import type { Describe } from "../../describe.ts"
 import { describe } from "./describe.ts"
 import { executeProposedChanges } from "./execute.ts"

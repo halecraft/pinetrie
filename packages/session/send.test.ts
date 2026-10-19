@@ -1,16 +1,14 @@
 import {
   atEntry,
-  type CardRecord,
   canvasIdFor,
   entryId,
-  type MessageAt,
   ROOT,
   runId,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { type CardRecord, type MessageAt, textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { IN_COLUMN, pendingSend } from "./card-moves.ts"
 import { TEST_ROOT } from "./fixtures.ts"

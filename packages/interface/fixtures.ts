@@ -5,38 +5,46 @@
 
 import {
   type CanvasId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   type EntryId,
-  type EntryLike,
-  indexTree,
   rootIdFor,
   THE_AGENT,
-  type ThreadCard,
   type ThreadId,
-  type ThreadRecord,
-  type TreeIndex,
-  textCardId,
   threadIdFor,
-  treeRoot,
-  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
+import { DIGEST, encodeMessage, setRecord } from "@pinetrie/rules"
+import { applyRecordWrites, type RootDocHandle } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
+import {
+  type CardRecord,
+  cardIdOfKind,
+  type EntryLike,
+  indexTree,
+  type ThreadCard,
+  type ThreadRecord,
+  type TreeIndex,
+  textCardId,
+  treeRoot,
+  UNTICKED,
+} from "@pinetrie/threads"
 import {
   canvasCard,
   entriesById,
   entry,
   personMessage,
   withThreads,
-} from "@pinetrie/core/fixtures"
-import { DIGEST, encodeMessage, setRecord } from "@pinetrie/rules"
-import { applyRecordWrites, type RootDocHandle } from "@pinetrie/schema"
-import { writeEntry } from "@pinetrie/schema/fixtures"
+} from "@pinetrie/threads/fixtures"
 import type { ClipLookups } from "./effects.ts"
 import type { Focus } from "./focus.ts"
 
+export {
+  newLiveDoc,
+  newRootDoc,
+  newSessionDoc,
+  writeLaneTip,
+} from "@pinetrie/schema/fixtures"
 export {
   entriesById,
   entry,
@@ -47,13 +55,7 @@ export {
   toolResultMessage,
   transcriptMessage,
   withThreads,
-} from "@pinetrie/core/fixtures"
-export {
-  newLiveDoc,
-  newRootDoc,
-  newSessionDoc,
-  writeLaneTip,
-} from "@pinetrie/schema/fixtures"
+} from "@pinetrie/threads/fixtures"
 
 import { type Canvases, canvasesOnBoard } from "./canvases.ts"
 

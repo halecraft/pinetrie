@@ -29,7 +29,7 @@ its rules and its codec are here (`identity.ts`, `list-width.ts`,
 `codec.ts`, `same-data.ts`, `palette.ts`, `column-motion.ts`, `clip.ts`,
 `page.ts`, `image-edge.ts`' `imageSpot`, `drag.ts`' `planDrop`); what the
 browser decides from them is web-core's. `apps/tui`, a terminal client
-declaring only this package, the session and core, proves it
+declaring only this package, the session, core and threads, proves it
 (`apps/tui/TECHNICAL.md`).
 
 - **Words a person reads are here, and only here** (ADR-0199): a sentence
@@ -44,7 +44,7 @@ declaring only this package, the session and core, proves it
   typecheck` beside the root's config, which includes the DOM. A `window`,
   a `document`, `fetch` or a timer here fails; a mere mention of the
   `HTMLElement` type does not, since React's types declare it.
-  `workspace.test.ts` pins the dependencies (core, protocol, reads, rules,
+  `workspace.test.ts` pins the dependencies (core, threads, protocol, reads, rules,
   schema, session, shell and TypeBox), and only the page, web-core, the
   terminal client and the app may depend on this package. The host takes
   `callLabel` from here for a revision titled by its first call.
@@ -54,10 +54,12 @@ declaring only this package, the session and core, proves it
   `projection.ts` and `presence.ts` re-export the reads a client gathers
   beside `readSessionFacts`, each its own function so the page memoises
   each (S54, S59). `workspace.test.ts` pins the page's dependencies.
-- **`index.ts` exports by name only what another package imports**, as
-  `@pinetrie/rules`' does; a name only this package and its tests use is
-  imported from its module. `host-rules.ts` is the one `export *`: it only
-  re-exports by name, so its list is the one place those names are kept. The tests' fixtures are `fixtures.ts`, which the
+- **`index.ts` is written by `pnpm run indexes`** (`scripts/indexes.ts`,
+  ADR-0201), as `@pinetrie/rules`' is: by name, exactly what some file
+  imports through it; a name only this package and its tests use is
+  imported from its module. `host-rules.ts` re-exports by name the rules a
+  client draws by, so its list is the one place those names are kept, and
+  the index names them from it. The tests' fixtures are `fixtures.ts`, which the
   page's tests take as `@pinetrie/interface/fixtures`; production code never
   imports it.
 - **Where `session` ends.** `@pinetrie/session` is one client's connection,
@@ -77,7 +79,7 @@ declaring only this package, the session and core, proves it
   else is here. Core keeps what its own exports use: `projectRail`, since
   `summarizeRoots` counts a root's messages by its rows, `projectSpine`,
   `threadEnd` and the tree's reads. A capsule's span is the client's
-  (`compactRail`'s `spanOf`, the page's `stretchSpan`); a long ask is core's
+  (`compactRail`'s `spanOf`, the page's `stretchSpan`); a long ask is threads'
   (`LONG_ASK`), since the host digests it.
 - **The projections stay separate functions** (`projectColumns`, `pathIds`,
   `branchColors`, `unsentSignals`): the page memoises each on its own inputs. A
@@ -140,7 +142,7 @@ declaring only this package, the session and core, proves it
 `readTreeIndex(doc)` (`@pinetrie/reads`) builds `indexTree` once per change of
 the document's entries, and returns the same index until one changes. The
 columns, the rail and the agent's path all read that one index
-(`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
+(`packages/threads/tree.ts`). `App` reads it through `readSessionFacts`
 (`projection.ts`), together with the entry count, the agent's activity, the
 streams to draw (`liveWork`, `live.ts`, over the stream records alone), the
 participants, the archive and the work facts, so they are always from the
@@ -578,7 +580,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   base news) above its prompt, in its own thread, and no
   column or rail row draws them. Read a thread's shape (its fork, whether
   it started) from `firstOf`; read what a person sees first from
-  `threadFirstMessage` (core), as `threadGlance` and `canvasRail`'s stubs do.
+  `threadFirstMessage` (threads), as `threadGlance` and `canvasRail`'s stubs do.
 - **A thread not yet started in a thread someone else holds** is decided by
   `canvasColumns` from `holders` (`heldByOthers`): its `UnstartedMode.held`
   names that thread and who; `projectColumns` leaves the thread's entries
@@ -615,7 +617,7 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
 (`canvasColumns`).
 
 - **A column shows a thread** (ADR-0117): its anchor is its thread's end
-  (`threadAnchor`: `threadEnd`, core, or before its first entry its lane's
+  (`threadAnchor`: `threadEnd`, threads, or before its first entry its lane's
   tip): a reply below its last message moves it on, and a branch, which
   starts another thread however new, never does. Its lane is the one named
   by its thread's id (`threadLane`), so there is no binding to do, and no
@@ -757,7 +759,7 @@ pending.
 - **The inbox** (`inbox.ts`, pure): `inboxMentions` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one
-  (core's `Mention` is a mention parsed from text). What you have seen is
+  (threads' `Mention` is a mention parsed from text). What you have seen is
   `{ since, seen }`: every mention at or before `since`, and the ids above it
   in `seen`; entry ids are uuidv7 (S9), so id order is creation order and
   `since` is a watermark. Marking compacts: `since` moves past a run of seen mentions, so
@@ -912,7 +914,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   stretch never crosses its work's edge. Short exchanges merge as before,
   into a capsule when its span is fewer rows than its dots (`compactRail`'s
   `spanOf`, the page's `stretchSpan`: three messages or more). `LONG_ASK`
-  is core's and the host's, since a long ask is digested; the span is the
+  is threads' and the host's, since a long ask is digested; the span is the
   client's (ADR-0093).
   The stretch carries its ask (`RailStretch.ask`), and its tooltip is
   `stretchWords`: `askWords`, `workWords`, then the ask's digest as
@@ -956,7 +958,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 
 ## Asks, densities and folds (ADR-0106)
 
-An ask is a message that started a run, with that run (`indexAsks`, core,
+An ask is a message that started a run, with that run (`indexAsks`, threads,
 kept per index). `readSessionFacts` reads it with the index, so the rail and
 the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column folds;
 `columnRows` (`ask-view.ts`) groups each ask's segments (`pathRows` is the
@@ -974,7 +976,7 @@ two in one call, which the page's message list and `apps/tui` make, with
   while open: a closed fold creates none of their elements (S59).
 - **An ask is one row, even with a message steered into its run.** A
   base's news (ADR-0080) is written mid-run, and no run wrote it, so it is
-  in no `askOf`. `indexAsks` (core) records it in `steered`, and `entryAsk`
+  in no `askOf`. `indexAsks` (threads) records it in `steered`, and `entryAsk`
   reads both: `columnRows` draws it in the ask's row and `compactRail` in
   its capsule. Read apart, it split the ask in two, and outline drew its
   line and digest twice.
@@ -1065,7 +1067,7 @@ two in one call, which the page's message list and `apps/tui` make, with
 - **`columnProposals` finds what a column draws**: for each node on its
   path, the tool results under it that hold a proposal, by the prompt of
   the ask whose run made each, and where each stands (`proposalState`,
-  core). Running is read from the proposing lane, not the column's: a
+  threads). Running is read from the proposing lane, not the column's: a
   shared stretch is drawn in the leftmost column showing it. `Column`
   memoises it; `MessageList` draws each proposal after its ask's row, at
   every density, so no fold hides it.
@@ -1106,7 +1108,7 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   so the match, and what the snippet marks, is the whole word. Not `\b`:
   in JavaScript it knows only ASCII word characters, and would find "rail"
   in "éraile". `-` is not a word character, unlike in a handle
-  (`HANDLE_CHARS`, core), so "rail" finds "rail-view". The flags are `giu`.
+  (`HANDLE_CHARS`, threads), so "rail" finds "rail-view". The flags are `giu`.
 - **The query is composed (NFC), the text is not.** Composing the text would
   move the ranges a snippet cuts by; text typed in a browser is NFC already.
 - **Unlike the board's label search, on purpose.** The board keeps any label
@@ -1160,8 +1162,8 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   use it; a message's copy keeps `callLabel`, since pasting wants the
   command.
 - A call's intent is read for any tool, from its arguments (`callIntent`,
-  `packages/core/tools.ts`, beside `callSubject`, with `INTENT_FIELD`, the
-  argument's one name for core and pi); which tools require one is pi's
+  `packages/threads/tools.ts`, beside `callSubject`, with `INTENT_FIELD`, the
+  argument's one name for threads and pi); which tools require one is pi's
   (`TAKES_INTENT`, `packages/pi/intent.ts`).
 
 ## A message's tools (`message-tools.ts`, ADR-0043)
@@ -1737,8 +1739,8 @@ refusal or a failure as a rename's does.
   text a choice puts in place of the list's span, so the composer neither
   knows nor asks which kind it shows.
 - **Completion** (`mentions.ts`): while the caret is in a mention
-  (`typedMention`, core, which reads mentions as a send does), every handle
-  of core's `mentionTargets` that holds what is typed before the caret is
+  (`typedMention`, threads, which reads mentions as a send does), every handle
+  of threads' `mentionTargets` that holds what is typed before the caret is
   offered: the handles `address` resolves by, so the list offers each once,
   and none a send would ignore. Leading matches come first. You are left
   out by your display name's handle, the one `participants` lists you by.
@@ -2099,7 +2101,7 @@ reads one back, is web-core's (`clip-carrier.ts`,
 ## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0048)
 
 Your inventory is a grid (`CardGrid`, `packages/web/card-grid.tsx`):
-core's `grid.ts` says what a cell is (`INVENTORY_GRID`, 2 × 6, and
+threads' `grid.ts` says what a cell is (`INVENTORY_GRID`, 2 × 6, and
 `inventoryGrid`, which grows a row for every two cards held past its 12),
 the first empty one (`firstEmpty`, which aims at the 12 alone) and a step
 (`step`).
@@ -2178,7 +2180,7 @@ gone.
 
 - **The composer's candidates** are every open canvas's named threads (the
   app's `inReach`, `reachableAgents` in rules), each a member when
-  `threadMembers` of the column's path holds it (`agentCandidates`, core):
+  `threadMembers` of the column's path holds it (`agentCandidates`, threads):
   the host builds them the same way, so the send button and the host agree.
 - **`recipientWords`** puts the agents a send invites first ("invite
   amber-fox · send to agent") and names those it asks as people are named.

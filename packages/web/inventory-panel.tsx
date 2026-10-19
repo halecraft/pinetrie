@@ -9,16 +9,7 @@
 // shown, the selection and the bench are `InventoryState`; every click and
 // drop here is an intent, planned like any other.
 
-import {
-  type CardRecord,
-  isTextCard,
-  type MediaId,
-  type NoteColumnId,
-  type ThreadId,
-  type ThreadName,
-  type TitledCardId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { ThreadId, ThreadName, WriterId } from "@pinetrie/core"
 import {
   type CardTitleRecord,
   CLOSE_INVENTORY,
@@ -49,6 +40,13 @@ import {
   type SessionClient,
   type Slots,
 } from "@pinetrie/session"
+import {
+  type CardRecord,
+  isTextCard,
+  type MediaId,
+  type NoteColumnId,
+  type TitledCardId,
+} from "@pinetrie/threads"
 import { type Dock, snappedDock } from "@pinetrie/web-core"
 import {
   type CSSProperties,

@@ -1,5 +1,5 @@
-import type { ProposedChangesAction } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import type { ProposedChangesAction } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { type Acting, type ActingEvent, nextActing } from "./acting.ts"
 

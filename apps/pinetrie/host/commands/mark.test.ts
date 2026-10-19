@@ -1,5 +1,6 @@
-import { cardIdOfKind, ERR, threadIdFor, writerId } from "@pinetrie/core"
+import { ERR, threadIdFor, writerId } from "@pinetrie/core"
 import { CARD_TITLE, deleteRecord, MARK, setRecord } from "@pinetrie/rules"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import {
   basics,

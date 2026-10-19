@@ -1,18 +1,20 @@
 import {
-  cardIdOfKind,
   entryId,
-  entryMargin,
-  imageMargin,
-  type PlaceKey,
   rootIdFor,
   type ThreadName,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { CardEvent } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
+import {
+  cardIdOfKind,
+  entryMargin,
+  imageMargin,
+  type PlaceKey,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   commandNote,

@@ -3,8 +3,8 @@
 // box can write into it.
 
 import { type Exchange, sync } from "@kyneta/exchange"
-import type { CardId, TextCardId } from "@pinetrie/core"
 import { cardDocId, TextDoc, type TextDocHandle } from "@pinetrie/schema"
+import type { CardId, TextCardId } from "@pinetrie/threads"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 
 interface CardTexts {

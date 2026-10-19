@@ -5,14 +5,12 @@
 
 import type {
   AcceptanceDecision,
-  Away,
   ConflictChoice,
   LatestFrom,
-  ProposedChangesFact,
-  QueuedFact,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
+import type { Away, ProposedChangesFact, QueuedFact } from "@pinetrie/threads"
 import { Type } from "typebox"
 import {
   CanvasIdSchema,

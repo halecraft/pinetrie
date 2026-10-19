@@ -3,7 +3,7 @@
 // Each ask's work is drawn together, folded or open (`AskWork`), and after it
 // each proposal its run made (`ProposalCard`), outside the fold.
 
-import { ancestry, type EntryId, transcriptCalls } from "@pinetrie/core"
+import type { EntryId } from "@pinetrie/core"
 import {
   askView,
   callStreams,
@@ -15,6 +15,7 @@ import {
   promptParent,
   rowHolds,
 } from "@pinetrie/interface"
+import { ancestry, transcriptCalls } from "@pinetrie/threads"
 import { Fragment, memo, useEffect } from "react"
 import { AskWork } from "./ask-work.tsx"
 import { markCommit } from "./commit-marks.ts"

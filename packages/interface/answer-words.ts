@@ -4,7 +4,6 @@
 // button's title among them). Words the agent reads are rules'.
 
 import {
-  type AcceptedAction,
   ERR,
   type ErrCode,
   type JjAcceptedRecord,
@@ -25,6 +24,7 @@ import {
   type OpenPlan,
   type ThreadHolding,
 } from "@pinetrie/rules"
+import type { AcceptedAction } from "@pinetrie/threads"
 
 /** Why a command in a thread in an inventory is refused. */
 export const HELD_WORDS = "put it on a canvas first"
@@ -33,7 +33,7 @@ export const HELD_WORDS = "put it on a canvas first"
 export const TRASHED_WORDS = "restore it first"
 
 /** Why a command in a thread held or trashed is refused, as the host says it. */
-export const holdingWords = (
+const holdingWords = (
   holding: Exclude<ThreadHolding, { readonly kind: "free" }>,
 ): string => (holding.kind === "held" ? HELD_WORDS : TRASHED_WORDS)
 

@@ -1,16 +1,9 @@
-import {
-  type CardRecord,
-  cardIdOfKind,
-  entryId,
-  runId,
-  threadIdFor,
-  UNTICKED,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import { decodeCanvasFact } from "@pinetrie/rules"
 import { beginRun } from "@pinetrie/schema/fixtures"
+import { type CardRecord, cardIdOfKind, UNTICKED } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { createCanvasNews } from "./canvas-news.ts"
 import { basics, CANVAS_ID, putCanvas, putLane, record } from "./fakes.ts"

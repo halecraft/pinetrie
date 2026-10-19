@@ -1,21 +1,23 @@
 import {
+  canvasIdFor,
+  entryId,
+  rootIdFor,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
+import {
   type AgentMessageLike,
   type CardRecord,
-  canvasIdFor,
   cardIdOfKind,
   type EntryLike,
-  entryId,
   indexTree,
   makeCard,
   type PlaceOf,
   type Reach,
   type RelayDetails,
-  rootIdFor,
   type ThreadLane,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
 import { DIGEST_EVERY } from "./digest.ts"

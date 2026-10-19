@@ -15,6 +15,7 @@
     "@pinetrie/protocol": "workspace:*",
     "@pinetrie/reads": "workspace:*",
     "@pinetrie/rules": "workspace:*",
-    "@pinetrie/schema": "workspace:*"
+    "@pinetrie/schema": "workspace:*",
+    "@pinetrie/threads": "workspace:*"
   }
 }

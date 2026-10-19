@@ -1,5 +1,4 @@
 import {
-  type BehindView,
   commitId,
   type JjAcceptedRecord,
   type JjBaseRecord,
@@ -8,6 +7,7 @@ import {
   pointId,
   threadIdFor,
 } from "@pinetrie/core"
+import type { BehindView } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   behindContent,

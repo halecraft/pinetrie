@@ -1,31 +1,20 @@
 import {
   type CanvasId,
-  type CardCommand,
-  type CardId,
   canvasIdFor,
-  cardIdOfKind,
   ERR,
   entryId,
   historyScope,
-  isTextCard,
-  type MoveDirection,
   PERSON_HISTORY,
-  type QueueHoldChange,
-  type QueueMove,
-  type Reorder,
   rootIdFor,
   runId,
   type Sha256,
   storedText,
-  type TextCard,
   type ThreadId,
-  TRASH_PLACE,
   threadIdFor,
   type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   readCanvases,
@@ -57,6 +46,19 @@ import {
   writeEntry,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
+import {
+  type CardCommand,
+  type CardId,
+  cardIdOfKind,
+  isTextCard,
+  type MoveDirection,
+  type QueueHoldChange,
+  type QueueMove,
+  type Reorder,
+  type TextCard,
+  TRASH_PLACE,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { memoryBlobs } from "../blobs.ts"
 import { canvasesNow } from "../canvases.ts"

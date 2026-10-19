@@ -9,11 +9,11 @@ import {
   type BlobStore,
   blobOfUrl,
   isSha256,
-  PUT_IMAGE_TOOL,
   type Sha256,
   type ThreadId,
 } from "@pinetrie/core"
 import type { PutImageAsk, ToolAnswer } from "@pinetrie/rules"
+import { PUT_IMAGE_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { prepareImage } from "./images.ts"
 import type { ToolContext } from "./lanes.ts"

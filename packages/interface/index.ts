@@ -1,6 +1,9 @@
 // @pinetrie/interface — what a person sees and can do, decided, for any
-// client. It exports by name only what another package imports;
-// a name only this package and its tests use is imported from its module.
+// client. A name only this package and its tests use is imported from its
+// module.
+//
+// Written by `pnpm run indexes`: each name some file imports through it, from
+// the module that declares it, and nothing else.
 
 export { type AccessView, accessWords } from "./access-view.ts"
 export {
@@ -10,7 +13,7 @@ export {
   inventoryWords,
 } from "./account-view.ts"
 export { addressWords, EDIT_AS_TEXT } from "./address-words.ts"
-export { type AgentsRow, agentsRow, agentsWords } from "./agents-view.ts"
+export { agentsRow, agentsWords } from "./agents-view.ts"
 export {
   acceptedRefusal,
   branchOutRefusal,
@@ -24,11 +27,9 @@ export {
 } from "./answer-words.ts"
 export {
   appView,
-  type CanvasRail,
   canvasRail,
   canvasWork,
   laneRootEntries,
-  NO_RAIL,
   type OpenProposedChanges,
   type RailStub,
   type ReadOnly,
@@ -38,15 +39,11 @@ export {
   threadWork,
 } from "./app-view.ts"
 export {
-  type AskDraw,
   type AskRow,
   type AskSummary,
-  type FoldFacts,
   type FoldMemory,
-  type FoldRow,
   foldMemory,
   planAskWork,
-  type SummaryAnchor,
   toggled,
 } from "./ask-fold.ts"
 export type { Segment } from "./ask-segments.ts"
@@ -79,9 +76,6 @@ export {
   type Moments,
   markLevel,
   moving,
-  needsYou,
-  type RunEndLevel,
-  STRIP_LEVEL,
   type StandingRunEnd,
   type Status,
   standingRunEnds,
@@ -92,9 +86,6 @@ export {
 export {
   addStateIntent,
   BOARD_MOVE_LABEL,
-  type BoardKey,
-  type BoardSearch,
-  type BoardShown,
   type BoardSide,
   type BoardView,
   boardKeyAct,
@@ -121,59 +112,38 @@ export {
   CANVAS_PINS_EMPTY,
   CANVAS_PINS_HEADING,
   type CanvasColumnView,
-  type CanvasTrash,
   canvasColumnView,
   canvasTrash,
   FOLD_CANVAS,
-  type PlaceOnBoard,
   pinnedCountWords,
   RENAME_CANVAS_TITLE,
   RESTORE_WORDS,
-  type TrashRow,
   trashHeading,
   trashKeepWords,
   trashWords,
   UNFOLD_CANVAS,
 } from "./canvas-column-view.ts"
 export {
-  type CanvasColumn,
   type CardColumn,
-  type CardView,
-  defaultView,
-  firstUnticked,
   heldByOthers,
   openColumns,
   type Strip,
   stripCards,
-  type YourCanvasView,
 } from "./canvas-columns.ts"
-export {
-  type Canvases,
-  type CanvasThreads,
-  canvasesOnBoard,
-} from "./canvases.ts"
+export { canvasesOnBoard } from "./canvases.ts"
 export {
   type CardFrameFacts,
   type CardFrameView,
-  type CardTone,
   cardFrame,
   cardFrameWords,
   moveKey,
   moveWords,
-  type QueueOn,
 } from "./card-frame.ts"
-export {
-  clipFacts,
-  type Landing,
-  type PutHow,
-  type PutSource,
-  putLanding,
-} from "./card-intents.ts"
+export { clipFacts, type PutHow } from "./card-intents.ts"
 export { cardKeyAct, newCardKeys } from "./card-keys.ts"
 export {
   type EditorEvent,
   type EditorState,
-  type EditorStep,
   editorState,
   free,
   shownBy,
@@ -183,7 +153,6 @@ export {
   CLEAR_COMMAND,
   CLOSE_CARD,
   CLOSE_INVENTORY,
-  type ControlWords,
   canvasMarkerWords,
   canvasPinnedMarkerWords,
   HISTORY_TITLE,
@@ -195,7 +164,6 @@ export {
   movedBackWords,
   NEW_PIN,
   NEW_PIN_TITLE,
-  type NewCardBoxView,
   newCardBox,
   noticeKey,
   noticeWords,
@@ -220,18 +188,13 @@ export {
   clipOfJson,
   clipText,
 } from "./clip.ts"
-export {
-  type ClipboardCellView,
-  type ClipSummary,
-  clipboardCellView,
-} from "./clipboard-cell.ts"
+export { type ClipboardCellView, clipboardCellView } from "./clipboard-cell.ts"
 export type { Codec } from "./codec.ts"
 export {
   COLUMN_MENU_LABEL,
   type ColumnHead,
   type ColumnMenuSection,
   columnHead,
-  type HeadBox,
 } from "./column-menu.ts"
 export type { ColumnMotion } from "./column-motion.ts"
 export {
@@ -242,7 +205,7 @@ export {
   threadTrack,
   trackIndex,
 } from "./column-paths.ts"
-export { type ColumnStatus, columnStatus } from "./column-status.ts"
+export type { ColumnStatus } from "./column-status.ts"
 export {
   AGENT_MARK,
   columnView,
@@ -272,48 +235,31 @@ export {
   workingWords,
 } from "./column-view.ts"
 export {
-  BOUND,
-  type CardKey,
   type Column,
   type ColumnKey,
-  type ColumnMode,
   isNextSendBranch,
-  keyText,
   type Pending,
   type Prefill,
   threadAnchor,
-  type UnstartedMode,
   unstartedMode,
 } from "./columns.ts"
-export { matchCommands } from "./commands.ts"
 export {
   type Compact,
-  type CompactBadge,
-  type CompactFacts,
-  type CompactMark,
-  type CompactText,
-  cardCompact,
   compactWords,
-  DETAIL_ON,
   type Detail,
   type DrawnCard,
   type DrawnKind,
   KIND_ICON,
 } from "./compact.ts"
-export {
-  type Completion,
-  type CompletionOption,
-  completion,
-} from "./completion.ts"
+export { type CompletionOption, completion } from "./completion.ts"
 export {
   type ConflictShown,
-  conflictChoiceWords,
   conflictsView,
   conflictsWords,
 } from "./conflicts-view.ts"
 export { COPY_MESSAGE, copyText } from "./copy-text.ts"
 export { countWords, type ListKind } from "./count-words.ts"
-export { byteWords, plural, whenWords } from "./counts.ts"
+export { plural } from "./counts.ts"
 export {
   type CanvasOver,
   type CanvasSource,
@@ -336,20 +282,11 @@ export {
   foldedMark,
   foldedView,
   foldedWords,
-  foldToggle,
   glanceCardId,
-  type ListGlance,
-  mediaColumnGlance,
   NO_MARK,
-  noteColumnGlance,
-  UNNAMED_THREAD,
 } from "./folded-column-view.ts"
-export { jjWordsIn, wordsIn } from "./folder-words.ts"
-export {
-  columnForeign,
-  columnReadOnly,
-  foreignWords,
-} from "./foreign-column.ts"
+export { jjWordsIn } from "./folder-words.ts"
+export { columnForeign, columnReadOnly } from "./foreign-column.ts"
 export { gridKeyAct } from "./grid-keys.ts"
 export type { GridView } from "./grid-view.ts"
 export {
@@ -370,11 +307,61 @@ export {
   type HistoryEntry,
   type HistoryView,
   historyView,
-  madeWords,
   restoreStatus,
   restoreWords,
 } from "./history-view.ts"
-export * from "./host-rules.ts"
+export {
+  type AcceptedRecord,
+  BLOCK_PROPERTY,
+  type BlockNode,
+  blankQueued,
+  blockKey,
+  CANVAS_BUSY_REASON,
+  type CardHistoryRecord,
+  type CardOnCanvas,
+  type CardTitleRecord,
+  type CommandSummary,
+  canvasLines,
+  canvasList,
+  canvasPinnedCards,
+  columnGlances,
+  type DigestRecord,
+  decodeRevisionReview,
+  diffUrl,
+  displayName,
+  effectiveBase,
+  entryMarginCounts,
+  type MarginCard,
+  marginCards,
+  marginCounts,
+  markBlocks,
+  movedBackBy,
+  pinnedCardsAtEnd,
+  type QueuedCard,
+  type QueuedText,
+  queuedOn,
+  type RootRecord,
+  type RunEndReportRecord,
+  reachableAgents,
+  readableThreadName,
+  reviewUrl,
+  type SeatRecord,
+  shareMarkdown,
+  TRASH_KEEP_MS,
+  type TraceRecord,
+  taskBoard,
+  tasksInArchive,
+  textBlocks,
+  threadReach,
+  traceEnd,
+  UNTITLED_IMAGE,
+  unstartedThreads,
+  type WorkflowState,
+  type WorkStripButton,
+  type WorkStripState,
+  writersOfClients,
+  yourCard,
+} from "./host-rules.ts"
 export {
   type Identity,
   identityCodec,
@@ -386,10 +373,7 @@ export {
   reconcileName,
   renameProblem,
 } from "./identity.ts"
-export {
-  type ImageEdge,
-  imageSpot,
-} from "./image-edge.ts"
+export { type ImageEdge, imageSpot } from "./image-edge.ts"
 export {
   type Inbox,
   type InboxItem,
@@ -415,19 +399,15 @@ export {
   planIntent,
 } from "./intent.ts"
 export {
-  cardFlight,
   type Flight,
   INVENTORY_CLOSED,
   type InventoryAct,
-  type InventoryShown,
   type InventoryState,
   inventoryReducer,
   isInventoryShown,
   PEEK_MS,
-  type ShowHow,
 } from "./inventory-state.ts"
 export {
-  type Bench,
   emptyBenchWords,
   inventoryCountWords,
   inventoryView,
@@ -435,7 +415,6 @@ export {
 export {
   canvasStrip,
   decodeLayout,
-  drawnColumns,
   encodeLayout,
   initialLayout,
   type Layout,
@@ -451,10 +430,7 @@ export {
   listWidthCodec,
   shownWidth,
 } from "./list-width.ts"
-export {
-  callStreams,
-  type LiveWork,
-} from "./live.ts"
+export { callStreams, type LiveWork } from "./live.ts"
 export {
   addCommentWords,
   COMMENT,
@@ -462,7 +438,6 @@ export {
   marginCountWords,
   shutMarginWords,
 } from "./margin.ts"
-export { addressMarkdown } from "./markdown-of.ts"
 export {
   commentVersionWords,
   type ImageView,
@@ -476,9 +451,7 @@ export {
 export {
   type MessageAct,
   type MessageTools,
-  messageReference,
   messageTools,
-  selectionReference,
   showsText,
 } from "./message-tools.ts"
 export { speakerWords } from "./names.ts"
@@ -500,13 +473,7 @@ export {
   type NoteColumnView,
 } from "./note-column-view.ts"
 export { actingSaid } from "./outcome-words.ts"
-export {
-  BACK,
-  isPage,
-  type PageName,
-  pageWords,
-  profileWords,
-} from "./page.ts"
+export { BACK, isPage, type PageName, pageWords, profileWords } from "./page.ts"
 export { keyAct } from "./page-keys.ts"
 export {
   type ColorSlot,
@@ -521,16 +488,12 @@ export {
   pastedFiles,
   type Selection,
   SHARE_FILE,
-  type ShareChip,
   shareChip,
   shareSelection,
   shareStatus,
   UPLOADING,
 } from "./paste.ts"
-export {
-  type AppPorts,
-  perform,
-} from "./perform.ts"
+export { type AppPorts, perform } from "./perform.ts"
 export {
   othersReading,
   othersWithValue,
@@ -540,11 +503,7 @@ export {
   readTypingIn,
   seenBy,
 } from "./presence.ts"
-export {
-  planReading,
-  type TypedLast,
-  typingDue,
-} from "./presence-report.ts"
+export { planReading, type TypedLast, typingDue } from "./presence-report.ts"
 export {
   type HeldView,
   participantsIn,
@@ -562,7 +521,6 @@ export {
   type ProposalButton,
   type ProposalFacts,
   type ProposalMemory,
-  type ProposalPress,
   proposalView,
 } from "./proposal-view.ts"
 export {
@@ -581,11 +539,7 @@ export {
   targetOfElement,
   targetOfFocus,
 } from "./put-target.ts"
-export {
-  compactRail,
-  type RailItem,
-  type RailStretch,
-} from "./rail.ts"
+export { compactRail, type RailItem, type RailStretch } from "./rail.ts"
 export {
   capsulePick,
   columnLandmarks,
@@ -600,12 +554,7 @@ export {
   stretchWords,
   type Tick,
 } from "./rail-view.ts"
-export {
-  cardBeforeGap,
-  keyMove,
-  landing,
-  pointerGap,
-} from "./reorder.ts"
+export { cardBeforeGap, pointerGap } from "./reorder.ts"
 export {
   DIFF_LINES_SHOWN,
   diffLines,
@@ -634,7 +583,6 @@ export {
 export {
   landingIn,
   placeAfter,
-  planRootDrop,
   ROOT_DROP_ZONE,
   ROOT_GROUP_ZONE,
   type RootDrag,
@@ -646,10 +594,8 @@ export {
 export { sameData } from "./same-data.ts"
 export {
   parseQuery,
-  type SearchAct,
   type SearchResult,
   type SearchState,
-  type SnippetPart,
   searchCorpus,
   searchOn,
   searchReducer,
@@ -658,7 +604,6 @@ export {
 export {
   type ColumnMatches,
   columnMatches,
-  type MatchRow,
   matchCountWords,
   SEARCH_CLEAR,
   SEARCH_CLOSE_TITLE,
@@ -674,7 +619,6 @@ export {
   type ColumnHow,
   type ComposerMode,
   forkWords,
-  NO_MODEL_LABEL,
   noModelLine,
   placeholderWords,
   planSend,
@@ -690,9 +634,7 @@ export {
 } from "./send.ts"
 export { type SetupView, setupView } from "./setup-view.ts"
 export {
-  credentialWords,
   fileStateWords,
-  layerWords,
   noModelWords,
   originWords,
   refusalWords,
@@ -718,7 +660,6 @@ export {
   holdsText,
   NO_STATUS_WORDS,
   ownCards,
-  reasonedWords,
   type Signal,
   signalWords,
   statusSignal,
@@ -727,45 +668,23 @@ export {
   unsentSignals,
   withFilled,
 } from "./signals.ts"
-export {
-  type CanvasStart,
-  type NewColumn,
-  newCanvasButton,
-  newColumnButton,
-  type StartButton,
-  type StartItem,
-} from "./start-button.ts"
+export { newColumnButton, type StartButton } from "./start-button.ts"
 export {
   moveTitle,
   type ThreadCardHead,
-  type ThreadMove,
   threadCardHeads,
 } from "./thread-card.ts"
 export {
-  bareThreadGlance,
   focusTitle,
-  glanceStatus,
-  type PreviewRow,
-  type ThreadFocus,
   type ThreadGlance,
   type ThreadPreview,
-  threadFocus,
   threadGlance,
-  threadOpening,
   threadPreview,
 } from "./thread-glance.ts"
-export {
-  builtInIconUrl,
-  type IconLookup,
-  type ThreadIcon,
-  threadIcon,
-} from "./thread-icon.ts"
+export { builtInIconUrl, type ThreadIcon, threadIcon } from "./thread-icon.ts"
 export {
   type CrossCanvasLink,
   crossCanvasLinks,
-  heldWords,
-  type LinkOpen,
-  linkOpen,
   linkWords,
   opens,
   type ThreadLink,
@@ -776,11 +695,7 @@ export {
   callStatus,
   NO_MEMORY,
   REVEAL_MS,
-  type RowBody,
-  type RowLead,
   type RowMemory,
-  type RowSummary,
-  type RowView,
   type Run,
   rowLead,
   rowSummary,
@@ -789,9 +704,4 @@ export {
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, callPurpose, toolWord } from "./tool-words.ts"
-export {
-  endTraces,
-  keptTraces,
-  seenBatches,
-  traceGroups,
-} from "./traces.ts"
+export { endTraces, keptTraces, seenBatches, traceGroups } from "./traces.ts"

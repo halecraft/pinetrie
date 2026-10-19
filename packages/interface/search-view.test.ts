@@ -1,12 +1,10 @@
+import { type EntryId, entryId, writerId } from "@pinetrie/core"
 import {
   type AgentMessageLike,
-  type EntryId,
-  entryId,
   indexAsks,
   projectRail,
   projectSpine,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { entry, indexEntries, personMessage } from "./fixtures.ts"
 import { parseQuery, searchCorpus, searchTexts } from "./search.ts"

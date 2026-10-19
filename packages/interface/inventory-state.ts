@@ -4,7 +4,7 @@
 // a key, a click, a take's landing or an undo, is an `InventoryAct`, and what
 // follows is a value the page draws.
 
-import type { MoveTarget } from "@pinetrie/core"
+import type { MoveTarget } from "@pinetrie/threads"
 
 /**
  * Whether the panel is shown, and who opened it, which says who closes it:
@@ -12,14 +12,14 @@ import type { MoveTarget } from "@pinetrie/core"
  * (`peek`) by its own end; a refusal (`refusal`) by the person acting
  * elsewhere, once they have read it.
  */
-export type InventoryShown =
+type InventoryShown =
   | { readonly kind: "closed" }
   | { readonly kind: "peek"; readonly id: number }
   | { readonly kind: "held" }
   | { readonly kind: "refusal" }
 
 /** How a plan asks for the panel: held open, a peek, or for a refusal. */
-export type ShowHow = "held" | "peek" | "refusal"
+type ShowHow = "held" | "peek" | "refusal"
 
 export interface InventoryState {
   readonly shown: InventoryShown

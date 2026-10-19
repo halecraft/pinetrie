@@ -2,7 +2,7 @@
 // inventory's, and a column's messages as a grid one cell wide. One table,
 // from a key and the grid's state to an act or nothing.
 
-import { type Grid, type GridStep, step } from "@pinetrie/core"
+import { type Grid, type GridStep, step } from "@pinetrie/threads"
 import type { KeyLike } from "./page-keys.ts"
 
 type GridAct =

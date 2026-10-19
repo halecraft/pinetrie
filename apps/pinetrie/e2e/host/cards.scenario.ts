@@ -4,19 +4,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { whenSettled } from "@kyneta/exchange"
-import {
-  BACK,
-  type CardId,
-  type EntryId,
-  entryId,
-  entryThread,
-  INVENTORY_SLOTS,
-  messageWriter,
-  ROOT,
-  type TextCardId,
-  type ThreadId,
-  TRASH_PLACE,
-} from "@pinetrie/core"
+import { type EntryId, entryId, ROOT, type ThreadId } from "@pinetrie/core"
 import { HELD_WORDS } from "@pinetrie/interface"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -35,6 +23,15 @@ import { cardsOnCanvas, yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
 import { LAST_ORDER, type SessionClient } from "@pinetrie/session"
 import { newCardId, newRootId, newThreadId } from "@pinetrie/session/connect"
+import {
+  BACK,
+  type CardId,
+  entryThread,
+  INVENTORY_SLOTS,
+  messageWriter,
+  type TextCardId,
+  TRASH_PLACE,
+} from "@pinetrie/threads"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {

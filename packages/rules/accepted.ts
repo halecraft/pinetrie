@@ -2,7 +2,6 @@
 // and what a publish does. A thread's base on accepted work is `base.ts`'s.
 
 import {
-  type AcceptedAction,
   type AcceptedFacts,
   type AcceptedWorkDecision,
   commitId,
@@ -13,6 +12,7 @@ import {
   type PublishDecision,
   type PublishFinish,
 } from "@pinetrie/core"
+import type { AcceptedAction } from "@pinetrie/threads"
 import { Type } from "typebox"
 import {
   CommitSchema,

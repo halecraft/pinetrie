@@ -54,6 +54,7 @@ export const mutations: readonly Mutation[] = [
     from: '    "@pinetrie/interface": "workspace:*",\n',
     to: '    "@pinetrie/interface": "workspace:*",\n    "@pinetrie/rules": "workspace:*",\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
-    expect: "the terminal client declares only interface, session and core",
+    expect:
+      "the terminal client declares only interface, session, core and threads",
   },
 ]

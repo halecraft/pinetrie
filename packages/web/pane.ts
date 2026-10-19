@@ -3,19 +3,21 @@
 // it.
 
 import {
+  blobUrl,
+  type EntryId,
+  type RevisionRecord,
+  type Sha256,
+  type ThreadId,
+} from "@pinetrie/core"
+import type { ConflictShown, ReviewTarget } from "@pinetrie/interface"
+import {
   type Address,
   type AskIndex,
   askSpan,
-  blobUrl,
-  type EntryId,
   printAddress,
-  type RevisionRecord,
-  type Sha256,
   type SpineNode,
-  type ThreadId,
   type TreeIndex,
-} from "@pinetrie/core"
-import type { ConflictShown, ReviewTarget } from "@pinetrie/interface"
+} from "@pinetrie/threads"
 import type { Element, Root } from "hast"
 import {
   blobLookup,

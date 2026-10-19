@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@pinetrie/core": "workspace:*",
-    "@pinetrie/interface": "workspace:*"
+    "@pinetrie/interface": "workspace:*",
+    "@pinetrie/threads": "workspace:*"
   }
 }

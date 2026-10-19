@@ -5,19 +5,26 @@
 // Each takes the tree and reads its own asks and ends; the shell reads,
 // carries the plan out, and words what the plan decided.
 
+import type {
+  CanvasId,
+  EntryId,
+  ForeignLane,
+  RootId,
+  ThreadId,
+  ThreadName,
+  ValueWrite,
+  WriterId,
+} from "@pinetrie/core"
 import {
   type AskCardId,
   type Away,
   askOutcome,
-  type CanvasId,
   type CardId,
   type CardRecord,
   canvasInView,
   canvasPinnedInView,
   cardTextSource,
-  type EntryId,
   entryMessage,
-  type ForeignLane,
   indexAsks,
   isRoundAnswered,
   lastIncomingEntry,
@@ -28,18 +35,13 @@ import {
   type QueuedFact,
   type Reach,
   type RelayDetails,
-  type RootId,
   runPrompt,
   type TextCardId,
-  type ThreadId,
   type ThreadLane,
-  type ThreadName,
   type TitledCardId,
   type TreeIndex,
   threadMembers,
-  type ValueWrite,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { canvasList, columnGlances, planCanvasRead } from "./canvas.ts"
 import type { CanvasIndex, CardOnCanvas } from "./canvas-index.ts"
 import { planCanvasPinnedRead } from "./canvas-pinned.ts"
@@ -89,14 +91,14 @@ import { endedOutcome } from "./stop.ts"
 // ── a relay into another thread ──────────────────────────────────
 
 /** A thread as a relay reads it: its tree, where its path ends, and its lane. */
-export interface RelayThread {
+interface RelayThread {
   readonly index: TreeIndex
   readonly end: EntryId | null
   readonly lane: ThreadLane
 }
 
 /** What a relay does: refused, run on the asked thread's lane, or queued there. */
-export type RelayDelivery<R> =
+type RelayDelivery<R> =
   | { readonly kind: "refused"; readonly why: RelayRefusal }
   | {
       readonly kind: "run"
@@ -308,7 +310,7 @@ export function planHeldAnswer(input: {
 }
 
 /** A round to ask about: its members by name, and the asking thread's lines. */
-export interface RoundAsk {
+interface RoundAsk {
   readonly members: ReadonlyMap<string, ThreadId>
   readonly lines: readonly string[]
 }
@@ -616,7 +618,7 @@ export function planPinnedContext(input: {
 // ── a queued card popped ─────────────────────────────────────────
 
 /** A queued text card's text as the host holds it, and whether it is its queuer's version. */
-export interface QueuedTextNow {
+interface QueuedTextNow {
   readonly text: string
   readonly current: boolean
 }

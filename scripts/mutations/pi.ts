@@ -590,7 +590,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "ask_about_conflict is in a lane's tools only sometimes",
-    file: "packages/core/tools.ts",
+    file: "packages/threads/tools.ts",
     from: "  CONFLICT_TOOL,\n",
     to: "",
     command: unit,

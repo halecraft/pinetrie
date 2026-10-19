@@ -5,14 +5,9 @@
 // in your inventory, whose slot and preview read it. Every other root is
 // read from the directory alone, the board's included.
 
-import type {
-  CardRecord,
-  EntryId,
-  RootId,
-  ThreadId,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, RootId, ThreadId, WriterId } from "@pinetrie/core"
 import type { RootRecord } from "@pinetrie/rules"
+import type { CardRecord } from "@pinetrie/threads"
 import type { Canvases } from "./canvases.ts"
 import type { Layout } from "./layout.ts"
 

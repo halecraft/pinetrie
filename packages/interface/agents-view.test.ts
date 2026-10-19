@@ -1,10 +1,5 @@
-import {
-  entryId,
-  type Reach,
-  type ThreadName,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, type ThreadName, threadIdFor, writerId } from "@pinetrie/core"
+import type { Reach } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { agentsRow, agentsWords } from "./agents-view.ts"
 

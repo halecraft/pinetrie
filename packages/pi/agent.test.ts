@@ -10,7 +10,6 @@ import {
   atEntry,
   ERR,
   entryId,
-  NOBODY,
   type Position,
   pointId,
   ROOT,
@@ -21,7 +20,6 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   BEHIND_TYPE,
   encodeBehind,
@@ -52,6 +50,8 @@ import {
   newScratchDoc,
   newSessionDoc,
 } from "@pinetrie/schema/fixtures"
+import { NOBODY } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CreateAgentOptions, newId } from "./agent.ts"
 import { NO_RESOURCES } from "./config.ts"

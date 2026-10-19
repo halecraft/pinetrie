@@ -240,7 +240,7 @@ export const mutations: readonly Mutation[] = [
     from: '    "@pinetrie/core": "workspace:*",\n',
     to: '    "@pinetrie/core": "workspace:*",\n    "react": "19.2.9",\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
-    expect: "web-core declares only core and interface",
+    expect: "web-core declares only core, threads and interface",
   },
   {
     name: "the strip scrolls left near its right edge",

@@ -1,16 +1,14 @@
 // pinned — the pinned cards a run reads.
 
+import { firstLine, type ThreadId, type WriterId } from "@pinetrie/core"
 import {
   type CardId,
   type CardRecord,
   cardTextSource,
-  firstLine,
   type PinnedCardRead,
   type PinnedView,
   type TextCardId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { sourceWords } from "./card-words.ts"
 import { CardIdSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"

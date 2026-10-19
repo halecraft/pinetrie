@@ -1,13 +1,4 @@
-import {
-  cardIdOfKind,
-  entryId,
-  type TextCard,
-  textCardId,
-  threadIdFor,
-  UNTICKED,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { entryId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   CANVAS_CAP,
   decodeCanvas,
@@ -16,6 +7,13 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
+import {
+  cardIdOfKind,
+  type TextCard,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { createCanvasContext } from "./canvas.ts"
 import type { CardPort } from "./cards.ts"

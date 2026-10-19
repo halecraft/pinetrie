@@ -12,21 +12,7 @@
 //
 // Pure reads: no subscription, no pi.
 
-import {
-  type AgentRun,
-  type AskIndex,
-  type CanvasId,
-  type CardId,
-  type CardRecord,
-  type EntryId,
-  indexAsks,
-  type LaneView,
-  type RootId,
-  type ThreadId,
-  type ThreadRecord,
-  type TitledCardId,
-  type TreeIndex,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId, RootId, ThreadId } from "@pinetrie/core"
 import {
   readAccepted,
   readAccess,
@@ -78,6 +64,17 @@ import {
   readStreamRecords,
   type SessionDocHandle,
 } from "@pinetrie/schema"
+import {
+  type AgentRun,
+  type AskIndex,
+  type CardId,
+  type CardRecord,
+  indexAsks,
+  type LaneView,
+  type ThreadRecord,
+  type TitledCardId,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import type { WorkFacts } from "./column-view.ts"
 import { type LiveWork, liveWork } from "./live.ts"
 import { sameData } from "./same-data.ts"

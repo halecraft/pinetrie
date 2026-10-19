@@ -14,8 +14,8 @@ import {
   type ThreadId,
 } from "./ids.ts"
 import type { ProposedLedger } from "./proposed.ts"
+import { firstLine } from "./text.ts"
 import type { ThreadName } from "./thread-names.ts"
-import { firstLine } from "./tree.ts"
 
 /**
  * The trailers the host writes into commit messages: a turn names its entry and
@@ -33,7 +33,7 @@ export const TRAILERS = {
 } as const
 
 /** A trailer, by its name in `TRAILERS`. */
-export type TrailerKey = keyof typeof TRAILERS
+type TrailerKey = keyof typeof TRAILERS
 
 const WRITTEN = "Pinetrie-"
 

@@ -4,21 +4,18 @@
 // canvas's view (`YourCanvasView`), holds maps and a flag and no list, so it has
 // nowhere to keep an order of its own.
 
+import type { CanvasId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
+import type { CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
 import {
-  type CanvasId,
   type CardId,
   type CardRecord,
   type CardWidth,
-  type EntryId,
   entryThread,
   type LaneView,
   type MediaId,
   type NoteColumnId,
-  type ThreadId,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
-import type { CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { Density } from "./ask-words.ts"
 import {
   BOUND,
@@ -115,7 +112,7 @@ export type CardColumn =
  * before every card and outside the order. It is no card, so it has no
  * card's id, and nothing moves, reorders or widens it.
  */
-export interface CanvasColumn {
+interface CanvasColumn {
   readonly kind: "canvas"
   readonly canvas: CanvasId
   readonly folded: boolean

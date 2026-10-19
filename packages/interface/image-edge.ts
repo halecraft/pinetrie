@@ -2,7 +2,7 @@
 // its middle, a version of it; on an edge, a spot just before or after it.
 // Which edge a pointer is on is web-core's (`imageEdge`).
 
-import type { ImageId } from "@pinetrie/core"
+import type { ImageId } from "@pinetrie/threads"
 
 /** Where on an image a drop lands: before it, onto it, or after it. */
 export type ImageEdge = "before" | "onto" | "after"

@@ -17,7 +17,6 @@ import {
   type ForeignLane,
   PROJECT_CONFIG_FILE,
   proveRunnable,
-  type ResolvedFact,
   type RunnableLane,
   type ThreadId,
   WORKSPACE_ROOT,
@@ -33,6 +32,7 @@ import {
   refusedAnswer,
   resolveAnswer,
 } from "@pinetrie/rules"
+import type { ResolvedFact } from "@pinetrie/threads"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"

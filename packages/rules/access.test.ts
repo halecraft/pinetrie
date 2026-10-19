@@ -1,4 +1,5 @@
-import { type AccessAnswer, ERR, threadIdFor, writerId } from "@pinetrie/core"
+import { ERR, threadIdFor, writerId } from "@pinetrie/core"
+import type { AccessAnswer } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   ACCESS,

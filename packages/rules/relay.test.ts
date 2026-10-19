@@ -1,13 +1,10 @@
-import {
-  canvasIdFor,
-  entryId,
-  type Reach,
-  type RelayDetails,
-  type ThreadLane,
-  type TranscriptMessage,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { canvasIdFor, entryId, threadIdFor, writerId } from "@pinetrie/core"
+import type {
+  Reach,
+  RelayDetails,
+  ThreadLane,
+  TranscriptMessage,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { planDelivery } from "./message.ts"
 import { planAnswer, planRelay, relayRefusalText } from "./relay.ts"

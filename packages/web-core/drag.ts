@@ -10,7 +10,6 @@ import {
   isCanvasId,
   isSha256,
   isWorkflowStateId,
-  parseCardId,
 } from "@pinetrie/core"
 import type {
   DragAt,
@@ -20,6 +19,7 @@ import type {
   PutHow,
   PutTarget,
 } from "@pinetrie/interface"
+import { parseCardId } from "@pinetrie/threads"
 
 const DRAG_CARD = "data-drag-card"
 const DRAG_CANVAS = "data-drag-canvas"
@@ -150,7 +150,7 @@ export function sidebarSpot(
 }
 
 /** A point on the page. */
-export interface Point {
+interface Point {
   readonly x: number
   readonly y: number
 }
@@ -179,7 +179,7 @@ export interface Armed {
 export type DropMark = "root" | "move" | "copy" | "replace" | "refused"
 
 /** What one frame draws: applied by the engine to `style` and `dataset`, nothing else. */
-export interface DrawPlan {
+interface DrawPlan {
   /** The dragged element's translate; null while it is hidden. Never a scale, a rotation or a shadow on it. */
   readonly dragged: Point | null
   /** The ghost's position, at compact's size under the pointer; null while the column is drawn instead. */

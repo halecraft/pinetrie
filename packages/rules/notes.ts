@@ -1,17 +1,15 @@
 // notes — note columns and the notes in them: where a card leaving a thread
 // goes, and a note's place at its column's end.
 
+import type { CanvasId, ThreadId, WriterId } from "@pinetrie/core"
 import type {
-  CanvasId,
   CardPlace,
   CardRecord,
   NoteColumnId,
   NotesTarget,
   TextCard,
   TextPlace,
-  ThreadId,
-  WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder } from "./card.ts"
 import { type MintContainer, makeContainer } from "./containers.ts"
@@ -81,7 +79,7 @@ export function nearestNoteColumn(
  * cards `renumbered` to fit it; or, for a thread whose card is in an
  * inventory, that inventory.
  */
-export type NotesNear =
+type NotesNear =
   | { readonly kind: "column"; readonly column: NoteColumnId }
   | {
       readonly kind: "make"

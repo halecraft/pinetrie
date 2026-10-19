@@ -1,9 +1,7 @@
 import {
   commitId,
-  type EntryLike,
   ERR,
   entryId,
-  indexTree,
   type JjAcceptedRecord,
   type LaneBase,
   type PointId,
@@ -13,7 +11,8 @@ import {
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import { type EntryLike, indexTree } from "@pinetrie/threads"
+import { FIXTURE_THREAD } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   acceptedActionState,

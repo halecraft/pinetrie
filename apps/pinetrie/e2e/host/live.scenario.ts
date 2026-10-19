@@ -4,8 +4,9 @@
 
 import { homedir } from "node:os"
 import { configPlaces } from "@pinetrie/config"
-import { type ImageRef, projectTranscript, ROOT } from "@pinetrie/core"
+import { type ImageRef, ROOT } from "@pinetrie/core"
 import { readBanners } from "@pinetrie/reads"
+import { projectTranscript } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   heldLaneNames,

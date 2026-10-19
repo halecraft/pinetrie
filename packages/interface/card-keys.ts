@@ -7,7 +7,7 @@
 // paragraph's start or end; those boxes lose that, and the composer keeps it. Ctrl, not Cmd, as take
 // (Ctrl+Shift+I) and put (Ctrl+Shift+O) are: Cmd+Backspace deletes the line.
 
-import type { CardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/threads"
 import type { ColumnAct } from "./intent.ts"
 import type { KeyLike } from "./page-keys.ts"
 

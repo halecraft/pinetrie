@@ -1,7 +1,7 @@
 // rules/blocks — the blocks of a message's text, numbered once, so the block
 // the page draws and the block an address names cannot be counted differently.
 
-import type { BlockKind, BlockRef } from "@pinetrie/core"
+import type { BlockKind, BlockRef } from "@pinetrie/threads"
 import { parseMarkdown } from "./markdown.ts"
 
 /** The fields of an mdast node this reads and writes; the rest are kept. */
@@ -24,7 +24,7 @@ const KIND_OF: Readonly<Record<string, BlockKind>> = {
 }
 
 /** Each block of `tree` with its number, in document order, nested ones included. */
-export function numberBlocks(
+function numberBlocks(
   tree: BlockNode,
 ): readonly { readonly node: BlockNode; readonly ref: BlockRef }[] {
   const counts = new Map<BlockKind, number>()
@@ -64,7 +64,7 @@ export function markBlocks(tree: BlockNode): void {
 }
 
 /** A block of a text: its number, and where it is in the text, `to` excluded. */
-export interface Block {
+interface Block {
   readonly ref: BlockRef
   readonly from: number
   readonly to: number

@@ -1,9 +1,10 @@
 // e2e/host/banners — an image behind each thread's column header.
 
-import { type ImageRef, messageText, ROOT } from "@pinetrie/core"
+import { type ImageRef, ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readBanners, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
+import { messageText } from "@pinetrie/threads"
 import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {

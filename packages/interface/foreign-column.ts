@@ -7,13 +7,12 @@ import {
   type EntryId,
   type ForeignLane,
   type LaneRecord,
-  nearestRevision,
   type RevisionRecord,
   type ThreadId,
-  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import { foreignIn, type ProjectRecord, type RunAt } from "@pinetrie/rules"
+import { nearestRevision, type TreeIndex } from "@pinetrie/threads"
 import type { ReadOnly } from "./app-view.ts"
 import { type Column, unstartedMode } from "./columns.ts"
 import type { Reader } from "./send.ts"

@@ -2,7 +2,6 @@
 // a text shares, and what a message and the model read of each.
 
 import {
-  type AgentMessageLike,
   type BlobRef,
   blobOfUrl,
   blobUrl,
@@ -10,13 +9,16 @@ import {
   type ImageRef,
   isImageRef,
   isSha256,
-  messageImages,
-  messageText,
   type Refusal,
   refused,
   type Sha256,
   type Share,
 } from "@pinetrie/core"
+import {
+  type AgentMessageLike,
+  messageImages,
+  messageText,
+} from "@pinetrie/threads"
 import { byteWords } from "./counts.ts"
 import { parseMarkdown } from "./markdown.ts"
 
@@ -239,7 +241,7 @@ export function planShares(
 export const DEFAULT_QUOTE_BYTES = 32 * 1024
 
 /** What the model reads of a share that is not an image. */
-export type ShareQuote =
+type ShareQuote =
   | { readonly kind: "quoted"; readonly text: string }
   | { readonly kind: "described"; readonly lines: number | null }
 
@@ -300,7 +302,7 @@ export function fittedLine(share: Share): string | null {
 
 declare const readableBrand: unique symbol
 /** The blobs a thread's path has shown its model: what `save_blob` may save. */
-export type ReadableBlobs = ReadonlySet<Sha256> & {
+type ReadableBlobs = ReadonlySet<Sha256> & {
   readonly [readableBrand]: true
 }
 
@@ -341,12 +343,12 @@ function shownText(message: AgentMessageLike | undefined): string {
 }
 
 /** `save_blob`'s blob as the agent passed it: `/blob/<sha256>`, or the hash alone. */
-export function blobOfArg(arg: string): Sha256 | null {
+function blobOfArg(arg: string): Sha256 | null {
   const trimmed = arg.trim()
   return isSha256(trimmed) ? trimmed : blobOfUrl(trimmed)
 }
 
-export type SaveBlobPlan =
+type SaveBlobPlan =
   | { readonly kind: "save"; readonly sha256: Sha256 }
   | { readonly kind: "refused"; readonly text: string }
 

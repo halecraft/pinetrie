@@ -1,20 +1,22 @@
 // relay — another thread's agent asked, and its answer.
 
 import {
-  type AnswerDetails,
-  type Asker,
-  type Away,
   type EntryId,
   type ForeignLane,
   firstLine,
-  type IncomingDetails,
-  type Reach,
-  type RelayDetails,
   type ThreadId,
-  type ThreadLane,
-  type TranscriptMessage,
   type WriterId,
 } from "@pinetrie/core"
+import type {
+  AnswerDetails,
+  Asker,
+  Away,
+  IncomingDetails,
+  Reach,
+  RelayDetails,
+  ThreadLane,
+  TranscriptMessage,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import {
   EntryIdSchema,
@@ -85,7 +87,7 @@ const relayContent = (d: RelayDetails): string =>
   `${d.askerName}, in the thread ${d.fromName}, asks you: ${d.text}\n\n(Your last message of this run is posted in ${d.fromName} as your answer.)`
 
 /** What the asking thread's agent reads of an answer. */
-export const answerContent = (d: AnswerDetails): string =>
+const answerContent = (d: AnswerDetails): string =>
   `${d.fromName} answers, from its own thread: ${d.text}`
 
 export const encodeIncoming = (
@@ -296,7 +298,7 @@ const isAnswerFrom = (m: TranscriptMessage, thread: ThreadId): boolean =>
   m.role === "answer" && m.from === thread
 
 /** How a relayed run ended, as its end reads it. */
-export type RelayEnd =
+type RelayEnd =
   | { readonly kind: "answered"; readonly text: string }
   | { readonly kind: "stopped" }
   | { readonly kind: "failed" }

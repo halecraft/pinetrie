@@ -1,16 +1,18 @@
 import {
-  type CardRecord,
   canvasIdFor,
   entryId,
-  type Gated,
-  livePlace,
   rootIdFor,
-  type SendAt,
   snapshotId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  type Gated,
+  livePlace,
+  type SendAt,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   foreignIn,

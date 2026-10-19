@@ -1,13 +1,9 @@
 // interface/board-view — what the board shows and offers, decided; `Board`
 // and `BoardStrip` (`board.tsx`) draw it.
 
-import type {
-  CanvasId,
-  CardRecord,
-  WorkflowStateId,
-  WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, WorkflowStateId, WriterId } from "@pinetrie/core"
 import { taskBoard, type Workflow, type WorkflowState } from "@pinetrie/rules"
+import type { CardRecord } from "@pinetrie/threads"
 import { type Level, markLevel } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
@@ -55,7 +51,7 @@ export interface StateSignals {
 const NO_SIGNALS: StateSignals = { working: 0, ready: 0, canvases: [] }
 
 /** An open state's column. */
-export interface BoardColumnView {
+interface BoardColumnView {
   readonly state: WorkflowState
   /** The cards of the roots the search keeps, in their order. */
   readonly items: readonly ThreadCard[]
@@ -79,7 +75,7 @@ export interface BoardColumnView {
 }
 
 /** The archive: collapsed to its count and its rows. */
-export interface ArchiveView {
+interface ArchiveView {
   readonly state: WorkflowState
   readonly count: Count
   /** The kept roots, newest first; with no words, the most recent few (`archiveRows`). */
@@ -103,7 +99,7 @@ export interface BoardSearch {
 }
 
 /** What the board shows of its roots: every one, or those a filter keeps. */
-export type BoardShown =
+type BoardShown =
   | { readonly kind: "all"; readonly total: number }
   | {
       readonly kind: "filtered"
@@ -368,7 +364,7 @@ export function archiveRows(input: {
 }
 
 /** What a key does on the open board (`boardKeyAct`). */
-export type BoardKey = "focus-search" | "clear-filter" | "close"
+type BoardKey = "focus-search" | "clear-filter" | "close"
 
 /** Where focus is, and what is open, when a key is pressed on the open board. */
 export interface BoardKeyFocus {

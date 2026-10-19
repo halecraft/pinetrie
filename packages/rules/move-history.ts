@@ -2,22 +2,24 @@
 // step answers, and when a history retires.
 
 import {
-  type ArchivedCanvas,
   type CanvasId,
+  historyScope,
+  type MoveHistoryScope,
+  movesOfDocId,
+} from "@pinetrie/core"
+import {
+  type ArchivedCanvas,
   type CardId,
   type CardPlace,
   type CardRecord,
-  historyScope,
   isNoteColumnId,
   kindOfCard,
   type Move,
-  type MoveHistoryScope,
   type MoveTarget,
-  movesOfDocId,
   type PlaceKey,
   parseCardId,
   placeKey,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { stateTransition, type Workflow } from "./board.ts"
 import {
   type CanvasIndex,
@@ -33,7 +35,7 @@ import type { MoveStep } from "./place-steps.ts"
  * What names a trash's history, the host's to decide: the canvases, and the
  * canvas the sender is on, for a card that leaves no canvas.
  */
-export interface Trashes {
+interface Trashes {
   readonly canvases: CanvasIndex
   readonly here: CanvasId | null
 }
@@ -42,10 +44,8 @@ export interface Trashes {
  * The history a card leaving `from` for gone is in: the canvas it leaves,
  * else, from an inventory, the canvas its sender is on.
  */
-export const trashHistory = (
-  from: CardPlace,
-  trashes: Trashes,
-): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here
+const trashHistory = (from: CardPlace, trashes: Trashes): CanvasId | null =>
+  canvasOfPlace(trashes.canvases, from) ?? trashes.here
 
 /**
  * The history of the sender's moves `moves` enter, or null for none.

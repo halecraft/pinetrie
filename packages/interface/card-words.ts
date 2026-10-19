@@ -2,12 +2,7 @@
 // each label in one function.
 
 import type {
-  CanvasView,
-  Card,
-  CardCommand,
-  GetLatestCommand,
   LatestFrom,
-  ListKey,
   ParentThread,
   ThreadBase,
   WriterId,
@@ -23,6 +18,13 @@ import {
   type Verb,
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
+import type {
+  CanvasView,
+  Card,
+  CardCommand,
+  GetLatestCommand,
+  ListKey,
+} from "@pinetrie/threads"
 import type { CardTone } from "./card-frame.ts"
 import type { PinnedMarker } from "./column-view.ts"
 import type { Reader } from "./send.ts"
@@ -243,7 +245,7 @@ export const NEW_PIN_TITLE =
   "write a new card pinned to the top of the column: the agent reads it on every run"
 
 /** The box a new card is written in, at its list's end. */
-export interface NewCardBoxView {
+interface NewCardBoxView {
   /** Its frame's tone: the list's. */
   readonly tone: CardTone
   /** What it says while empty. */

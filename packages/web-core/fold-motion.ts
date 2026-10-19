@@ -13,7 +13,7 @@ export interface Rect {
 }
 
 /** A strip's layout, from its registered `--strip-*` properties, in px. */
-export interface StripGeometry {
+interface StripGeometry {
   readonly width: number
   /** From the strip's top to its mark's. */
   readonly markTop: number
@@ -60,7 +60,7 @@ export interface FoldScene {
 }
 
 /** A move from where an element is wide to where it is in the strip. */
-export interface Shift {
+interface Shift {
   readonly dx: number
   readonly dy: number
 }
@@ -70,7 +70,7 @@ export interface Shift {
  * strip; `inset` how far the column's right edge has come in from its full
  * width, in px. The clip and every column after it follow that one edge.
  */
-export interface FoldFrame {
+interface FoldFrame {
   readonly offset: number
   readonly fold: number
   readonly inset: number

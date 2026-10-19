@@ -2,28 +2,30 @@
 
 import assert from "node:assert/strict"
 import {
-  type CardId,
   canvasIdFor,
-  cardIdOfKind,
   commitId,
   ERR,
   entryId,
-  type Intent,
-  type MoveOf,
-  type MoveTarget,
-  type PlaceKey,
   pointId,
-  printAddress,
   rootIdFor,
   runId,
   type Sha256,
   THE_AGENT,
-  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  type CardId,
+  cardIdOfKind,
+  type Intent,
+  type MoveOf,
+  type MoveTarget,
+  type PlaceKey,
+  printAddress,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   decodeCommand,

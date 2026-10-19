@@ -3,15 +3,11 @@
 // (`planCardRead`); then read an image's bytes from the blob store, which
 // the tool hands the model.
 
-import {
-  type BlobStore,
-  type CardId,
-  isNoteColumnId,
-  type ThreadId,
-} from "@pinetrie/core"
+import type { BlobStore, ThreadId } from "@pinetrie/core"
 import type { CardReadAnswer } from "@pinetrie/pi"
 import { readCardTitles, readPlaces } from "@pinetrie/reads"
 import { notesIn, planCardRead } from "@pinetrie/rules"
+import { type CardId, isNoteColumnId } from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 

@@ -4,7 +4,6 @@ import {
   threadIdFor,
   workflowStateIdFor,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   type CanvasOver,
   type CanvasSource,
@@ -16,6 +15,7 @@ import {
   type IntentState,
   planDrop,
 } from "@pinetrie/interface"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   type Armed,

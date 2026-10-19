@@ -2,10 +2,10 @@
 // each column of the root you are on reads, and when you are typing, and in
 // which card. `App` gathers and writes.
 
-import type { CardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/threads"
 
 /** Each reported column's key, and the thread end it shows (null: none yet). */
-export type Reported = ReadonlyMap<string, string | null>
+type Reported = ReadonlyMap<string, string | null>
 
 /**
  * The presence writes that move `reported` to `now`. A column whose end is

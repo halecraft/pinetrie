@@ -1,15 +1,17 @@
 import {
   canvasIdFor,
-  cardIdOfKind,
-  type ImageCard,
-  makeCard,
   type Sha256,
   type ThreadId,
   type ThreadName,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
+import {
+  cardIdOfKind,
+  type ImageCard,
+  makeCard,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   CANVAS_CAP,

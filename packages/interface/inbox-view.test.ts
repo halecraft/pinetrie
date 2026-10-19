@@ -1,5 +1,5 @@
 import { entryId, threadIdFor } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, RunEndLevel } from "./attention.ts"
 import {

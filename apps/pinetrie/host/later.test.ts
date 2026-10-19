@@ -1,7 +1,6 @@
 import {
   type CanvasId,
   canvasIdFor,
-  type QueuedFact,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -14,6 +13,7 @@ import {
   setRecord,
   WORKFLOW,
 } from "@pinetrie/rules"
+import type { QueuedFact } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   applyWrites,

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@pinetrie/core": "workspace:*",
+    "@pinetrie/threads": "workspace:*",
     "ignore": "7.0.12",
     "mdast-util-from-markdown": "2.1.0",
     "mdast-util-gfm": "3.1.0",

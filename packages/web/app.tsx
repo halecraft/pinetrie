@@ -23,20 +23,11 @@
 
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
-import {
-  type ArchivedCanvas,
-  branchesByProposal,
-  type CanvasId,
-  type CardId,
-  canvasPinnedInView,
-  type EntryId,
-  entryThread,
-  isPastAddress,
-  parseAddress,
-  pathIds,
-  type TextCard,
-  type ThreadId,
-  type WorkflowStateId,
+import type {
+  CanvasId,
+  EntryId,
+  ThreadId,
+  WorkflowStateId,
 } from "@pinetrie/core"
 import {
   type AppPorts,
@@ -177,6 +168,17 @@ import {
   newRootId,
   newThreadId,
 } from "@pinetrie/session/connect"
+import {
+  type ArchivedCanvas,
+  branchesByProposal,
+  type CardId,
+  canvasPinnedInView,
+  entryThread,
+  isPastAddress,
+  parseAddress,
+  pathIds,
+  type TextCard,
+} from "@pinetrie/threads"
 import {
   type Dock,
   placement,

@@ -2,10 +2,7 @@
 // `pnpm run typecheck` if the line below it ever compiles.
 
 import {
-  type CardId,
   entryId,
-  indexTree,
-  type Send,
   snapshotId,
   type ThreadId,
   threadIdFor,
@@ -20,6 +17,7 @@ import {
   planTurnRevision,
   planUndoAnswer,
 } from "@pinetrie/rules"
+import { type CardId, indexTree, type Send } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { ROOT_ID } from "../fakes.ts"
 import { type SendDeps, sendMessage } from "./send.ts"

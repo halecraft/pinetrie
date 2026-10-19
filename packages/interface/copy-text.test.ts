@@ -1,6 +1,6 @@
-import type { ToolCall, TranscriptMessage } from "@pinetrie/core"
 import { entryId } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import type { ToolCall, TranscriptMessage } from "@pinetrie/threads"
+import { FIXTURE_THREAD } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { copyText } from "./copy-text.ts"
 

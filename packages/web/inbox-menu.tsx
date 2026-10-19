@@ -7,10 +7,8 @@ import {
   type CanvasId,
   type EntryId,
   firstLine,
-  messageText,
   type ThreadId,
   type ThreadName,
-  type TreeIndex,
 } from "@pinetrie/core"
 import {
   attentionWords,
@@ -29,6 +27,7 @@ import {
   readableThreadName,
   type ThreadLink,
 } from "@pinetrie/interface"
+import { messageText, type TreeIndex } from "@pinetrie/threads"
 import { useState } from "react"
 import { InboxIcon } from "./icons.tsx"
 import { Menu, type MenuItem, type MenuSection } from "./menu.tsx"

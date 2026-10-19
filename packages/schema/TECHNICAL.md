@@ -3,7 +3,8 @@
 Each document's Kyneta shape, and the reads and writes at the storage edge
 (ADR-0095). It makes no decisions: what a stream event does, how a run
 ends, what a record says, are `@pinetrie/rules`', over types in
-`@pinetrie/core`. It imports Kyneta and core, never pi (ADR-0003). That pi-free property
+`@pinetrie/core` and `@pinetrie/threads`. It imports Kyneta, core and threads,
+never pi (ADR-0003). That pi-free property
 is what let spikes S7, S8 and S12 test convergence with no harness in the
 picture, and it is worth protecting.
 
@@ -143,7 +144,7 @@ cost O(n²) and store every snapshot (ADR-0014, S22).
   drawing the first in the change that adds its entry (ADR-0044). Per run, one
   stream would have shown the first message's committed text again.
 - A tool stream opens with the tool. Its output arrives as whole snapshots of
-  a tail-kept view and is written with `tailEdit` (`@pinetrie/core`).
+  a tail-kept view and is written with `tailEdit` (`@pinetrie/threads`).
 - **Nothing happens when a message or a tool ends.** A stream stays until its
   entry is written, so a reader never sees neither. A `close` is the one
   way a stream is deleted, and each plan that makes one knows the entry is
@@ -159,7 +160,7 @@ cost O(n²) and store every snapshot (ADR-0014, S22).
 - So a lane has at most one reply stream at a time.
 - **Planned in `@pinetrie/rules`, written here.** `planStream`, `planEndRun`
   and `planClear` (`packages/rules/live.ts`) are pure, and return `LiveOp`s
-  (`@pinetrie/core`). `applyLiveOps` is the one writer of `pinetrie:live`, in
+  (`@pinetrie/threads`). `applyLiveOps` is the one writer of `pinetrie:live`, in
   one batch. The host gathers, plans and applies: `streamInto` and `endRun`
   in `apps/pinetrie/host/runs.ts`, and the clear in `recover`.
 - **The row's codec is here**, beside `LiveDoc` (`encodeStream`,
@@ -176,9 +177,9 @@ cost O(n²) and store every snapshot (ADR-0014, S22).
 - `checkpointText` holds pi's tool-output checkpoints' text, keyed by
   `physicalKey`, written by `KynetaStorage` (`packages/pi/TECHNICAL.md`).
 
-This package depends on `@pinetrie/core` (for `LiveOp`, `StreamRecord` and
-`ValueWrite`), which the dependency direction `core → schema → pi → app`
-allows. It cannot depend on `@pinetrie/rules`, so a codec its own writer and
+This package depends on `@pinetrie/core` (for `ValueWrite`) and
+`@pinetrie/threads` (for `LiveOp` and `StreamRecord`), which the dependency
+direction `core → threads → schema → pi → app` allows. It cannot depend on `@pinetrie/rules`, so a codec its own writer and
 readers need, as the stream row's, lives here. It still imports no pi.
 
 ## Presence (`presence.ts`, ADR-0024)

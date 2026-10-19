@@ -1,16 +1,13 @@
 // queue-hold — a thread's queue held: who holds it, a hold or a release, the
 // hold a Stop leaves, and the holds the host sweeps.
 
+import type { CanvasId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import type {
-  CanvasId,
   CardCommand,
   CardRecord,
   QueueHoldChange,
   QueueMove,
-  ThreadId,
-  ValueWrite,
-  WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeRecord, threadKey } from "./decode.ts"
 import { type MovesStep, planMoveCommand } from "./moves.ts"

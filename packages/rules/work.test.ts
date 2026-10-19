@@ -1,7 +1,6 @@
 import {
   BASE_SNAPSHOT,
   entryId,
-  indexTree,
   NO_SHARED,
   pointId,
   type RevisionRecord,
@@ -10,7 +9,8 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { fromParents, personMessage } from "@pinetrie/core/fixtures"
+import { indexTree } from "@pinetrie/threads"
+import { fromParents, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   decodeRecords,

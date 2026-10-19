@@ -1,4 +1,5 @@
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { readdirSync } from "node:fs"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 // Every host record's spec: its key is stored once, as its address, and a
 // record reads back whole from what is stored.
 
@@ -646,14 +647,29 @@ describe("setIfChanged", () => {
 
 describe("every spec, and writes by document", () => {
   test("RECORD_SPECS holds every spec this package exports, one per namespace", async () => {
-    const exported = Object.values(await import("./index.ts")).filter(
-      v =>
-        typeof v === "object" &&
-        v !== null &&
-        "namespace" in v &&
-        "decode" in v &&
-        "keyOf" in v,
+    // Every module, not the index: the index holds only what another
+    // package imports, and a spec no other package names is a spec still.
+    const modules = await Promise.all(
+      readdirSync(import.meta.dirname)
+        .filter(f => f.endsWith(".ts") && !/\.test\.ts$|^fixtures\.ts$/.test(f))
+        .map(
+          f =>
+            // A URL, not a template Vite would try to resolve at build time.
+            import(
+              /* @vite-ignore */ new URL(f, import.meta.url).href
+            ) as Promise<Record<string, unknown>>,
+        ),
     )
+    const exported = modules
+      .flatMap(m => Object.values(m))
+      .filter(
+        v =>
+          typeof v === "object" &&
+          v !== null &&
+          "namespace" in v &&
+          "decode" in v &&
+          "keyOf" in v,
+      )
     expect(new Set(RECORD_SPECS)).toEqual(new Set(exported))
     const namespaces = RECORD_SPECS.map(s => s.namespace)
     expect(new Set(namespaces).size).toBe(namespaces.length)

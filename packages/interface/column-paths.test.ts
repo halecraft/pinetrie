@@ -1,13 +1,15 @@
 import {
   canvasIdFor,
   entryId,
+  type ThreadId,
+  threadIdFor,
+} from "@pinetrie/core"
+import {
   entryThread,
   indexTree,
   projectRail,
-  type ThreadId,
   threadEnd,
-  threadIdFor,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   branchColors,

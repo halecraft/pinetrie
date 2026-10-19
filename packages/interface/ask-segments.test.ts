@@ -1,19 +1,21 @@
 import {
+  type EntryId,
+  entryId,
+  NO_SHARED,
+  type RevisionRecord,
+  threadIdFor,
+} from "@pinetrie/core"
+import {
   type AgentMessageLike,
   type AssistantMessage,
   ancestry,
-  type EntryId,
   type EntryLike,
-  entryId,
   indexAsks,
   indexTree,
-  NO_SHARED,
   projectRail,
-  type RevisionRecord,
   startsRun,
   type TreeIndex,
-  threadIdFor,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
 import {

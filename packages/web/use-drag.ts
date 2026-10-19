@@ -11,14 +11,7 @@
 // threshold, so the one long frame of a drag falls before anything is seen
 // to move. Touch does not drag: a touch scrolls and taps.
 
-import {
-  type CanvasId,
-  type CardId,
-  isCanvasId,
-  kindOfCard,
-  parseCardId,
-  type WorkflowStateId,
-} from "@pinetrie/core"
+import { type CanvasId, isCanvasId, type WorkflowStateId } from "@pinetrie/core"
 import {
   type CanvasOver,
   type CardOver,
@@ -41,6 +34,7 @@ import {
   rootTargetOfElement,
   targetOfElement,
 } from "@pinetrie/interface"
+import { type CardId, kindOfCard, parseCardId } from "@pinetrie/threads"
 import {
   type Armed,
   DRAG_HANDLE,

@@ -1,7 +1,7 @@
 import { Exchange } from "@kyneta/exchange"
 import { entryId, threadIdFor, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { RootRecord } from "@pinetrie/rules"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { attentionStore, EARLIEST, startingSince } from "./attention-doc.ts"
 

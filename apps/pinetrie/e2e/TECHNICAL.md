@@ -299,11 +299,11 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   canvas (`entryCanvas`) before they name it (ADR-0116).
 - **A scenario queues and unqueues through the harness** (`queueCard`,
   `unqueueCard`), as a column's plan does: each finds the card as its client
-  draws it, builds the move with core's `cardMove` (onto its lane's thread),
+  draws it, builds the move with threads' `cardMove` (onto its lane's thread),
   and sends it with `moveCard`. Each throws if the card is not
   where it expects. An action on proposed changes and a line action are `client.proposed`
   and `client.line`, which the session tracks (`acting`); anything else
-  that moves no card is `client.request({ kind, … })`, one of core's
+  that moves no card is `client.request({ kind, … })`, one of threads'
   `Intent`s.
 
 ## Gotchas

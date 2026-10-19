@@ -2,6 +2,7 @@
 // is made by. The planners of moves, queues, notes and canvases all import
 // it, so it imports none of them.
 
+import type { WriterId } from "@pinetrie/core"
 import {
   type CardId,
   type CardRecord,
@@ -12,8 +13,7 @@ import {
   type MoveRefusal,
   type PlaceKey,
   placeKey,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** A write to the places document, as the host's one writer carries it out. */
 export type PlaceStep =

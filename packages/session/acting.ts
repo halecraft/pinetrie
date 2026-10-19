@@ -3,15 +3,13 @@
 // use of your ssh identity, while they are out, and what the
 // host answered; `nextActing` decides.
 
+import type { ErrCode, PointId, ThreadId } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import type {
   AcceptedAction,
   AccessAnswer,
-  ErrCode,
-  PointId,
   ProposedChangesAction,
-  ThreadId,
-} from "@pinetrie/core"
-import type { Outcome } from "@pinetrie/protocol/codec"
+} from "@pinetrie/threads"
 
 /**
  * A command's answer the page says (`outcomeWords`): refused, with its

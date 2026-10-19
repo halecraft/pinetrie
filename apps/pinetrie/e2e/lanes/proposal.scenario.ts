@@ -3,19 +3,18 @@
 // lane of its own forked where the run ended and asked its brief as the
 // presser's message; the press leaves a fact in the proposing thread.
 
+import { ROOT, type ThreadId } from "@pinetrie/core"
+import { scriptedModel } from "@pinetrie/pi"
+import { readPlaces, readThreads } from "@pinetrie/reads"
+import { cardsOnCanvas } from "@pinetrie/rules"
+import { newThreadId } from "@pinetrie/session/connect"
 import {
   entryThread,
   messageProposal,
   PROPOSE_TOOL,
   projectTranscript,
-  ROOT,
-  type ThreadId,
   threadEnd,
-} from "@pinetrie/core"
-import { scriptedModel } from "@pinetrie/pi"
-import { readPlaces, readThreads } from "@pinetrie/reads"
-import { cardsOnCanvas } from "@pinetrie/rules"
-import { newThreadId } from "@pinetrie/session/connect"
+} from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import { canvasHolding, heldTree, START_AGENT, waitFor } from "../harness.ts"
 import { inLane, type LaneHosts } from "../lane-hosts.ts"

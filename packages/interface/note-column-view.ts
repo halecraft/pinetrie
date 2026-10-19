@@ -3,7 +3,6 @@
 // there (`canvasColumns`). `NoteColumn` (`packages/web/note-column.tsx`) draws
 // one.
 
-import type { CardRecord, NoteColumnId, TitledCardId } from "@pinetrie/core"
 import {
   type CardOnCanvas,
   type CardTitleRecord,
@@ -11,6 +10,7 @@ import {
   type NoteCard,
   notesIn,
 } from "@pinetrie/rules"
+import type { CardRecord, NoteColumnId, TitledCardId } from "@pinetrie/threads"
 
 /** One note column, as drawn. */
 export interface NoteColumnView {

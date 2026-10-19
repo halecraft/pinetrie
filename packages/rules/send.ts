@@ -5,30 +5,32 @@
 // message, the thread it opens and what the model is quoted (`planSendMessage`).
 
 import {
-  agentCandidates,
   type BlobRef,
-  baseKnown,
   blobKind,
   type CanvasId,
+  type ImageRef,
+  type RootId,
+  type Sha256,
+  type Share,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
+  agentCandidates,
+  baseKnown,
   entryThread,
   forkEntry,
-  type ImageRef,
   type LaneView,
   messageText,
   type PlanMode,
   planMode,
   ROOT_ORIGIN,
-  type RootId,
   type Send,
-  type Sha256,
-  type Share,
-  type ThreadId,
   type ThreadRecord,
   type TreeIndex,
   threadMembers,
   threadOfSend,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { planBaseNews } from "./behind.ts"
 import type { Workflow } from "./board.ts"
 import { planThreadOpen, type ThreadOpen } from "./canvas-index.ts"
@@ -171,7 +173,7 @@ export interface SharedBlob {
 }
 
 /** What a send does, planned whole: its message, the thread it opens, and its quotes. */
-export type SendPlan =
+type SendPlan =
   /** Catch the thread's lane up first, then plan the send again. */
   | { readonly kind: "get-latest-first"; readonly thread: ThreadId }
   | {

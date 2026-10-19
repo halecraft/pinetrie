@@ -1,17 +1,16 @@
 // interface/root-label — what a canvas is called on screen, and the rename
 // field's submit.
 
-import {
-  type CanvasId,
-  type EntryId,
-  type LaneRecord,
-  NO_TEXT,
-  parseTitle,
-  type RootId,
-  type ThreadId,
-  type WriterId,
+import type {
+  CanvasId,
+  EntryId,
+  LaneRecord,
+  RootId,
+  ThreadId,
+  WriterId,
 } from "@pinetrie/core"
 import type { MarkRecord, RootRecord } from "@pinetrie/rules"
+import { NO_TEXT, parseTitle } from "@pinetrie/threads"
 import type { Canvases } from "./canvases.ts"
 
 export { NO_TEXT }

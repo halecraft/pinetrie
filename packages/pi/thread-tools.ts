@@ -9,18 +9,17 @@
 // the model reads it. `propose_branches` asks the host nothing: its result is
 // the proposal, and a person's press acts on it.
 
+import type { PointId, ThreadId } from "@pinetrie/core"
+import { parseProposal, type ToolAnswer } from "@pinetrie/rules"
 import {
   ASK_TOOL,
   GET_LATEST_TOOL,
   LEAVE_TOOL,
-  type PointId,
   PROPOSE_TOOL,
   type Proposal,
   RESOLVE_TOOL,
   SPLIT_TOOL,
-  type ThreadId,
-} from "@pinetrie/core"
-import { parseProposal, type ToolAnswer } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { threadOfContext } from "./thread-context.ts"
 

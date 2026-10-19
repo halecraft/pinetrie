@@ -1,12 +1,8 @@
 // interface/rail-view — the view's part of the rail's stretches (`compactRail`).
 
-import {
-  type EntryId,
-  nearestMessage,
-  type RailRow,
-  type TreeIndex,
-} from "@pinetrie/core"
+import type { EntryId } from "@pinetrie/core"
 import { type DigestRecord, digestText } from "@pinetrie/rules"
+import { nearestMessage, type RailRow, type TreeIndex } from "@pinetrie/threads"
 import { railLandmarks } from "./rail.ts"
 import type { SearchResult } from "./search.ts"
 import { itemMatches } from "./search-view.ts"
@@ -142,7 +138,7 @@ export function capsulePick(
 }
 
 /** What a rail item marks besides its place: decided here, drawn by `Rail`. */
-export interface RailMarks {
+interface RailMarks {
   /** On an open column's path: `data-open`. A stretch's first message speaks for it. */
   readonly open: boolean
   /** Your colour when an unsent card of yours waits here, else null. */
@@ -245,7 +241,7 @@ interface RailView {
  * are left out.
  */
 /** How close, in slots, two edges in one capsule are drawn as one line. */
-export const EDGE_MERGE = 0.25
+const EDGE_MERGE = 0.25
 
 export function railView(
   itemOf: ReadonlyMap<string, ViewItem>,

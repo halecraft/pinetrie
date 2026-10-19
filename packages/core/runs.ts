@@ -256,7 +256,7 @@ export type FoldNotices = (
 ) => RunTraces
 
 /** What a drain leaves: the traces to hold on to, and its answer. */
-export interface Drained<T> {
+interface Drained<T> {
   readonly traces: RunTraces
   readonly result: T
 }
@@ -348,7 +348,7 @@ export type SharedAccess =
  * Whether a run's events all arrived: a run some of whose events were lost
  * is not a recipe, since its key could miss what it read.
  */
-export type RunObserved =
+type RunObserved =
   | { readonly kind: "complete" }
   | { readonly kind: "lost"; readonly events: number }
 
@@ -405,7 +405,7 @@ export interface LaneRuns {
 export type FileHashes = Readonly<Record<string, string | null>>
 
 /** What a recipe's outputs were made from: they hold while all of it does. */
-export interface RecipeKey {
+interface RecipeKey {
   readonly command: string
   /** The lane's image, by its tag. */
   readonly image: string

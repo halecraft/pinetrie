@@ -3,21 +3,21 @@
 // primary action, and ↑ ↓ in a list). The card's icon and its compact are
 // its kind's (`compact.ts`).
 
-import type {
-  CardCommand,
-  CardKind,
-  CardPlace,
-  CardRecord,
-  Position,
-  ThreadId,
-  WriterId,
-} from "@pinetrie/core"
-import { cardCommand, fitsPlace, KINDS } from "@pinetrie/core"
+import type { Position, ThreadId, WriterId } from "@pinetrie/core"
 import {
   displayName,
   type PinnedStatus,
   type WorkflowState,
 } from "@pinetrie/rules"
+import {
+  type CardCommand,
+  type CardKind,
+  type CardPlace,
+  type CardRecord,
+  cardCommand,
+  fitsPlace,
+  KINDS,
+} from "@pinetrie/threads"
 import { reorderByStep } from "./card-intents.ts"
 import {
   commandNote,
@@ -39,7 +39,7 @@ import { lineWords, type Reader } from "./send.ts"
 export type CardTone = "inventory" | "composing" | "note" | "queued" | "pinned"
 
 /** What a card's header says of how it stands where it is. */
-export type CardState =
+type CardState =
   | { readonly kind: "none" }
   /** Queued, `n`th from 0, its queue held or not. */
   | { readonly kind: "line"; readonly n: number; readonly held: boolean }
@@ -49,7 +49,7 @@ export type CardState =
   | { readonly kind: "pinned"; readonly status: PinnedStatus }
 
 /** The footer's one primary action: put for the inventory, send for your message. */
-export type CardPrimary = "put" | "send"
+type CardPrimary = "put" | "send"
 
 /** Where a Move to ▸ item takes a card: a place, or a new thread in a state. */
 type CardMoveTo =
@@ -89,13 +89,13 @@ const offers = (kind: CardKind, to: CardMoveTo): boolean => {
 }
 
 /** One Move to ▸ item: the move a drag makes there. */
-export interface CardMoveItem {
+interface CardMoveItem {
   readonly to: CardMoveTo
   readonly act: ColumnAct
 }
 
 /** A ↑ or ↓ in a queue or among pinned cards; `act` null at an edge. */
-export interface CardTool {
+interface CardTool {
   readonly step: -1 | 1
   readonly act: ColumnAct | null
 }
@@ -115,7 +115,7 @@ export interface CardFrameView {
 }
 
 /** Where a queue from a column puts a card: as the composer's queue does. */
-export interface QueueOn {
+interface QueueOn {
   readonly lane: ThreadId
   readonly at: Position
 }

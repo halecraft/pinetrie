@@ -7,6 +7,10 @@
 - **Amends:**
   - ADR-0093: the placement rule the packages' notes share now says where a
     record's type lives; what the page shows is unchanged.
+- **Amended by:**
+  - ADR-0201: the placement rule stands, with `@pinetrie/threads` between core
+    and rules; its rejection of a package between them does not apply, since
+    no lane package declares threads.
 
 **Context.** The rule the packages' notes quote says core holds "every
 record's type", and that a type `lanes` or `jj` must name lives in core,

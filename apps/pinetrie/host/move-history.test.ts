@@ -1,21 +1,20 @@
 import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import {
   type CanvasId,
-  type CardRecord,
   canvasIdFor,
   historyScope,
   type MoveHistoryScope,
   movesDocId,
   PERSON_HISTORY,
   rootIdFor,
-  type TextCard,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { PlacesDoc } from "@pinetrie/schema"
+import type { CardRecord, TextCard } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { seedPlaces } from "./fakes.ts"
 import { createMoveHistories } from "./move-history.ts"

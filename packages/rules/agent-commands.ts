@@ -2,6 +2,7 @@
 // state of what it acts on, never from how the run began, so a refusal names
 // something true the agent can change.
 
+import type { PointId, ProjectKind, ThreadId, WriterId } from "@pinetrie/core"
 import {
   type CardRecord,
   cardCommand,
@@ -9,13 +10,9 @@ import {
   type GetLatestCommand,
   type MoveRefusal,
   makeCard,
-  type PointId,
-  type ProjectKind,
   type Role,
   type TextCardId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type LatestNow, type ParentNow, parentAhead } from "./base.ts"
 import type { LandMessage } from "./land.ts"
 import { orderAfter } from "./order.ts"
@@ -33,7 +30,7 @@ export interface ToolAnswer {
 }
 
 /** Why `catch_up` did not merge. */
-export type GetLatestRefusal =
+type GetLatestRefusal =
   /** Another call is in the same batch: a sibling's edit would leave the copy. */
   | "alone"
   /** The base, or the parent, has nothing the copy lacks. */
@@ -175,11 +172,7 @@ export function resolveAnswer(
 }
 
 /** Why `split_proposed_changes` queued nothing. */
-export type SplitRefusal =
-  | "folder"
-  | "no-proposed-changes"
-  | "queued"
-  | "splitting"
+type SplitRefusal = "folder" | "no-proposed-changes" | "queued" | "splitting"
 
 /** `split_proposed_changes`'s refusals, worded once. */
 export function splitRefusal(code: SplitRefusal): string {

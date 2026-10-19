@@ -2,12 +2,10 @@ import {
   commitId,
   ERR,
   entryId,
-  NOBODY,
   pointId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Agent } from "@pinetrie/pi"
 import {
   encodeBehind,
@@ -18,6 +16,8 @@ import {
 } from "@pinetrie/rules"
 import { readActiveRun, readStreams } from "@pinetrie/schema"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { NOBODY } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { BaseNews } from "./base-news.ts"
 import {

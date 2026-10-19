@@ -4,7 +4,7 @@ import {
   type ToolCall,
   type TranscriptMessage,
   transcriptCalls,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { callLabel } from "./tool-words.ts"
 
 /** A message's copy button: what it copies. Markdown is how, not what. */

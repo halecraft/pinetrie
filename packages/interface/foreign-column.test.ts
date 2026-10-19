@@ -1,12 +1,12 @@
 import {
   entryId,
   type ForeignLane,
-  indexTree,
   rootIdFor,
   snapshotId,
   writerId,
 } from "@pinetrie/core"
-import { fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
+import { indexTree } from "@pinetrie/threads"
+import { fromParents, threadOfEntry } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   columnForeign,

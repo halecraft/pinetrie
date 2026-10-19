@@ -10,7 +10,7 @@
 // (`card-editor.tsx`), so the frame's wrappers are the same with a card and
 // without one, and only the header's contents change.
 
-import { isTextCard, type WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import {
   type CardFrameView,
   CLEAR_COMMAND,
@@ -28,6 +28,7 @@ import {
   SHARE_FILE,
   TRASH_CARD_TITLE,
 } from "@pinetrie/interface"
+import { isTextCard } from "@pinetrie/threads"
 import { dragProps } from "@pinetrie/web-core"
 import { type ReactNode, useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"

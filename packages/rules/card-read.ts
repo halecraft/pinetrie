@@ -3,17 +3,15 @@
 // copy, which the tool hands the model as an image; a media column and a note
 // column are text.
 
+import type { CanvasId, Sha256, ThreadId } from "@pinetrie/core"
 import {
-  type CanvasId,
   type CardId,
   type CardRecord,
   isImageId,
   isMediaId,
   isNoteColumnId,
-  type Sha256,
-  type ThreadId,
   type TitledCardId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { NEW_MEDIA_TITLE, UNTITLED_IMAGE } from "./canvas.ts"
 import type { CardTitleRecord } from "./card-title.ts"
 import { count } from "./counts.ts"
@@ -21,7 +19,7 @@ import { imagesIn } from "./media.ts"
 import { NEW_NOTES_TITLE, notesIn } from "./notes.ts"
 
 /** What `read_card` answers: words, and for an image the blob it shows. */
-export type CardRead =
+type CardRead =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "image"; readonly text: string; readonly sha256: Sha256 }
   | { readonly kind: "refused"; readonly text: string }

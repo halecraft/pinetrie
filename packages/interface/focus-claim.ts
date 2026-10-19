@@ -2,7 +2,7 @@
 // (`arm-focus`), `App` holds it, and the element it names claims it once
 // (`claimFocus`). One key is armed at a time, so the newest arm wins.
 
-import type { CardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/threads"
 
 /** What a plan arms to take focus as it mounts. */
 export type FocusKey =

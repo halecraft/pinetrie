@@ -4,13 +4,6 @@
 
 import { useSelector } from "@kyneta/react"
 import {
-  isLineRole,
-  type StreamId,
-  type ToolCall,
-  type TranscriptMessage,
-  transcriptCalls,
-} from "@pinetrie/core"
-import {
   COMMENT,
   COPY_MESSAGE,
   callLabel,
@@ -42,6 +35,13 @@ import {
 } from "@pinetrie/interface"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import { newCardId } from "@pinetrie/session/connect"
+import {
+  isLineRole,
+  type StreamId,
+  type ToolCall,
+  type TranscriptMessage,
+  transcriptCalls,
+} from "@pinetrie/threads"
 import type { ScreenMemory } from "@pinetrie/web-core"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"

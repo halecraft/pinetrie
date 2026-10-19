@@ -6,14 +6,13 @@ import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import {
-  type CardCommand,
-  type CardId,
   entryId,
   PRODUCT_NAME,
   type SnapshotId,
   type ThreadId,
 } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
+import type { CardCommand, CardId } from "@pinetrie/threads"
 import { vmStateDir } from "@pinetrie/vm"
 import { composeCard, queueCard } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"

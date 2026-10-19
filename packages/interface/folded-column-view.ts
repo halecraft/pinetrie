@@ -2,7 +2,8 @@
 // with its card's mark and title, in its place on the canvas, so the
 // arrangement reads the same for everyone whatever you have folded.
 
-import type { CardId, MediaId, NoteColumnId, ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
+import type { CardId, MediaId, NoteColumnId } from "@pinetrie/threads"
 import type { CardColumn } from "./canvas-columns.ts"
 import type { ControlWords } from "./card-words.ts"
 import type { HeadIcon } from "./column-view.ts"
@@ -12,7 +13,7 @@ import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadGlance } from "./thread-glance.ts"
 
 /** A list column at a glance: a note column or a media column, its title, and how many it holds. */
-export interface ListGlance {
+interface ListGlance {
   readonly kind: ListKind
   readonly card: NoteColumnId | MediaId
   readonly title: string

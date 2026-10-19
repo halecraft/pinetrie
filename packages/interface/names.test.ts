@@ -1,10 +1,6 @@
-import {
-  entryId,
-  PRODUCT_NAME,
-  type TranscriptMessage,
-  writerId,
-} from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import { entryId, PRODUCT_NAME, writerId } from "@pinetrie/core"
+import type { TranscriptMessage } from "@pinetrie/threads"
+import { FIXTURE_THREAD } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { speakerLabel, speakerWords, writerNames } from "./names.ts"
 

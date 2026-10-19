@@ -6,31 +6,13 @@
 import type { Exchange, Undone, UndoStack } from "@kyneta/exchange"
 import type { CommitOptions } from "@kyneta/schema"
 import type {
-  AcceptedAction,
-  AccessAnswer,
   BlobRef,
   CanvasId,
-  CardCommand,
-  CardId,
-  CardRecord,
   ConflictChoice,
   EntryId,
-  Intent,
-  MessageAt,
-  MoveDirection,
-  MoveTarget,
-  Paste,
-  ProposedChangesAction,
-  QueueHoldChange,
-  QueueMove,
-  Reorder,
-  Replacing,
   RestorePreview,
   RootId,
-  TextCard,
-  TextCardId,
   ThreadId,
-  TypedMove,
   WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -41,6 +23,26 @@ import type {
   SessionDocHandle,
   TextDocHandle,
 } from "@pinetrie/schema"
+import type {
+  AcceptedAction,
+  AccessAnswer,
+  CardCommand,
+  CardId,
+  CardRecord,
+  Intent,
+  MessageAt,
+  MoveDirection,
+  MoveTarget,
+  Paste,
+  ProposedChangesAction,
+  QueueHoldChange,
+  QueueMove,
+  Reorder,
+  Replacing,
+  TextCard,
+  TextCardId,
+  TypedMove,
+} from "@pinetrie/threads"
 import type { ActingState } from "./acting.ts"
 import type { AttentionStore } from "./attention-store.ts"
 import type {

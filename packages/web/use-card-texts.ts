@@ -2,8 +2,8 @@
 // inventory's and a notes board's.
 
 import { subscribe } from "@kyneta/schema"
-import type { TextCardId } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
+import type { TextCardId } from "@pinetrie/threads"
 import { useEffect, useState } from "react"
 
 /**

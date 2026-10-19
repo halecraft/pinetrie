@@ -8,33 +8,13 @@
 import {
   agentAsk,
   type CanvasId,
-  type CardCommand,
-  type CardId,
-  type CardWidth,
   type ConflictChoice,
-  cardMove,
   type EntryId,
-  entryThread,
-  hasPlaceKind,
-  type ImageId,
-  type ImagesTarget,
-  type ListKey,
-  type MarkTarget,
-  type MoveDirection,
-  messageProposal,
   nonEmpty,
-  notesTarget,
   type Position,
-  type ProposedChangesAction,
-  type PutImage,
-  type QueueHoldChange,
   type RootId,
   type Sha256,
-  type TextCardId,
   type ThreadId,
-  type ThreadStart,
-  type TypedMove,
-  type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
@@ -47,6 +27,28 @@ import {
   type HostRequest,
   IN_COLUMN,
 } from "@pinetrie/session"
+import {
+  type CardCommand,
+  type CardId,
+  type CardWidth,
+  cardMove,
+  entryThread,
+  hasPlaceKind,
+  type ImageId,
+  type ImagesTarget,
+  type ListKey,
+  type MarkTarget,
+  type MoveDirection,
+  messageProposal,
+  notesTarget,
+  type ProposedChangesAction,
+  type PutImage,
+  type QueueHoldChange,
+  type TextCardId,
+  type ThreadStart,
+  type TypedMove,
+  type WorkflowEdit,
+} from "@pinetrie/threads"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import { keptTaskView } from "./canvas-columns.ts"
@@ -901,7 +903,7 @@ function planColumn(
  * in your inventory, its preview there, read only; one someone else holds,
  * or with no card, nothing.
  */
-export function planOpenLink(
+function planOpenLink(
   link: ThreadLink,
   entry: EntryId,
   state: IntentState,

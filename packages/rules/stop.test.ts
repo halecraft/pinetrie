@@ -1,24 +1,26 @@
 import {
-  type AgentMessageLike,
-  type CardRecord,
-  cardIdOfKind,
   type EntryId,
-  type EntryLike,
   ERR,
   entryId,
-  indexAsks,
-  indexTree,
-  type LaneView,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import {
+  type AgentMessageLike,
+  type CardRecord,
+  cardIdOfKind,
+  type EntryLike,
+  indexAsks,
+  indexTree,
+  type LaneView,
+} from "@pinetrie/threads"
 import {
   cardIdFor,
   FIXTURE_THREAD,
   lineMessage,
   personMessage,
   toolResultMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { encodeFact } from "./fact.ts"
 import { renderableMessage } from "./message.ts"

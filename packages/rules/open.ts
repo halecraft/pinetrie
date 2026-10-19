@@ -2,21 +2,23 @@
 // at an entry, a new canvas's new root, or a new root in a canvas the
 // session holds; or one branch of a proposal's press (`planBranchOpen`).
 
+import type {
+  CanvasId,
+  EntryId,
+  RootId,
+  ThreadId,
+  WriterId,
+} from "@pinetrie/core"
 import {
-  type CanvasId,
   type CardRecord,
-  type EntryId,
   entryThread,
   type Intent,
   type MoveRefusal,
   type ProposalBranch,
-  type RootId,
-  type ThreadId,
   type ThreadRecord,
   type ThreadStart,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { Workflow } from "./board.ts"
 import { planThreadOpen, type ThreadOpen } from "./canvas-index.ts"
 

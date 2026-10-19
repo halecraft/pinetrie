@@ -3,19 +3,7 @@
 // works; after it, what the composer shows (`settleSend`).
 // `card-editor.tsx` draws them.
 
-import {
-  type AgentCandidate,
-  type CanvasId,
-  type CardCommand,
-  parseMentions,
-  type QueueHoldChange,
-  type Recipients,
-  type SendMode,
-  sendWaits,
-  type ThreadId,
-  type ThreadLane,
-  type WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, ThreadId, WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   type AcceptedRecord,
@@ -27,6 +15,16 @@ import {
   shortId,
 } from "@pinetrie/rules"
 import type { SendHow } from "@pinetrie/session"
+import {
+  type AgentCandidate,
+  type CardCommand,
+  parseMentions,
+  type QueueHoldChange,
+  type Recipients,
+  type SendMode,
+  sendWaits,
+  type ThreadLane,
+} from "@pinetrie/threads"
 import { COMMAND_VERB } from "./card-words.ts"
 import type { Prefill } from "./columns.ts"
 import { UPLOADING } from "./paste.ts"
@@ -272,7 +270,7 @@ interface SendButton extends ButtonWords {
 }
 
 /** The button's label while a send that asks an agent has no model to ask. */
-export const NO_MODEL_LABEL = "no model"
+const NO_MODEL_LABEL = "no model"
 
 /** The link beside it, to the setup page. */
 export const SEE_SETUP = "See Setup"
@@ -361,7 +359,7 @@ export const placeholderWords = (plan: SendPlan): string =>
       : "say something · @agent to ask"
 
 /** Where a message queued now would wait: what the queue button says. */
-export type QueuePlace =
+type QueuePlace =
   /**
    * Last in a held queue that the send releases: `count` cards go, this one
    * with them.

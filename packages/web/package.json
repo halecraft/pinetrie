@@ -21,6 +21,7 @@
     "@pinetrie/protocol": "workspace:*",
     "@pinetrie/schema": "workspace:*",
     "@pinetrie/session": "workspace:*",
+    "@pinetrie/threads": "workspace:*",
     "@pinetrie/web-core": "workspace:*",
     "hast-util-to-jsx-runtime": "2.3.6",
     "react": "19.2.9",

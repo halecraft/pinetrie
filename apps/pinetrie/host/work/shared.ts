@@ -8,14 +8,14 @@
 // for good, from every lineage it read (`planForgottenReaders`). One
 // recorder for all of them, so no two read and write a lineage at once.
 
-import type {
-  EntryId,
-  SharedAccess,
-  SharedTouch,
-  ThreadId,
-  TurnShared,
+import {
+  type EntryId,
+  NO_SHARED,
+  type SharedAccess,
+  type SharedTouch,
+  type ThreadId,
+  type TurnShared,
 } from "@pinetrie/core"
-import { NO_SHARED } from "@pinetrie/core"
 import { readRevisions, readSharedLineages } from "@pinetrie/reads"
 import {
   deleteRecord,

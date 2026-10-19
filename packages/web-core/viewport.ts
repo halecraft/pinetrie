@@ -14,7 +14,7 @@ export interface Box {
 }
 
 /** One end of a column's view: a message, and how far through it (0 to 1). */
-export interface Edge {
+interface Edge {
   readonly id: string
   readonly at: number
 }
@@ -115,7 +115,7 @@ export function columnSpot(
 }
 
 /** Every spot kept, by the message it is at. */
-export type Spots = ReadonlyMap<string, Spot>
+type Spots = ReadonlyMap<string, Spot>
 
 /**
  * `spots` with `spot` as the one for the messages `shown`: a column's spot
@@ -210,7 +210,7 @@ export function railScroll(
 }
 
 /** What the rail reads of a mounted column's view. */
-export interface ColumnViewport {
+interface ColumnViewport {
   /** The column's colour track: its outline's colour. */
   readonly track: number
   /** Its messages from the view's top edge to its bottom edge, folded ones included. */
@@ -220,7 +220,7 @@ export interface ColumnViewport {
   readonly last: number
 }
 
-export interface Viewports {
+interface Viewports {
   /** Each mounted column's view, by its key. */
   readonly columns: ReadonlyMap<string, ColumnViewport>
   /** The column whose view changed last: the one the rail follows. */
@@ -240,7 +240,7 @@ export interface ViewportStore {
 }
 
 /** Whether a column's view is unchanged: the same messages, edges and colour. */
-export const sameViewport = (
+const sameViewport = (
   a: ColumnViewport | undefined,
   b: ColumnViewport,
 ): boolean =>

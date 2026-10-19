@@ -1,20 +1,17 @@
+import { entryId, type ThreadId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type EntryLike,
-  entryId,
   indexAsks,
   indexTree,
   type LaneView,
   type Proposal,
-  type ThreadId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import {
   entriesById,
   entry,
   personMessage,
   toolResultMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   columnProposals,

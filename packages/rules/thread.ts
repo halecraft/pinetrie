@@ -2,17 +2,14 @@
 // (each entry's `thread`, `firstOf` and `threadEnd` in @pinetrie/core), never
 // a record's.
 
+import { entryId, isRootId, type ThreadId, type WriterId } from "@pinetrie/core"
 import {
-  entryId,
-  isRootId,
   parseTextCardId,
   ROOT_ORIGIN,
   type TextCardId,
-  type ThreadId,
   type ThreadOrigin,
   type ThreadRecord,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
 import { decodeRecord, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"

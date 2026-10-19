@@ -4,7 +4,8 @@
 // records the write as the agent's, as it records `write`'s.
 
 import path from "node:path"
-import { SAVE_BLOB_TOOL, type Sha256, type ThreadId } from "@pinetrie/core"
+import type { Sha256, ThreadId } from "@pinetrie/core"
+import { SAVE_BLOB_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ToolContext } from "./lanes.ts"
 import { threadOfContext } from "./thread-context.ts"

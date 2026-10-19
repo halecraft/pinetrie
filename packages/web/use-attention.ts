@@ -3,16 +3,7 @@
 // canvas's, and keeps what changed as you watched long enough for a mark to
 // move (`moving`), a canvas's and a thread's. The decisions are `attention.ts`'s.
 
-import {
-  type AgentWork,
-  type CanvasId,
-  isBusy,
-  type LaneView,
-  laneWork,
-  type RootId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, RootId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   arrivals,
   attentionItems,
@@ -36,6 +27,12 @@ import {
   type WorkStripState,
 } from "@pinetrie/interface"
 import type { AttentionStore } from "@pinetrie/session"
+import {
+  type AgentWork,
+  isBusy,
+  type LaneView,
+  laneWork,
+} from "@pinetrie/threads"
 import {
   useEffect,
   useMemo,

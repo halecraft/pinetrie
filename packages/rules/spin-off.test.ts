@@ -1,17 +1,19 @@
 import {
-  type CardId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   type LaneRecord,
   rootIdFor,
-  type TextCard,
   threadIdFor,
-  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard, cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  type CardId,
+  type CardRecord,
+  cardIdOfKind,
+  type TextCard,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { canvasCard, cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CanvasIndex, NO_CANVAS_INDEX } from "./canvas-index.ts"
 import type { CardHistoryRecord } from "./card-history.ts"

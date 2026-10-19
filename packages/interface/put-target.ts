@@ -8,16 +8,20 @@
 // reachable by put, and every place put reaches accepts a drop.
 
 import {
-  type BackTarget,
   type CanvasId,
+  isCanvasId,
+  isWorkflowStateId,
+  type WorkflowStateId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
+  type BackTarget,
   type CanvasTarget,
   type CardId,
   type ImageId,
-  isCanvasId,
   isImageId,
   isMediaId,
   isNoteColumnId,
-  isWorkflowStateId,
   type MediaId,
   type NoteColumnId,
   notesTarget,
@@ -27,9 +31,7 @@ import {
   sameKey,
   type TargetOf,
   type TextPlace,
-  type WorkflowStateId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { Focus } from "./focus.ts"
 import type { ImageEdge } from "./image-edge.ts"
 

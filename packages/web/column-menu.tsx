@@ -4,13 +4,13 @@
 // its handle, the one part a drag starts from; and, unfolded, its ⋯ at the
 // end.
 
-import type { CardId } from "@pinetrie/core"
 import {
   COLUMN_MENU_LABEL,
   type ColumnHead,
   type ColumnMenuSection,
   type Intent,
 } from "@pinetrie/interface"
+import type { CardId } from "@pinetrie/threads"
 import { dragProps } from "@pinetrie/web-core"
 import type { ReactNode } from "react"
 import { IconButton } from "./button.tsx"

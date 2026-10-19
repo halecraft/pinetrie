@@ -1,4 +1,4 @@
-import { TOOL_IDS, type ToolCall, type ToolId } from "@pinetrie/core"
+import { TOOL_IDS, type ToolCall, type ToolId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { callLabel, PREVIEW_LENGTH, toolWord } from "./tool-words.ts"
 

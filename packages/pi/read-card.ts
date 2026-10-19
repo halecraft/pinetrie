@@ -4,7 +4,8 @@
 // The image part's bytes are the blob store's, so the session keeps it as a
 // reference, as `read`'s images are kept.
 
-import { READ_CARD_TOOL, type ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
+import { READ_CARD_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { threadOfContext } from "./thread-context.ts"
 

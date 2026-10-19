@@ -2,15 +2,14 @@
 // and menu, decided from its proposed changes' record. It writes no words: they
 // are the client's (`workStripWords`).
 
-import {
-  type AcceptsInto,
-  type CardCommand,
-  type ConflictCause,
-  isGetLatest,
-  type ParentThread,
-  type ProposedChangesRecord,
-  type ThreadBase,
+import type {
+  AcceptsInto,
+  ConflictCause,
+  ParentThread,
+  ProposedChangesRecord,
+  ThreadBase,
 } from "@pinetrie/core"
+import { type CardCommand, isGetLatest } from "@pinetrie/threads"
 import {
   effectiveBase,
   type FollowedBase,
@@ -309,7 +308,7 @@ export function workStripState(input: {
 }
 
 /** What the lane runs, as its strip cares: a queued catch-up while it is idle is one. */
-export const workStripActivity = (
+const workStripActivity = (
   activity: Exclude<WorkStripActivity, "get-latest">,
   queued: readonly CardCommand[],
 ): WorkStripActivity =>

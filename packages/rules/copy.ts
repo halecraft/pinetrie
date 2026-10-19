@@ -1,17 +1,15 @@
 // copy — a thread copied: a new thread forked at the source's end, put as its
 // own card where it was dropped.
 
+import type { ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import {
   type CardRecord,
   entryThread,
   type Intent,
   type MoveRefusal,
-  type ThreadId,
   type ThreadRecord,
   type TreeIndex,
-  type ValueWrite,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { planThreadOpen } from "./canvas-index.ts"
 import { threadCardHolding } from "./held.ts"
 import type { PlaceStep } from "./place-steps.ts"

@@ -9,11 +9,8 @@
 import { rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import {
-  ancestry,
   type EntryId,
   entryId,
-  GET_LATEST_TOOL,
-  messageText,
   type RevisionRecord,
   ROOT,
   type ThreadId,
@@ -21,6 +18,7 @@ import {
 import { scriptedModel } from "@pinetrie/pi"
 import { readPlaces, readRevisions } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
+import { ancestry, GET_LATEST_TOOL, messageText } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   at,

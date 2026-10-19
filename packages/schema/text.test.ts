@@ -5,7 +5,8 @@ import {
   merge,
   unwrap,
 } from "@kyneta/schema"
-import { textCardId, writerId } from "@pinetrie/core"
+import { writerId } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { cardDocId, cardIdOfDoc } from "./places.ts"
 import {

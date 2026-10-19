@@ -1,7 +1,7 @@
 // session/card-copies — when this client's copy of a card's text goes;
 // `card-texts.ts` carries it out.
 
-import type { CardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/threads"
 
 /**
  * Whether the host let go of a card's document: it left the document while

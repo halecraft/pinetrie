@@ -1,19 +1,16 @@
 // spin-off — a text card that becomes a thread, and the undo that lifts it
 // back into the card.
 
+import type { LaneRecord, RootId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   type CardId,
   type CardRecord,
   type Intent,
-  type LaneRecord,
   type Mention,
   type MoveRefusal,
   parseMentions,
   parseTextCardId,
-  type RootId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import {
   type CanvasIndex,
   type CanvasOpening,
@@ -29,7 +26,7 @@ import type { MoveStep } from "./place-steps.ts"
 export type SpinOff = Omit<Extract<Intent, { kind: "spin-off" }>, "kind">
 
 /** What a spin-off writes: the thread's opening, its first message, then the card's move. */
-export interface SpinOffPlan {
+interface SpinOffPlan {
   readonly kind: "spin"
   /** The new chat's root. */
   readonly root: RootId
@@ -45,7 +42,7 @@ export interface SpinOffPlan {
   readonly step: Extract<MoveStep, { kind: "write" }>
 }
 
-export type SpinOffRefusal =
+type SpinOffRefusal =
   | { readonly kind: "refused"; readonly code: MoveRefusal }
   /** A card with nothing in it starts no thread. */
   | { readonly kind: "blank" }

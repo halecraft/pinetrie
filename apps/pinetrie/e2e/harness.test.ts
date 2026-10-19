@@ -1,4 +1,5 @@
-import { entryId, rootIdFor, type TextCard, threadIdFor } from "@pinetrie/core"
+import { entryId, rootIdFor, threadIdFor } from "@pinetrie/core"
+import type { TextCard } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { composeCard, rootHolding, waitForRootHolding } from "./harness.ts"
 

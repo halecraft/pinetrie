@@ -1,14 +1,16 @@
 import {
   type EntryId,
   entryId,
-  type LiveOp,
   runId,
-  type Stream,
-  type StreamEvent,
-  streamId,
   type ThreadId,
   threadIdFor,
 } from "@pinetrie/core"
+import {
+  type LiveOp,
+  type Stream,
+  type StreamEvent,
+  streamId,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { planClear, planEndRun, planStream } from "./live.ts"
 

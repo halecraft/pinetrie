@@ -5,12 +5,10 @@ import {
   runId,
   SESSION_TARGET,
   type ThreadId,
-  textCardId,
   threadIdFor,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
   ACCEPTED,
@@ -27,6 +25,8 @@ import {
 } from "@pinetrie/rules"
 import { readNamespace } from "@pinetrie/schema"
 import { beginRun, newPlacesDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,

@@ -1,7 +1,7 @@
 import type { AgentMessage, CompactResult } from "@earendil-works/pi-agent-core"
 import { canvasIdFor, threadIdFor, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodeCanvas, encodeCanvasPinned, encodePinned } from "@pinetrie/rules"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 

@@ -3,8 +3,8 @@
 // paste's target (`targetOfFocus`) decide from it. It reads; it decides
 // nothing.
 
-import { type CardId, parseCardId } from "@pinetrie/core"
 import { DROP_ZONE, type Focus, targetOfElement } from "@pinetrie/interface"
+import { type CardId, parseCardId } from "@pinetrie/threads"
 import { blockOfProperty } from "./markdown.ts"
 import { isTextBox } from "./text-box.ts"
 

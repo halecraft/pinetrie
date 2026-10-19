@@ -3,15 +3,13 @@ import {
   ERR,
   entryId,
   type JjAcceptedRecord,
-  NOBODY,
   pointId,
-  type Recipients,
   runId,
   THE_AGENT,
-  type ThreadLane,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { NOBODY, type Recipients, type ThreadLane } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   baseChoices,

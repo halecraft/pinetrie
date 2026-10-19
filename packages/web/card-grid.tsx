@@ -8,13 +8,13 @@
 // not the grid's: it folds the bench or closes the panel. What a selection, a
 // move or a drop does is the caller's: an intent, planned like any other.
 
-import type { CardRecord } from "@pinetrie/core"
 import {
   dropProps,
   type GridView,
   gridKeyAct,
   type PutTarget,
 } from "@pinetrie/interface"
+import type { CardRecord } from "@pinetrie/threads"
 import { dragProps } from "@pinetrie/web-core"
 import { useRef } from "react"
 import { Button } from "./button.tsx"

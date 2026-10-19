@@ -1,13 +1,13 @@
 import {
   atEntry,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
   rootIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import { BOUND } from "./columns.ts"

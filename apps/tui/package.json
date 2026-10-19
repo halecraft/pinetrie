@@ -6,6 +6,7 @@
   "dependencies": {
     "@pinetrie/core": "workspace:*",
     "@pinetrie/interface": "workspace:*",
-    "@pinetrie/session": "workspace:*"
+    "@pinetrie/session": "workspace:*",
+    "@pinetrie/threads": "workspace:*"
   }
 }

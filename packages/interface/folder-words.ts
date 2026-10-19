@@ -9,7 +9,7 @@ const JJ_WORD =
   /\b(commit|commits|bookmark|bookmarks|revision|revisions|repo|repos|stack|stacks|WIP|WIPs|publish|published|publishing)\b/i
 
 /** Every string `value` holds, at any depth: a view's labels, titles and lines. */
-export function wordsIn(value: unknown): readonly string[] {
+function wordsIn(value: unknown): readonly string[] {
   if (typeof value === "string") return [value]
   if (Array.isArray(value)) return value.flatMap(wordsIn)
   if (value instanceof Map) return [...value.values()].flatMap(wordsIn)

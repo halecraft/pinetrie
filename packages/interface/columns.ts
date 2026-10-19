@@ -1,21 +1,23 @@
 // interface/columns — a thread's column as the page draws it.
 
+import type {
+  CanvasId,
+  EntryId,
+  RootId,
+  ThreadId,
+  WriterId,
+} from "@pinetrie/core"
 import {
-  type CanvasId,
   type CardId,
-  type EntryId,
   type ImageId,
   type LaneView,
   type MediaId,
   type NoteColumnId,
   type ReferenceCardId,
-  type RootId,
   type TextCardId,
-  type ThreadId,
   type TreeIndex,
   threadEnd,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { Density } from "./ask-words.ts"
 
 /**
@@ -120,7 +122,7 @@ export interface UnstartedMode {
  * How a column's next send writes: `bound` at its thread's end;
  * `unstarted`, its thread's first message (`UnstartedMode`).
  */
-export type ColumnMode = { readonly kind: "bound" } | UnstartedMode
+type ColumnMode = { readonly kind: "bound" } | UnstartedMode
 
 /** A column's unstarted mode, or undefined for a bound one. */
 export const unstartedMode = (

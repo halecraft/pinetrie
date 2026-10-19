@@ -1,14 +1,14 @@
 // interface/trashable — whether you may trash a card: the one test a
 // trash, a cut and a slot's replacement all ask.
 
+import type { WriterId } from "@pinetrie/core"
 import {
   type CardFittingPlace,
   type CardRecord,
   cardFitsPlace,
   isMovable,
   type MovableKind,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** A card you may trash: a kind ever in a trash that a person moves. */
 export type Trashable = Extract<

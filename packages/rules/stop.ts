@@ -1,25 +1,27 @@
 // stop — who stopped an ask's run, and carrying on after it.
 
 import {
+  type EntryId,
+  ERR,
+  type ErrCode,
+  type Refusal,
+  refused,
+  type ThreadId,
+  type ValueWrite,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   type AskIndex,
   type AskOutcome,
   askOutcome,
   type CardRecord,
-  type EntryId,
-  ERR,
-  type ErrCode,
   type FactCardId,
   indexAsks,
   isBusy,
   type LaneView,
-  type Refusal,
-  refused,
   runPrompt,
-  type ThreadId,
   type TreeIndex,
-  type ValueWrite,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
 import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"

@@ -1,14 +1,12 @@
 import {
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
   threadIdFor,
-  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { Workflow } from "@pinetrie/rules"
+import { type CardRecord, cardIdOfKind, UNTICKED } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   boardPlaceWords,

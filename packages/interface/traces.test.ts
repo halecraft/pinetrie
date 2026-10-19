@@ -1,6 +1,6 @@
 import { entryId, rootIdFor, threadIdFor, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { TracedPlace, TraceRecord } from "@pinetrie/rules"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { endTraces, keptTraces, seenBatches, traceGroups } from "./traces.ts"
 

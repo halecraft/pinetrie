@@ -5,18 +5,10 @@
 // its own.
 
 import {
-  type CardCommand,
-  type CardId,
-  type CardPlace,
-  type CardRecord,
-  cardCommand,
   firstLine,
-  type MediaId,
-  type NoteColumnId,
   type Sha256,
   type ThreadId,
   type ThreadName,
-  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -24,6 +16,16 @@ import {
   displayName,
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
+import {
+  type CardCommand,
+  type CardId,
+  type CardPlace,
+  type CardRecord,
+  cardCommand,
+  type MediaId,
+  type NoteColumnId,
+  type TitledCardId,
+} from "@pinetrie/threads"
 import { addressWords } from "./address-words.ts"
 import type { Status } from "./attention.ts"
 import type { CardTone } from "./card-frame.ts"
@@ -54,7 +56,7 @@ export type DrawnCard = Exclude<CardRecord, { readonly kind: "canvas" }>
 export type DrawnKind = DrawnCard["kind"]
 
 /** Whose a compact is: a writer's circle, a thread's icon, or nobody's. */
-export type CompactMark =
+type CompactMark =
   | { readonly kind: "writer"; readonly writer: WriterId }
   | {
       readonly kind: "thread"
@@ -68,12 +70,12 @@ export type CompactMark =
  * A compact's lead: its text, or a reference's quote, which the page reads
  * from its blob, drawn as `until` before it has.
  */
-export type CompactText =
+type CompactText =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "quote"; readonly quote: Sha256; readonly until: string }
 
 /** What a compact's header ends with: its slot's 1–9, or a thread's status. */
-export type CompactBadge =
+type CompactBadge =
   | { readonly kind: "key"; readonly key: string }
   | { readonly kind: "status"; readonly glance: ThreadGlance }
 

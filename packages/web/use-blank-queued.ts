@@ -4,10 +4,10 @@
 // stops being blank, so typing in a queued card redraws nothing that reads it.
 
 import { subscribe } from "@kyneta/schema"
-import { type CardId, type CardRecord, isTextCard } from "@pinetrie/core"
 import { blankQueued } from "@pinetrie/interface"
 import { textHolds } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
+import { type CardId, type CardRecord, isTextCard } from "@pinetrie/threads"
 import { useEffect, useMemo, useState } from "react"
 
 const sameSet = (a: ReadonlySet<CardId>, b: ReadonlySet<CardId>): boolean =>

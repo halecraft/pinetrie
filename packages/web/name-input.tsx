@@ -2,8 +2,8 @@
 // your profile page: one rule (`normalizeName`, through `identity.ts`) and one
 // wording for both.
 
-import { MAX_NAME_LENGTH } from "@pinetrie/core"
 import { nameHint } from "@pinetrie/interface"
+import { MAX_NAME_LENGTH } from "@pinetrie/threads"
 
 /** Why `normalizeName` refuses a name, in the client's words. */
 export const NAME_PROBLEM = `a name with a letter or digit, up to ${MAX_NAME_LENGTH} characters, and not “agent”`

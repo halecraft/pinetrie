@@ -1,24 +1,26 @@
 // board — the team's workflow and each canvas's card on the board.
 
 import {
-  type ArchivedCanvas,
   type CanvasId,
-  type CardId,
-  type CardInPlace,
-  type CardPlace,
-  type CardRecord,
   ERR,
-  hasPlaceKind,
   isWorkflowStateId,
-  type PlaceRefusal,
   type Refusal,
   refused,
   type ValueWrite,
-  type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
   workflowStateIdFor,
 } from "@pinetrie/core"
+import {
+  type ArchivedCanvas,
+  type CardId,
+  type CardInPlace,
+  type CardPlace,
+  type CardRecord,
+  hasPlaceKind,
+  type PlaceRefusal,
+  type WorkflowEdit,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { byOrder } from "./card.ts"
 import type { CardHistoryRecord } from "./card-history.ts"
@@ -116,19 +118,17 @@ export const planWorkflowSeed = (
   workflow === null ? [setRecord(WORKFLOW, defaultWorkflow(newId))] : []
 
 /** Every state, open then the archive: the board's columns. */
-export const boardStates = (w: Workflow): readonly WorkflowState[] => [
+const boardStates = (w: Workflow): readonly WorkflowState[] => [
   ...w.open,
   w.archive,
 ]
 
 /** The state `id` names, or undefined. */
-export const stateIn = (
-  w: Workflow,
-  id: WorkflowStateId,
-): WorkflowState | undefined => boardStates(w).find(s => s.id === id)
+const stateIn = (w: Workflow, id: WorkflowStateId): WorkflowState | undefined =>
+  boardStates(w).find(s => s.id === id)
 
 /** A canvas's card on the board. */
-export type BoardCard = CardInPlace<"board">
+type BoardCard = CardInPlace<"board">
 
 /** Whether `c` is a canvas's card on the board. */
 export const isBoardCard = (c: CardRecord): c is BoardCard =>
@@ -143,13 +143,13 @@ export const boardCanvases = (
 ): ReadonlySet<CanvasId> => new Set(cards.filter(isBoardCard).map(c => c.id))
 
 /** A column of the board: a state and its canvases, in order. */
-export interface BoardColumn {
+interface BoardColumn {
   readonly state: WorkflowState
   readonly canvases: readonly CanvasId[]
 }
 
 /** Every canvas in its state, in order. */
-export interface Board {
+interface Board {
   readonly open: readonly BoardColumn[]
   readonly archive: BoardColumn
   /** Each canvas's state. */
@@ -231,7 +231,7 @@ export function tasksInArchive(
 }
 
 /** Whether a move crosses the archive's edge: what the host must gather. */
-export type Transition = "within" | "archive" | "restore"
+type Transition = "within" | "archive" | "restore"
 
 export function stateTransition(
   workflow: Workflow,
@@ -336,7 +336,7 @@ export function boardEnd(
 }
 
 /** A change to the workflow, as the host plans it. */
-export type WorkflowPlan =
+type WorkflowPlan =
   | Refusal
   | { readonly kind: "unchanged" }
   | { readonly kind: "write"; readonly workflow: Workflow }

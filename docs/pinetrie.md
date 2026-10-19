@@ -105,8 +105,9 @@ Playwright.
 ```
 apps/pinetrie/         @pinetrie/app          host and e2e suites (run, never imported)
 apps/conformance/      @pinetrie/conformance  pi's Storage suite vs our adapter
-packages/core/         @pinetrie/core         declares NOTHING
-packages/schema/       @pinetrie/schema       core and Kyneta only; the document shape
+packages/core/         @pinetrie/core         declares NOTHING; the kernel: ids, refusals, writes, lanes, disks, histories (ADR-0201)
+packages/threads/      @pinetrie/threads      core only; threads, messages, commands and cards; no lane package declares it (ADR-0201)
+packages/schema/       @pinetrie/schema       core, threads and Kyneta only; the document shape
 packages/pi/           @pinetrie/pi           THE pi boundary
 packages/protocol/     @pinetrie/protocol     the wire contract and its codec
 packages/rules/        @pinetrie/rules        each stored shape and the pure rules about it
@@ -128,7 +129,7 @@ packages/web/          @pinetrie/web          the browser page: React and the DO
 (root)                                        development tooling only
 ```
 
-Dependency direction is physical: **core → schema, protocol, rules → reads →
+Dependency direction is physical: **core → threads → schema, protocol, rules → reads →
 session → interface → web → app**, with `shell` under the interface. `pi`,
 `config` and the lanes' packages (`lanes`, `lanehost`, `channel`, `docker`,
 `vm`, `jj`, `folder`, `keeper`, `ssh`) sit beside that line: the app and
@@ -236,13 +237,13 @@ swapped argument is a compile error. They are minted where they enter: the proto
 reads (`renderableEntry`), the schema's readers, `@pinetrie/rules`' decoders, a
 commit's trailer (`packages/core/trailers.ts`), the pi adapter, the page's
 stored forms, and the host's id generator. Biome's `noRestrictedImports`
-(`biome.json`) refuses `entryId` and `threadIdFor` in core, the interface,
+(`biome.json`) refuses `entryId` and `threadIdFor` in core, threads, the interface,
 the page and the host, and `runId` in all of them but the host (S95): a new
 thread's id is minted by `newThreadId`, in `@pinetrie/session`, alone. A `LocalSeq` brand was deleted (ADR-0013
 above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
-pure and imports nothing, and `@pinetrie/rules` decides from what
+pure and imports nothing, `packages/threads` imports only core, and `@pinetrie/rules` decides from what
 `@pinetrie/reads` and the adapters gather; the shell in `apps/pinetrie/host/`
 performs the decision. This mirrors pi's own lane loop. Each operation reads
 its facts once and calls one plan, which its package exports in place of
@@ -268,7 +269,7 @@ scroll; a branch opens beside its parent in its rail track's colour, and
 the rail draws the tree of each root the canvas's threads are in, with each
 uneventful stretch drawn as one capsule (ADR-0031), a long ask's work a
 capsule of its own (ADR-0106).
-Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
+Views are pure functions over one `indexTree` (`packages/threads/tree.ts`,
 `roots.ts`); which canvas you are on and your view of each canvas are
 a reducer in `packages/interface/layout.ts`, the sidebar is your `open:`
 document (`packages/session/open-threads.ts`), and the inbox is
@@ -421,7 +422,7 @@ your words only under `drawn`.
 
 **A column folds each ask's work** (ADR-0106). An ask is a message that
 started a run, with that run, read from the tree (`indexAsks`,
-`packages/core/asks.ts`). A column is read in brief, story or everything (stored `outline`, `story`, `raw`): story
+`packages/threads/asks.ts`). A column is read in brief, story or everything (stored `outline`, `story`, `raw`): story
 shows each ask's message, one digest line folding its work, and its last
 word. The rail and the column compact the same stretches: one landmark rule
 (`railLandmarks`) is drawn apart in both, and a long ask is a dot and a

@@ -1,7 +1,6 @@
 // session/host-line — requests to the host, each answered by the reply that
 // carries its id.
 
-import type { Intent } from "@pinetrie/core"
 import {
   decodeReply,
   encodeIntent,
@@ -9,6 +8,7 @@ import {
   revOfReply,
 } from "@pinetrie/protocol/codec"
 import type { Command, Reply } from "@pinetrie/protocol/messages"
+import type { Intent } from "@pinetrie/threads"
 
 /** The host's answer: its outcome, and the places document's `rev` it carried. */
 export interface Answered {

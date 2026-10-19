@@ -122,11 +122,8 @@ function labelOf(
 }
 
 /** A command's qualified name, without the slash. */
-export const qualified = (
-  label: string,
-  kind: CommandKind,
-  name: string,
-): string => (kind === "skill" ? `${label}:skill:${name}` : `${label}:${name}`)
+const qualified = (label: string, kind: CommandKind, name: string): string =>
+  kind === "skill" ? `${label}:skill:${name}` : `${label}:${name}`
 
 /**
  * Every command under its package's label, and what is refused.

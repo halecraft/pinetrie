@@ -5,13 +5,7 @@
 // a ✓ that fades), and the others reading in it. Each reads presence itself, so
 // a presence write redraws it and not the list or the board.
 
-import type {
-  CanvasId,
-  EntryId,
-  ThreadId,
-  TreeIndex,
-  WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   detailsTitle,
   moving,
@@ -31,6 +25,7 @@ import {
   withOpenMenus,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { TreeIndex } from "@pinetrie/threads"
 import { useMemo, useState } from "react"
 import { Button } from "./button.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"

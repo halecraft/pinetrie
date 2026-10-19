@@ -1,10 +1,5 @@
-import {
-  type AskOutcome,
-  entryId,
-  rootIdFor,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, rootIdFor, threadIdFor, writerId } from "@pinetrie/core"
+import type { AskOutcome } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import type { AskLines, DigestPlan, DigestRecord } from "./digest.ts"
 import {

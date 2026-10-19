@@ -31,7 +31,7 @@ export const CONFLICT_ASK: RecordSpec<ConflictAskRecord, ThreadId, "session"> =
   }
 
 /** What an `ask_about_conflict` call comes to. */
-export interface ConflictAskPlan {
+interface ConflictAskPlan {
   /** The person is asked: the lane's copy has a conflict to ask about. */
   readonly asked: boolean
   readonly writes: readonly ValueWrite<"session">[]

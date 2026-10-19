@@ -138,7 +138,7 @@ export const revisionReadWords = (failed: string | null): string =>
     : `could not read this revision: ${failed}`
 
 /** What a revision's `pinetrie.json` would let every lane do once accepted, in one line; "" for nothing. */
-export const wideningLine = (widenings: readonly ConfigWidening[]): string =>
+const wideningLine = (widenings: readonly ConfigWidening[]): string =>
   widenings.length === 0
     ? ""
     : `Accepting this lets threads use ${widenings.map(wideningWords).join(", ")}.`

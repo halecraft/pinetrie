@@ -202,7 +202,7 @@ changes pine·trie can keep this note true. You can skip them.
   things. You always have the tool, but it asks only while this copy has a
   conflict; otherwise it answers that there is nothing to ask about.
   <!-- packages/rules/land.ts LAND_TYPE -->
-  <!-- packages/core/tools.ts CONFLICT_TOOL -->
+  <!-- packages/threads/tools.ts CONFLICT_TOOL -->
   <!-- packages/pi/lanes.ts NO_CONFLICTS -->
 
 ## This thread's base
@@ -216,7 +216,7 @@ changes pine·trie can keep this note true. You can skip them.
   there is something new, and only as the one tool call in its turn: a call
   beside another is refused. A conflicted merge answers with the conflicts,
   to resolve here. <!-- packages/rules/agent-commands.ts planGetLatestCall -->
-  <!-- packages/core/tools.ts GET_LATEST_TOOL -->
+  <!-- packages/threads/tools.ts GET_LATEST_TOOL -->
 - `split_proposed_changes` asks for this thread's proposed changes to be
   split into a stack of reviewable revisions. The split runs after your run, as a run of its own.
   <!-- packages/rules/agent-commands.ts planSplitCall -->

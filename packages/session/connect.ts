@@ -10,21 +10,7 @@ import {
 } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
-import {
-  type CanvasId,
-  type CardId,
-  type CardPlace,
-  type CardRecord,
-  type Intent,
-  isTextCard,
-  isTextCardId,
-  type Paste,
-  placeKey,
-  TRASH_PLACE,
-  type TypedMove,
-  type WriterId,
-  writerOfPrincipal,
-} from "@pinetrie/core"
+import { type CanvasId, type WriterId, writerOfPrincipal } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { Control } from "@pinetrie/protocol/line"
 import {
@@ -53,6 +39,18 @@ import {
   SessionDoc,
   textVersion,
 } from "@pinetrie/schema"
+import {
+  type CardId,
+  type CardPlace,
+  type CardRecord,
+  type Intent,
+  isTextCard,
+  isTextCardId,
+  type Paste,
+  placeKey,
+  TRASH_PLACE,
+  type TypedMove,
+} from "@pinetrie/threads"
 import { type ActingCommand, type ActingState, NO_ACTING } from "./acting.ts"
 import { attentionStore, startingSince } from "./attention-doc.ts"
 import {

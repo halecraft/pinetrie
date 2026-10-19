@@ -25,7 +25,7 @@
 
 import type { SessionStats } from "@earendil-works/pi-agent-core"
 import type { Usage } from "@earendil-works/pi-ai"
-import { orderNewEntries } from "@pinetrie/core"
+import { orderNewEntries } from "@pinetrie/threads"
 import { addUsage, emptyUsage } from "./deep.ts"
 
 export type Arrival =

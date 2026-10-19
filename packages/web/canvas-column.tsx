@@ -6,13 +6,7 @@
 // does. Folded, it is a `FoldedStrip` with its title, and no mark or box.
 // What it says is `canvasColumnView`'s.
 
-import type {
-  CanvasId,
-  CanvasPinnedView,
-  CardId,
-  EntryId,
-  TextCard,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId } from "@pinetrie/core"
 import {
   boardPlaceWords,
   CANVAS_BUSY_REASON,
@@ -39,6 +33,7 @@ import {
   UNFOLD_CANVAS,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { CanvasPinnedView, CardId, TextCard } from "@pinetrie/threads"
 import { useState } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { PinnedCardEditor } from "./card-editor.tsx"

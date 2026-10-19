@@ -3,15 +3,14 @@
 // straight stretch of uneventful messages drawn as one capsule, each item
 // placed in rows and across.
 
+import type { EntryId, RevisionRecord } from "@pinetrie/core"
 import {
   type AskIndex,
-  type EntryId,
   entryAsk,
   isLongAsk,
   type RailRow,
-  type RevisionRecord,
   type TreeIndex,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type WorkStats, workStats } from "./work-stats.ts"
 
 interface RailItemBase {
@@ -30,7 +29,7 @@ interface RailItemBase {
 }
 
 /** A message the rail draws on its own. */
-export interface RailDot extends RailItemBase {
+interface RailDot extends RailItemBase {
   readonly kind: "dot"
   readonly span: 1
   readonly ids: readonly [EntryId]

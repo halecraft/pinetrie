@@ -1,13 +1,10 @@
 // web/markdown — message text as the tree `MessageText` draws.
 
 import {
-  addressOfUrl,
-  type BlockRef,
   blobKind,
   blobOfUrl,
   blobUrl,
   type ImageRef,
-  printAddress,
   type Sha256,
   type Share,
 } from "@pinetrie/core"
@@ -18,6 +15,7 @@ import {
   markBlocks,
   shareChip,
 } from "@pinetrie/interface"
+import { addressOfUrl, type BlockRef, printAddress } from "@pinetrie/threads"
 import type { Element, ElementContent, Root, RootContent } from "hast"
 import remarkGfm from "remark-gfm"
 import remarkParse from "remark-parse"

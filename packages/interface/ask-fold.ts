@@ -15,7 +15,7 @@ import { type CountsAt, type Density, foldWords } from "./ask-words.ts"
 import { plural } from "./counts.ts"
 
 /** What the reader chose for an ask's work, if anything. */
-export type FoldChoice = "open" | "closed"
+type FoldChoice = "open" | "closed"
 
 /** What decides whether an ask's work is drawn open. */
 export interface FoldFacts {
@@ -46,10 +46,7 @@ export function foldOpen(f: FoldFacts): boolean {
 }
 
 /** A fold of an ask's work: its head's words, and the messages it holds. */
-export type FoldRow = Pick<
-  Extract<Segment, { kind: "fold" }>,
-  "kind" | "ids"
-> & {
+type FoldRow = Pick<Extract<Segment, { kind: "fold" }>, "kind" | "ids"> & {
   /** The ask's first fold on this path (`Segment.first`). */
   readonly first: boolean
   /** Its head's words: the ask's counts and outcome on its first fold in story, else its step count. */
@@ -65,7 +62,7 @@ export type AskRow =
   | { readonly kind: "outcome"; readonly text: string }
 
 /** Where an ask's one summary is drawn. */
-export type SummaryAnchor =
+type SummaryAnchor =
   /** After outline's line. */
   | { readonly kind: "line" }
   /** After the fold row whose first id is `fold`: the ask's first fold. */

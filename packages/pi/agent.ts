@@ -18,9 +18,7 @@ import {
   isThreadId,
   type RootId,
   type Spot,
-  type StreamEvent,
   type ThreadId,
-  TOOL_IDS,
 } from "@pinetrie/core"
 import {
   type BannerAnswer,
@@ -34,6 +32,7 @@ import {
   readLaneTip,
   type ScratchDocHandle,
 } from "@pinetrie/schema"
+import { type StreamEvent, TOOL_IDS } from "@pinetrie/threads"
 import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
 import { NO_MODEL_STAND_IN } from "./config.ts"

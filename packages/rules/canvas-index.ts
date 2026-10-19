@@ -3,16 +3,23 @@
 import {
   agentAsk,
   type CanvasId,
+  type EntryId,
+  isThreadId,
+  type RootId,
+  type ThreadId,
+  type ValueWrite,
+  type WorkflowStateId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   type CanvasKey,
   type CanvasTarget,
   type CardId,
   type CardInPlace,
   type CardPlace,
   type CardRecord,
-  type EntryId,
   forkEntry,
   hasPlaceKind,
-  isThreadId,
   livePlace,
   type MoveTarget,
   makeCard,
@@ -21,20 +28,15 @@ import {
   type PlaceKey,
   type PlaceOf,
   type RankedCanvas,
-  type RootId,
   type SurfaceOwner,
   surfaceOwner,
   type ThreadFork,
-  type ThreadId,
   type ThreadOrigin,
   type ThreadRecord,
   type TreeIndex,
   threadOfPlace,
   UNTICKED,
-  type ValueWrite,
-  type WorkflowStateId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { boardEnd, type Workflow } from "./board.ts"
 import { type MakeStep, type PlaceStep, planMake } from "./place-steps.ts"
 import { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"

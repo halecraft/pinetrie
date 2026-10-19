@@ -1,5 +1,5 @@
 // interface/tool-words — what people call each tool, and a call as one line of
-// words. The model calls a tool by its id (`TOOL_IDS`, core); a person reads
+// words. The model calls a tool by its id (`TOOL_IDS`, threads); a person reads
 // its word. Revision titles, an ask's live line, copied calls and a row's tag
 // all read these.
 
@@ -24,7 +24,7 @@ import {
   type ToolCall,
   type ToolId,
   WRITE_TOOL,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** What each tool's call did, as people read it on its row. */
 const TOOL_WORDS: Readonly<Record<ToolId, string>> = {

@@ -1,14 +1,11 @@
+import { entryId, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
+import { addressLink } from "@pinetrie/rules"
 import {
   type CardRecord,
   cardIdOfKind,
-  entryId,
   entryMessage,
-  type Sha256,
   textCardId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { addressLink } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { type ClipFacts, clipOfFocus } from "./clip.ts"
 import { NO_FOCUS, tree } from "./fixtures.ts"

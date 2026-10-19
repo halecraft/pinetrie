@@ -15,7 +15,6 @@ import {
   type CanvasId,
   type EntryId,
   ERR,
-  type Intent,
   type RevisionRecord,
   refused,
   type WriterId,
@@ -39,6 +38,7 @@ import {
   planWorkflowChange,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import type { Intent } from "@pinetrie/threads"
 import type { Basics, HostKeeper } from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"

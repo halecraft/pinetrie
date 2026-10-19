@@ -1,11 +1,11 @@
+import { entryId } from "@pinetrie/core"
 import {
   type AgentMessageLike,
   type EntryLike,
-  entryId,
   indexAsks,
   indexTree,
-} from "@pinetrie/core"
-import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { DigestRecord } from "./digest.ts"
 import type { FocusRecord } from "./focus.ts"

@@ -14,7 +14,7 @@ import { count } from "./counts.ts"
 export type InboxSection = "needs-you" | "ready" | "worth-a-read" | "mentions"
 
 /** A group of the threads you follow: every section but the mentions. */
-export type ThreadSection = Exclude<InboxSection, "mentions">
+type ThreadSection = Exclude<InboxSection, "mentions">
 
 const ORDER: readonly InboxSection[] = [
   "needs-you",

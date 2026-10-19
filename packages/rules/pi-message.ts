@@ -4,17 +4,16 @@
 // not decode, is no message: pi writes no other role into a root, and a
 // `custom` one no history decoder takes was stored in an older shape.
 
+import { type PointId, pointId } from "@pinetrie/core"
 import {
   type AgentMessageLike,
   GET_LATEST_TOOL,
   type MessageContent,
   type MessagePart,
-  type PointId,
   PROPOSE_TOOL,
   type Proposal,
-  pointId,
   storedImage,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
 import { isWellFormed } from "./decode.ts"
 import { decodeProposal } from "./proposal.ts"

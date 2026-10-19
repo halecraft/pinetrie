@@ -6,7 +6,7 @@
 import type { Sha256 } from "@pinetrie/core"
 
 /** An upload's answer, as `SessionClient.upload` gives it, with what this reads of its ref. */
-export type ImageUpload =
+type ImageUpload =
   | { readonly ok: false }
   | {
       readonly ok: true

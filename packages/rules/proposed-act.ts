@@ -6,18 +6,18 @@ import type {
   AcceptanceDecision,
   AcceptanceFacts,
   ErrCode,
-  ProposedChangesFact,
   ProposedChangesGather,
   ProposedChangesSeen,
   Rebuild,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
+import type { ProposedChangesFact } from "@pinetrie/threads"
 import { acceptedFact, actionFact } from "./fact.ts"
 import { planAcceptance, planDescribeAgain, planRebuild } from "./proposed.ts"
 
 /** What an action on proposed changes does, with its fact; or why not. */
-export type ProposedAct =
+type ProposedAct =
   | { readonly kind: "refused"; readonly code: ErrCode }
   /** Describe the proposed changes again, once the command is done. */
   | { readonly kind: "describe"; readonly fact: ProposedChangesFact }

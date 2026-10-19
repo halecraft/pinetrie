@@ -9,7 +9,7 @@ import type { Intent } from "./intent.ts"
 import type { CanvasPut } from "./put-target.ts"
 
 /** One thing ＋ starts: its main action, or an item of its ▾. */
-export interface StartItem {
+interface StartItem {
   readonly key: string
   readonly label: string
   /** Its accessible name where the button shows ＋ alone. */
@@ -111,7 +111,7 @@ const item = (make: NewColumn, intent: Intent): StartItem => ({
  * the end of the first open state (null before the board has arrived), or a
  * board column, whose canvas lands at the end of its state.
  */
-export type CanvasStart =
+type CanvasStart =
   | { readonly from: "sidebar"; readonly landsIn: WorkflowState | null }
   | { readonly from: "board"; readonly landsIn: WorkflowState }
 

@@ -4,7 +4,8 @@
 // which opens its details; an unfolded head ends in its ⋯, what changes the
 // canvas everyone shares, ending in its trash.
 
-import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
+import { isThreadId } from "@pinetrie/core"
+import type { CardId, CardWidth } from "@pinetrie/threads"
 import { moveWords } from "./card-frame.ts"
 import {
   type ControlWords,
@@ -19,7 +20,7 @@ import type { Intent } from "./intent.ts"
  * An item of a column's ⋯: one that asks an intent, or one the page opens
  * itself (its title field, its pin box), as the sidebar's Rename is.
  */
-export type ColumnMenuItem = {
+type ColumnMenuItem = {
   readonly key: string
   readonly label: string
   readonly title: string
@@ -36,13 +37,13 @@ export interface ColumnMenuSection {
 }
 
 /** A button of a head: what it says, and what a press asks. */
-export interface HeadButton {
+interface HeadButton {
   readonly words: ControlWords
   readonly intent: Intent
 }
 
 /** A column's box: whether it is ticked, what it says, and what a press asks; null intent for a reader who may not change it. */
-export interface HeadBox {
+interface HeadBox {
   readonly ticked: boolean
   readonly title: string
   readonly intent: Intent | null

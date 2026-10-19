@@ -6,13 +6,13 @@ import type { Exchange } from "@kyneta/exchange"
 import {
   type EntryId,
   ERR,
-  type MessageAt,
   type RootId,
   rootDocId,
   rootOfDocId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { RootDoc, type RootDocHandle } from "@pinetrie/schema"
+import type { MessageAt } from "@pinetrie/threads"
 import { newRootId } from "./ids.ts"
 import { planHold } from "./root-hold.ts"
 import { type Readable, readable, snapshotStore } from "./store.ts"

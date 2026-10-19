@@ -6,25 +6,15 @@
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import {
   type CanvasId,
-  type CardId,
-  type CardRecord,
   canvasIdFor,
   type EntryId,
-  indexTree,
-  makeCard,
-  NO_CONTENT,
-  NOBODY,
-  type NoteColumnId,
   proveRunnable,
-  ROOT_ORIGIN,
   type RootId,
   type RunnableLane,
   rootIdFor,
-  type Send,
   type Target,
   type ThreadId,
   threadIdFor,
-  UNTICKED,
   type ValueWrite,
   type WorkflowStateId,
   type WriterId,
@@ -76,6 +66,18 @@ import {
   newSessionDoc,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
+import {
+  type CardId,
+  type CardRecord,
+  indexTree,
+  makeCard,
+  NO_CONTENT,
+  NOBODY,
+  type NoteColumnId,
+  ROOT_ORIGIN,
+  type Send,
+  UNTICKED,
+} from "@pinetrie/threads"
 import type { Basics, HostKey } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { HostDocuments } from "./docs.ts"

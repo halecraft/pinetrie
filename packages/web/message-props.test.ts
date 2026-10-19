@@ -1,4 +1,4 @@
-import { entryId, streamId } from "@pinetrie/core"
+import { entryId } from "@pinetrie/core"
 import {
   messageTools,
   projectColumns,
@@ -6,6 +6,7 @@ import {
 } from "@pinetrie/interface"
 import { entry, indexEntries } from "@pinetrie/interface/fixtures"
 import { newLiveDoc } from "@pinetrie/schema/fixtures"
+import { streamId } from "@pinetrie/threads"
 import { screenMemory } from "@pinetrie/web-core"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"

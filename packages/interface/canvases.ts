@@ -2,17 +2,12 @@
 // (`indexCanvases`, the host's too), each canvas with its threads and their
 // roots. A canvas's signals are its threads' (`canvasStatus`, `canvasWork`).
 
-import type {
-  CanvasId,
-  CardRecord,
-  RootId,
-  ThreadId,
-  ThreadRecord,
-} from "@pinetrie/core"
+import type { CanvasId, RootId, ThreadId } from "@pinetrie/core"
 import { boardCanvases, type CanvasIndex, indexCanvases } from "@pinetrie/rules"
+import type { CardRecord, ThreadRecord } from "@pinetrie/threads"
 
 /** One canvas, as the page reads it. */
-export interface CanvasThreads {
+interface CanvasThreads {
   readonly canvas: CanvasId
   /** Its thread cards, in its canvas's order. */
   readonly threads: readonly ThreadId[]

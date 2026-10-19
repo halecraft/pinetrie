@@ -31,14 +31,17 @@ Where a rule lives, as `packages/rules/TECHNICAL.md` and
 `packages/jj/TECHNICAL.md` state it too:
 
 > A type lives in the highest package that all its users can import
-> (ADR-0180). Core holds the vocabulary (ids, intents) and the reads of
-> the tree. A stored shape's type is `@pinetrie/rules`', beside its spec,
-> with the types only it uses. A type core's own code names, or one a
-> package below rules must read, write or name (one that declares
-> `@pinetrie/core` and not `@pinetrie/rules`: `lanes`, `jj`, `folder`
-> among them), lives in core instead. What a stored shape says, and how
-> the host changes it, is `@pinetrie/rules`', whoever reads it. One
-> client's own in-flight state (its moves, held roots, slot repair,
+> (ADR-0180). Core is the kernel every package shares: ids, refusals,
+> writes, and what a lane, its disk and its history are. `@pinetrie/threads`
+> holds threads, their entries and messages, the commands a client
+> sends, and the cards placed beside them; no lane package declares it
+> (ADR-0201). A stored shape's type is `@pinetrie/rules`', beside its spec,
+> with the types only it uses. A type a package below rules must read,
+> write or name (one that declares core and not rules) lives in core
+> when core's own code or a lane package (`lanes`, `jj`, `folder`
+> among them) names it, and in threads otherwise. What a stored shape
+> says, and how the host changes it, is `@pinetrie/rules`', whoever reads it.
+> One client's own in-flight state (its moves, held roots, slot repair,
 > commands out) is `@pinetrie/session`'s. What a person sees and can do,
 > and its words, is `@pinetrie/interface`'s, for any client; how the page
 > draws it is `@pinetrie/web`'s (ADR-0093).
@@ -177,7 +180,7 @@ session or someone else's inventory throws before it is made.
   `yourCard` finds the card still your message at the thread's end between the
   reply and the change, and takes it back.
 - **A reorder is tracked as a move is** (`reorderCard`, ADR-0048 step 7):
-  a pending `reorder` is drawn by running core's rules' `planReorder` over
+  a pending `reorder` is drawn by running rules' `planReorder` over
   what is drawn, so the card sits where the host will put it, its queuer and
   placer kept, until the copy reaches the reply's `rev`. A refused one draws
   nothing, and its refusal is kept where you acted. It is not a
@@ -242,7 +245,7 @@ session or someone else's inventory throws before it is made.
 - **`settleSlots` is the one slot rule**: the page's panel draws it
   (`inventoryView`, `@pinetrie/interface`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
-  first empty. Both are core's grid rule (`grid.ts`).
+  first empty. Both are threads' grid rule (`grid.ts`).
 - **The grid grows past its 12 slots only while you hold more**
   (`inventoryGrid(held.length)`, ADR-0171): a 13th card held (an undo, a
   limit lowered) is drawn and kept in the row past the sixth, and once you

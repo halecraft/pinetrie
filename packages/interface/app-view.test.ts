@@ -1,24 +1,26 @@
 import {
-  type ArchivedCanvas,
   canvasIdFor,
   entryId,
-  indexTree,
-  type LaneView,
   type ProposedChangesRecord,
   rootIdFor,
   type ThreadId,
   threadIdFor,
-  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import type { Workflow } from "@pinetrie/rules"
+import {
+  type ArchivedCanvas,
+  indexTree,
+  type LaneView,
+  UNTICKED,
+} from "@pinetrie/threads"
 import {
   cardIdFor,
   entriesById,
   entry,
   personMessage,
-} from "@pinetrie/core/fixtures"
-import type { Workflow } from "@pinetrie/rules"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,

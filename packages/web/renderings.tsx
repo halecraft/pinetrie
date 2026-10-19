@@ -10,15 +10,9 @@
 
 import {
   blobUrl,
-  type CardRecord,
-  type CardWidth,
-  type ImageVersion,
-  type MediaId,
-  type NoteColumnId,
   type Sha256,
   type ThreadId,
   type ThreadName,
-  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -44,6 +38,14 @@ import {
 } from "@pinetrie/interface"
 import { AT_INVENTORY, type SessionClient } from "@pinetrie/session"
 import { newCardId } from "@pinetrie/session/connect"
+import type {
+  CardRecord,
+  CardWidth,
+  ImageVersion,
+  MediaId,
+  NoteColumnId,
+  TitledCardId,
+} from "@pinetrie/threads"
 import { createContext, type ReactNode, useContext } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { BoundCardEditor } from "./card-editor.tsx"

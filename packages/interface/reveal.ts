@@ -4,9 +4,10 @@
 // The host answers an undo with each card it moved and where it is now, so
 // the place is shown as the undo acts.
 
-import type { CardId, EntryId, PlaceKey, ThreadId } from "@pinetrie/core"
+import type { EntryId, ThreadId } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
+import type { CardId, PlaceKey } from "@pinetrie/threads"
 import { heldByOthers } from "./canvas-columns.ts"
 import {
   type Effect,

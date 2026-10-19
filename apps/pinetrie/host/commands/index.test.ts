@@ -1,19 +1,18 @@
 import {
   ERR,
   entryId,
-  type Intent,
-  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { HELD_WORDS } from "@pinetrie/interface"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { foreignLaneWords, LANE, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
+import { type Intent, textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,

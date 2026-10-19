@@ -4,15 +4,10 @@
 // thread in the canvas, sends the card's text as its first message, and moves the
 // card to its sender's trash.
 
-import {
-  type CanvasId,
-  type CardId,
-  cardMove,
-  TRASH_PLACE,
-  type WorkflowStateId,
-} from "@pinetrie/core"
+import type { CanvasId, WorkflowStateId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { HostRequest } from "@pinetrie/session"
+import { type CardId, cardMove, TRASH_PLACE } from "@pinetrie/threads"
 import type { Minted } from "./columns.ts"
 import {
   canvasOfTab,

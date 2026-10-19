@@ -1,17 +1,14 @@
 // canvas — what a run's agent is told of its canvas.
 
+import type { CanvasId, ThreadId, ThreadName, WriterId } from "@pinetrie/core"
 import type {
   AgentWork,
-  CanvasId,
   CanvasView,
   CardId,
   CardRecord,
   ImageId,
-  ThreadId,
-  ThreadName,
   TitledCardId,
-  WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { type CardOnCanvas, isCardOnCanvas } from "./canvas-index.ts"
 import type { CardTitleRecord } from "./card-title.ts"
@@ -78,7 +75,7 @@ const STATE_WORDS: Readonly<Record<AgentWork, string>> = {
 export const MEDIA_LINE_CAP = 12
 
 /** What the list says of a column: its title, and its notes' count or its images. */
-export type ColumnGlance =
+type ColumnGlance =
   | {
       readonly kind: "note-column"
       readonly title: string
@@ -91,7 +88,7 @@ export type ColumnGlance =
     }
 
 /** An image as a media column's line names it: never the image itself. */
-export interface ImageGlance {
+interface ImageGlance {
   readonly id: ImageId
   readonly title: string
   readonly versions: number
@@ -239,7 +236,7 @@ export const encodeCanvas = (
  * flight as base news is. Reorders, widths and titles wait
  * for the next run's list.
  */
-export interface CanvasFact {
+interface CanvasFact {
   readonly canvas: CanvasId
   readonly by: WriterId
   /**
@@ -251,7 +248,7 @@ export interface CanvasFact {
   readonly change: "added" | "taken" | "moved" | "versioned"
 }
 
-export const CANVAS_FACT_TYPE = "pinetrie.canvas-fact"
+const CANVAS_FACT_TYPE = "pinetrie.canvas-fact"
 
 const CanvasFactDetailsSchema = Type.Object({
   canvas: CanvasIdSchema,
@@ -274,7 +271,7 @@ export const CANVAS_FACT = historyMessage(
 )
 
 /** A canvas fact as told: with who moved it, by name. */
-export type ToldCanvasFact = CanvasFact & { readonly byName: string }
+type ToldCanvasFact = CanvasFact & { readonly byName: string }
 
 /** The pi `CustomMessage` a canvas fact is steered as. */
 export type CanvasFactMessage = HistoryMessage<
@@ -316,7 +313,7 @@ export function encodeCanvasFact(
 }
 
 /** A canvas fact steered into one running lane. Never a queued fact card: those wait for the run's end. */
-export interface CanvasSteer {
+interface CanvasSteer {
   readonly kind: "steer"
   readonly lane: ThreadId
   readonly fact: CanvasFact

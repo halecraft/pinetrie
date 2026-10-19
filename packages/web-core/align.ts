@@ -18,7 +18,7 @@ interface Placing {
   readonly first: number | null
 }
 
-export type Placement =
+type Placement =
   /** At its end, as a column with no fork point opens. */
   | { readonly kind: "end" }
   | {

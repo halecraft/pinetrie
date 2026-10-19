@@ -1,18 +1,20 @@
 import {
-  type CardPlace,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
-  type NoteColumnCard,
-  type RelayDetails,
   type Sha256,
-  type TextCard,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, threadOfEntry } from "@pinetrie/core/fixtures"
 import { factLine, type NoteCard, relayLine } from "@pinetrie/rules"
+import {
+  type CardPlace,
+  cardIdOfKind,
+  type NoteColumnCard,
+  type RelayDetails,
+  type TextCard,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor, threadOfEntry } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { hostCardLine } from "./card-words.ts"
 import type { Column } from "./columns.ts"

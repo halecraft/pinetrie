@@ -1,7 +1,7 @@
 // host/commands/mark — a canvas's or a titled card's title: gather,
 // `planMark`, execute.
 
-import type { Intent, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readCanvases,
@@ -10,6 +10,7 @@ import {
   readPlaces,
 } from "@pinetrie/reads"
 import { planMark, titledCards } from "@pinetrie/rules"
+import type { Intent } from "@pinetrie/threads"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
 

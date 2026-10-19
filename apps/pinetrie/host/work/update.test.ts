@@ -1,7 +1,6 @@
 import {
   commitId,
   entryId,
-  GET_LATEST_TOOL,
   planCopyReady,
   pointId,
   rootIdFor,
@@ -20,6 +19,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { GET_LATEST_TOOL } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   applyWrites,

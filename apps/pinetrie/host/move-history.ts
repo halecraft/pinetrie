@@ -20,13 +20,13 @@ import {
 } from "@kyneta/exchange"
 import {
   type CanvasId,
-  type MoveDirection,
   type MoveHistoryScope,
   movesDocId,
   movesOfDocId,
   type WriterId,
 } from "@pinetrie/core"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
+import type { MoveDirection } from "@pinetrie/threads"
 import type { Gesture } from "./places.ts"
 
 export interface MoveHistories {

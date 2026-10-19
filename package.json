@@ -32,6 +32,7 @@
     "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser",
     "mutate": "node scripts/mutate.ts",
     "proofs:unit": "node scripts/unit-proofs.ts",
+    "indexes": "node scripts/indexes.ts",
     "record": "node scripts/record.ts"
   },
   "devDependencies": {

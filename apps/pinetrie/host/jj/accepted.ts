@@ -5,12 +5,7 @@
 // `planSetup` and the publish's steps) and execute, on the owner: the record as
 // upkeep (`later("accepted")`), a command as a command.
 
-import type {
-  AcceptedAction,
-  JjAcceptedRecord,
-  RepoConfig,
-  ValueWrite,
-} from "@pinetrie/core"
+import type { JjAcceptedRecord, RepoConfig, ValueWrite } from "@pinetrie/core"
 import { acceptedRefusal, publishUndone } from "@pinetrie/interface"
 import {
   planGetLatestUndo,
@@ -30,6 +25,7 @@ import {
   planPublishFinish,
   setIfChanged,
 } from "@pinetrie/rules"
+import type { AcceptedAction } from "@pinetrie/threads"
 import type { Basics } from "../basics.ts"
 import type { AcceptedAnswer } from "../work/destination.ts"
 

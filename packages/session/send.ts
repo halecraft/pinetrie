@@ -1,21 +1,23 @@
 // session/chat — a chat as this client asks the host for it: how it is sent
 // (`SendHow`), and what sending it does (`planSendRequest`).
 
+import type {
+  CanvasId,
+  Position,
+  RootId,
+  ThreadId,
+  WorkflowStateId,
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import {
-  type CanvasId,
   type Intent,
   type MessageAt,
-  type Position,
   parseMentions,
-  type RootId,
   type SendMode,
   type SentCard,
   type TextCard,
   type TextCardId,
-  type ThreadId,
-  type WorkflowStateId,
-} from "@pinetrie/core"
-import type { Outcome } from "@pinetrie/protocol/codec"
+} from "@pinetrie/threads"
 import { IN_COLUMN, type Pending, pendingSend } from "./card-moves.ts"
 
 /** How a chat is sent: from what column and card, and its send id. */

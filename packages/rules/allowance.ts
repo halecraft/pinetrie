@@ -87,7 +87,7 @@ export function addedTokens(
 }
 
 /** What one spend does: the new count, and the record to write when it went over. */
-export interface Spend {
+interface Spend {
   readonly spent: number
   /** The record with `over`, the first time the count crosses `limit`; null otherwise. */
   readonly over: AllowanceRecord | null

@@ -5,7 +5,7 @@
 // last read on the lane's path (`planPinnedContext`). `runs.ts` only awaits the
 // result, so a run's lifecycle knows nothing of cards.
 
-import type { SentCard, ThreadId, WriterId } from "@pinetrie/core"
+import type { ThreadId, WriterId } from "@pinetrie/core"
 import {
   readParticipantNames,
   readPlaces,
@@ -19,6 +19,7 @@ import {
   planPinnedContext,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import type { SentCard } from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { RunDocs } from "./runs.ts"

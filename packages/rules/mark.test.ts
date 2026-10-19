@@ -1,10 +1,5 @@
-import {
-  canvasIdFor,
-  cardIdOfKind,
-  ERR,
-  THE_AGENT,
-  writerId,
-} from "@pinetrie/core"
+import { canvasIdFor, ERR, THE_AGENT, writerId } from "@pinetrie/core"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { MARK, type MarkRecord, planMark } from "./mark.ts"

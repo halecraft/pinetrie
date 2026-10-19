@@ -33,7 +33,7 @@ import { decodeWith } from "./decode.ts"
 import type { RemovalCause, StaleRemoval } from "./removals.ts"
 
 /** What a path a turn wrote is. */
-export type PathClass = "source" | "derived" | "private"
+type PathClass = "source" | "derived" | "private"
 
 /** Paths never classed: pine·trie's own and the repos', but the lane's home (`LANE_HOME_PATH`). */
 const isSkipped = (p: string, shared: readonly string[]): boolean =>
@@ -102,7 +102,7 @@ function pathsToCheck(input: {
 }
 
 /** What to ask whether `.gitignore` ignores, then its answer read back for the paths. */
-export interface IgnoreQuery {
+interface IgnoreQuery {
   /** Each path, or the first symlink on its way; no repeats, none beyond a symlink. */
   readonly asked: readonly string[]
   /** The paths ignored, given which of `asked` are. */
@@ -125,7 +125,7 @@ export function ignoreQuery(
 }
 
 /** A run that made derived files, before its inputs are hashed. */
-export interface MadeRecipe {
+interface MadeRecipe {
   readonly run: string
   readonly command: string
   readonly outputs: readonly DiskPath[]
@@ -148,7 +148,7 @@ export interface ClassedWrites {
 }
 
 /** What a turn wrote, to class: the paths to ask `.gitignore` about, then the classes. */
-export interface WritesToClass {
+interface WritesToClass {
   readonly paths: readonly string[]
   /**
    * The classes, given which of `paths` are ignored. Asking about a path
@@ -332,7 +332,7 @@ function classifyWrites(input: {
 const CACHEDIR_TAG = "CACHEDIR.TAG"
 
 /** A turn's registry, to key: the paths to hash, then the registry. */
-export interface RegistryToKey {
+interface RegistryToKey {
   readonly paths: readonly string[]
   /**
    * The registry, given a hash or null for each of `paths`, as the helper

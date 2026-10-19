@@ -3,7 +3,6 @@
 
 import {
   entryId,
-  NOBODY,
   rootIdFor,
   SESSION_TARGET,
   type Sha256,
@@ -23,6 +22,7 @@ import {
   writeEntry,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
+import { NOBODY } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   readHeldIndex,

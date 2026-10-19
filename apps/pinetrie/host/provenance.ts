@@ -3,13 +3,7 @@
 // (`places.ts`), in the same step. The records are the session's, never the
 // places': a field there would refuse each whole undo of a move.
 
-import type {
-  CardId,
-  CardRecord,
-  EntryId,
-  ThreadId,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   readCardHistories,
   readPlaces,
@@ -28,6 +22,7 @@ import {
   type TraceRecord,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
+import type { CardId, CardRecord } from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import type { Records } from "./records.ts"
 import type { StepDocs } from "./roots.ts"

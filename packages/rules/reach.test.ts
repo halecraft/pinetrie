@@ -1,13 +1,15 @@
 import {
-  type ArchivedCanvas,
-  type CardPlace,
-  type CardRecord,
   canvasIdFor,
-  type LivePlace,
   type ThreadName,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import type {
+  ArchivedCanvas,
+  CardPlace,
+  CardRecord,
+  LivePlace,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"

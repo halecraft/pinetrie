@@ -1,12 +1,7 @@
 // canvas-pinned — the cards pinned to a canvas that a run reads.
 
-import {
-  type CanvasId,
-  type CanvasPinnedView,
-  firstLine,
-  type PinnedCardRead,
-  type WriterId,
-} from "@pinetrie/core"
+import { type CanvasId, firstLine, type WriterId } from "@pinetrie/core"
+import type { CanvasPinnedView, PinnedCardRead } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { CanvasIdSchema, CardIdSchema, List, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
@@ -50,7 +45,7 @@ export const decodeCanvasPinned = (
 ): CanvasPinnedView | undefined => CANVAS_PINNED.decode(message)
 
 /** What the model reads of `view`, each card named by its owner's display name. */
-export function canvasPinnedContent(
+function canvasPinnedContent(
   view: CanvasPinnedView,
   nameOf: (writer: WriterId) => string,
 ): string {

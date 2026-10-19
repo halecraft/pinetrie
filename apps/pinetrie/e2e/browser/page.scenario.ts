@@ -2,19 +2,7 @@
 // branches and their columns, moving them, tabs, the header and the inbox,
 // the composer and cards, a second window, and a reload.
 
-import {
-  atEntry,
-  entryId,
-  isTextCard,
-  mentionHandle,
-  placeKey,
-  projectRail,
-  ROOT,
-  type ThreadId,
-  textCardId,
-  threadFirstMessage,
-  writerId,
-} from "@pinetrie/core"
+import { atEntry, entryId, ROOT, type ThreadId, writerId } from "@pinetrie/core"
 import {
   type ButtonWords,
   identityCodec,
@@ -38,6 +26,14 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import { cardsOnCanvas, indexCanvases, replyTitle } from "@pinetrie/rules"
+import {
+  isTextCard,
+  mentionHandle,
+  placeKey,
+  projectRail,
+  textCardId,
+  threadFirstMessage,
+} from "@pinetrie/threads"
 import { COPIED } from "@pinetrie/web/copy"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"

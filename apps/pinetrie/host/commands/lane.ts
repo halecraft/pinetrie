@@ -3,15 +3,10 @@
 // changes, which leaves a fact in the thread.
 
 import {
-  type AcceptedAction,
-  cardIdOfKind,
   ERR,
   type ErrCode,
-  type Intent,
-  type LaneView,
   type RootId,
   type ThreadId,
-  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -36,6 +31,13 @@ import {
   planStop,
 } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
+import {
+  type AcceptedAction,
+  cardIdOfKind,
+  type Intent,
+  type LaneView,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { type Basics, failed, type StepBasics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Later } from "../later.ts"

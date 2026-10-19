@@ -10,13 +10,13 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type {
   BannerRecord,
   IconsRecord,
   MarkRecord,
   Workflow,
 } from "@pinetrie/rules"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import { tree } from "./fixtures.ts"

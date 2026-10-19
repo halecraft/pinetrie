@@ -1,13 +1,8 @@
-import {
-  NOBODY,
-  type RootId,
-  rootIdFor,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { type RootId, rootIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import { readRoots } from "@pinetrie/reads"
 import { encodeMessage, setRecord, THREAD } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
+import { NOBODY } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { planRebuild, startDirectory } from "./directory.ts"
 import {

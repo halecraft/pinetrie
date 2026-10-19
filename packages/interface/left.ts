@@ -2,7 +2,8 @@
 // read on its lane, on any device of yours, from your attention document
 // (`@pinetrie/session`'s `attention-doc.ts`).
 
-import { ancestry, type EntryId, type TreeIndex } from "@pinetrie/core"
+import type { EntryId } from "@pinetrie/core"
+import { ancestry, type TreeIndex } from "@pinetrie/threads"
 
 /**
  * The message a "since you were here" line goes before: the first of `ids`,

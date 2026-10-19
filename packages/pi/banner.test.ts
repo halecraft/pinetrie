@@ -5,8 +5,6 @@ import { mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-  BANNER_TOOL,
-  messageText,
   ROOT,
   type Sha256,
   THE_AGENT,
@@ -22,6 +20,7 @@ import {
 } from "@pinetrie/rules"
 import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
+import { BANNER_TOOL, messageText } from "@pinetrie/threads"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { bannerImageConfig, fitDrawnImage, parseBannerArgs } from "./banner.ts"

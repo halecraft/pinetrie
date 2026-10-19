@@ -8,7 +8,7 @@
 // root is loaded once the gate lets it through, before the plan reads it, so
 // a plan never meets a root the host let go during the gap.
 
-import type { Away, QueuedFact, ThreadId, ValueWrite } from "@pinetrie/core"
+import type { ThreadId, ValueWrite } from "@pinetrie/core"
 import {
   readArchived,
   readParticipantNames,
@@ -23,6 +23,7 @@ import {
   type LateScope,
   lateAway,
 } from "@pinetrie/rules"
+import type { Away, QueuedFact } from "@pinetrie/threads"
 import type { Basics, HostKeeper } from "./basics.ts"
 import { queueFact } from "./facts.ts"
 import type { Places } from "./places.ts"

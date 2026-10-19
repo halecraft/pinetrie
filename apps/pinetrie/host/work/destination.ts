@@ -4,7 +4,6 @@
 // learns which.
 
 import type {
-  AcceptedAction,
   CommitId,
   EntryId,
   ErrCode,
@@ -12,7 +11,6 @@ import type {
   LaneBase,
   LaneRecord,
   PointId,
-  ProposedChangesFact,
   ProposedChangesSeen,
   RevisionRecord,
   ThreadId,
@@ -34,6 +32,7 @@ import {
   type ReviewAsk,
   type ReviewFacts,
 } from "@pinetrie/rules"
+import type { AcceptedAction, ProposedChangesFact } from "@pinetrie/threads"
 import type { LeaseBasics } from "../basics.ts"
 
 /** What a catch-up decides its base's update from (`planUpdateFrom`). */

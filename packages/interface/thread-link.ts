@@ -6,16 +6,13 @@
 // (`@pinetrie/rules`), the one reader of where a thread is; opening one
 // (`planOpenLink`) takes nothing else, so no link reaches a held thread.
 
+import type { CanvasId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
+import { displayName, threadReach } from "@pinetrie/rules"
 import type {
   ArchivedCanvas,
-  CanvasId,
   CardRecord,
-  EntryId,
-  ThreadId,
   TranscriptMessage,
-  WriterId,
-} from "@pinetrie/core"
-import { displayName, threadReach } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { Reader } from "./send.ts"
 
 const NO_ARCHIVE: ReadonlyMap<CanvasId, ArchivedCanvas> = new Map()
@@ -98,7 +95,7 @@ export const opens = (link: ThreadLink): boolean =>
   link.kind === "open" || link.kind === "mine" || link.kind === "trashed"
 
 /** What following a link to `entry` in its thread asks of the page. */
-export type LinkOpen =
+type LinkOpen =
   | {
       readonly kind: "canvas"
       readonly canvas: CanvasId

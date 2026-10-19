@@ -46,7 +46,7 @@ and has a required unique id, so its fields are `readonly` (ADR-0004).
 `seq` never crosses the wire (ADR-0013): it is never part of a stored or
 sent shape, and `projectTranscript(entries, tipId)` cannot accept one. Ids
 are branded (`EntryId`, `RunId`, `ThreadId`), minted only where they enter,
-which `biome.json`'s `noRestrictedImports` enforces in core, the interface,
+which `biome.json`'s `noRestrictedImports` enforces in core, threads, the interface,
 the page and the host.
 
 **The npm package is the one build** (ADR-0189). Node will not strip

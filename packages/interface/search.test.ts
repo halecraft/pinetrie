@@ -1,4 +1,5 @@
-import { canvasIdFor, entryId, projectRail } from "@pinetrie/core"
+import { canvasIdFor, entryId } from "@pinetrie/core"
+import { projectRail } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   entry,

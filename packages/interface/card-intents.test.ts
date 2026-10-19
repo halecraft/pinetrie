@@ -1,10 +1,20 @@
 import {
+  canvasIdFor,
+  entryId,
+  rootIdFor,
+  type Sha256,
+  threadIdFor,
+  workflowStateIdFor,
+  writerId,
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import { addressLink } from "@pinetrie/rules"
+import { LAST_ORDER } from "@pinetrie/session"
+import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  canvasIdFor,
   cardIdOfKind,
-  entryId,
   entryMargin,
   fitsPlace,
   INVENTORY_SLOTS,
@@ -13,21 +23,13 @@ import {
   livePlace,
   makeCard,
   type PlacedKind,
-  rootIdFor,
-  type Sha256,
   type TextCard,
   type TextPlace,
   TRASH_PLACE,
   textCardId,
-  threadIdFor,
   UNTICKED,
-  workflowStateIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
-import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink } from "@pinetrie/rules"
-import { LAST_ORDER } from "@pinetrie/session"
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { afterKeep, type Landing, planPut, putLanding } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"

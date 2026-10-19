@@ -350,7 +350,7 @@ ADR-0098).
 - **A failed hook costs only the context.** It throws nothing on purpose:
   when `compact()` fails it returns nothing, and pi compacts on its own.
   The next run's entries restate what is not in view (`pinnedInView`,
-  `canvasPinnedInView`, `canvasInView`, `@pinetrie/core`).
+  `canvasPinnedInView`, `canvasInView`, `@pinetrie/threads`).
 - **The faux provider caches per lane** (`withUsageEstimate`), and pi stores
   each reply's `usage`, so `agent.test.ts` checks that an edited card keeps
   the cache with no model key. Each part is estimated rounding up, so a
@@ -820,14 +820,14 @@ item 18, and in `lanes.test.ts` against the harness.
     whose definition changes still changes the prefix: pi-ai sends a
     redefined tool whole.
   - **Tools register from one table keyed by `ToolId`** (`TOOLS`,
-    `tools.ts`, ADR-0114), in `TOOL_IDS`' order (core), which is the order
+    `tools.ts`, ADR-0114), in `TOOL_IDS`' order (threads), which is the order
     of every request's list: a reordered `TOOL_IDS` changes every lane's
     prefix once. A tool with no factory fails to compile, and
     `tools.test.ts` checks each is named its id, so a pi upgrade that
     renames one of its own fails there. The id is what the model calls; it
     never changes for people's words ("ran" for `bash` is interface's).
-    The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
-  - **The host's tools are active in every lane** (`TOOL_IDS`, core):
+    The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are threads'.
+  - **The host's tools are active in every lane** (`TOOL_IDS`, threads):
     `ask_about_conflict`, `catch_up` and `split_proposed_changes` (ADR-0080),
     `set_banner` (ADR-0143), and `propose_branches` (ADR-0157). A call that
     does not apply answers why: the tool list never names who may call it.
@@ -1098,7 +1098,7 @@ Nothing about `seq` is replicated: an entry is named by its uuidv7 id,
 written once (ADR-0009), and entries and usage rows are only ever added
 (ADR-0004), so `dirtyFrom` re-indexes the whole field for a change to
 either that sets no key. `planArrivals` (`arrivals.ts`) assigns arrival order. Entries are ordered by
-`orderNewEntries` in `@pinetrie/core`, which is pure and property-tested there for
+`orderNewEntries` in `@pinetrie/threads`, which is pure and property-tested there for
 permutation invariance. Its `unresolved` ids are a parent cycle and the entries
 below one: a parent outside the batch never blocks a child, whether or not it
 exists. `#reconcile` sequences the rest and throws once, naming the cycle.

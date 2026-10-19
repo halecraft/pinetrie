@@ -9,6 +9,7 @@
   "dependencies": {
     "@pinetrie/core": "workspace:*",
     "@pinetrie/rules": "workspace:*",
-    "@pinetrie/schema": "workspace:*"
+    "@pinetrie/schema": "workspace:*",
+    "@pinetrie/threads": "workspace:*"
   }
 }

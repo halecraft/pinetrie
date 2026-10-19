@@ -1,5 +1,4 @@
-import type { Sha256 } from "@pinetrie/core"
-import { commitId, pointFromCommit, pointId } from "@pinetrie/core"
+import { commitId, pointFromCommit, pointId, type Sha256 } from "@pinetrie/core"
 import { diffUrl, reviewUrl } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { KEY_COOKIE, type RequestFacts } from "./admission.ts"

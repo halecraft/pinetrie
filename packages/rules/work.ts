@@ -2,7 +2,6 @@
 // entry, and what the host found where it runs.
 
 import {
-  type Above,
   BASE_SNAPSHOT,
   type EntryId,
   type ForeignLane,
@@ -11,21 +10,24 @@ import {
   isRootId,
   isThreadId,
   type LaneRecord,
-  messageToolCalls,
   type OwnLane,
   type PointId,
   type ProjectKind,
   type RevisionRecord,
-  runPrompt,
   type SnapshotId,
   snapshotId,
   type ThreadId,
-  type TreeIndex,
-  turnEntry,
-  turnMerged,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  type Above,
+  messageToolCalls,
+  runPrompt,
+  type TreeIndex,
+  turnEntry,
+  turnMerged,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ForkBegin } from "./base.ts"
 import {
@@ -178,7 +180,7 @@ declare const turnBrand: unique symbol
  * is, and its snapshot. Only `planTurn` makes one, so a revision is planned
  * only for a turn it read from the tree.
  */
-export interface TurnToCommit {
+interface TurnToCommit {
   readonly kind: "commit"
   readonly entry: EntryId
   readonly lane: ThreadId
@@ -347,7 +349,7 @@ export function sourceHistory(input: {
 }
 
 /** Where a fork starts: the snapshot it clones and the state it starts on. */
-export interface ForkSource {
+interface ForkSource {
   readonly kind: "source"
   readonly snapshot: SnapshotId
   readonly start: ForkStart

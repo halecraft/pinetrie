@@ -3,13 +3,7 @@
 // the thread's person, through the commands a person's put goes through, and
 // title a column it made as the agent asked.
 
-import {
-  cardIdOfKind,
-  errorText,
-  type Intent,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+import { errorText, type ThreadId, type WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { readCardTitles, readPlaces } from "@pinetrie/reads"
 import {
@@ -17,6 +11,7 @@ import {
   planImageAsk,
   type ToolAnswer,
 } from "@pinetrie/rules"
+import { cardIdOfKind, type Intent } from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 
 const answer = (text: string, isError: boolean): ToolAnswer => ({

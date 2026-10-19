@@ -1,14 +1,12 @@
 // interface/ask-words — how an ask, its work and its outcome read.
 
+import { type EntryId, firstLine, type WriterId } from "@pinetrie/core"
 import {
   type AskOutcome,
-  type EntryId,
   entryMessage,
-  firstLine,
   type TranscriptMessage,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { AskView } from "./ask-view.ts"
 import { count, listPhrase, plural } from "./counts.ts"
 import type { WorkStats } from "./work-stats.ts"

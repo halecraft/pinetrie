@@ -2,6 +2,7 @@
 // no canvas takes (`WRAPS`): a note column for a note, a media column for an
 // image; and the place of the first card in it.
 
+import type { WriterId } from "@pinetrie/core"
 import {
   type CanvasPlace,
   type CardPlace,
@@ -13,8 +14,7 @@ import {
   UNTICKED,
   type WRAPS,
   type WrappedKind,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { orderAfter } from "./order.ts"
 import { type PlaceStep, planMake } from "./place-steps.ts"
 
@@ -54,7 +54,7 @@ export const mintWith =
   }
 
 /** The place of the first card in a container. */
-export type FirstPlace = Extract<CardPlace, { kind: "note" | "image" }>
+type FirstPlace = Extract<CardPlace, { kind: "note" | "image" }>
 
 /**
  * `container`, made at `at` on a canvas by `by` through `planMake` as every

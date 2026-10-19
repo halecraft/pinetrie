@@ -10,8 +10,6 @@ import {
   atEntry,
   entryId,
   isThreadId,
-  messageText,
-  projectRail,
   ROOT,
   type ThreadName,
   threadNameParts,
@@ -24,6 +22,7 @@ import {
 } from "@pinetrie/interface"
 import { type Held, scriptedModel } from "@pinetrie/pi"
 import { readLaneRecords, readNames, readPlaces } from "@pinetrie/reads"
+import { messageText, projectRail } from "@pinetrie/threads"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"

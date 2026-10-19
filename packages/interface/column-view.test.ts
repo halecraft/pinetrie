@@ -1,32 +1,21 @@
 import {
-  type AgentMessageLike,
-  type CardCommand,
   canvasIdFor,
   commitId,
   type EntryId,
   entryId,
-  entryThread,
-  indexAsks,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type JjProposedChangesRecord,
   type LaneRecord,
-  type LaneView,
-  type PinnedView,
   pointId,
   type RevisionRecord,
   type Sha256,
   snapshotId,
   type ThreadId,
-  type ThreadLane,
   type ThreadName,
-  type TreeIndex,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   type LatestNow,
   type ParentNow,
@@ -35,6 +24,19 @@ import {
   workStripView,
 } from "@pinetrie/rules"
 import type { ProposedChangesActing } from "@pinetrie/session"
+import {
+  type AgentMessageLike,
+  type CardCommand,
+  entryThread,
+  indexAsks,
+  type LaneView,
+  type PinnedView,
+  type ThreadLane,
+  type TreeIndex,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { canvasMarkerWords, canvasPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"

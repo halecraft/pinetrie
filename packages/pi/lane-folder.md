@@ -183,8 +183,8 @@ changes pine·trie can keep this note true. You can skip them.
   `/workspace/<path>` what it should be and call `resolve_conflict` with
   `ours`, or take one version whole with `theirs` or `base`. Use
   `ask_about_conflict` when the two sides meant different things.
-  <!-- packages/core/tools.ts RESOLVE_TOOL -->
-  <!-- packages/core/tools.ts CONFLICT_TOOL -->
+  <!-- packages/threads/tools.ts RESOLVE_TOOL -->
+  <!-- packages/threads/tools.ts CONFLICT_TOOL -->
 
 ## This thread's base
 
@@ -198,7 +198,7 @@ changes pine·trie can keep this note true. You can skip them.
   there is something new, and only as the one tool call in its turn: a call
   beside another is refused. A conflicted merge answers with the conflicts,
   to resolve here. <!-- packages/rules/agent-commands.ts planGetLatestCall -->
-  <!-- packages/core/tools.ts GET_LATEST_TOOL -->
+  <!-- packages/threads/tools.ts GET_LATEST_TOOL -->
 - `split_proposed_changes` is refused here: a folder project's proposed
   changes are its files, never a stack of revisions. <!-- packages/rules/agent-commands.ts planSplitCall -->
 - `propose_branches` proposes new threads that branch from the end of

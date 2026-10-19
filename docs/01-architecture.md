@@ -111,10 +111,11 @@ Five contracts. Fix these and everything else proceeds in parallel.
 apps/         things you RUN; nothing imports them
   pinetrie/      @pinetrie/app          the host (server) and its e2e suites
   conformance/   @pinetrie/conformance  pi's own Storage suite vs our adapter
-  tui/           @pinetrie/tui          a terminal client: interface, session and core only (TECHNICAL.md)
+  tui/           @pinetrie/tui          a terminal client: interface, session, core and threads only (TECHNICAL.md)
 
 packages/     libraries; their boundaries are enforced by resolution
-  core/          @pinetrie/core         declares NOTHING; pure decisions and types
+  core/          @pinetrie/core         declares NOTHING; the kernel: ids, refusals, writes, lanes, disks, histories (TECHNICAL.md)
+  threads/       @pinetrie/threads      core only; threads, entries, messages, commands and cards; no lane package declares it (TECHNICAL.md)
   schema/        @pinetrie/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pinetrie/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pinetrie/protocol     the wire contract and its codec (TECHNICAL.md)
@@ -134,7 +135,7 @@ packages/     libraries; their boundaries are enforced by resolution
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   shell/         @pinetrie/shell        unbash only; shell source as structure (TECHNICAL.md)
   interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM, no I/O (ADR-0093, ADR-0194)
-  web-core/      @pinetrie/web-core     core and interface only; the web client's own decisions (TECHNICAL.md)
+  web-core/      @pinetrie/web-core     core, threads and interface only; the web client's own decisions (TECHNICAL.md)
   web/           @pinetrie/web          the browser page: React and the DOM; owns its Vite build; no rules, no reads
 
 (root)        a bare workspace: development tooling only, no dependencies
@@ -187,7 +188,7 @@ declared them.
 `workspace.test.ts` checks the manifest rules resolution cannot express: the
 root's tooling allowlist, that only `packages/pi` and `apps/conformance` declare
 pi, what each package may declare (`core`, `keeper`, `channel`, `ssh` and
-`install` nothing, and only `lanes`, `docker` and the app `install`; `protocol` only Kyneta and core; `session` no React; `interface`
+`install` nothing, and only `lanes`, `docker` and the app `install`; `threads` only core; `protocol` only Kyneta, core and threads; `session` no React; `interface`
 no React and no DOM), that the page declares no server package, that only
 the app declares a runtime, config or ssh, and that nothing depends on an
 app. It also re-measures the resolution claim itself in a child process.
@@ -210,12 +211,30 @@ depend on fails until the rule covers it. The page's build-time files,
   undeclared package and still run. `typecheck`, which is in `verify`, still
   reports it.
 - Per-file rules are gone. `messages.ts` "imports nothing" became "the protocol
-  package declares only Kyneta and core".
+  package declares only Kyneta, core and threads".
 
-Dependency direction is physical: `core → schema → pi → app`, and
+Dependency direction is physical: `core → threads → schema → pi → app`, and
 `session → interface → web → app`. A package cannot reach up into the app,
 which is what forced `core` and `schema` to become packages — pi depends on
 them.
+
+### The kernel and the threads apart
+
+Core is the kernel every package names: ids, refusals, writes, and what a
+lane, its disk and its history are. Threads, their entries and messages, the
+commands a client sends and the cards placed beside them are
+`@pinetrie/threads`, which declares only core (ADR-0201). No lane package
+(`lanes`, `lanehost`, `docker`, `jj`, `folder`) declares threads, so none can
+name a card, a move or a command; core declares nothing, so no kernel module
+can import a threads module. Both hold by resolution, as every boundary here
+does, not by a check that reads syntax (S285).
+
+The indexes of core, threads, rules, interface and web-core are written by
+`pnpm run indexes` (`scripts/indexes.ts`), as `pnpm run record` writes a
+record's header: each holds exactly the names some file imports through it,
+from the module that declares each, and `scripts/indexes.test.ts` fails while
+one differs. A name only its module and its tests use is not in the index,
+and a module exports nothing no other module imports.
 
 
 ### Pure code names only the globals it may

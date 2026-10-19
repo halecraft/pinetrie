@@ -7,7 +7,6 @@
 
 import { attach } from "@kyneta/react"
 import { subscribe } from "@kyneta/schema"
-import type { CardId, TextCardId } from "@pinetrie/core"
 import {
   type EditorEvent,
   type EditorState,
@@ -16,6 +15,7 @@ import {
   shownBy,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { CardId, TextCardId } from "@pinetrie/threads"
 import { type RefObject, useEffect, useRef, useState } from "react"
 
 /**

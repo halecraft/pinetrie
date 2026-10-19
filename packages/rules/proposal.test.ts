@@ -1,22 +1,24 @@
 import {
-  type BranchOut,
   canvasIdFor,
   entryId,
-  indexTree,
   nonEmpty,
-  type Proposal,
   rootIdFor,
   type ThreadId,
-  type ThreadRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import {
+  type BranchOut,
+  indexTree,
+  type Proposal,
+  type ThreadRecord,
+} from "@pinetrie/threads"
 import {
   entriesById,
   entry,
   personMessage,
   toolResultMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { cardsOnCanvas, proposalDraft } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"

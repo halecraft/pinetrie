@@ -1,14 +1,9 @@
 import {
-  type CardRecord,
-  type CardWidth,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
-  type NoteColumnId,
   rootIdFor,
   type ThreadId,
   threadIdFor,
-  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -17,6 +12,13 @@ import {
   cardsOnCanvas,
   type ThreadOpening,
 } from "@pinetrie/rules"
+import {
+  type CardRecord,
+  type CardWidth,
+  cardIdOfKind,
+  type NoteColumnId,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   type CardColumn,

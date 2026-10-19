@@ -1,4 +1,4 @@
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { claimFocus } from "./focus-claim.ts"
 

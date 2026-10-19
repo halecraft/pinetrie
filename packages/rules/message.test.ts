@@ -1,31 +1,33 @@
 import assert from "node:assert/strict"
 import {
-  address,
   atEntry,
-  CONFLICT_TOOL,
   canvasIdFor,
   commitId,
   ERR,
   entryId,
-  GET_LATEST_TOOL,
-  NOBODY,
-  type PlanMode,
   type Position,
-  PROPOSE_TOOL,
-  parseMentions,
   proveRunnable,
-  type Responder,
-  type SendAt,
   type Sha256,
   THE_AGENT,
-  type ThreadLane,
-  textCardId,
   threadIdFor,
   type WorkflowStateId,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  address,
+  CONFLICT_TOOL,
+  GET_LATEST_TOOL,
+  NOBODY,
+  type PlanMode,
+  PROPOSE_TOOL,
+  parseMentions,
+  type Responder,
+  type SendAt,
+  type ThreadLane,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   addressMessage,

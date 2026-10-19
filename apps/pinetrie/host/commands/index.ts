@@ -3,14 +3,7 @@
 // (`placeOfCommand`): a step on the documents' keeper, straight through to the
 // owner of your repo, or a board move's three parts.
 
-import {
-  ERR,
-  errorText,
-  historyScope,
-  type Intent,
-  type Send,
-  type WriterId,
-} from "@pinetrie/core"
+import { ERR, errorText, historyScope, type WriterId } from "@pinetrie/core"
 import {
   decodeCommand,
   encodeOutcome,
@@ -24,6 +17,7 @@ import {
   PARTICIPANT,
   setRecord,
 } from "@pinetrie/rules"
+import type { Intent, Send } from "@pinetrie/threads"
 import {
   type Basics,
   failed,

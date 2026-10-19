@@ -5,7 +5,6 @@
 // (`bannerImageConfig`).
 
 import {
-  BANNER_TOOL,
   blobOfUrl,
   errorText,
   isSha256,
@@ -14,6 +13,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { BannerAnswer, BannerAsk, ModelRef } from "@pinetrie/rules"
+import { BANNER_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"

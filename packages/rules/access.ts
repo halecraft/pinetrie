@@ -5,12 +5,12 @@
 // lane.
 
 import {
-  type AccessAnswer,
   ERR,
   type ThreadId,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import type { AccessAnswer } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeRecord, threadKey, WriterIdSchema } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
@@ -150,7 +150,7 @@ export const answersFor = (record: AccessRecord): readonly AccessAnswer[] =>
   record.personal === null ? [] : ACCESS_ANSWERS[record.personal.kind]
 
 /** Why an answer is refused: the host's own codes, which its reply carries unchanged. */
-export type AccessRefusal = typeof ERR.NOT_OWNER | typeof ERR.NOTHING_TO_ANSWER
+type AccessRefusal = typeof ERR.NOT_OWNER | typeof ERR.NOTHING_TO_ANSWER
 
 /**
  * An answer, as the record it makes and its write, or why it is refused. It

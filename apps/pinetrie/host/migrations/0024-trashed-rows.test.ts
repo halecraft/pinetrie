@@ -1,4 +1,4 @@
-import { asPlaceFields, placeOfFields } from "@pinetrie/core"
+import { asPlaceFields, placeOfFields } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import {
   trashedFieldsNow,

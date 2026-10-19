@@ -3,14 +3,20 @@
 // browser's clipboard, and reads one back, is web-core's (`clip-carrier.ts`).
 
 import {
-  type Address,
   type CanvasId,
-  type CardRecord,
   type EntryId,
   entryId,
+  isSha256,
+  type Sha256,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
+import { addressLink } from "@pinetrie/rules"
+import {
+  type Address,
+  type CardRecord,
   entryMessage,
   isPastAddress,
-  isSha256,
   kindedId,
   type LaneView,
   type NoteColumnId,
@@ -19,13 +25,9 @@ import {
   parseCardId,
   printAddress,
   type ReferenceCardId,
-  type Sha256,
   type TextCardId,
-  type ThreadId,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
-import { addressLink } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import { addressWords } from "./address-words.ts"
 import { threadAnchor } from "./columns.ts"
 import type { Focus } from "./focus.ts"
@@ -173,7 +175,7 @@ export function threadClip(
 }
 
 /** What a copy does: leave it to the browser, or write a clip. */
-export type CopyPlan =
+type CopyPlan =
   | { readonly kind: "browser" }
   | { readonly kind: "clip"; readonly clip: Clip }
 

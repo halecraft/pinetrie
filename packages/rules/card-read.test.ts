@@ -1,13 +1,10 @@
+import { canvasIdFor, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type CardRecord,
-  canvasIdFor,
   cardIdOfKind,
   makeCard,
-  type Sha256,
-  threadIdFor,
   UNTICKED,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { planCardRead } from "./card-read.ts"
 

@@ -1,5 +1,6 @@
-import { cardIdOfKind, makeCard, threadIdFor, writerId } from "@pinetrie/core"
+import { threadIdFor, writerId } from "@pinetrie/core"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
+import { cardIdOfKind, makeCard } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { queueFact } from "./facts.ts"
 import { basics, placesFor, seedPlaces } from "./fakes.ts"

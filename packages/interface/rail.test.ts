@@ -1,13 +1,11 @@
+import { type EntryId, entryId, writerId } from "@pinetrie/core"
 import {
   type AgentMessageLike,
-  type EntryId,
   type EntryLike,
-  entryId,
   indexAsks,
   indexTree,
   projectRail,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { entriesById, entry, fromParents, personMessage } from "./fixtures.ts"
 import { compactRail, type RailItem, stretchSpan } from "./rail.ts"

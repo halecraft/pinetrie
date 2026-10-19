@@ -3,7 +3,6 @@
 // its handle, how many it holds, and its ⋯, whose Rename opens the title's
 // field for anyone who may write.
 
-import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/core"
 import {
   columnHead,
   countWords,
@@ -12,6 +11,7 @@ import {
   type ListKind,
   type ReadOnly,
 } from "@pinetrie/interface"
+import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/threads"
 import { useState } from "react"
 import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"

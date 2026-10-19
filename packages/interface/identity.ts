@@ -10,8 +10,9 @@
 // follows the session's name for you: `reconcileName` decides which way a
 // difference goes.
 
-import { mentionHandle, normalizeEmail, normalizeName } from "@pinetrie/core"
+import { normalizeEmail } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import { mentionHandle, normalizeName } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Codec } from "./codec.ts"
@@ -60,7 +61,7 @@ export function reconcileName(
     : { kind: "store", identity: { email, name: inSession } }
 }
 
-export type RenamePlan =
+type RenamePlan =
   | { readonly kind: "refuse" }
   | { readonly kind: "unchanged" }
   | { readonly kind: "send"; readonly name: string }

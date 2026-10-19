@@ -4,22 +4,24 @@
 // makes, so a send nobody checked does not compile.
 
 import {
-  type ArchivedCanvas,
   atEntry,
   type CanvasId,
-  type CardRecord,
   type EntryId,
-  entryThread,
   type ForeignLane,
-  type Gated,
   type LaneRecord,
-  nearestRevision,
   type ProjectKind,
   type RevisionRecord,
   type RootId,
   type ThreadId,
-  type TreeIndex,
 } from "@pinetrie/core"
+import {
+  type ArchivedCanvas,
+  type CardRecord,
+  entryThread,
+  type Gated,
+  nearestRevision,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { archivedIn, writesIn } from "./archive.ts"
 import type { CanvasIndex } from "./canvas-index.ts"
 import {

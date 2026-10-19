@@ -5,7 +5,6 @@
 
 import {
   type BlobStore,
-  type Intent,
   isImageRef,
   type Sha256,
   type StoredImage,
@@ -13,6 +12,7 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { planFittedPicture, planPicture } from "@pinetrie/rules"
+import type { Intent } from "@pinetrie/threads"
 import type { Records } from "../records.ts"
 
 export interface PictureDeps {

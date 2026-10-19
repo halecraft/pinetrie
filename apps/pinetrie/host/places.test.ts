@@ -1,17 +1,10 @@
 import {
-  type CardRecord,
   canvasIdFor,
   entryId,
-  makeCard,
   rootIdFor,
-  type TextCard,
-  type TextPlace,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   readCardHistories,
   readPlaces,
@@ -25,6 +18,15 @@ import {
   writeEntry,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
+import {
+  type CardRecord,
+  makeCard,
+  type TextCard,
+  type TextPlace,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   basics,

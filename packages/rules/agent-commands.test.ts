@@ -1,13 +1,12 @@
 import {
-  type CardRecord,
   commitId,
   type JjProposedChangesRecord,
   pointFromCommit,
   type ThreadName,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { type CardRecord, textCardId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { getLatestAnswer, planGetLatestCall } from "./agent-commands.ts"
 import {

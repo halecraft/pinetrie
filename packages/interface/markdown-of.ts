@@ -2,8 +2,9 @@
 // puts on the system clipboard and what a reference keeps as its quote, from
 // one rule.
 
-import type { Address, EntryId, TranscriptMessage } from "@pinetrie/core"
+import type { EntryId } from "@pinetrie/core"
 import { addressLink, pastMarkdown } from "@pinetrie/rules"
+import type { Address, TranscriptMessage } from "@pinetrie/threads"
 import { copyText } from "./copy-text.ts"
 
 /**

@@ -1,7 +1,7 @@
 // host/commands/gate — every person's command, and every send made for one,
 // cleared by the one gate (`planGate`) before it is carried out.
 
-import type { Gated, RootId } from "@pinetrie/core"
+import type { RootId } from "@pinetrie/core"
 import { gateRefusal } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -19,6 +19,7 @@ import {
   type GateRoot,
   planGate,
 } from "@pinetrie/rules"
+import type { Gated } from "@pinetrie/threads"
 import type { Basics } from "../basics.ts"
 import type { StepDocs } from "../roots.ts"
 import type { LaneWork } from "../work/index.ts"

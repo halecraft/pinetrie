@@ -6,9 +6,7 @@
 import type { Store } from "@kyneta/exchange"
 import {
   type BlobStore,
-  cardBlobs,
   type EntryId,
-  isTextCard,
   MOVES_DOC_PREFIX,
   type RevisionRecord,
   type Sha256,
@@ -35,6 +33,7 @@ import {
   QUEUE_HOLD,
   TRASH_KEEP_MS,
 } from "@pinetrie/rules"
+import { cardBlobs, isTextCard } from "@pinetrie/threads"
 import { type Basics, failed, type LeaseBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"

@@ -4,18 +4,20 @@
 import {
   type CanvasId,
   canvasIdFor,
+  type RootId,
+  rootIdFor,
+  type ThreadId,
+  threadIdFor,
+} from "@pinetrie/core"
+import {
   cardIdOfKind,
   type ImageId,
   type MediaId,
   type NoteColumnId,
   type ReferenceCardId,
-  type RootId,
-  rootIdFor,
   type TextCardId,
-  type ThreadId,
   textCardId,
-  threadIdFor,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** A uuidv7: 48 bits of milliseconds, the version, the variant, randomness. */
 function newUuidv7(): string {

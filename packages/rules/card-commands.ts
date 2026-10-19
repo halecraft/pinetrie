@@ -6,42 +6,44 @@
 
 import {
   type BlobRef,
+  type CanvasId,
+  type EntryId,
+  historyScope,
+  type ImageRef,
+  type LaneRecord,
+  type MoveHistoryScope,
+  PERSON_HISTORY,
+  type RootId,
+  type Sha256,
+  type ThreadId,
+  type ValueWrite,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   type BranchedFact,
   type BranchOut,
-  type CanvasId,
   type CardCommand,
   type CardId,
   type CardRecord,
   cardMove,
-  type EntryId,
-  historyScope,
-  type ImageRef,
   type Intent,
   isTextCardId,
-  type LaneRecord,
   MAX_TITLE,
   type Mention,
   type Move,
   type MoveDirection,
-  type MoveHistoryScope,
   messageWriter,
-  PERSON_HISTORY,
   parseTitle,
   type QueueHoldChange,
   type QueueMove,
-  type RootId,
   type Send,
   type SentCard,
-  type Sha256,
   type TextCardId,
-  type ThreadId,
   type ThreadRecord,
   TRASH_PLACE,
   type TreeIndex,
   threadOfSend,
-  type ValueWrite,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { BoardMove, Workflow } from "./board.ts"
 import {
   type CanvasIndex,
@@ -105,7 +107,7 @@ declare const plannedBrand: unique symbol
  * neither build a plan's steps or records nor edit them. A new list (a
  * spread, a `map`) is unbranded.
  */
-export type Planned<T> = readonly T[] & { readonly [plannedBrand]: true }
+type Planned<T> = readonly T[] & { readonly [plannedBrand]: true }
 
 const planned = <T>(list: readonly T[]): Planned<T> => list as Planned<T>
 
@@ -115,7 +117,7 @@ const NONE: Planned<never> = planned([])
 export type CardRefusal = Extract<MoveStep | ReorderStep, { kind: "refused" }>
 
 /** A card command's one change, and what it writes around it. */
-export interface CardSteps {
+interface CardSteps {
   readonly kind: "steps"
   /** Records written before the change, so a reader that finds a card finds its thread's root. */
   readonly before: Planned<ValueWrite<"session">>
@@ -664,7 +666,7 @@ export function planThreadCopy(
 }
 
 /** A spin-off planned whole: its thread's records, first message and change, or why not. */
-export type CardSpinOff =
+type CardSpinOff =
   | {
       readonly kind: "spin"
       /** The card the thread starts from: a text card. */
@@ -749,7 +751,7 @@ export function planCardSpinOff(
 }
 
 /** The threads an undo would lift, and what deciding it needs read of them. */
-export interface UndoReach {
+interface UndoReach {
   readonly kind: "reach"
   readonly direction: MoveDirection
   /** The cards the step moves, read from its parts before it is tried. */
@@ -810,7 +812,7 @@ declare const revertBrand: unique symbol
  * it is undone. Only `planUndo` makes one, so no answer is planned for a
  * revert no plan asked for.
  */
-export interface UndoRevert {
+interface UndoRevert {
   readonly kind: "revert"
   readonly cards: readonly CardId[]
   readonly lift: Extract<LiftPlan, { kind: "lift" }>["delete"]

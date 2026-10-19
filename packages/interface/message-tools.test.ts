@@ -1,17 +1,16 @@
+import { entryId, threadIdFor } from "@pinetrie/core"
 import {
   address,
-  entryId,
   parseMentions,
   type ThreadLane,
   type TranscriptMessage,
-  threadIdFor,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import {
   FIXTURE_THREAD,
   lineMessage,
   personMessage,
   transcriptMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   branchPrefill,

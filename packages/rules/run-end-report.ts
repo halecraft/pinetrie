@@ -1,7 +1,6 @@
 // run-end-report — how a thread's last run ended, for the people who follow it.
 
 import {
-  type AskOutcome,
   type EntryId,
   entryId,
   type RootId,
@@ -9,6 +8,7 @@ import {
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import type { AskOutcome } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { choiceSchema, decodeRecord, threadKey } from "./decode.ts"
 import {
@@ -129,7 +129,7 @@ const URGENCY_WORDS: Readonly<Record<string, ReaderUrgency>> = {
 }
 
 /** What the model said of a run: an urgency line read. */
-export interface UrgencyLine {
+interface UrgencyLine {
   readonly urgency: ReaderUrgency
   /** Null for `done`, whose reason no one is shown. */
   readonly reason: string | null

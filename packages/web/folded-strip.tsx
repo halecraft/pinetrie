@@ -8,8 +8,8 @@
 // (`data-fold-name`, `data-fold-mark`): at the header's size, so the turn ends
 // on them exactly.
 
-import type { CardId } from "@pinetrie/core"
 import type { FoldedMark } from "@pinetrie/interface"
+import type { CardId } from "@pinetrie/threads"
 import type { ReactNode } from "react"
 import { ColumnHandle } from "./column-menu.tsx"
 import { ThreadMark } from "./thread-mark.tsx"

@@ -3,24 +3,22 @@
 // how many comments its margin holds. `MediaColumn`
 // (`packages/web/media-column.tsx`) draws one on a canvas.
 
-import {
-  type CanvasId,
-  type CardRecord,
-  type ImageId,
-  type ImageVersion,
-  imageMargin,
-  type MediaId,
-  printAddress,
-  type Sha256,
-  type ThreadId,
-  type TitledCardId,
-} from "@pinetrie/core"
+import type { CanvasId, Sha256, ThreadId } from "@pinetrie/core"
 import {
   type CardTitleRecord,
   imagesIn,
   NEW_MEDIA_TITLE,
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
+import {
+  type CardRecord,
+  type ImageId,
+  type ImageVersion,
+  imageMargin,
+  type MediaId,
+  printAddress,
+  type TitledCardId,
+} from "@pinetrie/threads"
 import type { StartButton } from "./start-button.ts"
 
 /** One image, as drawn. */

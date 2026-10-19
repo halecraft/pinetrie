@@ -2,7 +2,6 @@ import {
   type CanvasId,
   canvasIdFor,
   entryId,
-  type RelayDetails,
   runId,
   threadIdFor,
   writerId,
@@ -11,6 +10,7 @@ import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import { encodeRelayMessage, queuedOn } from "@pinetrie/rules"
 import { beginRun, writeEntry } from "@pinetrie/schema/fixtures"
+import type { RelayDetails } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import type { Allowances } from "./allowances.ts"
 import { createAnswers } from "./answers.ts"

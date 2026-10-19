@@ -1,16 +1,15 @@
+import { entryId, rootIdFor } from "@pinetrie/core"
 import {
   type AgentMessageLike,
   type EntryLike,
-  entryId,
   indexAsks,
   indexTree,
-  rootIdFor,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import {
   FIXTURE_THREAD,
   lineMessage,
   personMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST_EVERY,

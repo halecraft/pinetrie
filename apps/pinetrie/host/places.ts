@@ -20,15 +20,10 @@ import { isDeepStrictEqual } from "node:util"
 import { batch } from "@kyneta/schema"
 import {
   type CanvasId,
-  type CardId,
-  type CardRecord,
   type EntryId,
   errorText,
-  isTextCardId,
   type RootId,
-  type TextCardId,
   type ThreadId,
-  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -49,6 +44,13 @@ import {
   takenIn,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle } from "@pinetrie/schema"
+import {
+  type CardId,
+  type CardRecord,
+  isTextCardId,
+  type TextCardId,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import { canvasesNow } from "./canvases.ts"
 import type { CardPort } from "./cards.ts"

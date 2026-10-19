@@ -1,9 +1,9 @@
-import type { ThreadName } from "@pinetrie/core"
 import {
   commitId,
   pointFromCommit,
   type ReviewFile,
   type RevisionReview,
+  type ThreadName,
   threadIdFor,
   withTrailers,
 } from "@pinetrie/core"

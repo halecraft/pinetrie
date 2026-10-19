@@ -4,16 +4,18 @@ import {
   type AgentId,
   type CanvasId,
   ERR,
-  KINDS,
-  kindOfCard,
-  type MarkTarget,
   type Refusal,
   refused,
   THE_AGENT,
-  type TitledCardId,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  KINDS,
+  kindOfCard,
+  type MarkTarget,
+  type TitledCardId,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { decodeRecord, parseCanvasKey } from "./decode.ts"

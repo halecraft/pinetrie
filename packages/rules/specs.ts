@@ -37,7 +37,7 @@ import { THREAD } from "./thread.ts"
 import { LANE, LANE_FORK, PROJECT, REVISION } from "./work.ts"
 
 /** What a check over every record reads of a spec: its address and its decoder. */
-export type AnyRecordSpec = Pick<
+type AnyRecordSpec = Pick<
   RecordSpec<unknown, string>,
   "namespace" | "home" | "decode"
 >
@@ -85,7 +85,7 @@ const DECLARED: ReadonlyMap<string, AnyRecordSpec["home"]> = new Map(
 )
 
 /** The namespaces a document holds, with each one's keys, where it is. */
-export interface StoredRecords {
+interface StoredRecords {
   readonly target: Target
   readonly namespaces: ReadonlyMap<string, readonly string[]>
 }

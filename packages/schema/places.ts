@@ -9,7 +9,7 @@
 
 import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type TextCardId, textCardId } from "@pinetrie/core"
+import { type TextCardId, textCardId } from "@pinetrie/threads"
 
 /**
  * A card's record as flat strings, "" for none, decoded in

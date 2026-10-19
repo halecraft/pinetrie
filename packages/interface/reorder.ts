@@ -4,7 +4,7 @@
 // A gap is a place between columns: gap 0 is before the first, gap n after
 // the last of n. A column dropped in the gap either side of itself does not move.
 
-import type { CardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/threads"
 /** The gap a pointer at `x` is in: the number of columns whose centre is left of it. */
 export function pointerGap(mids: readonly number[], x: number): number {
   return mids.filter(mid => mid < x).length

@@ -2,17 +2,16 @@ import { readFileSync } from "node:fs"
 import {
   type EntryId,
   entryId,
-  indexAsks,
   pointId,
   type RevisionRecord,
   type Sha256,
-  type SpineNode,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
 import type { ReviewTarget } from "@pinetrie/interface"
 import { entry, indexEntries } from "@pinetrie/interface/fixtures"
+import { indexAsks, type SpineNode } from "@pinetrie/threads"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   ASK_REVIEW_LINE,

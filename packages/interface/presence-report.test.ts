@@ -1,4 +1,4 @@
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { planReading, TYPING_EVERY_MS, typingDue } from "./presence-report.ts"
 

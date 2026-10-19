@@ -1,10 +1,5 @@
-import {
-  type ImageRef,
-  isSha256,
-  streamId,
-  type ToolCall,
-  type ToolResult,
-} from "@pinetrie/core"
+import { type ImageRef, isSha256 } from "@pinetrie/core"
+import { streamId, type ToolCall, type ToolResult } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   type CommandLine,

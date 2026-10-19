@@ -1,7 +1,7 @@
 import { canvasIdFor, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readingKey, seatKey } from "@pinetrie/schema"
 import { newPresenceDoc } from "@pinetrie/schema/fixtures"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   readReading,

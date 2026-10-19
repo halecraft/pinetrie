@@ -1,7 +1,8 @@
 // request — what a one-shot model request outside a thread is made from, and
 // a one-line answer read back (`bareLine`).
 
-import { firstLine, type TranscriptMessage } from "@pinetrie/core"
+import { firstLine } from "@pinetrie/core"
+import type { TranscriptMessage } from "@pinetrie/threads"
 
 /**
  * One message as `speaker: text`. A person's speaker is its author as sent,

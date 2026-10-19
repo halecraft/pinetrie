@@ -5,9 +5,10 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { CardId, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
 import { InventoryDoc, readSlots } from "@pinetrie/schema"
+import type { CardId } from "@pinetrie/threads"
 import {
   type HeldSince,
   type Intents,

@@ -17,7 +17,6 @@ import {
   type CommitId,
   type ErrCode,
   PROJECT_CONFIG_FILE,
-  type ProposedChangesFact,
   type ProposedChangesSeen,
   type RepoConfig,
   type ThreadId,
@@ -47,6 +46,7 @@ import {
   type ReviewAnswer,
   type ReviewAsk,
 } from "@pinetrie/rules"
+import type { ProposedChangesFact } from "@pinetrie/threads"
 import { failed, type LeaseBasics } from "../../basics.ts"
 import { createDescriber } from "../../describe.ts"
 import type { Records } from "../../records.ts"

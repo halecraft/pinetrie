@@ -44,13 +44,14 @@ export function accountView(input: {
   }
 }
 
-export interface ControlWords {
+/** An account menu item's words: its label, and a tooltip when the label needs one. */
+interface AccountItemWords {
   readonly label: string
   readonly title?: string
 }
 
 /** An account menu item's words. A count is drawn beside the label, not in it. */
-export function accountWords(item: AccountItem): ControlWords {
+export function accountWords(item: AccountItem): AccountItemWords {
   switch (item.kind) {
     case "inbox":
       return { label: INBOX }
@@ -74,6 +75,6 @@ export function accountWords(item: AccountItem): ControlWords {
 }
 
 /** The inventory's toggle in the corner: an icon, so its words are its name. */
-export const inventoryWords = (count: number): ControlWords => ({
+export const inventoryWords = (count: number): AccountItemWords => ({
   label: `your inventory: ${count === 0 ? "empty" : plural(count, "card")}`,
 })

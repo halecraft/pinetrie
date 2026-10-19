@@ -9,13 +9,7 @@
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import {
-  type CardId,
-  type CardRecord,
-  isTextCard,
-  type TextCardId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import { readSeats } from "@pinetrie/reads"
 import { blankQueued, writersOfClients } from "@pinetrie/rules"
 import {
@@ -25,6 +19,12 @@ import {
   textClients,
   textHolds,
 } from "@pinetrie/schema"
+import {
+  type CardId,
+  type CardRecord,
+  isTextCard,
+  type TextCardId,
+} from "@pinetrie/threads"
 
 /** A card's text, as the sweeps need it. */
 export interface GatheredText {

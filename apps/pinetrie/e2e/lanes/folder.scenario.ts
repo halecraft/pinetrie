@@ -19,16 +19,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import {
-  ancestry,
-  ERR,
-  entryId,
-  GET_LATEST_TOOL,
-  messageText,
-  RESOLVE_TOOL,
-  ROOT,
-  type ThreadId,
-} from "@pinetrie/core"
+import { ERR, entryId, ROOT, type ThreadId } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -40,6 +31,12 @@ import {
 } from "@pinetrie/reads"
 import { foreignLaneWords, reviewUrl } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
+import {
+  ancestry,
+  GET_LATEST_TOOL,
+  messageText,
+  RESOLVE_TOOL,
+} from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
 import {

@@ -29,7 +29,8 @@ modules decide. What any client decides alike is `@pinetrie/interface`'s
 - **How the page draws stays the page's**, pure or not: `React.memo`'s
   rules (`same-props.ts`, `message-props.ts`) and the palette's colours,
   checked against `index.html` (`colors.ts`).
-- **`index.ts` exports by name only what the page imports.**
+- **`index.ts` is written by `pnpm run indexes`** (`scripts/indexes.ts`):
+  by name, exactly what the page imports through it.
 
 ## A fold in motion (`fold-motion.ts`, ADR-0137)
 

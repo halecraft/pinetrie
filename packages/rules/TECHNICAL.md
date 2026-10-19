@@ -11,24 +11,27 @@ modules decide, and the host writes.
 The package was `@pinetrie/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pinetrie/core` and `@pinetrie/jj` state it too:
+Where a rule lives, as `@pinetrie/core`, `@pinetrie/threads` and `@pinetrie/jj` state it too:
 
 > A type lives in the highest package that all its users can import
-> (ADR-0180). Core holds the vocabulary (ids, intents) and the reads of
-> the tree. A stored shape's type is `@pinetrie/rules`', beside its spec,
-> with the types only it uses. A type core's own code names, or one a
-> package below rules must read, write or name (one that declares
-> `@pinetrie/core` and not `@pinetrie/rules`: `lanes`, `jj`, `folder`
-> among them), lives in core instead. What a stored shape says, and how
-> the host changes it, is `@pinetrie/rules`', whoever reads it. One
-> client's own in-flight state (its moves, held roots, slot repair,
+> (ADR-0180). Core is the kernel every package shares: ids, refusals,
+> writes, and what a lane, its disk and its history are. `@pinetrie/threads`
+> holds threads, their entries and messages, the commands a client
+> sends, and the cards placed beside them; no lane package declares it
+> (ADR-0201). A stored shape's type is `@pinetrie/rules`', beside its spec,
+> with the types only it uses. A type a package below rules must read,
+> write or name (one that declares core and not rules) lives in core
+> when core's own code or a lane package (`lanes`, `jj`, `folder`
+> among them) names it, and in threads otherwise. What a stored shape
+> says, and how the host changes it, is `@pinetrie/rules`', whoever reads it.
+> One client's own in-flight state (its moves, held roots, slot repair,
 > commands out) is `@pinetrie/session`'s. What a person sees and can do,
 > and its words, is `@pinetrie/interface`'s, for any client; how the page
 > draws it is `@pinetrie/web`'s (ADR-0093).
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressMessage`; `address`, `parseMentions` and `cardMove`, which know no
-record, are core's; the trailer format and the proposed changes' facts and decisions
+record, are threads'; the trailer format and the proposed changes' facts and decisions
 are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.
 A record's type is beside its spec (`SeatRecord` beside `SEAT`), unless
 core or a package below rules names it: `LaneRecord` and `JjBaseRecord`
@@ -37,8 +40,10 @@ package does, and `BaseRecord`, the union of the two, is here.
 
 ## Where things are
 
-`index.ts` exports, by name, only what another package imports; its groups
-follow this list. A name only this package uses is imported from its module.
+`index.ts` is written by `pnpm run indexes` (`scripts/indexes.ts`,
+ADR-0201): by name, exactly what some file imports through it, one statement
+per module, and `scripts/indexes.test.ts` fails while it differs. A name
+only this package uses is imported from its module.
 For an operation the host carries out, that is its plan, its facts and its
 result, never the planners the plan builds on (ADR-0193); a planner stays
 exported only where another package decides with it on its own
@@ -300,15 +305,15 @@ the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeMessage` and the total `decodeMessage`
 are the only code that builds or reads the shape.
 
-- **Mentions are read once** (`mentionSpans`, core): what is sent
+- **Mentions are read once** (`mentionSpans`, threads): what is sent
   (`parseMentions`) and what the composer completes at the caret
   (`typedMention`) are both its spans, so a list never opens where a send
   would read no mention.
-- **A mention in code is no mention** (`withoutCode`, core, ADR-0128):
+- **A mention in code is no mention** (`withoutCode`, threads, ADR-0128):
   inline code spans and fenced blocks are blanked first.
   A four-space indented block is not: a line scan cannot tell it from a
   paragraph's continuation.
-- **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
+- **Who a message is for is `address`** (`@pinetrie/threads`, ADR-0021): `@agent`
   asks the agent; a message naming only participants is for them; with no
   mention that resolves, the thread decides (`agentByDefault`: the agent where
   the thread has a lane, and never by a lane's default for a `branch`, which
@@ -338,7 +343,7 @@ are the only code that builds or reads the shape.
   the quotes). Each refusal before anything is written is a
   `SendRefusal`.
 - **`planMessage` decides what a message does** (ADR-0120), over the thread
-  `threadOfSend` (core) gives for where it goes (`SendAt`), and names
+  `threadOfSend` (threads) gives for where it goes (`SendAt`), and names
   exactly where to write:
 
   | a message… | no lane | idle lane | busy lane (running, cards queued, or its queue held: `sendWaits`) |
@@ -361,7 +366,7 @@ are the only code that builds or reads the shape.
 - **A lane is named by its thread's id** (ADR-0117): `create-and-run` takes
   the thread the send continues, or the one a branch starts. No other name is
   chosen; pi makes none. A branch naming a thread that has an entry or a
-  lane is `taken` (core), refused before planning.
+  lane is `taken` (threads), refused before planning.
 - **Every entry names its thread** (ADR-0125), in its row's `thread`
   column, from the commit that writes it. Every `MessageDecision` that writes
   names its thread once, as `thread`: the one the send continues, or the
@@ -378,9 +383,9 @@ are the only code that builds or reads the shape.
   `assistant`, `toolResult`) are checked and their parts decoded
   (`decodePiMessage`, `pi-message.ts`), a host tool's result gaining what it
   says as a fact. Anything else is no message: a role pi does not write
-  into a root, or a `custom` message no decoder takes. core's types
+  into a root, or a `custom` message no decoder takes. threads' types
   (`AgentMessageLike`, `TranscriptMessage`) are unions keyed by role, so
-  every read past this narrows on `role`, and core needs no schema library.
+  every read past this narrows on `role`, and threads needs no schema library.
   The blob sweep alone reads a stored message raw (`storedImages`), so a
   message left out here loses none of its images.
 - **A chat's images are references** (ADR-0042). `details.images` lists an
@@ -483,7 +488,7 @@ only the host writes. These modules decode a record, decide where a card
 sits, which moves the host accepts, which queued card is popped next, and
 which are swept.
 
-- **A card is an identity, a place and content** (`Card<K>`, core's
+- **A card is an identity, a place and content** (`Card<K>`, threads'
   `places.ts`, ADR-0126): its kind, its id, its owner and placer, its
   place (`PlaceOf<K>`), and its content (`ContentOf[K]`): a text card's
   command and why it was not sent, a fact's fact, nothing for a thread's
@@ -491,7 +496,7 @@ which are swept.
   records (`PlacedKind`), so a thread's card in a queue or a fact anywhere
   but a queue does not compile. A new kind is a row in `KINDS`, one in
   `ContentOf`, and one in the page's `RENDERINGS`.
-- **`KINDS` is every kind once** (core's `kinds.ts`, `satisfies
+- **`KINDS` is every kind once** (threads' `kinds.ts`, `satisfies
   Record<CardKind, KindSpec>`): its id's prefix (`kindOfCard` reads them;
   a bare uuidv7 is a text card's), its places (`PLACES_OF` is read from
   it), whether a person moves it (`moves`: not a fact), whether it is
@@ -509,13 +514,13 @@ which are swept.
   `isMovable(card)` is `KINDS`' `moves`. A kind added to a place's row is
   queued, taken or put there with no other change. A test of what a kind
   *is* (a fact's row in the dock) still reads its kind.
-- **A card's id is built from `KINDS`** (`cardIdOfKind(kind, uuid)`, core's
-  `index.ts`): its prefix and the rest, typed by `IdOf<K>`. `parseCardId`'s
+- **A card's id is built from `KINDS`** (`cardIdOfKind(kind, uuid)`, threads'
+  `card-ids.ts`): its prefix and the rest, typed by `IdOf<K>`. `parseCardId`'s
   pattern is built from the same prefixes, so a kind's id parses as soon
   as its row has one. Each kind keeps its own brand (`NoteColumnId`,
   `FactCardId`, …).
 - **An address names a thread, an entry, a block, a range or a card**
-  (core's `address.ts`, ADR-0126): one codec, `printAddress` and
+  (threads' `address.ts`, ADR-0126): one codec, `printAddress` and
   `parseAddress`, total, for the record, the wire, the pane and links in
   text (`/a/<address>`, `addressLink`, `addressLinks`). An entry names its
   thread, so it resolves without a walk. A block is numbered once
@@ -567,8 +572,8 @@ which are swept.
   `command`, `unsent` and `origin`; a reference its `address` and `quote`;
   a fact its `fact`; an ask its `relay` (ADR-0128); a thread's card, a
   note column's and a media column's their box, `ticked` ("1" or "", one
-  `COLUMN_CODEC`, ADR-0198); a canvas's card none. Where a card is goes through core's `placeFields`
-  and `placeOfFields` (`core/places.ts`), which the wire's key codec uses
+  `COLUMN_CODEC`, ADR-0198); a canvas's card none. Where a card is goes through threads' `placeFields`
+  and `placeOfFields` (`threads/places.ts`), which the wire's key codec uses
   too, so the two cannot drift. Each stored kind's row has its fields in
   one table (`ROWS`): a row is written through it and read narrowed to its
   kind, so neither can touch a field its kind does not store. Your
@@ -602,7 +607,7 @@ which are swept.
   (`sameKey`, over its kind and thread, or an inventory's holder). A
   key leaves out a queue's order and queuer, so a reorder does not make
   someone else's unqueue fail. It leaves out a queue's `seen` too. Every
-  move, on the host and on a client, is built by core's `cardMove` (from
+  move, on the host and on a client, is built by threads' `cardMove` (from
   where the card is); an unqueue's or an unpin's target is `notesTarget`, the
   thread's nearest notes (`notes`). That is a `MoveTarget` alone, on
   `Move.to`, never a `PlaceKey`, so no stored place or `from` is one; the
@@ -610,7 +615,7 @@ which are swept.
   and `planMove` takes a `ResolvedMove`, so an unresolved one does not
   compile. No `from` creates the card, its sender its owner: a text card,
   or a note column on a canvas (`n-` id), which is then in its canvas's
-  history. Where each kind of card may be is one table, core's
+  history. Where each kind of card may be is one table, threads'
   `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
   (`PlaceOf`) read. Nobody removes a card:
   `Move.to` is never null. Trashing is a move to a trash (`TRASH_PLACE`,
@@ -620,7 +625,7 @@ which are swept.
   `{ kind: "trash", left }`), and the sender is its placer, as for any
   move. Nothing else decides where it is: whose trash it is, who sees it,
   where a restore goes and which history it is in follow from `left`
-  (`surfaceOwner`, `livePlace`, core). Its history (`movesHistory`, over
+  (`surfaceOwner`, `livePlace`, threads). Its history (`movesHistory`, over
   `Trashes`) is the canvas it left (`canvasOfPlace`), or for a card in an
   inventory the canvas its sender is on (`here`, which a `move` carries),
   or, on none, its sender's history outside any canvas. A spin-off's `here`
@@ -665,7 +670,7 @@ which are swept.
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
   places alone, since a thread's pinned cards are found through the tree,
-  which a handoff does not read. Where a reorder may be is core's
+  which a handoff does not read. Where a reorder may be is threads'
   `REORDER_PLACES` (`ReorderAt`, `isReorderPlace`, which the codec and
   `reorderByStep` read too), and `REORDERS` has a row for each, so a place a
   reorder may be at cannot lack its siblings: the lane's queue, its note
@@ -773,7 +778,7 @@ which are swept.
   decodes.
 - **A drop resolves to a place** (ADR-0126). A card of a kind no canvas
   takes, sent to a spot on one (`canvas-at`), lands in the container its
-  kind is made in there: `WRAPS` (core's `places.ts`) says which, a note
+  kind is made in there: `WRAPS` (threads' `places.ts`) says which, a note
   column for a text card or a reference, a media column for an image
   (ADR-0182), so a later kind is a row. It is part of `TargetOf`
   (`isTargetForKind`, the wire's check), and `planMoveTargets` resolves it:
@@ -893,7 +898,7 @@ which are swept.
 # Queue holds (`queue-hold.ts`, ADR-0048 step 7)
 
 A thread's queue held: while `QUEUE_HOLD` has its lane, the host pops no
-message card from it, and a send there waits in it (`sendWaits`, core), so
+message card from it, and a send there waits in it (`sendWaits`, threads), so
 people can stage several cards on an idle thread. It is a session record,
 not `pinetrie:live`, so it lasts until a release, across a restart.
 
@@ -908,7 +913,7 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   so a swept hold held nothing.
 - **`isBusy` is unchanged, and a held queue is not work.** A held queue
   with no card is not busy: it blocks no archiving. A busy lane that is not
-  running and whose queue is held is `held` in `threadsWork` (core), which
+  running and whose queue is held is `held` in `threadsWork` (threads), which
   refuses archiving as `waiting` does but draws no ring (`threadStatus`):
   nothing happens there until a person acts (ADR-0113).
 - **`planQueueCard`** (ADR-0113): every queue is one request, `queue-card`,
@@ -975,7 +980,7 @@ Each card's history and the traces left where someone else moved your card.
 Both are session records the host writes: `CARD_HISTORY`
 (`pinetrie.card-history`, keyed by the card, deleted with it) and `TRACE`
 (`pinetrie.trace`, keyed by its own id, since a trace outlives its card). A
-place in them is stored as core's flat key fields (`placeFields`,
+place in them is stored as threads' flat key fields (`placeFields`,
 `keyOfFields`), the wire's own codec; an event whose place this build cannot
 read is dropped, not its history. The places document holds neither: it
 grows for good (S90), and a field every event changes would refuse each
@@ -1171,7 +1176,7 @@ not gated here: they ask `threadReach` (`reach.ts`).
 - **One pass, one maker.** `planGate` is the only maker of a
   `Cleared<C>`, as `planCopyReady` is of core's `ReadyCopy`; the host's
   `sendMessage` takes only a `Cleared<Send>`, and its dispatcher carries out
-  only a `Cleared<Intent>`. What the gate decides on is core's `Gated`, a
+  only a `Cleared<Intent>`. What the gate decides on is threads' `Gated`, a
   command or a `Send`.
 - **The order is the plan's.** The archive first (`writesIn`,
   `archivedIn`), which needs no root, so a command it refuses opens none;
@@ -1317,7 +1322,7 @@ home).
 - **`by` is a writer, or the agent for a title it made unasked**
   (ADR-0074). A writer id always starts `w-`, so the two never collide, and
   nothing decides by it.
-- **The title rule is `parseTitle`'s** (`@pinetrie/core`): trimmed, empty
+- **The title rule is `parseTitle`'s** (`@pinetrie/threads`): trimmed, empty
   clears, one line of at most `MAX_TITLE`. The codec and the page both
   decide by it. The decoder checks only the shape (a non-empty title): the
   host is the session's one writer, and stores only parsed titles.
@@ -1332,7 +1337,7 @@ or appended already: the first press is the one named. The run's end
 appends it first, whatever the hold, as a `pinetrie.fact` history message
 whose `content` the agent's next run reads ("Bea stopped this run.",
 `factContent`), and whose renderable form carries `stopped` (`{ prompt,
-by }`) for core. `planStop` also gives the write of the hold the Stop
+by }`) for threads. `planStop` also gives the write of the hold the Stop
 leaves on the queue (`holdOnStop`, ADR-0048 step 7), written before the
 abort, and reads the asks from the tree it is given.
 
@@ -1396,7 +1401,7 @@ replaced whole each time: a value, not a text, since nothing accumulates
   `reading`, ADR-0024) and `DIGEST_EVERY` has passed; at the end, once, for the
   final one.
 - **`planDigest`** is the decision and the request's parts: a long ask only
-  (`isLongAsk`, core's `LONG_ASK`, which the rail draws as a capsule of its own), then `digestDue`, then the
+  (`isLongAsk`, threads' `LONG_ASK`, which the rail draws as a capsule of its own), then `digestDue`, then the
   ask's message as one line, its run's messages walked up from the run's
   last entry (`AskIndex.last`) and kept to the ask's own, and its last word
   (`lastWord`) apart from them as `shown`, since the reader sees it after
@@ -1521,7 +1526,7 @@ each run's end. Not a *topic*, which is a canvas in Topics (ADR-0158).
 
 - **`planFocus`** is the decision and the request's parts: none with digests
   off, since a focus reads its asks' headlines, or for a thread with no ask
-  (`threadAsks`, core). Each ask is its prompt's `transcriptLine`, cut, with
+  (`threadAsks`, threads). Each ask is its prompt's `transcriptLine`, cut, with
   its digest's headline; the run that just ended gives its own (`settled`),
   since the root may not hold it yet.
 - **`focusRequest`** is the shape the `thread-focus` skill was measured with
@@ -1749,7 +1754,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       bounding them.
   - Every record with a state carries its `conflicts`, a prompt's
     included, since a branch from it is cloned with them (ADR-0072);
-    `pointConflicts` (core) reads them by point.
+    `pointConflicts` (threads) reads them by point.
 - **`sourceHistory`** is the kind of the disk a fork clones (ADR-0150): the
   lane's whose snapshot it is, or the project's from the base snapshot.
   A new lane's record takes it, and the gate checks a send at an entry by
@@ -1920,7 +1925,7 @@ commit-message request `request.ts` (`describeRequest`).
   conflicted where it starts, so the conflict came with the lane's copy;
   else `work` (ADR-0072).
 - **`parentNow`** (`base.ts`) is the thread a lane branched from, read from
-  the document alone: `forkParent` (core) names it and the fork commit; its
+  the document alone: `forkParent` (threads) names it and the fork commit; its
   newest commit is the nearest above its thread's end; what the lane last
   got the latest from (`upToDateWith`) is the newest of the parent's commits that an update or land message
   below the lane's first prompt merged (`TranscriptMessage.merged`), else
@@ -2123,7 +2128,7 @@ commit-message request `request.ts` (`describeRequest`).
 
 A cards entry is a history message (`PINNED`), `customType: "pinetrie.pinned"`,
 `display: false`: `content` is what the model reads, `details` the
-`PinnedView` (`@pinetrie/core`) pine·trie reads back. `encodePinned`
+`PinnedView` (`@pinetrie/threads`) pine·trie reads back. `encodePinned`
 and the total `decodePinned` are the only code that builds or reads it, and
 `renderableMessage` makes it role `pinned`, which no projection draws.
 
@@ -2133,7 +2138,7 @@ and the total `decodePinned` are the only code that builds or reads it, and
   under its owner's display name then. A card's `</card>` and
   `</pinned-cards>` are neutralised (`<\/card>`), so a card cannot close the
   block the model is told to trust.
-- **What the model reads now is `pinnedInView`** (`@pinetrie/core`, beside
+- **What the model reads now is `pinnedInView`** (`@pinetrie/threads`, beside
   `runPrompt`): the newest cards entry on the path; at a compaction, the
   cards its retained tail carries, or none, since pi replaces what is above
   it. The host plans a run's entry from it, and the column shows each card's
@@ -2274,7 +2279,7 @@ the tip it must match, and the bookmark to leave on it.
   cards entry, or a steer into a running lane, S103), `get-latest` (a lane whose
   work changes no file, `BaseRecord.work`, is got the latest quietly before a
   chat's run: `planMessage`'s `get-latest-first`), or `nothing`. What the thread
-  already heard of or merged is read from the tree (`baseKnown`, core), so
+  already heard of or merged is read from the tree (`baseKnown`, threads), so
   a commit is told once, and again only past a compaction.
 - **`planGetLatestCall`** decides `catch_up` from the documents before
   anything is queued: a lane of its own, the only call in its turn (a
@@ -2310,9 +2315,9 @@ them, or opens and starts them.
   one branch.
 - **Spent is read from the thread records**, never the facts: a branch
   opened from a proposal names it and its row in its origin
-  (`ThreadFork.proposal`, core), written in the same step as the press,
+  (`ThreadFork.proposal`, threads), written in the same step as the press,
   and a sweep keeps a thread's record, so a proposal stays spent even once
-  every branch is closed. `proposalState` (core) reads it from
+  every branch is closed. `proposalState` (threads) reads it from
   `branchesByProposal`, one pass over the records.
 - **The fork is the proposing run's last entry**, a tool result included
   when a Stop left one last: a reply after a Stop goes there too, and the
@@ -2396,10 +2401,10 @@ Gotchas:
 
 Another thread's agent, invited into a thread, is asked there and answers
 from its own thread. Who a message invites and asks is `address`
-(`@pinetrie/core`), and the chat stores both (`MessageDetails.asks`,
+(`@pinetrie/threads`), and the chat stores both (`MessageDetails.asks`,
 `invites`, absent when none); members, what came into an agent and whether
 a round is done are read from the path (`threadMembers`, `lastIncomingEntry`,
-`isRoundAnswered`, core). Nothing about them is stored beside the entries.
+`isRoundAnswered`, threads). Nothing about them is stored beside the entries.
 
 - **Three history messages.** `pinetrie.incoming` (role `incoming`, a one-line
   message): what an asked agent was told of the thread that asked, its text

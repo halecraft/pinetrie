@@ -7,15 +7,9 @@
 // seen, and `seen` holds the ids of later ones you have seen. Entry ids are
 // uuidv7, so id order is creation order.
 
-import {
-  address,
-  type EntryId,
-  parseMentions,
-  type RootId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { EntryId, RootId, ThreadId, WriterId } from "@pinetrie/core"
 import type { RootRecord } from "@pinetrie/rules"
+import { address, parseMentions } from "@pinetrie/threads"
 
 /** A message that mentions you. */
 export interface InboxItem {

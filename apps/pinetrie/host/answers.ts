@@ -6,7 +6,7 @@
 // `undelivered` fact, never a message the asker would get. Where an answer
 // goes in its asker's thread is `delivery.ts`'.
 
-import type { EntryId, RelayDetails, ThreadId } from "@pinetrie/core"
+import type { EntryId, ThreadId } from "@pinetrie/core"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import { readNames, readTreeIndex } from "@pinetrie/reads"
 import {
@@ -21,6 +21,7 @@ import {
   roundRequest,
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
+import type { RelayDetails } from "@pinetrie/threads"
 import type { Allowances } from "./allowances.ts"
 import { type Basics, type HostKeeper, notWritten } from "./basics.ts"
 import type { Deliver } from "./delivery.ts"

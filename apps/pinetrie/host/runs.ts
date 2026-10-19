@@ -9,12 +9,9 @@
 import {
   type EntryId,
   type Refusal,
-  type Role,
   type RunId,
   type RunnableLane,
   runId,
-  type SentCard,
-  type StreamEvent,
   type ThreadId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -40,6 +37,7 @@ import {
   readStreamRecords,
   readStreams,
 } from "@pinetrie/schema"
+import type { Role, SentCard, StreamEvent } from "@pinetrie/threads"
 import type { BaseNews } from "./base-news.ts"
 import { type Basics, failed, notWritten } from "./basics.ts"
 import type { CanvasContext } from "./canvas.ts"

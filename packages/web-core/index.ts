@@ -1,10 +1,10 @@
+// web-core — the web client's own decisions, from the browser's inputs.
+//
+// Written by `pnpm run indexes`: each name some file imports through it, from
+// the module that declares it, and nothing else.
+
 export { placement } from "./align.ts"
-export {
-  type AtTop,
-  askAtTop,
-  sameAtTop,
-  type WorkBox,
-} from "./ask-bar.ts"
+export { type AtTop, askAtTop, sameAtTop, type WorkBox } from "./ask-bar.ts"
 export {
   CLIP_ATTRIBUTE,
   CLIP_MIME,
@@ -42,18 +42,9 @@ export {
 } from "./follow.ts"
 export { imageClick } from "./image-click.ts"
 export { imageEdge } from "./image-edge.ts"
-export {
-  type Dock,
-  dockCodec,
-  snappedDock,
-} from "./inventory-dock.ts"
+export { type Dock, dockCodec, snappedDock } from "./inventory-dock.ts"
 export { keptImages } from "./kept-images.ts"
-export {
-  hashOfPage,
-  PAGE_STATE,
-  pageOfHash,
-  planLeave,
-} from "./page-url.ts"
+export { hashOfPage, PAGE_STATE, pageOfHash, planLeave } from "./page-url.ts"
 export {
   type Crop,
   cropSource,
@@ -65,10 +56,7 @@ export {
   zoomCrop,
 } from "./picture-crop.ts"
 export { type BoxPlacement, placeBox } from "./popover-place.ts"
-export {
-  type ScreenMemory,
-  screenMemory,
-} from "./screen-memory.ts"
+export { type ScreenMemory, screenMemory } from "./screen-memory.ts"
 export {
   THEME_HEADING,
   THEMES,

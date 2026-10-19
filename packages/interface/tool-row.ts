@@ -8,17 +8,17 @@
 // which shows both whole. In story, a call with an intent leads with it
 // (`rowLead`), its command in the detail alone.
 
+import type { ImageRef } from "@pinetrie/core"
+import { readShell, type ShellRole } from "@pinetrie/shell"
 import {
   BASH_TOOL,
-  type ImageRef,
   knownToolId,
   type StreamId,
   streamStart,
   type ToolCall,
   type ToolId,
   type ToolResult,
-} from "@pinetrie/core"
-import { readShell, type ShellRole } from "@pinetrie/shell"
+} from "@pinetrie/threads"
 import type { Density } from "./ask-words.ts"
 import { elapsed, plural } from "./counts.ts"
 import { toolWord } from "./tool-words.ts"
@@ -84,7 +84,7 @@ export function runningFor(
 }
 
 /** What a run of a command is, for the page to colour. Only a shell command has runs other than plain. */
-export type RunRole = ShellRole
+type RunRole = ShellRole
 
 /** Some of a command's text, and what it is. */
 export interface Run {
@@ -93,7 +93,7 @@ export interface Run {
 }
 
 /** What a call touched, as a row shows it. */
-export interface RowSummary {
+interface RowSummary {
   /** The tool's word (`toolWord`). Absent when the call has no subject: its word is then its command. */
   readonly tag: string | undefined
   /** All of what the call touched: a shell command highlighted, and laid out when it is one long line. */
@@ -105,7 +105,7 @@ export interface RowSummary {
 }
 
 /** What a tool row leads with: an intent it has, or its command. */
-export type RowLead =
+type RowLead =
   | { readonly kind: "intent"; readonly intent: string }
   | { readonly kind: "command" }
 
@@ -160,13 +160,13 @@ export function rowSummary(call: ToolCall): RowSummary {
 }
 
 /** Lines a summary shows of a command, and of its output. */
-export const SUMMARY_LINES = 5
+const SUMMARY_LINES = 5
 /** The most of one line a summary shows. */
 export const LINE_LENGTH = 160
 /** The most of a result the detail draws: its end. */
 export const SHOWN = 20_000
 /** The tallest image a summary draws at its own size, in CSS px: 10rem, as `.tool-images[data-thumb]` caps it. */
-export const THUMB_HEIGHT = 160
+const THUMB_HEIGHT = 160
 
 type Line = readonly Run[]
 
@@ -218,7 +218,7 @@ function joinLines(lines: readonly Line[]): Run[] {
 }
 
 /** Some of a text's lines, and what the cut hides. */
-export interface Cut {
+interface Cut {
   readonly runs: readonly Run[]
   /** Lines left out. */
   readonly hidden: number
@@ -255,7 +255,7 @@ export function wholeOutput(text: string): string {
 }
 
 /** What a row's body draws: its output's text, or its images. */
-export type RowBody =
+type RowBody =
   | { readonly kind: "text"; readonly text: string }
   | {
       readonly kind: "images"
@@ -273,7 +273,7 @@ export interface CommandLine {
 }
 
 /** Everything a row draws but its tag and status. */
-export interface RowView {
+interface RowView {
   /** The intent it leads with, beside its tag (`rowLead`); null when it leads with its command. */
   readonly head: string | null
   /** Its intent, as a caption under its command, when it leads with the command; null for none. */
@@ -286,7 +286,7 @@ export interface RowView {
 }
 
 /** What a summary hides, which its toggle names. */
-export interface Hidden {
+interface Hidden {
   /** The command's lines left out; "all" when its intent stands for it. */
   readonly command: number | "all"
   /** The output's lines left out. */

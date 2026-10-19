@@ -8,12 +8,8 @@
 // Each function takes one field's entries, so a part of the screen reads only
 // the field it shows, and a write to another field redraws nothing of it.
 
-import {
-  type EntryId,
-  pathIds,
-  type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+import type { EntryId, WriterId } from "@pinetrie/core"
+import { pathIds, type TreeIndex } from "@pinetrie/threads"
 
 /** Who reads which thread end and canvas, and who types where: presence's reads, as the host reads them. */
 export {

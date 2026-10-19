@@ -1,18 +1,16 @@
-import {
-  type CardRecord,
-  canvasIdFor,
-  cardIdOfKind,
-  textCardId,
-  threadIdFor,
-  UNTICKED,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { canvasIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type CardOnCanvas,
   cardsOnCanvas,
   NEW_NOTES_TITLE,
 } from "@pinetrie/rules"
+import {
+  type CardRecord,
+  cardIdOfKind,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { canvasNoteColumns } from "./note-column-view.ts"
 

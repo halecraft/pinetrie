@@ -7,8 +7,6 @@ import {
   type BlobStore,
   ERR,
   refused,
-  type Send,
-  type SentCard,
   type Sha256,
   type ThreadId,
   type WriterId,
@@ -46,6 +44,7 @@ import {
   type SharedBlob,
   type ThreadOpen,
 } from "@pinetrie/rules"
+import type { Send, SentCard } from "@pinetrie/threads"
 import type { StepBasics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Names } from "../names.ts"

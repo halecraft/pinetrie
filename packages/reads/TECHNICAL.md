@@ -91,7 +91,7 @@ singletons (`readAccepted`, `readProject`, `readCommands`, `readIcons`) take
 their one key; `readIcons` is null before a host wrote it, which the page
 reads as no built-in icons.
 
-It declares core, schema and rules only (`workspace.test.ts`), so it runs
+It declares core, threads, schema and rules only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 
 The records it reads, and the decisions that made them:
@@ -131,7 +131,7 @@ Kyneta has let go.
   unchanged**, so a write elsewhere (a checkpoint, a value, a lane tip)
   costs no indexing, and the host's many reads within one command share one
   index. Every caller shares it: copy a list before sorting it
-  (`packages/core/roots.ts` does).
+  (`packages/threads/roots.ts` does).
 - **`readTreeIndex`'s entries are the same for the same stored row**,
   frozen. Kyneta gives an unchanged row the same object across writes, so a
   new entry decodes only itself.
@@ -194,7 +194,7 @@ Kyneta has let go.
   names its thread and a store from before is refused until migrated
   (ADR-0096). So is a row whose type is none of pi's four (`EntryType`):
   the schema keeps `type` a free string so a new pi needs no schema change
-  (`packages/schema/TECHNICAL.md`), and a new type is read once core
+  (`packages/schema/TECHNICAL.md`), and a new type is read once threads
   names it.
 - **A compaction entry carries the pinned cards its retained tail holds**
   (`carried`, ADR-0048 step 5, S92): the tail's newest cards entry, read from the

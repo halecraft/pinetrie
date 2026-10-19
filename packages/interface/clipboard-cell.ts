@@ -2,14 +2,15 @@
 // header shows: the last copy this tab made, never a slot. No page can read
 // the system clipboard before a paste, so it says no more than that.
 
-import { firstLine, INVENTORY_SLOTS } from "@pinetrie/core"
+import { firstLine } from "@pinetrie/core"
 import { firstEmpty, type Slots } from "@pinetrie/session"
+import { INVENTORY_SLOTS } from "@pinetrie/threads"
 import { addressWords } from "./address-words.ts"
 import { CLIPBOARD_CELL, CLIPBOARD_CELL_TITLE } from "./card-words.ts"
 import type { CardClip, Clip } from "./clip.ts"
 
 /** How the cell draws its copy: what it is ("a message", "a thread", "text") and its first line. */
-export interface ClipSummary {
+interface ClipSummary {
   readonly words: string
   readonly line: string
 }

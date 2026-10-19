@@ -1,19 +1,16 @@
 // put-images — new images put in a media column, and a new version of one.
 
+import type { ImageRef, Sha256, ThreadId, WriterId } from "@pinetrie/core"
 import {
   type CardRecord,
   type ImageId,
-  type ImageRef,
   type ImagesTarget,
   type Intent,
   isMediaId,
   type MediaId,
   makeCard,
-  type Sha256,
-  type ThreadId,
   type TitledCardId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { NEW_MEDIA_TITLE } from "./canvas.ts"
 import { cardsOnCanvas } from "./canvas-index.ts"
 import type { CardTitleRecord } from "./card-title.ts"
@@ -159,7 +156,7 @@ export interface PutImageAsk {
 }
 
 /** What the host does for a `put_image` ask, or why it does nothing. */
-export type ImageAskPlan =
+type ImageAskPlan =
   | {
       readonly kind: "put"
       readonly intent: Extract<Intent, { kind: "put-images" }>

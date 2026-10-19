@@ -9,7 +9,6 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
   type EntryId,
   ERR,
-  messageText,
   pointId,
   ROOT,
   THE_AGENT,
@@ -25,6 +24,7 @@ import {
 } from "@pinetrie/rules"
 import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
+import { messageText } from "@pinetrie/threads"
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"

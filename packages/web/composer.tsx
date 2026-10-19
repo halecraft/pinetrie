@@ -1,15 +1,7 @@
 // web/composer — one per column, at its foot: your message's editor, which only
 // you see, and who else is writing here.
 
-import type {
-  AgentCandidate,
-  CardId,
-  EntryId,
-  Position,
-  TextCard,
-  TextPlace,
-  ThreadLane,
-} from "@pinetrie/core"
+import type { EntryId, Position } from "@pinetrie/core"
 import {
   type ColumnAct,
   type ColumnHow,
@@ -23,6 +15,13 @@ import {
   type ReadOnly,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type {
+  AgentCandidate,
+  CardId,
+  TextCard,
+  TextPlace,
+  ThreadLane,
+} from "@pinetrie/threads"
 import { CardEditor, type Where } from "./card-editor.tsx"
 import { nameFor } from "./presence.tsx"
 import { useOthersTyping } from "./use-presence.ts"

@@ -8,8 +8,8 @@ so nothing ships it; its tests run with the unit tests.
 
 ## What holds it to interface
 
-- **Resolution.** It declares `@pinetrie/interface`, `@pinetrie/session`
-  and `@pinetrie/core`, and nothing else (`workspace.test.ts`). A view it
+- **Resolution.** It declares `@pinetrie/interface`, `@pinetrie/session`,
+  `@pinetrie/core` and `@pinetrie/threads`, and nothing else (`workspace.test.ts`). A view it
   draws by that leaves interface's index fails its tests; a decision taken
   from `@pinetrie/rules` or `@pinetrie/reads` does not resolve.
 - **Exhaustive switches.** `draw.ts` switches over `ColumnRow` and

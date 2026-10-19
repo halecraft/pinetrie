@@ -3,30 +3,11 @@
 // because `planIntent`, the card intents and the reveal all plan them.
 
 import type {
-  Address,
-  AskIndex,
   CanvasId,
-  CardCommand,
-  CardId,
-  CardRecord,
   ConflictChoice,
   EntryId,
-  LaneView,
-  MessageAt,
-  MoveDirection,
-  MoveTarget,
-  ProposedChangesAction,
-  QueueHoldChange,
-  QueueMove,
-  ReferenceCardId,
-  Reorder,
-  Replacing,
   Sha256,
-  TextCard,
-  TextCardId,
   ThreadId,
-  TreeIndex,
-  TypedMove,
   WriterId,
 } from "@pinetrie/core"
 import type {
@@ -37,6 +18,27 @@ import type {
   SlotMove,
   Slots,
 } from "@pinetrie/session"
+import type {
+  Address,
+  AskIndex,
+  CardCommand,
+  CardId,
+  CardRecord,
+  LaneView,
+  MessageAt,
+  MoveDirection,
+  MoveTarget,
+  ProposedChangesAction,
+  QueueHoldChange,
+  QueueMove,
+  ReferenceCardId,
+  Reorder,
+  Replacing,
+  TextCard,
+  TextCardId,
+  TreeIndex,
+  TypedMove,
+} from "@pinetrie/threads"
 import type { Raised } from "./attention.ts"
 import { firstUnticked, heldByOthers } from "./canvas-columns.ts"
 import type { Canvases } from "./canvases.ts"
@@ -230,7 +232,7 @@ export type Effect =
   | { readonly kind: "reload" }
 
 /** A change to the sidebar, by canvas: your document's key. */
-export type ListAct =
+type ListAct =
   /** At its end, unless it is in the sidebar already. */
   | { readonly kind: "ensure"; readonly canvas: CanvasId }
   | {
@@ -262,7 +264,7 @@ export interface IntentState {
 }
 
 /** What a paste makes, as the page plans it (`Paste`, with what it writes first). */
-export type PastedCard =
+type PastedCard =
   | {
       readonly kind: "text"
       readonly card: TextCardId

@@ -14,21 +14,7 @@
 // message's editor makes itself (a command chosen, a pasted image) goes
 // through the element, so no path asks whether a card exists yet.
 
-import type {
-  AgentCandidate,
-  CardId,
-  CardRecord,
-  PinnedView,
-  Position,
-  TextPlace,
-  ThreadLane,
-} from "@pinetrie/core"
-import {
-  cardCommand,
-  type ListKey,
-  type TextCard,
-  type TextCardId,
-} from "@pinetrie/core"
+import type { Position } from "@pinetrie/core"
 import {
   type AcceptedRecord,
   baseChoices,
@@ -77,6 +63,18 @@ import {
   type SessionClient,
 } from "@pinetrie/session"
 import { newCardId } from "@pinetrie/session/connect"
+import {
+  type AgentCandidate,
+  type CardId,
+  type CardRecord,
+  cardCommand,
+  type ListKey,
+  type PinnedView,
+  type TextCard,
+  type TextCardId,
+  type TextPlace,
+  type ThreadLane,
+} from "@pinetrie/threads"
 import {
   type ClipboardEvent,
   type KeyboardEvent,

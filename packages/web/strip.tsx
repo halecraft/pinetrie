@@ -4,19 +4,12 @@
 // sent among them. What is drawn is decided in `@pinetrie/interface` (`canvasStrip`);
 // this draws it. A column's header is its drag handle (`use-drag.ts`).
 
-import {
-  type CanvasId,
-  type CanvasPinnedView,
-  type CardId,
-  type CardRecord,
-  type EntryId,
-  type ForeignLane,
-  type MediaId,
-  type NoteColumnId,
-  parseCardId,
-  type TextCard,
-  type ThreadId,
-  type WriterId,
+import type {
+  CanvasId,
+  EntryId,
+  ForeignLane,
+  ThreadId,
+  WriterId,
 } from "@pinetrie/core"
 import {
   type CanvasColumnView,
@@ -43,6 +36,15 @@ import {
   stripCards,
   type ThreadGlance,
 } from "@pinetrie/interface"
+import {
+  type CanvasPinnedView,
+  type CardId,
+  type CardRecord,
+  type MediaId,
+  type NoteColumnId,
+  parseCardId,
+  type TextCard,
+} from "@pinetrie/threads"
 import type { ReactElement, RefObject } from "react"
 import { useMemo, useState } from "react"
 import { AddButton } from "./add-button.tsx"

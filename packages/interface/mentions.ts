@@ -1,14 +1,14 @@
 // interface/mentions — whom the mention at the caret may name, as the
 // composer offers it (`completion.ts`).
 
+import { displayName } from "@pinetrie/rules"
 import {
   type AgentCandidate,
   type MentionTarget,
   mentionHandle,
   mentionTargets,
   typedMention,
-} from "@pinetrie/core"
-import { displayName } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { Completion } from "./completion.ts"
 import type { Reader } from "./send.ts"
 

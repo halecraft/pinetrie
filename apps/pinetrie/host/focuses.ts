@@ -7,7 +7,6 @@
 // No request is held per thread: a run that ends while another's focus is out
 // asks too, and `focusToWrite` keeps the newer ask's.
 
-import { indexAsks } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import { readDigests, readFocuses, readTreeIndex } from "@pinetrie/reads"
 import {
@@ -18,6 +17,7 @@ import {
   planFocus,
   setRecord,
 } from "@pinetrie/rules"
+import { indexAsks } from "@pinetrie/threads"
 import { askModel, oneAnswer } from "./ask-model.ts"
 import type { Basics } from "./basics.ts"
 import type { RunEndSettled } from "./digests.ts"

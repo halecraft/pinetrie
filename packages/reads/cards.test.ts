@@ -1,13 +1,8 @@
-import {
-  rootIdFor,
-  type TextCard,
-  textCardId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { rootIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeCard } from "@pinetrie/rules"
 import { newPlacesDoc } from "@pinetrie/schema/fixtures"
+import { type TextCard, textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"
 

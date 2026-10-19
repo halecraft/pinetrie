@@ -6,14 +6,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import {
-  indexAsks,
-  projectSpine,
-  ROOT,
-  rootDocId,
-  threadIdFor,
-  transcriptCalls,
-} from "@pinetrie/core"
+import { ROOT, rootDocId, threadIdFor } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import {
@@ -23,6 +16,7 @@ import {
   readThreads,
 } from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
+import { indexAsks, projectSpine, transcriptCalls } from "@pinetrie/threads"
 import { rootsOpenedWords } from "../../host/docs.ts"
 import { resumingLine } from "../../host/runs.ts"
 import { openStore } from "../../host/store.ts"

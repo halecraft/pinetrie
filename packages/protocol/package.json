@@ -12,6 +12,7 @@
   "dependencies": {
     "@kyneta/exchange": "4.0.0",
     "@kyneta/schema": "4.0.0",
-    "@pinetrie/core": "workspace:*"
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/threads": "workspace:*"
   }
 }

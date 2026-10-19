@@ -81,7 +81,7 @@ export interface LandSkill {
  * How much of each conflicted file a land message shows, fullest first. A
  * file shown less is read in the lane, where `jj resolve --list` lists them.
  */
-export type ConflictShown = "whole" | "sections" | "names" | "count"
+type ConflictShown = "whole" | "sections" | "names" | "count"
 
 const SHOWN_FULLEST_FIRST = ["whole", "sections", "names"] as const
 
@@ -151,7 +151,7 @@ export interface Floor {
 }
 
 /** What `resolutionFloor` found: the floor, or how far over the budget it is. */
-export type FloorFound =
+type FloorFound =
   | { readonly kind: "fits"; readonly floor: Floor }
   | {
       readonly kind: "too-large"

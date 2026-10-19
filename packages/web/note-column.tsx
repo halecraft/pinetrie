@@ -8,7 +8,7 @@
 // its rank there (`canvasColumns`); its header is a drag handle, as a thread
 // column's is, its ⋯ folds it, and × trashes it with its notes.
 
-import type { CardId, CardWidth, TextCardId, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import {
   type ColumnAct,
   dropProps,
@@ -20,6 +20,7 @@ import {
   type SeatRecord,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { CardId, CardWidth, TextCardId } from "@pinetrie/threads"
 import { useState } from "react"
 import { NewCardBox, NoteCardEditor } from "./card-editor.tsx"
 import { ListColumnHead } from "./list-column-head.tsx"

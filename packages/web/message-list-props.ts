@@ -2,14 +2,7 @@
 // each prop is compared: `React.memo`'s rule for `MessageList` (`sameProps`),
 // kept pure.
 
-import type {
-  AskIndex,
-  EntryId,
-  RevisionRecord,
-  ThreadLane,
-  TreeIndex,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, RevisionRecord, WriterId } from "@pinetrie/core"
 import type {
   ColumnAct,
   ColumnView,
@@ -26,6 +19,7 @@ import type {
   ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
+import type { AskIndex, ThreadLane, TreeIndex } from "@pinetrie/threads"
 import type { ScreenMemory } from "@pinetrie/web-core"
 import type { ReactNode } from "react"
 import { type PropRule, sameProps } from "./same-props.ts"

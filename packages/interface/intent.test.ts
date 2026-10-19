@@ -1,30 +1,32 @@
 import {
-  type AskIndex,
   atEntry,
   type CanvasId,
-  type CardId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   type EntryId,
   ERR,
   entryId,
-  INVENTORY_SLOTS,
-  indexAsks,
-  indexTree,
   rootIdFor,
   type Sha256,
-  type TextCard,
-  type TextPlace,
-  type ThreadCard,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, entriesById, entry } from "@pinetrie/core/fixtures"
+import {
+  type AskIndex,
+  type CardId,
+  type CardRecord,
+  cardIdOfKind,
+  INVENTORY_SLOTS,
+  indexAsks,
+  indexTree,
+  type TextCard,
+  type TextPlace,
+  type ThreadCard,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor, entriesById, entry } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"

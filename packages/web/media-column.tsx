@@ -7,16 +7,7 @@
 // the column puts its images at the end; on an image's edge, a new image
 // before or after it (`imageEdge`); onto the image, a version of it.
 
-import {
-  blobUrl,
-  type CardId,
-  type CardRecord,
-  type CardWidth,
-  type ImageId,
-  type ImagesTarget,
-  imageMargin,
-  type MediaId,
-} from "@pinetrie/core"
+import { blobUrl } from "@pinetrie/core"
 import {
   type ColumnAct,
   commentVersionWords,
@@ -34,6 +25,15 @@ import {
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import { newCardId } from "@pinetrie/session/connect"
+import {
+  type CardId,
+  type CardRecord,
+  type CardWidth,
+  type ImageId,
+  type ImagesTarget,
+  imageMargin,
+  type MediaId,
+} from "@pinetrie/threads"
 import { dragProps, imageEdge } from "@pinetrie/web-core"
 import { useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"

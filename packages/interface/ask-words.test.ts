@@ -1,4 +1,5 @@
-import { type AgentMessageLike, entryId, writerId } from "@pinetrie/core"
+import { entryId, writerId } from "@pinetrie/core"
+import type { AgentMessageLike } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   askLine,

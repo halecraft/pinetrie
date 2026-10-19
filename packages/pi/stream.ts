@@ -2,7 +2,8 @@
 // of pi's events leaves this package.
 
 import type { HarnessEvent } from "@earendil-works/pi-agent-core"
-import { isThreadId, type StreamEvent } from "@pinetrie/core"
+import { isThreadId } from "@pinetrie/core"
+import type { StreamEvent } from "@pinetrie/threads"
 
 /** The harness events a stream is made of. */
 export const STREAM_SOURCES = [

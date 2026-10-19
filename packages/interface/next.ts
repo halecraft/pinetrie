@@ -3,16 +3,7 @@
 // own rules (`planNextQueuedCardPop`, `carryOnState`), so ▸ and the host cannot
 // disagree.
 
-import {
-  type AskIndex,
-  type CardId,
-  type CardRecord,
-  type LaneView,
-  runPrompt,
-  type ThreadId,
-  type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+import type { ThreadId, WriterId } from "@pinetrie/core"
 import {
   carryOnState,
   displayName,
@@ -22,6 +13,14 @@ import {
   queuedOn,
   runStopper,
 } from "@pinetrie/rules"
+import {
+  type AskIndex,
+  type CardId,
+  type CardRecord,
+  type LaneView,
+  runPrompt,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import type { ControlWords } from "./card-words.ts"
 import type { Reader } from "./send.ts"
 

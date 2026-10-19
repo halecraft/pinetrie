@@ -2,7 +2,7 @@
 // (`packages/web/focus.ts`), which the keys, a copy and a paste's target
 // decide from.
 
-import type { BlockRef, CardId } from "@pinetrie/core"
+import type { BlockRef, CardId } from "@pinetrie/threads"
 import type { PutTarget } from "./put-target.ts"
 
 /** Where focus is when a key is pressed, or a copy or a paste happens. */

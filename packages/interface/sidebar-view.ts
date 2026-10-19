@@ -2,8 +2,12 @@
 // to icons: `Sidebar` (`sidebar.tsx`) draws it, and each click sends the
 // intent it names.
 
-import type { CanvasId, ThreadId, ThreadName } from "@pinetrie/core"
-import { PRODUCT_NAME } from "@pinetrie/core"
+import {
+  type CanvasId,
+  PRODUCT_NAME,
+  type ThreadId,
+  type ThreadName,
+} from "@pinetrie/core"
 import {
   type MarkRecord,
   readableThreadName,
@@ -67,7 +71,7 @@ interface ItemCommon {
   readonly close: Intent
 }
 
-export type ItemView = ItemCommon & {
+type ItemView = ItemCommon & {
   readonly kind: "canvas"
   readonly canvas: CanvasId
   /** Its thread card's header, the board's too (`threadCardHead`). */

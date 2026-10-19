@@ -3,13 +3,14 @@
 // plans no intent: `planIntent` reads the page's layout, which such a client
 // has none of, so it acts through the session, as `planSend` decides.
 
-import type { EntryId, MessageAt, ThreadId, WriterId } from "@pinetrie/core"
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   attentionItems,
   attentionWords,
   inboxMentions,
   type planSend,
 } from "@pinetrie/interface"
+import type { MessageAt } from "@pinetrie/threads"
 
 /** What needs you, a line each: the thread, and why, in interface's words. */
 export const needsYouLines = (

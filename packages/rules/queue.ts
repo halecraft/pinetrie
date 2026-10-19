@@ -1,9 +1,9 @@
 // queue — a thread's queued cards: which is popped next, what a pop carries,
 // what unqueueing writes back, and the cards a run's facts make.
 
+import type { CanvasId, ThreadId } from "@pinetrie/core"
 import {
   type AskCardId,
-  type CanvasId,
   type CardId,
   type CardInPlace,
   type CardPlace,
@@ -21,8 +21,7 @@ import {
   type RelayDetails,
   type TextCard,
   type TextCardId,
-  type ThreadId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { byOrder } from "./card.ts"
 import type { MintContainer } from "./containers.ts"
 import { toNotes } from "./notes.ts"
@@ -74,7 +73,7 @@ export const isPinned = (
 } => c.place.kind === "pinned"
 
 /** A card pinned to a canvas, with its place narrowed. */
-export type CanvasPinnedCard = TextCard & {
+type CanvasPinnedCard = TextCard & {
   readonly place: Extract<CardPlace, { kind: "canvas-pinned" }>
 }
 

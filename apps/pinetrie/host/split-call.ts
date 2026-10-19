@@ -6,7 +6,7 @@
 // (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run while the
 // step waits.
 
-import { type ThreadId, textCardId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import {
   readLaneRecords,
   readLatestPrompt,
@@ -24,6 +24,7 @@ import {
   type ToolAnswer,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import { textCardId } from "@pinetrie/threads"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Places } from "./places.ts"
 

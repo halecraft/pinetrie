@@ -1,8 +1,5 @@
 import {
   canvasIdFor,
-  cardIdOfKind,
-  livePlace,
-  makeCard,
   movesDocId,
   rootIdFor,
   type Sha256,
@@ -11,11 +8,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readRootRecord } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
 import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
+import { cardIdOfKind, livePlace, makeCard } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, CANVAS_ID, placesFor, putValue, seedPlaces } from "./fakes.ts"

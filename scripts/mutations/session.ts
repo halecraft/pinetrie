@@ -7,8 +7,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the session declares React",
     file: "packages/session/package.json",
-    from: '    "@pinetrie/schema": "workspace:*"\n',
-    to: '    "@pinetrie/schema": "workspace:*",\n    "react": "19.2.0"\n',
+    from: '    "@pinetrie/threads": "workspace:*"\n',
+    to: '    "@pinetrie/threads": "workspace:*",\n    "react": "19.2.0"\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
     expect: "session declares only Kyneta's exchange and WebSocket transport",
   },
@@ -144,7 +144,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a take into the inventory ignores the selected slot",
-    file: "packages/core/grid.ts",
+    file: "packages/threads/grid.ts",
     from: "  if (start !== undefined && isCell(grid, start) && !taken.has(start))",
     to: "  if (false && start !== undefined && isCell(grid, start) && !taken.has(start))",
     command: unit,

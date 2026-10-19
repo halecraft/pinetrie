@@ -2,29 +2,31 @@
 // writes in, which the gate (`gate.ts`) keeps out of an archived canvas.
 
 import {
-  type AgentWork,
-  type ArchivedCanvas,
   atEntry,
   type CanvasId,
-  type CardId,
-  type CardRecord,
   type EntryId,
   ERR,
-  type Gated,
-  type LaneView,
-  type MoveTarget,
-  nearestRevision,
   type PointId,
   type Refusal,
   type RevisionRecord,
   refused,
   type SnapshotId,
   type ThreadId,
+  type ValueWrite,
+} from "@pinetrie/core"
+import {
+  type AgentWork,
+  type ArchivedCanvas,
+  type CardId,
+  type CardRecord,
+  type Gated,
+  type LaneView,
+  type MoveTarget,
+  nearestRevision,
   type TreeIndex,
   threadEnd,
   threadsWork,
-  type ValueWrite,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import {
   type CanvasIndex,
   canvasOfCard,

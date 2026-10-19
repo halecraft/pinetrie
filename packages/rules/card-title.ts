@@ -2,13 +2,12 @@
 // media column's or an image's (`KINDS`' `titled`). A canvas's title is a
 // mark (`mark.ts`).
 
+import type { AgentId, WriterId } from "@pinetrie/core"
 import {
-  type AgentId,
   type CardRecord,
   isTitledCardId,
   type TitledCardId,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeRecord, titledCardKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"

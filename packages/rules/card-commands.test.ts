@@ -1,24 +1,30 @@
 import {
-  type CardId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
   historyScope,
-  indexTree,
-  isTextCardId,
-  makeCard,
   PERSON_HISTORY,
   rootIdFor,
   type Sha256,
   TEXT_MIME,
-  type ThreadRecord,
-  TRASH_PLACE,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard, fromParents, personMessage } from "@pinetrie/core/fixtures"
+import {
+  type CardId,
+  type CardRecord,
+  cardIdOfKind,
+  indexTree,
+  isTextCardId,
+  makeCard,
+  type ThreadRecord,
+  TRASH_PLACE,
+  UNTICKED,
+} from "@pinetrie/threads"
+import {
+  canvasCard,
+  fromParents,
+  personMessage,
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
 import {

@@ -1,16 +1,16 @@
 // margin — the cards beside an entry or an image: comments on it, shared by
 // everyone in its canvas and never read by the agent.
 
+import type { EntryId } from "@pinetrie/core"
 import {
   type CardInPlace,
   type CardPlace,
   type CardRecord,
-  type EntryId,
   hasPlaceKind,
   type MarginOn,
   printAddress,
   sameMarginOn,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { byOrder } from "./card.ts"
 import { orderAfter } from "./order.ts"
 

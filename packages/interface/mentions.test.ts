@@ -1,9 +1,5 @@
-import {
-  type AgentCandidate,
-  type ThreadId,
-  type ThreadName,
-  writerId,
-} from "@pinetrie/core"
+import { type ThreadId, type ThreadName, writerId } from "@pinetrie/core"
+import type { AgentCandidate } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { mentionCompletion } from "./mentions.ts"
 

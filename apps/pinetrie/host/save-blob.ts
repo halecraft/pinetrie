@@ -3,11 +3,12 @@
 // them into the lane itself, through its environment, so the helper counts
 // the write as the agent's.
 
-import { ancestry, type BlobStore, type ThreadId } from "@pinetrie/core"
+import type { BlobStore, ThreadId } from "@pinetrie/core"
 import type { BlobAnswer } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import { planSaveBlob, readableBlobs } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import { ancestry } from "@pinetrie/threads"
 import type { RunDocs } from "./runs.ts"
 
 /** A lane's `save_blob` asks: gather its path, plan, then read the bytes. */

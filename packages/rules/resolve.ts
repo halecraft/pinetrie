@@ -6,7 +6,7 @@
 import { ERR, type ErrCode } from "@pinetrie/core"
 
 /** Whether a person's choice of a conflict's version goes ahead, or why not. */
-export type ResolveCommand =
+type ResolveCommand =
   | { readonly kind: "go" }
   | { readonly kind: "refused"; readonly code: ErrCode }
 

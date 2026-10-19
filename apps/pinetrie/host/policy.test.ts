@@ -7,7 +7,6 @@ import {
   scratchDocId,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -27,6 +26,7 @@ import {
   SessionDoc,
   TextDoc,
 } from "@pinetrie/schema"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   acceptsWrite,

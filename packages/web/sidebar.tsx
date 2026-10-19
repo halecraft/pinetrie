@@ -8,7 +8,7 @@
 // else starts is not added here. An item holding an unsent card of yours
 // carries a pip (`unsentSignals`), and before its label, its status.
 
-import type { CanvasId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { CanvasId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   CANVAS_BUSY_REASON,
   dropProps,
@@ -29,6 +29,7 @@ import {
   type SidebarView,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { TreeIndex } from "@pinetrie/threads"
 import { dragProps } from "@pinetrie/web-core"
 import {
   type KeyboardEvent,

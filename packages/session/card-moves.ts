@@ -2,6 +2,14 @@
 // places document reaches the `rev` the host's answer carried. The answer and
 // the change to the places reach the tab in either order.
 
+import type { WriterId } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import {
+  cardsOnCanvas,
+  notesNear,
+  planReorder,
+  rankOfDrop,
+} from "@pinetrie/rules"
 import {
   type CardCommand,
   type CardId,
@@ -16,15 +24,7 @@ import {
   type QueueMove,
   type Reorder,
   type TypedMove,
-  type WriterId,
-} from "@pinetrie/core"
-import type { Outcome } from "@pinetrie/protocol/codec"
-import {
-  cardsOnCanvas,
-  notesNear,
-  planReorder,
-  rankOfDrop,
-} from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { Intents } from "./inventory.ts"
 
 /**

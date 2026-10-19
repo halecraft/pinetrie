@@ -84,7 +84,7 @@ export const decodeRevisionReview = (
 export const REVIEW_WIRE = 5
 
 /** Which side of a span a file is read at: its first state's, or its last's. */
-export type ReviewSide = "before" | "after"
+type ReviewSide = "before" | "after"
 
 /**
  * What a page asks: a span's review, one file's diff in it, or one file's
@@ -181,12 +181,12 @@ export const MAX_DIFF_BYTES = 1024 * 1024
  * Who may read a range's points: one lane, whose states or commits they
  * are, or accepted work, whose kept states they are.
  */
-export type SpanReader =
+type SpanReader =
   | { readonly kind: "lane"; readonly lane: ThreadId }
   | { readonly kind: "accepted" }
 
 /** A range found in a record, with who reads it: its points are its reader's alone. */
-export type RecordedRange = Extract<DiffSpan, { readonly kind: "range" }> & {
+type RecordedRange = Extract<DiffSpan, { readonly kind: "range" }> & {
   readonly reader: SpanReader
 }
 

@@ -3,13 +3,8 @@
 // stretches both leave `railLandmarks` apart, so a fold never hides what the
 // rail draws on its own.
 
-import {
-  type AskIndex,
-  type EntryId,
-  lastWord,
-  type RevisionRecord,
-  type TreeIndex,
-} from "@pinetrie/core"
+import type { EntryId, RevisionRecord } from "@pinetrie/core"
+import { type AskIndex, lastWord, type TreeIndex } from "@pinetrie/threads"
 import { entriesWorkStats, type WorkStats } from "./work-stats.ts"
 
 /** What a column draws, in order: an entry as itself, or part of an ask's work folded. */

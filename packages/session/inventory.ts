@@ -2,6 +2,7 @@
 // says you hold: one rule (`settleSlots`) that the page draws and the repair
 // writes, so what is drawn and what is written cannot differ.
 
+import type { WriterId } from "@pinetrie/core"
 import {
   type CardId,
   type CardInPlace,
@@ -12,8 +13,7 @@ import {
   INVENTORY_GRID,
   inventoryGrid,
   isCell,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** Slot index ("0"–"11", reading order; more while someone holds more) to card. */
 export type Slots = Readonly<Record<string, CardId>>
@@ -35,7 +35,7 @@ const takenOf = (slots: Slots): ReadonlySet<number> =>
 
 /**
  * The first empty slot in reading order, from `start` if it is empty; null
- * when full (core's `firstEmpty` over the inventory's grid). It never names a
+ * when full (threads' `firstEmpty` over the inventory's grid). It never names a
  * slot past the twelfth: those exist only to draw what someone holds past it.
  */
 export const firstEmpty = (slots: Slots, start?: number): number | null =>

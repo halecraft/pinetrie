@@ -1,16 +1,22 @@
 import {
-  type CardId,
   canvasIdFor,
   entryId,
-  indexTree,
-  livePlace,
   rootIdFor,
-  type ThreadRecord,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
+import {
+  type CardId,
+  indexTree,
+  livePlace,
+  type ThreadRecord,
+} from "@pinetrie/threads"
+import {
+  canvasCard,
+  fromParents,
+  threadOfEntry,
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { unstartedThreads } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"

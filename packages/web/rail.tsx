@@ -7,14 +7,7 @@
 // the root (`useTrackColors`), and the column headers and fork dots take the
 // same, so a branch looks the same everywhere.
 
-import type {
-  AskIndex,
-  EntryId,
-  RailRow,
-  RevisionRecord,
-  TreeIndex,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, RevisionRecord, WriterId } from "@pinetrie/core"
 import {
   askLine,
   capsulePick,
@@ -40,6 +33,7 @@ import {
   workWords,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { AskIndex, RailRow, TreeIndex } from "@pinetrie/threads"
 import { railScroll, type ViewportStore } from "@pinetrie/web-core"
 import {
   type ComponentProps,

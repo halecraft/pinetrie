@@ -1,5 +1,4 @@
 import {
-  type AgentMessageLike,
   type BlobRef,
   ERR,
   type ImageRef,
@@ -7,12 +6,13 @@ import {
   type Share,
   writerId,
 } from "@pinetrie/core"
+import type { AgentMessageLike } from "@pinetrie/threads"
 import {
   cardIdFor,
   FIXTURE_THREAD,
   personMessage,
   toolResultMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   fenceFor,

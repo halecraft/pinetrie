@@ -1,14 +1,17 @@
 import {
   canvasIdFor,
   entryId,
-  indexTree,
-  type TextCard,
   type ThreadName,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
+import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
+import {
+  indexTree,
+  type TextCard,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
 import {
   cardIdFor,
   entriesById,
@@ -16,8 +19,7 @@ import {
   fromParents,
   personMessage,
   threadOfEntry,
-} from "@pinetrie/core/fixtures"
-import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
 import { glanceStatus, threadGlance, threadPreview } from "./thread-glance.ts"

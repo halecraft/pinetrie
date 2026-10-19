@@ -5,7 +5,7 @@
 // command to it, a new root lands where its chat says, and the records reach
 // another client.
 
-import { type CanvasId, entryId, ROOT, TRASH_PLACE } from "@pinetrie/core"
+import { type CanvasId, entryId, ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -15,6 +15,7 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session/connect"
+import { TRASH_PLACE } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   archivedFor,

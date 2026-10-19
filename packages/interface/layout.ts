@@ -16,18 +16,20 @@
 
 import {
   type CanvasId,
-  type CardId,
   type EntryId,
-  entryThread,
   isCanvasId,
-  type LaneView,
-  parseCardId,
-  pathIds,
   type ThreadId,
-  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import type { CanvasIndex, CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
+import {
+  type CardId,
+  entryThread,
+  type LaneView,
+  parseCardId,
+  pathIds,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Density } from "./ask-words.ts"
@@ -132,7 +134,7 @@ export type LayoutAction =
     } & LayoutFacts)
 
 /** What a canvas's columns are drawn from: its canvas and the tree, one moment's. */
-export interface CanvasFacts {
+interface CanvasFacts {
   /** Each canvas, in order (`CanvasIndex.cardsOn`). */
   readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
   /** Each thread opened and not yet started (`unstartedThreads`). */
@@ -144,7 +146,7 @@ export interface CanvasFacts {
 }
 
 /** The document facts a layout follows: one moment's, read together. */
-export interface LayoutFacts extends CanvasFacts {
+interface LayoutFacts extends CanvasFacts {
   /** The canvases in the archive. */
   readonly archived: ReadonlySet<CanvasId>
   /** The sidebar (`openThreads`). */
@@ -253,7 +255,7 @@ const sameList = (a: readonly CanvasId[], b: readonly CanvasId[]): boolean =>
  * What to show once `closed` is closed: its neighbour below in the sidebar,
  * else above, else nothing. `layout` is before the close.
  */
-export function afterClosing(layout: Layout, closed: Here): Here {
+function afterClosing(layout: Layout, closed: Here): Here {
   const items = sidebarList(layout)
   const at = items.findIndex(t => sameHere(t, closed))
   const next = items[at + 1] ?? items[at - 1]
@@ -464,7 +466,7 @@ export const canvasStrip = (
   )
 
 /** What showing an entry means, for the shell to carry out. */
-export type OpenPlan =
+type OpenPlan =
   /** Column `key` of `canvas` already shows it: show the canvas and scroll there. */
   | { readonly kind: "scroll"; readonly canvas: CanvasId; readonly key: string }
   /** Show `canvas`, unfold its thread's card `card`, and scroll there. */

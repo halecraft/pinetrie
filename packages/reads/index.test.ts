@@ -1,14 +1,10 @@
 import {
-  type CardRecord,
   entryId,
   rootIdFor,
   runId,
-  type TextCard,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodePinned } from "@pinetrie/rules"
 import type { StoredEntryRow } from "@pinetrie/schema"
 import {
@@ -18,6 +14,8 @@ import {
   writeEntry,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
+import { type CardRecord, type TextCard, textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { readLanes, readTreeIndex } from "./index.ts"
 

@@ -38,7 +38,6 @@ import {
   isImageMime,
   isImageRef,
   type ThreadId,
-  tailEdit,
 } from "@pinetrie/core"
 import {
   applyTextEdits,
@@ -50,6 +49,7 @@ import {
   type StoredValueRecord,
   valuePrefix,
 } from "@pinetrie/schema"
+import { tailEdit } from "@pinetrie/threads"
 import { ArrivalIndex, type Observed, planArrivals } from "./arrivals.ts"
 import {
   type CommitPart,

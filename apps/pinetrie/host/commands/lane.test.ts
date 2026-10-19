@@ -6,7 +6,6 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { jjWordsIn } from "@pinetrie/interface"
 import { createKeeper } from "@pinetrie/keeper"
 import type { Agent } from "@pinetrie/pi"
@@ -23,6 +22,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,

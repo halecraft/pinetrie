@@ -1,18 +1,16 @@
 // live — what each stream event, and a run's start and end, do to
 // `pinetrie:live`, as `LiveOp`s `applyLiveOps` (@pinetrie/schema) writes.
 
+import type { EntryId, RunId, ThreadId } from "@pinetrie/core"
 import {
-  type EntryId,
   type LiveOp,
-  type RunId,
   type Stream,
   type StreamEvent,
   type StreamId,
   type StreamRecord,
   streamId,
-  type ThreadId,
   tailEdit,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /**
  * Whether `s` is its lane's reply being written now: the lane's tip has not
@@ -24,7 +22,7 @@ export const isCurrentReply = (s: StreamRecord, tip: EntryId | null): boolean =>
   s.kind === "reply" && s.under === tip
 
 /** Close each stream given: the one way a stream is deleted. */
-export const closeStreams = (
+const closeStreams = (
   streams: readonly { readonly id: StreamId }[],
 ): LiveOp[] => streams.map(s => ({ kind: "close", id: s.id }))
 

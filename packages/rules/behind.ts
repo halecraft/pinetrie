@@ -1,12 +1,8 @@
 // behind — a thread's base has new work: what the thread is told, and when it
 // is caught up instead.
 
-import {
-  type BehindView,
-  GET_LATEST_TOOL,
-  type PointId,
-  type ProposedChangesRecord,
-} from "@pinetrie/core"
+import type { PointId, ProposedChangesRecord } from "@pinetrie/core"
+import { type BehindView, GET_LATEST_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
 import { type BaseRecord, latestNow } from "./base.ts"

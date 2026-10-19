@@ -2,20 +2,22 @@
 // ask's work, and the words and facts that work is drawn with.
 
 import {
-  type AskIndex,
-  askOutcome,
-  askSpan,
   type EntryId,
-  entryAsk,
-  entryMessage,
   firstLine,
-  lastWord,
   type RevisionRecord,
-  type TreeIndex,
-  transcriptCalls,
   type WriterId,
 } from "@pinetrie/core"
 import type { DigestBody, DigestRecord } from "@pinetrie/rules"
+import {
+  type AskIndex,
+  askOutcome,
+  askSpan,
+  entryAsk,
+  entryMessage,
+  lastWord,
+  type TreeIndex,
+  transcriptCalls,
+} from "@pinetrie/threads"
 import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
 import { outcomeWords, workWords } from "./ask-words.ts"
 import { callPurpose } from "./tool-words.ts"

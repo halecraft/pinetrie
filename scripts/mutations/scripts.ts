@@ -98,6 +98,31 @@ const scenarios = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "rules' index exports a name no package imports",
+    file: "packages/rules/index.ts",
+    from: "  planAccessOutside,\n",
+    to: "  planAccessAsk,\n  planAccessOutside,\n",
+    command: ["pnpm", "exec", "vitest", "run", "scripts/indexes.test.ts"],
+    expect: "every indexed package's index is as `pnpm run indexes` writes it",
+  },
+  {
+    name: "a name imported as a type once is exported as a type",
+    file: "scripts/indexes.ts",
+    from: "(taken.get(n.name) ?? true) && n.typeOnly",
+    to: "(taken.get(n.name) ?? false) || n.typeOnly",
+    command: ["pnpm", "exec", "vitest", "run", "scripts/indexes.test.ts"],
+    expect: "a name imported as a value anywhere is exported as a value",
+  },
+  {
+    name: "each overload of a function is a module of its own",
+    file: "scripts/indexes.ts",
+    from: "        if (!(exporters.get(n.name) ?? []).includes(module))\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "scripts/indexes.test.ts"],
+    expect:
+      "a module's re-exports are its exports, and an overloaded function is one name",
+  },
+  {
     name: "a suite's command crashes on a child that does not read its input",
     file: "apps/pinetrie/e2e/command.ts",
     from: '    child.stdin.on("error", () => {})\n',
@@ -600,9 +625,9 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a camelCase tag joins a union",
     file: "packages/rules/review.ts",
-    from: 'export type ReviewSide = "before" | "after"\n',
+    from: 'type ReviewSide = "before" | "after"\n',
     // Split in two, so this file does not hold the tag it adds.
-    to: 'export type ReviewSide = "before" | "after" | "be' + 'foreNow"\n',
+    to: 'type ReviewSide = "before" | "after" | "be' + 'foreNow"\n',
     command: tagSpelling,
     expect: "no tag in the source is spelled other than kebab-case",
   },
@@ -699,7 +724,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a comment cites a name the code does not hold",
-    file: "packages/core/edits.ts",
+    file: "packages/threads/edits.ts",
     from: "// deltas and a tool's output, goes through here.",
     // Split in two, so this file does not hold the name it cites.
     to: "// deltas and a tool's output, goes through `tail" + "EditsOf`.",

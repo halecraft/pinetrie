@@ -2,17 +2,12 @@
 // thread's members, those out of reach marked away, and what agents talking
 // from its messages have spent.
 
-import type {
-  EntryId,
-  Reach,
-  ThreadId,
-  ThreadName,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, ThreadId, ThreadName, WriterId } from "@pinetrie/core"
 import { type AllowanceRecord, awayWords, tokensWords } from "@pinetrie/rules"
+import type { Reach } from "@pinetrie/threads"
 
 /** What a column's header says of other threads' agents. */
-export interface AgentsRow {
+interface AgentsRow {
   /** The thread's members, by name, in the order invited; why one is away. */
   readonly members: readonly {
     readonly name: string

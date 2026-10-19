@@ -5,12 +5,13 @@
 // lane never meet. Each adapter gathers its proposed changes and decides, as it
 // settles, whether the proposed changes are still the one asked about.
 
-import { projectTranscript, type ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import { describeRequest, transcriptLines } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import { projectTranscript } from "@pinetrie/threads"
 import { failed, type LeaseBasics } from "./basics.ts"
 
 /** A description request's size: the skill, recent messages, the thread, the diff. */

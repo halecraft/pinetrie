@@ -10,15 +10,17 @@ import {
   type EntryId,
   entryOfMessage,
   firstLine,
+  type PointId,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   type GetLatestCommand,
   messageText,
   messageToolCalls,
-  type PointId,
-  type ThreadId,
   type TreeIndex,
   turnEntry,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { AcceptedRecord } from "./accepted.ts"
 import {
   getLatestAnswer,
@@ -227,7 +229,7 @@ declare const latestInRunBrand: unique symbol
  * `planLatestInRun` makes one, so no answer is planned for a merge no call asked
  * for.
  */
-export interface LatestInRun {
+interface LatestInRun {
   readonly kind: "merge"
   readonly lane: ThreadId
   readonly command: GetLatestCommand

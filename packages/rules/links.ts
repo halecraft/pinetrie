@@ -7,7 +7,7 @@ import {
   addressUrl,
   isPastAddress,
   type PastAddress,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { blockSource } from "./blocks.ts"
 import { parseMarkdown } from "./markdown.ts"
 
@@ -19,7 +19,7 @@ interface LinkNode {
 }
 
 /** A link to an address in a text: what it names, and its label. */
-export interface AddressLink {
+interface AddressLink {
   readonly address: Address
   readonly label: string
 }

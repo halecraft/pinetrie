@@ -2,7 +2,7 @@
 // document stores it. The card's record decodes it, so this imports none of
 // the relay's rules, which load the card's record.
 
-import type { RelayDetails } from "@pinetrie/core"
+import type { RelayDetails } from "@pinetrie/threads"
 import { Type } from "typebox"
 import {
   EntryIdSchema,

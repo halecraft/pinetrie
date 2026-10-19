@@ -4,18 +4,16 @@
 // slots labelled 1–9; how many you hold of 12; and the bench, the selected
 // slot drawn beside the grid.
 
+import type { ThreadId, ThreadName, WriterId } from "@pinetrie/core"
+import type { CardTitleRecord } from "@pinetrie/rules"
+import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
 import {
   type CardId,
   INVENTORY_SLOTS,
   inventoryGrid,
   type MediaId,
-  type ThreadId,
-  type ThreadName,
   type TitledCardId,
-  type WriterId,
-} from "@pinetrie/core"
-import type { CardTitleRecord } from "@pinetrie/rules"
-import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
+} from "@pinetrie/threads"
 import type { DrawnCard } from "./compact.ts"
 import { type GridView, gridView } from "./grid-view.ts"
 import type { MediaColumnView } from "./media-column-view.ts"
@@ -25,7 +23,7 @@ import type { ThreadGlance } from "./thread-glance.ts"
  * The bench: the selected slot, one column wide. An empty slot says what it
  * is; a card is drawn normal and read only, or full once opened.
  */
-export type Bench =
+type Bench =
   | { readonly kind: "empty"; readonly slot: number }
   | {
       readonly kind: "card"

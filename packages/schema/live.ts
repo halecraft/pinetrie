@@ -11,16 +11,18 @@ import {
 import {
   entryId,
   isThreadId,
-  type LiveOp,
   type RunId,
   runId,
+  type ThreadId,
+} from "@pinetrie/core"
+import {
+  type LiveOp,
   type Stream,
   type StreamId,
   type StreamRecord,
   streamId,
   type TextEdit,
-  type ThreadId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /**
  * What is streaming now, written only by the host. No restarted

@@ -8,14 +8,14 @@
 // state.
 
 import { subscribe } from "@kyneta/schema"
+import { holdsText, withFilled } from "@pinetrie/interface"
+import type { SessionClient } from "@pinetrie/session"
 import {
   type CardId,
   type CardRecord,
   isTextCard,
   type TextCardId,
-} from "@pinetrie/core"
-import { holdsText, withFilled } from "@pinetrie/interface"
-import type { SessionClient } from "@pinetrie/session"
+} from "@pinetrie/threads"
 import { useEffect, useState } from "react"
 
 /**

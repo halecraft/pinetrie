@@ -1,16 +1,22 @@
 import {
-  type CardRecord,
   canvasIdFor,
   entryId,
-  INVENTORY_SLOTS,
-  indexTree,
   rootIdFor,
-  type ThreadRecord,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
+import {
+  type CardRecord,
+  INVENTORY_SLOTS,
+  indexTree,
+  type ThreadRecord,
+  UNTICKED,
+} from "@pinetrie/threads"
+import {
+  cardIdFor,
+  fromParents,
+  threadOfEntry,
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CopyThread, planCopy } from "./copy.ts"
 import { landedThreadCard } from "./fixtures.ts"

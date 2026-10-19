@@ -4,8 +4,8 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard } from "@pinetrie/core/fixtures"
 import type { Workflow } from "@pinetrie/rules"
+import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { boardView } from "./board-view.ts"
 import { tree } from "./fixtures.ts"

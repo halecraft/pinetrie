@@ -1,5 +1,4 @@
-import type { EntryId, ThreadId } from "@pinetrie/core"
-import { entryId } from "@pinetrie/core"
+import { type EntryId, entryId, type ThreadId } from "@pinetrie/core"
 import {
   type ColumnView,
   foldMemory,

@@ -5,7 +5,7 @@
 // as a message's pane facts do (`pane-context.ts`): a prop through every editor
 // would be one more for each to pass on.
 
-import type { CardId, TextCardId, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import {
   type CardHistoryRecord,
   HISTORY_TITLE,
@@ -19,6 +19,7 @@ import {
 } from "@pinetrie/interface"
 import { textClients } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
+import type { CardId, TextCardId } from "@pinetrie/threads"
 import { createContext, useContext } from "react"
 
 interface CardHistoryFacts {

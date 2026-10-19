@@ -1,6 +1,6 @@
 import { canvasIdFor } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { AppPorts } from "@pinetrie/interface"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { type PortCall, terminalPorts } from "./ports.ts"
 

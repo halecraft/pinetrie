@@ -1,7 +1,7 @@
 // interface/address-words — what an address names, in words:
 // a reference's chip and a link's label, and a reference's *Edit as text*.
 
-import type { Address, BlockKind } from "@pinetrie/core"
+import type { Address, BlockKind } from "@pinetrie/threads"
 
 /**
  * What a reference names, in words: the chip's label and a link's

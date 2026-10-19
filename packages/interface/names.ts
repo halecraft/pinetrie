@@ -6,14 +6,13 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
+import { PRODUCT_NAME, type WriterId } from "@pinetrie/core"
+import { displayName } from "@pinetrie/rules"
 import {
   isLineRole,
   type PersonMessage,
-  PRODUCT_NAME,
   type TranscriptMessage,
-  type WriterId,
-} from "@pinetrie/core"
-import { displayName } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 
 /**
  * A message written together names its sender, then the others who wrote it:

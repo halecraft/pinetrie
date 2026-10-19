@@ -13,20 +13,11 @@ import { subscribe } from "@kyneta/schema"
 import {
   atEntry,
   type BlobStore,
-  type CardId,
-  type CardRecord,
-  cardTextSource,
   errorText,
-  parseMentions,
-  type QueuedFact,
-  type RelayDetails,
   type RootId,
-  type Send,
   type Sha256,
   type Spot,
-  type TextCardId,
   type ThreadId,
-  threadEnd,
 } from "@pinetrie/core"
 import type { Agent, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -58,6 +49,17 @@ import {
   threadCardHolding,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
+import {
+  type CardId,
+  type CardRecord,
+  cardTextSource,
+  parseMentions,
+  type QueuedFact,
+  type RelayDetails,
+  type Send,
+  type TextCardId,
+  threadEnd,
+} from "@pinetrie/threads"
 import { notWritten, type StepBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { OpenChange, Places } from "./places.ts"

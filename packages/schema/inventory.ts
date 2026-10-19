@@ -6,7 +6,7 @@
 
 import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type CardId, parseCardId } from "@pinetrie/core"
+import { type CardId, parseCardId } from "@pinetrie/threads"
 
 /** Slot index ("0"–"17", reading order) to card id. An empty slot has no key. */
 export const InventoryDoc = yjs.bind(

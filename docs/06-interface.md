@@ -1084,7 +1084,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
 - **Tool calls are rows under the agent's message** (ADR-0107): what the call
-  touched (`packages/core/tree.ts`, `pnpm test`), and what it returned. The
+  touched (`packages/threads/tree.ts`, `pnpm test`), and what it returned. The
   tool's word is a tag at the row's top right, apart from what it touched:
   what the call did, "ran", "read", "wrote", "edited", "searched",
   "looked for", "asked you" (ADR-0114, ADR-0172), with ✓ or ✗ beside it

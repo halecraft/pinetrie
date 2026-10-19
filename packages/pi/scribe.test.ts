@@ -5,9 +5,10 @@ import {
   BACKGROUND_CONTEXT as CTX,
   type StorageBackedSession,
 } from "@earendil-works/pi-agent-core"
-import { atEntry, NOBODY, ROOT, threadIdFor, writerId } from "@pinetrie/core"
+import { atEntry, ROOT, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeMessage } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
+import { NOBODY } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { newId, type Stack } from "./agent.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"

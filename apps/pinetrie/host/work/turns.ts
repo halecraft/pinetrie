@@ -6,15 +6,11 @@
 import {
   type EntryId,
   firstLine,
-  messageText,
-  messageToolCalls,
   NO_SHARED,
-  nearestRevision,
   type PointId,
   type RevisionRecord,
   type SnapshotId,
   type ThreadId,
-  type TreeIndex,
 } from "@pinetrie/core"
 import { callPurpose } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
@@ -27,6 +23,12 @@ import {
   REVISION,
   setRecord,
 } from "@pinetrie/rules"
+import {
+  messageText,
+  messageToolCalls,
+  nearestRevision,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"

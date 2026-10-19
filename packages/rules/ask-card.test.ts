@@ -1,11 +1,9 @@
+import { entryId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type CardRecord,
   cardIdOfKind,
-  entryId,
   type RelayDetails,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { decodeCard, encodeCard } from "./card.ts"
 import { planAskCard, planCarry, planNextQueuedCardPop } from "./queue.ts"

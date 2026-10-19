@@ -1,4 +1,5 @@
-import { entryId, type TranscriptMessage, threadIdFor } from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
+import type { TranscriptMessage } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { copyText } from "./copy-text.ts"
 import { addressMarkdown } from "./markdown-of.ts"

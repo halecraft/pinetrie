@@ -1,23 +1,25 @@
 import {
   atEntry,
-  type CardId,
-  type CardPlace,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   type EntryId,
   entryId,
-  type PlaceKey,
-  placeKey,
   rootIdFor,
-  type TextCard,
-  type TextPlace,
   threadIdFor,
-  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  type CardId,
+  type CardPlace,
+  type CardRecord,
+  cardIdOfKind,
+  type PlaceKey,
+  placeKey,
+  type TextCard,
+  type TextPlace,
+  UNTICKED,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type CardEvent,

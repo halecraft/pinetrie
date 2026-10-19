@@ -1,21 +1,23 @@
 import {
   type CanvasId,
-  type CardId,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
-  type EntryLike,
   entryId,
   rootIdFor,
-  type TextCard,
   type ThreadId,
-  type TreeIndex,
-  textCardId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { landedThreadCard } from "@pinetrie/rules/fixtures"
+import {
+  type CardId,
+  type CardRecord,
+  cardIdOfKind,
+  type EntryLike,
+  type TextCard,
+  type TreeIndex,
+  textCardId,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import type { LEVELS, Status } from "./attention.ts"
 import { canvasesWith, entry, indexEntries } from "./fixtures.ts"

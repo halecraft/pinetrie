@@ -3,7 +3,7 @@
 The contract between the host and its clients: commands over a Kyneta Line,
 and state over replicated documents (ADR-0007). `messages.ts` holds the
 wire's shapes as plain values and imports nothing; `line.ts` binds them to a
-Line; `codec.ts` turns them into `@pinetrie/core`'s `Intent` and `Outcome`
+Line; `codec.ts` turns them into `@pinetrie/threads`' `Intent` and `Outcome`
 and back; `writers.ts` says who may write each document.
 
 ## The wire (`messages.ts`, `line.ts`)

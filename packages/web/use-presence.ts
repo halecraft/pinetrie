@@ -4,7 +4,7 @@
 // components call these: never `App`, never a `Column`.
 
 import { useSelector } from "@kyneta/react"
-import type { CanvasId, EntryId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { CanvasId, EntryId, WriterId } from "@pinetrie/core"
 import {
   othersReading,
   othersWithValue,
@@ -14,6 +14,7 @@ import {
   seenBy,
 } from "@pinetrie/interface"
 import type { PresenceDocHandle } from "@pinetrie/schema"
+import type { TreeIndex } from "@pinetrie/threads"
 import { useMemo } from "react"
 
 /** Others reading each thread end, you left out (`othersReading`). */

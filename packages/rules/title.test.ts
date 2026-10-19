@@ -1,19 +1,21 @@
 import {
-  type AgentMessageLike,
   atEntry,
   canvasIdFor,
-  type EntryLike,
   entryId,
-  indexTree,
   type LaneRecord,
   ROOT,
   rootIdFor,
   THE_AGENT,
-  type TreeIndex,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
+import {
+  type AgentMessageLike,
+  type EntryLike,
+  indexTree,
+  type TreeIndex,
+} from "@pinetrie/threads"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   planTitling,

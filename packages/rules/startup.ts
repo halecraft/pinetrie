@@ -1,11 +1,7 @@
 // startup — what a starting host does with the lanes it finds.
 
-import type {
-  CardRecord,
-  ForeignLane,
-  RunnableLane,
-  ThreadId,
-} from "@pinetrie/core"
+import type { ForeignLane, RunnableLane, ThreadId } from "@pinetrie/core"
+import type { CardRecord } from "@pinetrie/threads"
 import { queuedOn } from "./queue.ts"
 import {
   type RunEndReportRecord,

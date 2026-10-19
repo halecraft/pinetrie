@@ -3,13 +3,15 @@
 
 import {
   type CanvasId,
-  type CardRecord,
-  ROOT_ORIGIN,
   rootIdFor,
-  type ThreadCard,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  ROOT_ORIGIN,
+  type ThreadCard,
+} from "@pinetrie/threads"
 import { planThreadOpen } from "./canvas-index.ts"
 
 /** A thread's card as it first lands on `canvas`'s canvas: at its end. */

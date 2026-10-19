@@ -6,14 +6,9 @@ import {
   type ErrCode,
   entryId,
   type ImageRef,
-  NOBODY,
-  parseMentions,
   pointId,
   ROOT,
-  ROOT_ORIGIN,
   runId,
-  type Send,
-  type SentCard,
   type Sha256,
   threadIdFor,
   type ValueWrite,
@@ -21,7 +16,6 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import {
@@ -41,6 +35,14 @@ import {
   WORKFLOW,
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import {
+  NOBODY,
+  parseMentions,
+  ROOT_ORIGIN,
+  type Send,
+  type SentCard,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   basics,

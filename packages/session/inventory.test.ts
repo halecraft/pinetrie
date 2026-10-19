@@ -1,5 +1,6 @@
-import { textCardId, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { writerId } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   firstEmpty,

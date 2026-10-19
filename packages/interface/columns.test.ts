@@ -1,4 +1,5 @@
-import { entryId, type LaneView, rootIdFor, threadIdFor } from "@pinetrie/core"
+import { entryId, rootIdFor, threadIdFor } from "@pinetrie/core"
+import type { LaneView } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import {
   BOUND,

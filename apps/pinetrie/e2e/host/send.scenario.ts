@@ -7,9 +7,10 @@
 // Last, a host whose config names no model starts, and says why.
 
 import { subscribe } from "@kyneta/schema"
-import { type EntryId, projectTranscript, ROOT } from "@pinetrie/core"
+import { type EntryId, ROOT } from "@pinetrie/core"
 import { readPlaces, readSetup } from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
+import { projectTranscript } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   at,

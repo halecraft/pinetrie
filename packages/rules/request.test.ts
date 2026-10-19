@@ -1,5 +1,5 @@
 import { entryId, writerId } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import { FIXTURE_THREAD } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   CUT_MARK,

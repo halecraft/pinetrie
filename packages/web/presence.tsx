@@ -6,14 +6,9 @@
 // from their writer id. A person's circle shows their picture when they have
 // set one, over their initial in their colour.
 
-import {
-  blobUrl,
-  messageWriters,
-  type Sha256,
-  type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+import { blobUrl, type Sha256, type WriterId } from "@pinetrie/core"
 import { displayName, stringHash } from "@pinetrie/interface"
+import { messageWriters, type TreeIndex } from "@pinetrie/threads"
 import { type CSSProperties, useContext, useState } from "react"
 import { Pictures } from "./pictures-context.ts"
 

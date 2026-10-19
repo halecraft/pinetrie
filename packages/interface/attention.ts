@@ -5,7 +5,6 @@
 // the board and a column's dot cannot disagree.
 
 import type {
-  AgentWork,
   CanvasId,
   EntryId,
   ProposedChangesRecord,
@@ -22,6 +21,7 @@ import {
   workStripState,
 } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
+import type { AgentWork } from "@pinetrie/threads"
 import { sshAskWords } from "./access-view.ts"
 import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 

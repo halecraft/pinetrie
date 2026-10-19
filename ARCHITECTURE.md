@@ -32,7 +32,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 
 | package | role |
 |---|---|
-| `core` | pure types and decisions; depends on nothing |
+| `core` | the kernel every package names: ids, refusals, writes, and what a lane, its disk and its history are; it declares nothing (ADR-0201) |
+| `threads` | threads, their entries and messages, the commands a client sends, and the cards placed beside them; it declares only `core`, and no lane package declares it, so none names a card, a move or a command (ADR-0201) |
 | `schema` | the document's shape |
 | `pi` | the only package that imports pi: the scribe, the model setup from pine·trie's config, sign-in, and the agent |
 | `config` | pine·trie's config: settings declared with their rules, each layer's file decoded against them, and one pure settle; it declares only `core`, and only the app declares it (ADR-0146) |
@@ -51,8 +52,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it declares nothing, and knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |
-| `interface` | what a person sees and can do, decided, for any client: no React, no DOM, no I/O (ADR-0093, ADR-0194); a terminal client, `apps/tui`, proves it. A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |
-| `web-core` | the web client's own decisions, from the browser's inputs (a pointer, scroll, the clipboard's formats, the URL): pure, declaring only `core` and `interface`, so no React resolves there (ADR-0194) |
+| `interface` | what a person sees and can do, decided, for any client: no React, no DOM, no I/O (ADR-0093, ADR-0194); a terminal client, `apps/tui`, proves it. A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; threads holds only what a call is (ADR-0114) |
+| `web-core` | the web client's own decisions, from the browser's inputs (a pointer, scroll, the clipboard's formats, the URL): pure, declaring only `core`, `threads` and `interface`, so no React resolves there (ADR-0194) |
 | `web` | the browser page: React and the DOM, drawing what `interface` and `web-core` decide; it declares neither `rules` nor `reads` |
-| `apps/tui` | a terminal client, declaring only `interface`, `session` and `core`: its tests draw a thread, a digest and the composer from interface alone, so a view leaving interface fails them (ADR-0194). Not shipped |
+| `apps/tui` | a terminal client, declaring only `interface`, `session`, `core` and `threads`: its tests draw a thread, a digest and the composer from interface alone, so a view leaving interface fails them (ADR-0194). Not shipped |
 | `apps/pinetrie` | the host; its shell is split by responsibility (`apps/pinetrie/host/TECHNICAL.md`). The one place that picks a runtime and wires `vm` to `docker` (`host/work/runtime.ts`) |

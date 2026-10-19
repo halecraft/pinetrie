@@ -7,18 +7,20 @@
 import {
   type EntryId,
   firstLine,
+  type ThreadId,
+  type ThreadName,
+} from "@pinetrie/core"
+import type { FocusRecord } from "@pinetrie/rules"
+import {
   indexAsks,
   type LaneView,
   messageText,
   projectSpine,
   runPrompt,
-  type ThreadId,
-  type ThreadName,
   type TreeIndex,
   threadEnd,
   threadFirstMessage,
-} from "@pinetrie/core"
-import type { FocusRecord } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { Status } from "./attention.ts"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
@@ -65,7 +67,7 @@ const OPENING = 120
  * first entry, which is often a context entry its branch's first run wrote
  * above its prompt. "" before it has one.
  */
-export function threadOpening(
+function threadOpening(
   index: TreeIndex,
   thread: ThreadId,
   length = OPENING,
@@ -152,7 +154,7 @@ export function glanceStatus(glance: ThreadGlance): string | null {
 }
 
 /** One message of a preview: who wrote it and what. */
-export interface PreviewRow {
+interface PreviewRow {
   readonly id: EntryId
   readonly who: string
   readonly text: string

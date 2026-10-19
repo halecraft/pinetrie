@@ -1,16 +1,8 @@
 // reach — where a thread is, for another thread's agent to be asked there, to
 // answer there, or for a link to open it.
 
-import type {
-  ArchivedCanvas,
-  Away,
-  CanvasId,
-  CardRecord,
-  Reach,
-  ThreadId,
-  ThreadName,
-  WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, ThreadId, ThreadName, WriterId } from "@pinetrie/core"
+import type { ArchivedCanvas, Away, CardRecord, Reach } from "@pinetrie/threads"
 import { type CardOnCanvas, isLivePlace } from "./canvas-index.ts"
 
 /** `thread`'s reach now, from its card's place and the archive. */
@@ -72,7 +64,7 @@ export function lateAway(
 
 /**
  * Every named thread on an open canvas, in each canvas's order: the
- * other threads' agents a message may name (`agentCandidates`, core). The
+ * other threads' agents a message may name (`agentCandidates`, threads). The
  * host and the page build their candidates from it alike.
  */
 export function reachableAgents(input: {

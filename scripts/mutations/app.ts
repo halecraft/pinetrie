@@ -2636,7 +2636,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the wire carries no holder",
-    file: "packages/core/places.ts",
+    file: "packages/threads/places.ts",
     from: '  holder: { key: "always" },',
     to: '  holder: { key: "never" },',
     suite: "host",

@@ -1,6 +1,13 @@
 // card — a card's record and where it sits.
 
 import {
+  type EntryId,
+  isImageMime,
+  isSha256,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   asPlaceFields,
   CARD_COMMANDS,
   type Card,
@@ -10,11 +17,8 @@ import {
   type CardRecord,
   type ColumnContent,
   type ContentOf,
-  type EntryId,
   type IdOf,
   type ImageVersion,
-  isImageMime,
-  isSha256,
   isTextCard,
   kindedId,
   NO_CONTENT,
@@ -27,12 +31,10 @@ import {
   placeOfKind,
   printAddress,
   type TextCard,
-  type ThreadId,
   type TreeIndex,
   threadEnd,
   UNTICKED,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeQueuedFact, encodeQueuedFact } from "./fact.ts"
@@ -313,7 +315,7 @@ const decodeOfKind = <K extends PlacedKind>(
  * undefined for one that is malformed, in a place its kind is never in,
  * with content its kind does not hold or this build cannot read
  * (`CARD_CODEC`), or of a kind this build holds no records of yet. Total.
- * Where it is is read by core's `placeOfFields`, as a move's key on the
+ * Where it is is read by threads' `placeOfFields`, as a move's key on the
  * wire is by `keyOfFields`.
  */
 export const decodeCard = (

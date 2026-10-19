@@ -4,7 +4,7 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { CardId, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import { PRESENCE_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   type PresenceDecay,
@@ -13,6 +13,7 @@ import {
   readingKey,
   seatKey,
 } from "@pinetrie/schema"
+import type { CardId } from "@pinetrie/threads"
 
 interface PresenceSeat {
   /** Who is here: read it through `@pinetrie/reads`; write it only here. */

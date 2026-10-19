@@ -1,17 +1,15 @@
 // interface/work-stats — what some messages hold: a stretch on the rail, or
 // an ask's work in a column, counted alike.
 
+import type { EntryId, RevisionRecord, WriterId } from "@pinetrie/core"
 import {
-  type EntryId,
   entryMessage,
   messageWriters,
-  type RevisionRecord,
   resultsOn,
   type ToolCall,
   type TreeIndex,
   transcriptCalls,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /**
  * What some messages hold: a stretch on the rail, or an ask's work in a

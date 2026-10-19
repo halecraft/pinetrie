@@ -16,12 +16,7 @@ import {
   configPlaces,
   readStartLayers,
 } from "@pinetrie/config"
-import {
-  type CardId,
-  isTextCardId,
-  type RootId,
-  type ThreadId,
-} from "@pinetrie/core"
+import type { RootId, ThreadId } from "@pinetrie/core"
 import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
@@ -77,6 +72,7 @@ import {
   TextDoc,
 } from "@pinetrie/schema"
 import { hostSocketIn } from "@pinetrie/ssh"
+import { type CardId, isTextCardId } from "@pinetrie/threads"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { createAllowances } from "./allowances.ts"
 import { createAnswers } from "./answers.ts"

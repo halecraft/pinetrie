@@ -3,16 +3,18 @@
 
 import {
   type CanvasId,
-  type CardRecord,
-  livePlace,
   type RootId,
   rootDocId,
-  surfaceOwner,
   type ThreadId,
-  type ThreadRecord,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  livePlace,
+  surfaceOwner,
+  type ThreadRecord,
+} from "@pinetrie/threads"
 import { isBoardCard } from "./board.ts"
 import { MARK } from "./mark.ts"
 import type { PlaceStep } from "./place-steps.ts"
@@ -84,7 +86,7 @@ export function planCanvasesTrashed(
 }
 
 /** What deleting a root writes, and what it lets go. */
-export interface RootDelete {
+interface RootDelete {
   /** Its directory record, its thread's, and its canvas's title. */
   readonly values: readonly ValueWrite<"session">[]
   /** Every card still in it, a new canvas's, say, its canvas and the canvas's card. */

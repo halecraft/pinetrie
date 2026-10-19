@@ -6,15 +6,15 @@ import path from "node:path"
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import { validateToolArguments } from "@earendil-works/pi-ai"
+import { threadIdFor } from "@pinetrie/core"
 import {
   BANNER_TOOL,
   type EDIT_TOOL,
   INTENT_FIELD,
   TOOL_IDS,
   type ToolId,
-  threadIdFor,
   WRITE_TOOL,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { requireIntent, TAKES_INTENT } from "./intent.ts"
 import { threadContext } from "./thread-context.ts"

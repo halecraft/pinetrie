@@ -1,15 +1,17 @@
 import {
   type CanvasId,
-  type CardId,
   canvasIdFor,
   entryId,
-  indexTree,
-  type LaneView,
   type ThreadId,
-  type TreeIndex,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import {
+  type CardId,
+  indexTree,
+  type LaneView,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { defaultView, type YourCanvasView } from "./canvas-columns.ts"
 import {

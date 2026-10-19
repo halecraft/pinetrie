@@ -1,9 +1,10 @@
 // host/facts — a fact of the host's queued as a card on its thread, the one
 // way every module queues one.
 
-import { cardIdOfKind, type QueuedFact, type ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import { readPlaces, readThreadName } from "@pinetrie/reads"
 import { planFactCard } from "@pinetrie/rules"
+import { cardIdOfKind, type QueuedFact } from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import type { Places } from "./places.ts"
 

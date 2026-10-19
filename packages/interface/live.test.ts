@@ -1,11 +1,5 @@
-import {
-  type AgentRun,
-  entryId,
-  type StreamRecord,
-  streamId,
-  type ThreadId,
-  threadIdFor,
-} from "@pinetrie/core"
+import { entryId, type ThreadId, threadIdFor } from "@pinetrie/core"
+import { type AgentRun, type StreamRecord, streamId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
 

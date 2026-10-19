@@ -36,7 +36,7 @@ const releaseStamp = (e: Extract<RunEvent, { kind: "call" }>): ReleaseStamp =>
     : { kind: "stamp", stamp: e.stamp }
 
 /** Where a lane's runs' paths are: what a fold needs besides the events. */
-export interface LanePlaces {
+interface LanePlaces {
   /** The lane's directory, absolute. */
   readonly root: string
   /** Shared directories, relative to `root`. */

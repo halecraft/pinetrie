@@ -1,13 +1,7 @@
 // web/message-props — what a message is drawn from, and how each of its
 // props is compared: `React.memo`'s rule for `Message` (`sameProps`), kept pure.
 
-import type {
-  BranchSummary,
-  EntryId,
-  SpineNode,
-  StreamId,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, WriterId } from "@pinetrie/core"
 import type {
   CrossCanvasLink,
   Density,
@@ -19,6 +13,7 @@ import type {
   ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
+import type { BranchSummary, SpineNode, StreamId } from "@pinetrie/threads"
 import type { ScreenMemory } from "@pinetrie/web-core"
 import { type PropRule, sameProps } from "./same-props.ts"
 

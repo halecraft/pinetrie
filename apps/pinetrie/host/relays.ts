@@ -10,16 +10,7 @@
 // from the session and the places, and a thread out of reach is refused
 // before any root is opened.
 
-import {
-  cardIdOfKind,
-  type EntryId,
-  messageText,
-  type QueuedFact,
-  type RelayDetails,
-  type ThreadId,
-  type ThreadName,
-  threadMembers,
-} from "@pinetrie/core"
+import type { EntryId, ThreadId, ThreadName } from "@pinetrie/core"
 import { readArchived, readNames, readPlaces } from "@pinetrie/reads"
 import {
   encodeIncoming,
@@ -31,6 +22,13 @@ import {
   type ToolAnswer,
   unreachableRefusal,
 } from "@pinetrie/rules"
+import {
+  cardIdOfKind,
+  messageText,
+  type QueuedFact,
+  type RelayDetails,
+  threadMembers,
+} from "@pinetrie/threads"
 import type { Allowances } from "./allowances.ts"
 import type { Basics, HostKeeper } from "./basics.ts"
 import { canvasesNow } from "./canvases.ts"

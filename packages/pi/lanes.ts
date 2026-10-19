@@ -9,10 +9,7 @@
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core"
 import { getSystemMessageText } from "@earendil-works/pi-ai"
 import {
-  CONFLICT_TOOL,
   type EntryId,
-  FIND_TOOL,
-  GREP_TOOL,
   HOST_WORKING_COPY,
   isWithin,
   laneSkillPath,
@@ -26,6 +23,7 @@ import {
   type PutImageAsk,
   type ToolAnswer,
 } from "@pinetrie/rules"
+import { CONFLICT_TOOL, FIND_TOOL, GREP_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPromptSections } from "./deep.ts"

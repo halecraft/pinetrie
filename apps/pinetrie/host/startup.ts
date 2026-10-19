@@ -2,7 +2,6 @@
 
 import {
   type ForeignLane,
-  isTextCard,
   type RootId,
   type RunnableLane,
   SESSION_TARGET,
@@ -56,6 +55,7 @@ import {
   readStoredRecordKeys,
   readStreamIds,
 } from "@pinetrie/schema"
+import { isTextCard } from "@pinetrie/threads"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Places } from "./places.ts"

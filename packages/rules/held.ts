@@ -2,22 +2,19 @@
 // there.
 
 import {
-  type Above,
-  type CardRecord,
   type EntryId,
   ERR,
   type ForeignLane,
-  type Gated,
   type LaneRecord,
   type ProjectKind,
   proveRunnable,
   type Refusal,
   type RootId,
   refused,
-  type ThreadFork,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import type { Above, CardRecord, Gated, ThreadFork } from "@pinetrie/threads"
 import { sourceHistory } from "./work.ts"
 
 /**

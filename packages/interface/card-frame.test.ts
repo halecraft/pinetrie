@@ -1,17 +1,19 @@
 import {
   atEntry,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
-  entryMargin,
   type Sha256,
-  type TextCard,
-  type TextPlace,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  type CardRecord,
+  cardIdOfKind,
+  entryMargin,
+  type TextCard,
+  type TextPlace,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type CardFrameFacts,

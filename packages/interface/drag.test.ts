@@ -1,10 +1,10 @@
 import {
   canvasIdFor,
-  cardIdOfKind,
   type Sha256,
   threadIdFor,
   workflowStateIdFor,
 } from "@pinetrie/core"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import {
   type CanvasOver,

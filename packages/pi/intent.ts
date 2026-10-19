@@ -21,7 +21,7 @@ import {
   SPLIT_TOOL,
   type ToolId,
   WRITE_TOOL,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /**
  * Whether each tool takes a required `intent`: a record of every tool, so a

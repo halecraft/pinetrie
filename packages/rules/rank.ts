@@ -1,13 +1,13 @@
 // rank — where a card goes among ranked cards: just after a card, at a drop,
 // and where a branch lands on a canvas.
 
+import type { ThreadId } from "@pinetrie/core"
 import {
   type CardId,
   type CardRecord,
   type OrderedPlace,
   placed,
-  type ThreadId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { orderAfter, orderBetween, respace } from "./order.ts"
 
 /** A card at a ranked place: on a canvas, on the board. */

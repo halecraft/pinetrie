@@ -1,11 +1,11 @@
 // moves — a card's handoffs between places: whether the host accepts a move,
 // where a target resolves to, and the steps a command's moves make.
 
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  type EntryId,
   fitsPlace,
   isMediaId,
   isNoteColumnId,
@@ -27,12 +27,10 @@ import {
   type ResolvedTarget,
   sameKey,
   surfaceOwner,
-  type ThreadId,
   TRASH_PLACE,
   UNTICKED,
-  type WriterId,
   wrapperKind,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { Workflow } from "./board.ts"
 import { planCanvasOpening, rankOnCanvas } from "./canvas-index.ts"
 import { type MintContainer, makeContainer } from "./containers.ts"
@@ -196,12 +194,12 @@ export function planMove(
  * Why a card leaves a trash besides an undo: its cutter's paste (`uncut`),
  * to the paste's target; or a restore, back to the place it left.
  */
-export type FromTrash =
+type FromTrash =
   | { readonly kind: "uncut"; readonly to: ResolvedTarget }
   | { readonly kind: "restore" }
 
 /** A restore: back to where the card was. */
-export const RESTORE: FromTrash = { kind: "restore" }
+const RESTORE: FromTrash = { kind: "restore" }
 
 /**
  * A card moved out of a trash: the one way but an undo. Refused `gone`
@@ -662,7 +660,7 @@ export function planMoves(
 }
 
 /** What a command's moves do: its steps, and the lanes they leave to drain. */
-export interface MoveCommand {
+interface MoveCommand {
   readonly step: MovesStep
   /**
    * The lanes to drain, those not running: each a move leaves a card queued

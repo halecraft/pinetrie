@@ -1,22 +1,16 @@
 import {
   atEntry,
-  type CardCommand,
-  type CardId,
-  cardIdOfKind,
   commitId,
   ERR,
   entryId,
-  isTextCard,
   rootIdFor,
   runId,
   type Sha256,
   type Spot,
   storedText,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pinetrie/reads"
@@ -37,6 +31,14 @@ import {
   newPresenceDoc,
   writeEntry,
 } from "@pinetrie/schema/fixtures"
+import {
+  type CardCommand,
+  type CardId,
+  cardIdOfKind,
+  isTextCard,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import type { CardPort } from "./cards.ts"

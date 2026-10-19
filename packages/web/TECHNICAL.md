@@ -882,7 +882,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     is then its command; then `.tool-status`, ✓ or ✗ (`callMark`). A
     running call has no mark: once ringed, it has `.tool-elapsed`, how long
     it has run (below).
-  - `.tool-command`, what the call touched (`callSubject`, core), as
+  - `.tool-command`, what the call touched (`callSubject`, threads), as
     `rowSummary` reads it: a shell command highlighted, and a long one-line
     chain laid out a step a line (`@pinetrie/shell`). A `grep` or `find`
     shows its pattern and the path it searches.
@@ -1023,7 +1023,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - The same row shows how long it has run in its head (`Elapsed` in
     `message.tsx`, `.tool-elapsed`): `runningFor` (`tool-row.ts`) counts
     from its stream's start, the time in the stream id's uuidv7, minted on
-    the host's clock (`streamStart`, core), so a reload or a tab shown
+    the host's clock (`streamStart`, threads), so a reload or a tab shown
     again counts from the same start. A browser whose clock is behind the
     host's shows 0s until it gets the latest. `Elapsed` redraws itself, not its
     row, at each whole second the call has run, by a timeout to the next
@@ -1079,7 +1079,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   up", "get the latest and send", "split"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
-- **One-line messages** (`isLineRole`, core) show as one line each: `land`,
+- **One-line messages** (`isLineRole`, threads) show as one line each: `land`,
   `update`, `stack`, `carry-on`, `incoming`, and the host's facts, `fact`
   (what a command on the proposed changes did, ADR-0080; a stop, a member gone, a
   allowance used up, a canvas change) and `behind` (the base's new work). The
@@ -1312,7 +1312,7 @@ the session sends moves and draws them until its copy holds them
 (`card-moves.ts`), and when it destroys a spent card's copy, is in
 `packages/session/TECHNICAL.md`.
 
-- **A move is planned once.** `planIntent` builds each `Move` with core's
+- **A move is planned once.** `planIntent` builds each `Move` with threads'
   `cardMove` (an unqueue's target is `notesTarget`, the thread's nearest notes),
   from the cards as drawn, and the session sends it.
 - **Refusals are worded in `@pinetrie/interface`** (`noticeWords`), from

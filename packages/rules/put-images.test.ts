@@ -1,16 +1,13 @@
+import { canvasIdFor, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type CardRecord,
-  canvasIdFor,
   cardIdOfKind,
   type ImageVersion,
   imageMargin,
   makeCard,
-  type Sha256,
-  threadIdFor,
   UNTICKED,
-  writerId,
-} from "@pinetrie/core"
-import { canvasCard } from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads"
+import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { mintContainer } from "./containers.ts"
 import { imagesIn } from "./media.ts"

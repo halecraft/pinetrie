@@ -1,17 +1,15 @@
 // interface/grid-view — your inventory's slots as they are drawn: cells in
 // reading order, each a compact or empty, the selection, and its rows.
 
+import type { ThreadId, ThreadName, WriterId } from "@pinetrie/core"
+import type { CardTitleRecord } from "@pinetrie/rules"
 import type {
   CardId,
   Grid,
   MediaId,
   NoteColumnId,
-  ThreadId,
-  ThreadName,
   TitledCardId,
-  WriterId,
-} from "@pinetrie/core"
-import type { CardTitleRecord } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import type { CardTone } from "./card-frame.ts"
 import { type Compact, cardCompact, type DrawnCard } from "./compact.ts"
 import type { MediaColumnView } from "./media-column-view.ts"
@@ -19,7 +17,7 @@ import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadGlance } from "./thread-glance.ts"
 import { isTrashable } from "./trashable.ts"
 
-export interface GridCell {
+interface GridCell {
   readonly index: number
   /** Its card, and the card at its least detail (`cardCompact`); null for an empty cell. */
   readonly card: DrawnCard | null

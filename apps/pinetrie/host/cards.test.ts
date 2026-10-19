@@ -1,14 +1,10 @@
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, createDocAs, exportEntirety, merge } from "@kyneta/schema"
-import {
-  type TextCard,
-  textCardId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { threadIdFor, writerId } from "@pinetrie/core"
 import { cardDocId, TextDoc, textVersion } from "@pinetrie/schema"
 import { newSessionDoc } from "@pinetrie/schema/fixtures"
+import { type TextCard, textCardId } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { startCards } from "./cards.ts"
 

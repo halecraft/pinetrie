@@ -4,18 +4,16 @@
 // draws the result. Each tool but copy is the `MessageAct` it sends, which
 // reaches `App` as its column's intent (`intent.ts`).
 
+import { agentAsk, type EntryId, type ThreadId } from "@pinetrie/core"
 import {
   type Address,
-  agentAsk,
   type BlockRef,
-  type EntryId,
   parseMentions,
   type TextCardId,
-  type ThreadId,
   type ThreadLane,
   type TranscriptMessage,
   transcriptCalls,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import type { Taken } from "./clip.ts"
 import type { Prefill } from "./columns.ts"
 import { addressMarkdown } from "./markdown-of.ts"
@@ -26,7 +24,7 @@ const AGENT_PREFIX = agentAsk("")
 /** `@agent ` as a box starts with it: the one blank prefill, nothing typed. */
 export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }
 
-export interface OpenBranch {
+interface OpenBranch {
   readonly at: EntryId
   readonly prefill: Prefill | undefined
 }

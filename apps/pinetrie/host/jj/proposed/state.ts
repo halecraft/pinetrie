@@ -10,9 +10,7 @@
 import {
   type GetLatestRead,
   type JjBaseRecord,
-  laneFirstPrompt,
   type ProposedChangesRecord,
-  projectTranscript,
   type RepoConfig,
   type ThreadId,
   type ThreadName,
@@ -39,6 +37,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import { laneFirstPrompt, projectTranscript } from "@pinetrie/threads"
 import type { LeaseBasics } from "../../basics.ts"
 import { canvasesNow } from "../../canvases.ts"
 import type { Records } from "../../records.ts"

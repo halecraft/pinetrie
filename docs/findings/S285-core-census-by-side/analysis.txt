@@ -1,0 +1,146 @@
+exports: 676 (336 types)
+named by no other package's source: 90; of them named by no test either: 62
+  fixtures.ts (15): cardIdFor°ᵗ lineMessage°ᵗ transcriptMessage°ᵗ collectionSteps°ᵗ findSeqKeys°ᵗ FIXTURE_STATE° canvasCard°ᵗ personMessage°ᵗ toolResultMessage°ᵗ FIXTURE_THREAD°ᵗ entry°ᵗ entriesById°ᵗ fromParents°ᵗ threadOfEntry°ᵗ withThreads°ᵗ
+  places.ts (12): parseMarginOn° ImageTarget° RankedImage° NewCanvasTarget° QueuedKey° REORDER_PLACES°ᵗ storedRowFields° PLACES_OF° KindsInPlace° KeyOf° MoveOfᵗ MovesOf°
+  messages.ts (7): AssistantMessage°ᵗ ToolResultMessage° FactMessage° MessageOf° ENTRY_TYPES° EntryType° TranscriptRole°
+  facts.ts (6): StopFact MemberFact UnansweredFact UndeliveredFact RoundFact AllowanceSpentFact
+  images.ts (6): BlobKind° TextRef° OpaqueRef° kindOfMime° StoredText° StoredOpaque°
+  tree.ts (6): newestOnPath treeRoot°ᵗ startsRunᵗ Ancestry° SpineProjection° ThreadSend°
+  runs.ts (5): encodeRunEvent°ᵗ CallOp°ᵗ Drained° RunObserved° RecipeKey°
+  trailers.ts (5): trailerValues° withLedger° TRAILERS° TrailerKey° withTrailers°ᵗ
+  cards.ts (4): GET_LATEST_COMMANDS° CanvasCard°ᵗ ReferenceCardᵗ shownVersion°
+  thread-names.ts (4): ADJECTIVES°ᵗ NOUNS°ᵗ Adjective° isThreadNameHandle
+  ids.ts (3): writerId°ᵗ FileCardId KindedId°
+  kinds.ts (3): KindSpec° TitledKind isTitledKind
+  address.ts (2): BLOCK_KINDS° ADDRESS_PATH°
+  mentions.ts (2): NOBODY°ᵗ TypedMention°
+  tools.ts (2): callSubject callIntent
+  asks.ts (1): LONG_ASK°
+  bases.ts (1): LaneBaseOf°
+  intents.ts (1): TargetIn°
+  lane-env.ts (1): HOST_MOUNT°
+  marks.ts (1): TitleInput°
+  ordering.ts (1): EntryOrdering°
+  roots.ts (1): RootSummary°
+  work.ts (1): ForkParent°
+  (° named nowhere in core's source either; ᵗ named by another package's tests)
+
+== modules by the sides that name their exports (source; lane/below/conv counts of exports)
+  accepted.ts        lines   120  lane   2  below   0  conv   3
+  access.ts          lines     5  lane   0  below   0  conv   1
+  address.ts         lines   146  lane   0  below   2  conv   9
+  agents.ts          lines   117  lane   0  below   0  conv   5
+  asks.ts            lines   242  lane   0  below   0  conv   9
+  bases.ts           lines   172  lane  13  below   3  conv  13
+  board.ts           lines    35  lane   0  below   2  conv   2
+  cards.ts           lines   307  lane   0  below   2  conv  25
+  config.ts          lines    74  lane   3  below   4  conv  10
+  disks.ts           lines    93  lane   7  below   0  conv  12
+  edits.ts           lines    72  lane   0  below   1  conv   1
+  errors.ts          lines    15  lane   1  below   0  conv   2
+  facts.ts           lines   128  lane   0  below   0  conv   3
+  fixtures.ts        lines     0  lane   0  below   0  conv   0
+  folder.ts          lines   388  lane  27  below   1  conv  30
+  grid.ts            lines    66  lane   0  below   0  conv   8
+  ids.ts             lines   474  lane   5  below  31  conv  58
+  images.ts          lines   201  lane   2  below   1  conv  20
+  intents.ts         lines   583  lane   3  below  13  conv  21
+  kinds.ts           lines   165  lane   0  below   0  conv   1
+  lane-env.ts        lines    67  lane   8  below   0  conv   8
+  lanes.ts           lines    70  lane   5  below   0  conv   7
+  live.ts            lines    76  lane   0  below   5  conv   7
+  marks.ts           lines    42  lane   0  below   4  conv   5
+  mentions.ts        lines   314  lane   0  below   2  conv  16
+  messages.ts        lines   386  lane   0  below   0  conv  19
+  ordering.ts        lines    61  lane   0  below   0  conv   1
+  paste.ts           lines    37  lane   0  below   1  conv   2
+  paths.ts           lines    38  lane   1  below   0  conv   2
+  places.ts          lines  1411  lane   0  below  19  conv  67
+  product.ts         lines    16  lane   2  below   1  conv   1
+  proposals.ts       lines    97  lane   0  below   0  conv   4
+  proposed.ts        lines   403  lane  23  below   3  conv  24
+  revisions.ts       lines   196  lane   7  below   0  conv  11
+  roots.ts           lines   104  lane   0  below   0  conv   7
+  runs.ts            lines   510  lane  10  below   0  conv  35
+  thread-names.ts    lines   588  lane   1  below   3  conv   6
+  threads.ts         lines   119  lane   0  below   2  conv  10
+  tools.ts           lines   143  lane   0  below   0  conv  21
+  trailers.ts        lines   313  lane  10  below   0  conv   4
+  tree.ts            lines  1034  lane   0  below   0  conv  40
+  work.ts            lines   130  lane   0  below   0  conv   5
+
+== lane side names exports of 20 modules: accepted.ts bases.ts config.ts disks.ts errors.ts fixtures.ts folder.ts ids.ts images.ts intents.ts lane-env.ts lanes.ts paths.ts product.ts proposed.ts revisions.ts runs.ts thread-names.ts trailers.ts tree.ts
+closed over value imports: 22 of 42 modules, 5663 of 9605 lines; conversation modules taken in: tree.ts intents.ts
+  added by closure: kinds.ts tools.ts
+closed over value and type imports: 33 of 42 modules, 8593 of 9605 lines; conversation modules taken in: cards.ts places.ts tree.ts intents.ts messages.ts mentions.ts
+  added by closure: access.ts address.ts board.ts cards.ts facts.ts kinds.ts marks.ts mentions.ts messages.ts paste.ts places.ts threads.ts tools.ts
+
+below rules (lane side and schema, protocol, config), source only, closed over all imports: 34 modules, 8741 lines; conversation modules taken in: cards.ts places.ts tree.ts intents.ts messages.ts mentions.ts
+
+== names the lane side takes from conversation modules
+  cards.ts CardCommand (type) <- protocol
+  cards.ts CARD_COMMANDS (value) <- protocol
+  intents.ts ERR (value) <- folder,protocol,folderᵗ,protocolᵗ
+  intents.ts ErrCode (type) <- folder,protocol
+  intents.ts Refusal (type) <- protocol
+  intents.ts refused (value) <- protocol
+  intents.ts SESSION_TARGET (value) <- schemaᵗ
+  intents.ts ValueWrite (type) <- lanes,schema,schemaᵗ
+  intents.ts SendMode (type) <- protocol
+  intents.ts MessageAt (type) <- protocol
+  intents.ts chatMode (value) <- protocol
+  intents.ts ThreadStart (type) <- protocol
+  intents.ts PutImage (type) <- protocol
+  intents.ts Intent (type) <- protocol,protocolᵗ
+  intents.ts ProposedChangesAction (type) <- protocol
+  intents.ts PROPOSED_CHANGES_ACTIONS (value) <- protocol
+  mentions.ts parseMentions (value) <- protocol
+  mentions.ts normalizeName (value) <- protocol
+  places.ts placeFields (value) <- protocol
+  places.ts keyOfFields (value) <- protocol
+  places.ts targetOfFields (value) <- protocol
+  places.ts typedMove (value) <- protocol
+  places.ts SentCard (type) <- protocol
+  places.ts PlaceKey (type) <- protocol,protocolᵗ
+  places.ts MoveTarget (type) <- protocol,protocolᵗ
+  places.ts QueueHoldChange (type) <- protocol
+  places.ts QUEUE_HOLD_CHANGES (value) <- protocol
+  places.ts MoveDirection (type) <- protocol
+  places.ts MOVE_DIRECTIONS (value) <- protocol
+  places.ts Move (type) <- protocol
+  places.ts isReorderPlace (value) <- protocol
+  places.ts Reorder (type) <- protocol
+  places.ts TRASH_PLACE (value) <- protocol
+  places.ts PlaceRefusal (type) <- protocol
+  places.ts wireKeyFields (value) <- protocol
+  places.ts keyFieldsFrom (value) <- protocol
+  places.ts MoveOf (type) <- protocolᵗ
+  places.ts TypedMove (type) <- protocol
+  tree.ts firstLine (value) <- jjᵗ
+
+== imports from a lane-side module into a conversation module
+  ids.ts -> places.ts (type)
+  intents.ts -> cards.ts (type)
+  intents.ts -> mentions.ts (type)
+  intents.ts -> places.ts (type)
+  proposed.ts -> intents.ts (type)
+  trailers.ts -> tree.ts (value)
+  tree.ts -> intents.ts (type)
+  tree.ts -> messages.ts (type)
+
+== who names ERR, ErrCode, ValueWrite, Target
+  ERR (intents.ts, value): src app,folder,pi,protocol,rules,session | test app,folder,interface,pi,protocol,rules,session | core proposed.ts
+  ErrCode (intents.ts, type): src app,folder,pi,protocol,rules,session | test app | core proposed.ts
+  ValueWrite (intents.ts, type): src app,lanes,rules,schema | test app,schema | core 
+  Target (intents.ts, type): src app,rules | test app | core 
+  refused (intents.ts, value): src app,protocol,rules | test  | core 
+  Refusal (intents.ts, type): src app,protocol,rules | test  | core 
+
+== exports by the sides that name them (source)
+  conv: 372
+  (none): 90
+  conv+lane: 79
+  below+conv: 68
+  lane: 35
+  below+conv+lane: 16
+  below: 16

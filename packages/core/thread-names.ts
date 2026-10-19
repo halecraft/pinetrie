@@ -528,7 +528,7 @@ export const NOUNS = [
 ] as const
 
 /** One of the 256 adjectives a thread's name begins with. */
-export type Adjective = (typeof ADJECTIVES)[number]
+type Adjective = (typeof ADJECTIVES)[number]
 /** One of the 256 nouns a thread's name ends with: the key of its built-in icon. */
 export type Noun = (typeof NOUNS)[number]
 

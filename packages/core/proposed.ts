@@ -4,7 +4,7 @@
 
 import type { JjAcceptedRecord, JjBaseRecord } from "./accepted.ts"
 import type { CommitBase, CommitId, PointId } from "./bases.ts"
-import type { ERR, ErrCode } from "./intents.ts"
+import type { ERR, ErrCode } from "./refusals.ts"
 import type { JjProposedChangesRecord } from "./revisions.ts"
 import type { ThreadName } from "./thread-names.ts"
 

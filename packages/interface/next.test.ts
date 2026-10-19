@@ -1,17 +1,14 @@
+import { entryId, threadIdFor, type WriterId, writerId } from "@pinetrie/core"
+import type { QueuedText } from "@pinetrie/rules"
 import {
   type AgentMessageLike,
   type CardId,
   type CardRecord,
-  entryId,
   indexAsks,
   type LaneView,
   textCardId,
-  threadIdFor,
-  type WriterId,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor, personMessage } from "@pinetrie/core/fixtures"
-import type { QueuedText } from "@pinetrie/rules"
+} from "@pinetrie/threads"
+import { cardIdFor, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { entry, indexEntries } from "./fixtures.ts"
 import {

@@ -1,4 +1,5 @@
-import { entryId, runId, streamId, threadIdFor } from "@pinetrie/core"
+import { entryId, runId, threadIdFor } from "@pinetrie/core"
+import { streamId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { newLiveDoc } from "./fixtures.ts"
 import {

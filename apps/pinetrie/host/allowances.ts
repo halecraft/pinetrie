@@ -8,12 +8,7 @@
 // crosses the limit and at each run's end, so a session write is not made for
 // every model request.
 
-import {
-  cardIdOfKind,
-  type EntryId,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   readLanes,
   readPlaces,
@@ -37,6 +32,7 @@ import {
   type RequestTokens,
   setRecord,
 } from "@pinetrie/rules"
+import { cardIdOfKind } from "@pinetrie/threads"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import type { Later } from "./later.ts"
 import type { Places } from "./places.ts"

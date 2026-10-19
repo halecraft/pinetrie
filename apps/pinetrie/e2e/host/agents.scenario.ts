@@ -2,13 +2,7 @@
 // thread's agent, and its answer waking the asker; then its canvas archived,
 // which refuses the next ask; then a budget spent, which wakes nobody.
 
-import {
-  messageText,
-  projectTranscript,
-  ROOT,
-  type ThreadId,
-  threadEnd,
-} from "@pinetrie/core"
+import { ROOT, type ThreadId } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readNames,
@@ -18,6 +12,7 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import { ALLOWANCE } from "@pinetrie/rules"
+import { messageText, projectTranscript, threadEnd } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   at,

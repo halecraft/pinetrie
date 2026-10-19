@@ -1,7 +1,7 @@
 import { writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { expect, test } from "vitest"
 import { type ControlListener, startControl } from "./control.ts"
 

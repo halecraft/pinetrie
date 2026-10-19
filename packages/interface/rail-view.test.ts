@@ -1,10 +1,11 @@
-import { entryId, indexTree } from "@pinetrie/core"
+import { entryId } from "@pinetrie/core"
+import { indexTree } from "@pinetrie/threads"
 import {
   entriesById,
   entry,
   personMessage,
   toolResultMessage,
-} from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   capsulePick,

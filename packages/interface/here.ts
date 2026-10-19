@@ -4,14 +4,8 @@
 // the end of its thread. `peopleHere` groups those by person, where
 // `othersReading` groups them by thread end; "never you" is `othersReading`'s.
 
-import {
-  type CanvasId,
-  type EntryId,
-  entryThread,
-  type ThreadId,
-  type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
+import { entryThread, type TreeIndex } from "@pinetrie/threads"
 
 interface PersonHere {
   readonly writer: WriterId

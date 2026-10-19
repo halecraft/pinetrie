@@ -1,10 +1,5 @@
-import {
-  cardIdOfKind,
-  makeCard,
-  threadIdFor,
-  UNTICKED,
-  writerId,
-} from "@pinetrie/core"
+import { threadIdFor, writerId } from "@pinetrie/core"
+import { cardIdOfKind, makeCard, UNTICKED } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, CANVAS_ID, putCanvas, seedPlaces } from "./fakes.ts"

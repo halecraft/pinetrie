@@ -24,7 +24,6 @@ import {
   type FolderProposedChangesRecord,
   type FolderStamp,
   type PointId,
-  type ProposedChangesFact,
   type ProposedChangesSeen,
   type StateRecord,
   snapshotId,
@@ -51,6 +50,7 @@ import {
 } from "@pinetrie/folder"
 import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
 import { deleteRecord, FOLDER_WRITE_JOURNAL, setRecord } from "@pinetrie/rules"
+import type { ProposedChangesFact } from "@pinetrie/threads"
 import type { ActRefusal } from "../work/destination.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
 import type { FolderLine } from "./line.ts"

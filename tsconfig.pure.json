@@ -7,6 +7,8 @@
   "compilerOptions": { "lib": ["ESNext"], "types": [] },
   "include": [
     "pure-globals.d.ts",
+    "packages/core",
+    "packages/threads",
     "packages/interface",
     "packages/shell",
     "packages/web-core",

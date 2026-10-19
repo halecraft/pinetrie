@@ -70,14 +70,24 @@ test("core declares nothing", () => {
   assert.deepEqual(allDeps(read("packages/core")), [])
 })
 
-test("the protocol declares only Kyneta and core", () => {
+test("threads declares only core: no lane package declares it, so none names a card, a move or a command", () => {
+  // Core declares nothing, so no kernel module can import a module of this
+  // package either: the lane side and this vocabulary stay apart by
+  // resolution.
+  assert.deepEqual(allDeps(read("packages/threads")), ["@pinetrie/core"])
+})
+
+test("the protocol declares only Kyneta, core and threads", () => {
   const extra = deps(read("packages/protocol")).filter(
-    d => !d.startsWith("@kyneta/") && d !== "@pinetrie/core",
+    d =>
+      !d.startsWith("@kyneta/") &&
+      d !== "@pinetrie/core" &&
+      d !== "@pinetrie/threads",
   )
   assert.deepEqual(extra, [])
 })
 
-test("rules declares only TypeBox, core, the markdown parser the client's remark wraps, and a .gitignore matcher", () => {
+test("rules declares only TypeBox, core, threads, the markdown parser the client's remark wraps, and a .gitignore matcher", () => {
   // Which images a message shows is read from its markdown on the host, by
   // the parser under the client's remark-parse and remark-gfm, at the same
   // versions, so both read one tree and the bundle holds one copy. `ignore`
@@ -85,6 +95,7 @@ test("rules declares only TypeBox, core, the markdown parser the client's remark
   // never imports.
   assert.deepEqual(deps(read("packages/rules")).sort(), [
     "@pinetrie/core",
+    "@pinetrie/threads",
     "ignore",
     "mdast-util-from-markdown",
     "mdast-util-gfm",
@@ -97,16 +108,17 @@ test("folder declares only core: it decides a folder project's history, and lane
   assert.deepEqual(deps(read("packages/folder")), ["@pinetrie/core"])
 })
 
-test("reads declares only core, schema and rules: no pi, no transport", () => {
+test("reads declares only core, threads, schema and rules: no pi, no transport", () => {
   // The host and the client decide from these reads, so they must run in both.
   assert.deepEqual(deps(read("packages/reads")).sort(), [
     "@pinetrie/core",
     "@pinetrie/rules",
     "@pinetrie/schema",
+    "@pinetrie/threads",
   ])
 })
 
-test("session declares only Kyneta's exchange and WebSocket transport, core, protocol, reads, rules and schema: no React", () => {
+test("session declares only Kyneta's exchange and WebSocket transport, core, threads, protocol, reads, rules and schema: no React", () => {
   // It runs unchanged in a browser and in Node: the page draws from it, and
   // the suites drive a host through it. Declaring no React, it cannot draw.
   assert.deepEqual(deps(read("packages/session")).sort(), [
@@ -118,10 +130,11 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
     "@pinetrie/reads",
     "@pinetrie/rules",
     "@pinetrie/schema",
+    "@pinetrie/threads",
   ])
 })
 
-test("interface declares only core, protocol, reads, rules, schema, session, shell and TypeBox: no React, no DOM", () => {
+test("interface declares only core, threads, protocol, reads, rules, schema, session, shell and TypeBox: no React, no DOM", () => {
   // What any client shows and does: a TTY must be able to take
   // it without a browser. `tsconfig.pure.json` checks it has no DOM.
   assert.deepEqual(deps(read("packages/interface")).sort(), [
@@ -132,6 +145,7 @@ test("interface declares only core, protocol, reads, rules, schema, session, she
     "@pinetrie/schema",
     "@pinetrie/session",
     "@pinetrie/shell",
+    "@pinetrie/threads",
     "typebox",
   ])
 })
@@ -159,12 +173,13 @@ test("only the page, its core, the terminal client and the app depend on interfa
   ])
 })
 
-test("web-core declares only core and interface: the web client's decisions, no React and no page", () => {
+test("web-core declares only core, threads and interface: the web client's decisions, no React and no page", () => {
   // Resolution keeps React and the page's components out of it in the type
   // check, Vitest and Vite alike; `tsconfig.pure.json` keeps out the DOM.
   assert.deepEqual(deps(read("packages/web-core")).sort(), [
     "@pinetrie/core",
     "@pinetrie/interface",
+    "@pinetrie/threads",
   ])
 })
 
@@ -175,13 +190,15 @@ test("only the page depends on web-core: it is the web client's", () => {
   assert.deepEqual(declaring, ["packages/web"])
 })
 
-test("the terminal client declares only interface, session and core: it draws from interface alone", () => {
+test("the terminal client declares only interface, session, core and threads: it draws from interface alone", () => {
   // What it draws proves interface holds what any client needs: a name it
-  // took from rules or reads would prove nothing.
+  // took from rules or reads would prove nothing. Core and threads are the
+  // vocabulary every package names, and decide nothing it draws.
   assert.deepEqual(allDeps(read("apps/tui")).sort(), [
     "@pinetrie/core",
     "@pinetrie/interface",
     "@pinetrie/session",
+    "@pinetrie/threads",
   ])
 })
 
@@ -314,6 +331,7 @@ test("the page declares neither rules nor reads: it draws what interface decides
       "@pinetrie/protocol",
       "@pinetrie/schema",
       "@pinetrie/session",
+      "@pinetrie/threads",
       "@pinetrie/web-core",
     ],
   )
@@ -398,4 +416,5 @@ const PROBED = [
   "react",
   "@earendil-works/pi-agent-core",
   "unbash",
+  "@pinetrie/threads",
 ]

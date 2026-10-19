@@ -3,7 +3,6 @@
 // edit through the box, as typing is, so a bound box's binding sends it.
 
 import { hasPosition, POSITION, type Position } from "@kyneta/schema"
-import type { TextCardId } from "@pinetrie/core"
 import {
   insertSnippet,
   type Selection,
@@ -12,6 +11,7 @@ import {
   shareStatus,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
+import type { TextCardId } from "@pinetrie/threads"
 import { type RefObject, useState } from "react"
 
 /** A box files can be shared into. */

@@ -1,14 +1,4 @@
-import {
-  type CardId,
-  type CardRecord,
-  entryId,
-  type SentCard,
-  type TextCard,
-  textCardId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { entryId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   decodePinned,
   encodePinned,
@@ -16,6 +6,14 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
+import {
+  type CardId,
+  type CardRecord,
+  type SentCard,
+  type TextCard,
+  textCardId,
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import {

@@ -5,23 +5,25 @@
 import {
   CANVAS_PATTERN,
   type CanvasId,
-  type CardId,
   type CommitId,
   type EntryId,
   entryId,
   isCanvasId,
   isRootId,
   isThreadId,
-  isTitledCardId,
   type PointId,
-  parseCardId,
   type RootId,
   THREAD_PATTERN,
   type ThreadId,
   type ThreadName,
-  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  type CardId,
+  isTitledCardId,
+  parseCardId,
+  type TitledCardId,
+} from "@pinetrie/threads"
 import { type Static, type TSchema, Type } from "typebox"
 import { Compile } from "typebox/compile"
 

@@ -3,12 +3,8 @@
 // restored when pi reads the message back. `KynetaStorage` gathers the
 // lookups.
 
-import {
-  type ImageMime,
-  type ImageRef,
-  type Sha256,
-  storedImage,
-} from "@pinetrie/core"
+import type { ImageMime, ImageRef, Sha256 } from "@pinetrie/core"
+import { storedImage } from "@pinetrie/threads"
 
 /** A blob's bytes, as the rejoin reads them. */
 export type BlobOf = (

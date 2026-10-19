@@ -12,33 +12,15 @@
 // answer that wrote the places document, or refused a move, carries its
 // `rev`: a client draws its move until its copy reaches it.
 
-import {
-  type BlobStore,
-  type BranchOut,
-  type CanvasId,
-  type CardCommand,
-  type CardId,
-  type CardRecord,
-  type EntryId,
-  type Intent,
-  isTextCardId,
-  type Move,
-  type MoveDirection,
-  type MoveHistoryScope,
-  type MoveTarget,
-  placeKey,
-  type QueuedFact,
-  type QueueHoldChange,
-  type QueueMove,
-  type Reorder,
-  type RootId,
-  type Send,
-  type SentCard,
-  type Sha256,
-  type TextCardId,
-  type ThreadId,
-  type TreeIndex,
-  type WriterId,
+import type {
+  BlobStore,
+  CanvasId,
+  EntryId,
+  MoveHistoryScope,
+  RootId,
+  Sha256,
+  ThreadId,
+  WriterId,
 } from "@pinetrie/core"
 import {
   branchOutRefusal,
@@ -97,6 +79,26 @@ import {
   type StoredBlob,
 } from "@pinetrie/rules"
 import { readActiveLanes } from "@pinetrie/schema"
+import {
+  type BranchOut,
+  type CardCommand,
+  type CardId,
+  type CardRecord,
+  type Intent,
+  isTextCardId,
+  type Move,
+  type MoveDirection,
+  type MoveTarget,
+  placeKey,
+  type QueuedFact,
+  type QueueHoldChange,
+  type QueueMove,
+  type Reorder,
+  type Send,
+  type SentCard,
+  type TextCardId,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import type { StepBasics } from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"

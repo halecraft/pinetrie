@@ -1,16 +1,18 @@
 import {
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
-  ROOT_ORIGIN,
   rootIdFor,
   type ThreadId,
   threadIdFor,
-  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  cardIdOfKind,
+  ROOT_ORIGIN,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   canvasOfPlace,

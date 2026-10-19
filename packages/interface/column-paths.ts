@@ -2,16 +2,15 @@
 // past what the columns to its left show, and the colour each takes from the
 // rail.
 
+import type { EntryId, ThreadId } from "@pinetrie/core"
 import {
-  type EntryId,
   projectSpine,
   type RailRow,
   type SpineNode,
-  type ThreadId,
   type TreeIndex,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
-export interface ColumnSpec {
+interface ColumnSpec {
   /**
    * Where the column's path ends: its thread's end, or an unstarted
    * thread's fork; null only for a new canvas's thread, at the root.

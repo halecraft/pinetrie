@@ -3,14 +3,14 @@ import {
   commitId,
   type DiskPath,
   entryId,
-  indexTree,
   pointId,
   revisionMessage,
   type ThreadName,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { fromParents, personMessage } from "@pinetrie/core/fixtures"
+import { indexTree } from "@pinetrie/threads"
+import { fromParents, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { AcceptedRecord } from "./accepted.ts"
 import { getLatestRefusal } from "./agent-commands.ts"

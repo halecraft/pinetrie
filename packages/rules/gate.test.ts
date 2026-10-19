@@ -1,19 +1,21 @@
 import {
   type CanvasId,
-  type CardRecord,
   canvasIdFor,
-  type EntryLike,
   entryId,
-  indexTree,
   type LaneRecord,
   rootIdFor,
-  type Send,
-  type SendAt,
   type ThreadId,
   threadIdFor,
-  UNTICKED,
   writerId,
 } from "@pinetrie/core"
+import {
+  type CardRecord,
+  type EntryLike,
+  indexTree,
+  type Send,
+  type SendAt,
+  UNTICKED,
+} from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"

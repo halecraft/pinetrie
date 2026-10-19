@@ -8,13 +8,8 @@
 
 import type {
   CanvasId,
-  CardId,
-  CardRecord,
-  MediaId,
-  NoteColumnId,
   ThreadId,
   ThreadName,
-  TitledCardId,
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
@@ -30,6 +25,13 @@ import {
   trashedTime,
   type Workflow,
 } from "@pinetrie/rules"
+import type {
+  CardId,
+  CardRecord,
+  MediaId,
+  NoteColumnId,
+  TitledCardId,
+} from "@pinetrie/threads"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"
 import { foldToggle, UNNAMED_THREAD } from "./folded-column-view.ts"
@@ -81,7 +83,7 @@ export interface CanvasColumnView {
 }
 
 /** A canvas's trash, as its list draws it. */
-export interface CanvasTrash {
+interface CanvasTrash {
   /** The columns trashed from the canvas, newest first. */
   readonly rows: readonly TrashRow[]
   /** How long a trashed column is kept before it is deleted. */
@@ -89,7 +91,7 @@ export interface CanvasTrash {
 }
 
 /** A column in the trash of a canvas, as its list draws it. */
-export interface TrashRow {
+interface TrashRow {
   readonly card: ThreadId | NoteColumnId | MediaId
   /** The thread's name, or the note column's title. */
   readonly title: string
@@ -111,8 +113,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * last day, or the last quarter of a keep shorter than four days, so a short
  * keep does not warn from the start.
  */
-export const trashWarnMs = (keepMs: number): number =>
-  Math.min(DAY_MS, keepMs / 4)
+const trashWarnMs = (keepMs: number): number => Math.min(DAY_MS, keepMs / 4)
 
 /**
  * The columns trashed from `canvas`'s canvas: each thread or note column in a

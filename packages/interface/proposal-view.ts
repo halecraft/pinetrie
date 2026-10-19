@@ -3,9 +3,9 @@
 // (`columnProposals`), and what one card shows and offers (`proposalView`),
 // worded in one place (`proposalWords`).
 
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   type AskIndex,
-  type EntryId,
   entryAsk,
   entryThread,
   type LaneView,
@@ -15,11 +15,9 @@ import {
   type ProposedThread,
   proposalState,
   runPrompt,
-  type ThreadId,
   type TreeIndex,
   threadLane,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 
 /** A press on a proposal's card, as the page asks the host. */
 export type ProposalPress =

@@ -3032,7 +3032,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card's thread is cast, not checked",
-    file: "packages/core/places.ts",
+    file: "packages/threads/places.ts",
     from: "  isThreadId(r.lane) ? { thread: r.lane } : undefined",
     to: '  r.lane === "" ? undefined : { thread: r.lane as ThreadId }',
     command: unit,
@@ -4007,16 +4007,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "trashing's history is its sender's canvas, not the one it leaves",
     file: "packages/rules/move-history.ts",
-    from: "): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here",
-    to: "): CanvasId | null => trashes.here",
+    from: "  canvasOfPlace(trashes.canvases, from) ?? trashes.here",
+    to: "  trashes.here",
     command: unit,
     expect: "trashing at a thread: the canvas it leaves, not its sender's",
   },
   {
     name: "trashing from an inventory is in no history",
     file: "packages/rules/move-history.ts",
-    from: "): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here",
-    to: "): CanvasId | null => canvasOfPlace(trashes.canvases, from)",
+    from: "  canvasOfPlace(trashes.canvases, from) ?? trashes.here",
+    to: "  canvasOfPlace(trashes.canvases, from)",
     command: unit,
     expect: "trashing from an inventory: the canvas its sender is on",
   },
@@ -4110,7 +4110,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column is held anywhere",
-    file: "packages/core/places.ts",
+    file: "packages/threads/places.ts",
     from: '      return fits("note-column", place) ? { ...card, place } : undefined',
     to: "      return { ...card, place }",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -4769,7 +4769,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a canvas card's place is never read",
-    file: "packages/core/places.ts",
+    file: "packages/threads/places.ts",
     from: '      return !isWorkflowStateId(r.state) || r.order === ""',
     to: '      return !isWorkflowStateId(r.state) || r.order !== "-"',
     command: unit,

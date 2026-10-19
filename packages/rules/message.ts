@@ -1,35 +1,37 @@
 // message — a person's message in the conversation tree, and who it is for.
 
 import {
-  type AgentCandidate,
   type AgentId,
-  type AgentMessageLike,
-  address,
   type CanvasId,
   ERR,
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
-  type Mention,
   OPAQUE_MIME,
-  type PlanMode,
   type Position,
-  planMode,
-  type Recipients,
   type Refusal,
-  type Responder,
   refused,
-  type SendAt,
   type Sha256,
   type Share,
-  sendWaits,
   TEXT_MIME,
   THE_AGENT,
   type ThreadId,
-  type ThreadLane,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  type AgentCandidate,
+  type AgentMessageLike,
+  address,
+  type Mention,
+  type PlanMode,
+  planMode,
+  type Recipients,
+  type Responder,
+  type SendAt,
+  sendWaits,
+  type ThreadLane,
+} from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
@@ -183,7 +185,7 @@ export type PromptMessage =
  * conversion carries attribution into context and a rename later cannot
  * rewrite what the agent already saw.
  */
-export const attributed = (d: MessageDetails): string =>
+const attributed = (d: MessageDetails): string =>
   `${d.authorName}: ${d.command?.expanded ?? d.text}`
 
 /**
@@ -438,7 +440,7 @@ export function promptAuthor(message: unknown): WriterId | null {
 }
 
 /** One step of a run: resume pi's open operation, or run the prompt. */
-export type RunStep = "resume" | "prompt"
+type RunStep = "resume" | "prompt"
 
 const RESUME = { kind: "resume" } as const
 
@@ -488,7 +490,7 @@ export function planAfterStep(input: {
  * the canvas its card goes on, and the board state a new canvas lands in, null
  * for the first open one. The thread is the decision's own.
  */
-export interface ThreadStarts {
+interface ThreadStarts {
   readonly canvas: CanvasId
   readonly state: WorkflowStateId | null
 }
@@ -597,7 +599,7 @@ export function addressMessage(input: {
  * - An idle lane appends, or, compelled, runs. A compelled `reply` that
  *   finds it raced or busy is a conflict, so its sender chooses.
  */
-export type Delivery =
+type Delivery =
   | { readonly kind: "append-to-tree" }
   | { readonly kind: "create-and-run" }
   | { readonly kind: "append-to-lane"; readonly thread: ThreadId }

@@ -22,12 +22,12 @@ import {
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
-import { INTENT_FIELD, type ToolId } from "@pinetrie/core"
 import {
   FOCUS_REQUEST_HEAD,
   URGENCY_ALONE,
   URGENCY_THEN_DIGEST,
 } from "@pinetrie/rules"
+import { INTENT_FIELD, type ToolId } from "@pinetrie/threads"
 import { TAKES_INTENT } from "./intent.ts"
 
 /**

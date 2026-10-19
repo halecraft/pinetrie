@@ -8,15 +8,7 @@
 // one set for every reader.
 
 import { useSelector } from "@kyneta/react"
-import type {
-  AskIndex,
-  CardId,
-  CardRecord,
-  LaneView,
-  Position,
-  TreeIndex,
-  WriterId,
-} from "@pinetrie/core"
+import type { Position, WriterId } from "@pinetrie/core"
 import {
   ADD_TO_QUEUE,
   type ColumnAct,
@@ -38,6 +30,13 @@ import {
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import { newCardId } from "@pinetrie/session/connect"
+import type {
+  AskIndex,
+  CardId,
+  CardRecord,
+  LaneView,
+  TreeIndex,
+} from "@pinetrie/threads"
 import type { ReactNode } from "react"
 import { Button } from "./button.tsx"
 import { QueuedCardEditor } from "./card-editor.tsx"

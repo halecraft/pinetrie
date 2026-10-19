@@ -1,15 +1,14 @@
 import {
   atEntry,
-  type CardRecord,
   canvasIdFor,
-  cardIdOfKind,
   entryId,
   rootIdFor,
   type Sha256,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { type CardRecord, cardIdOfKind } from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { planUnqueueAll, type QueuedCard } from "./queue.ts"
 import {

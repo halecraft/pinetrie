@@ -1,46 +1,318 @@
-// core — the vocabulary every package shares (ids, intents) and the reads of
-// the tree. Nothing here may import pi, Kyneta, or a Node builtin
-// (`TECHNICAL.md`). This module only re-exports: a sibling imports the module
-// that declares a name, never this one.
+// core — the kernel every package shares: ids, refusals, writes, and what a
+// lane, its disk and its history are. Nothing here may import pi, Kyneta, a
+// Node builtin, or another package (`TECHNICAL.md`). A sibling imports the
+// module that declares a name, never this one.
+//
+// Written by `pnpm run indexes`: each name some file imports through it, from
+// the module that declares it, and nothing else.
 
-export * from "./accepted.ts"
-export * from "./access.ts"
-export * from "./address.ts"
-export * from "./agents.ts"
-export * from "./asks.ts"
-export * from "./bases.ts"
-export * from "./board.ts"
-export * from "./cards.ts"
-export * from "./config.ts"
-export * from "./disks.ts"
-export * from "./edits.ts"
-export * from "./errors.ts"
-export * from "./facts.ts"
-export * from "./folder.ts"
-export * from "./grid.ts"
-export * from "./ids.ts"
-export * from "./images.ts"
-export * from "./intents.ts"
-export * from "./kinds.ts"
-export * from "./lane-env.ts"
-export * from "./lanes.ts"
-export * from "./live.ts"
-export * from "./marks.ts"
-export * from "./mentions.ts"
-export * from "./messages.ts"
-export * from "./ordering.ts"
-export * from "./paste.ts"
-export * from "./paths.ts"
-export * from "./places.ts"
-export * from "./product.ts"
-export * from "./proposals.ts"
-export * from "./proposed.ts"
-export * from "./revisions.ts"
-export * from "./roots.ts"
-export * from "./runs.ts"
-export * from "./thread-names.ts"
-export * from "./threads.ts"
-export * from "./tools.ts"
-export * from "./trailers.ts"
-export * from "./tree.ts"
-export * from "./work.ts"
+export type {
+  FolderBaseRecord,
+  GetLatestRead,
+  JjAcceptedRecord,
+  JjBaseRecord,
+} from "./accepted.ts"
+export {
+  type BaseMerge,
+  type CommitBase,
+  type CommitId,
+  type CopyFacts,
+  type CopyRefusal,
+  commitId,
+  type ForkStart,
+  folderCopyReady,
+  type LaneBase,
+  type LatestFrom,
+  type ParentThread,
+  type PointId,
+  planCopyReady,
+  pointFromCommit,
+  pointId,
+  type ReadyCopy,
+  type ThreadBase,
+} from "./bases.ts"
+export {
+  CONFIG_FILE_STATES,
+  CONFIG_LAYERS,
+  type ConfigFileState,
+  type ConfigLayer,
+  type ConfigOrigin,
+  type ConfigRefusal,
+  PROJECT_CONFIG_FILE,
+  type ProjectKind,
+  REFUSAL_REASONS,
+  type RepoConfig,
+} from "./config.ts"
+export {
+  BASE_SNAPSHOT,
+  DISK_LISTED,
+  DISK_OWN_ROOTS,
+  type DiskChange,
+  type DiskDiff,
+  type DiskPath,
+  diskPath,
+  isPathInside,
+  isUnderAny,
+  type ListedPaths,
+  type SnapshotId,
+  snapshotId,
+  type TurnDisk,
+} from "./disks.ts"
+export { assertNever, errorText } from "./errors.ts"
+export {
+  type BasePlan,
+  type ConflictChoice,
+  type ConflictRecord,
+  concurrentStateId,
+  type DiffStat,
+  type FileContent,
+  FOLDER_RESERVED,
+  type FolderStamp,
+  getLatestStateId,
+  type InodeStat,
+  isDiskName,
+  isFolderReserved,
+  isFolderStateId,
+  isLineState,
+  type LaneStatesOp,
+  lineStateId,
+  lineStates,
+  type MergeStep,
+  type PathFact,
+  type PathPair,
+  type PathWrite,
+  type ReadInAnswer,
+  type ReadPath,
+  type RestorePreview,
+  resolveStateId,
+  restoreStateId,
+  type StateMade,
+  type StateRecord,
+  startStateId,
+  stateLane,
+  type TextMerged,
+  turnStateId,
+  type WriteJournal,
+  type WritePath,
+  writeAsideDir,
+  writeContent,
+  writeStageDir,
+} from "./folder.ts"
+export {
+  type AgentId,
+  agentAsk,
+  atEntry,
+  CANVAS_PATTERN,
+  type CanvasId,
+  canvasIdFor,
+  type EntryId,
+  emailLocalPart,
+  entryId,
+  historyScope,
+  isCanvasId,
+  isRootId,
+  isThreadId,
+  isWorkflowStateId,
+  MOVES_DOC_PREFIX,
+  type MoveHistoryScope,
+  movesDocId,
+  movesOfDocId,
+  normalizeEmail,
+  PERSON_HISTORY,
+  type Position,
+  parseNewCanvas,
+  parseNewRoot,
+  parseNewThread,
+  ROOT,
+  type RootId,
+  type RunId,
+  rootDocId,
+  rootIdFor,
+  rootOfDocId,
+  rootOfScratchDocId,
+  runId,
+  type Spot,
+  scratchDocId,
+  THE_AGENT,
+  THREAD_PATTERN,
+  type ThreadId,
+  threadIdFor,
+  type WorkflowStateId,
+  type WriterId,
+  workflowStateIdFor,
+  writerId,
+  writerOfPrincipal,
+} from "./ids.ts"
+export {
+  type BlobMime,
+  type BlobRef,
+  type BlobStore,
+  blobKind,
+  blobOfUrl,
+  blobUrl,
+  FILE_CONTENT_WINDOW,
+  fileContent,
+  IMAGE_MIMES,
+  type ImageMime,
+  type ImageRef,
+  isBlobMime,
+  isImageMime,
+  isImageRef,
+  isSha256,
+  OPAQUE_MIME,
+  type Sha256,
+  type Share,
+  type StoredBlob,
+  type StoredImage,
+  storedText,
+  TEXT_MIME,
+} from "./images.ts"
+export {
+  HOST_WORKING_COPY,
+  hostPathInLane,
+  LANE_HOME,
+  LANE_HOME_PATH,
+  laneSkillPath,
+  NO_EDITOR,
+  RUNTIME_PROGRAMS,
+  type RuntimeProgram,
+  SHARED_ENV,
+  shellWord,
+  WORKSPACE_ROOT,
+} from "./lane-env.ts"
+export {
+  type ForeignLane,
+  type LaneRecord,
+  laneFits,
+  type OwnLane,
+  ownLane,
+  proveRunnable,
+  type RunnableLane,
+} from "./lanes.ts"
+export { isWithin, pathUnder } from "./paths.ts"
+export { HOST_OPERATOR, PRODUCT_NAME } from "./product.ts"
+export {
+  type AcceptanceDecision,
+  type AcceptanceFacts,
+  type AcceptedFacts,
+  type AcceptedWorkDecision,
+  type AcceptsInto,
+  type DescribeDecision,
+  type FilesTouched,
+  type NonEmpty,
+  nonEmpty,
+  type Placed,
+  type ProposedChangesGather,
+  type ProposedChangesInRepo,
+  type ProposedChangesNow,
+  type ProposedChangesPlace,
+  type ProposedChangesSeen,
+  type ProposedLedger,
+  type ProposedRevision,
+  type ProposedSource,
+  type PublishDecision,
+  type PublishFinish,
+  type PublishMove,
+  type Rebuild,
+  type RefreshDecision,
+  type RefreshFacts,
+  type RevisionFacts,
+  revisionChangeIds,
+  type StackFacts,
+  type StartRead,
+} from "./proposed.ts"
+export { ERR, type ErrCode, type Refusal, refused } from "./refusals.ts"
+export {
+  type ConflictCause,
+  type DiffSpan,
+  type FileChange,
+  type FolderProposedChangesRecord,
+  type JjProposedChangesRecord,
+  type MediaSide,
+  type ProposedChangesRecord,
+  type ReviewFile,
+  type RevisionRecord,
+  type RevisionReview,
+  spanKey,
+} from "./revisions.ts"
+export {
+  type CallOp,
+  type ConfigWidening,
+  type DerivedRoot,
+  decodeRunEvent,
+  EMPTY_REGISTRY,
+  encodeRunEvent,
+  type FileHashes,
+  type FoldNotices,
+  isCache,
+  type LaneDrain,
+  type LaneObservation,
+  type LaneRuns,
+  NO_SHARED,
+  OBSERVER_SOCKET,
+  type ObserverRelay,
+  OPEN_FLAGS,
+  type PathKind,
+  type PathTrace,
+  type Recipe,
+  type RecipeCheck,
+  type Registry,
+  type ReleaseStamp,
+  type RootEvidence,
+  type RunEvent,
+  type RunNotice,
+  type RunRecord,
+  type RunSource,
+  type RunTrace,
+  type RunTraces,
+  type RunWrite,
+  SHARED_KEPT,
+  type SharedAccess,
+  type SharedTouch,
+  type Stamp,
+  stamp,
+  stampTimeUs,
+  statStamp,
+  type ToolWrites,
+  type TurnShared,
+  wideningWords,
+} from "./runs.ts"
+export { firstLine } from "./text.ts"
+export {
+  ADJECTIVES,
+  fnv1a,
+  isThreadNameHandle,
+  NAME_PAIRS,
+  NOUNS,
+  type Noun,
+  namePair,
+  type ThreadName,
+  threadNameParts,
+} from "./thread-names.ts"
+export {
+  type BaseTrailer,
+  baseMessage,
+  entryOfMessage,
+  hasTrailer,
+  isUnfinishedLine,
+  messageBase,
+  messageSources,
+  proposedLedger,
+  proposedMessage,
+  revisionMessage,
+  TRAILERS,
+  trailerRevset,
+  trailerValues,
+  unfinishedDescription,
+  untracedLanes,
+  withLedger,
+  withoutTrailers,
+  withTrailers,
+} from "./trailers.ts"
+export {
+  type Home,
+  type HostNamespace,
+  SESSION_TARGET,
+  type Target,
+  type ValueWrite,
+} from "./writes.ts"

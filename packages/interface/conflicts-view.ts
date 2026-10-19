@@ -14,7 +14,7 @@ import {
 } from "@pinetrie/core"
 
 /** One side of a conflict: what it changed from the base, as a review's span. */
-export interface ConflictSide {
+interface ConflictSide {
   readonly side: "ours" | "theirs"
   readonly label: string
   readonly span: DiffSpan
@@ -31,7 +31,7 @@ export interface ConflictShown {
 }
 
 /** What a choice of a conflict's version says: `theirs` names the thread it came from, or accepted work. */
-export function conflictChoiceWords(
+function conflictChoiceWords(
   choose: ConflictChoice,
   theirsFrom: string | null,
 ): string {

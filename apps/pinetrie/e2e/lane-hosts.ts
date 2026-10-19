@@ -9,13 +9,14 @@
 import { rmSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { ancestry, entryId, messageText, type ThreadId } from "@pinetrie/core"
+import { entryId, type ThreadId } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
 import { thisInstall } from "@pinetrie/install"
 import { type SessionFiles, sessionFiles } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import { readLaneRecords, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
+import { ancestry, messageText } from "@pinetrie/threads"
 import { vmProblem, vmStateDir } from "@pinetrie/vm"
 import {
   type RunningHost,

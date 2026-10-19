@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@pinetrie/core": "workspace:*",
+    "@pinetrie/threads": "workspace:*",
     "@kyneta/schema": "4.0.0",
     "@kyneta/yjs-schema": "4.0.0"
   }

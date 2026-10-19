@@ -49,7 +49,7 @@ export const shellWord = (s: string): string =>
  * then the host path. One rule, so no granted path can shadow a directory of
  * the image's.
  */
-export const HOST_MOUNT = "/mnt/host"
+const HOST_MOUNT = "/mnt/host"
 
 /** A host path, as a lane of its own sees it. */
 export const hostPathInLane = (hostPath: string): string =>

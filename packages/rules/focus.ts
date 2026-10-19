@@ -1,15 +1,13 @@
 // focus — a thread's focus: what it is doing now, in a few words, named by a
 // model after each of its runs from its asks and their digests' headlines.
 
+import { type EntryId, entryId, type ThreadId } from "@pinetrie/core"
 import {
   type AskIndex,
-  type EntryId,
-  entryId,
   entryMessage,
-  type ThreadId,
   type TreeIndex,
   threadAsks,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import { decodeRecord, threadKey } from "./decode.ts"
 import type { DigestRecord } from "./digest.ts"
@@ -60,7 +58,7 @@ export const FOCUS_WORDS = 10
 const SAME = "same"
 
 /** A focus reply, read. */
-export type FocusReply =
+type FocusReply =
   | { readonly kind: "same" }
   | { readonly kind: "focus"; readonly focus: string }
 
@@ -92,7 +90,7 @@ const ASK_LENGTH = 300
 const NEWEST_ASKS = 29
 
 /** One of a thread's asks as a focus request lists it. */
-export interface FocusAsk {
+interface FocusAsk {
   /** The ask's message, as a transcript line. */
   readonly said: string
   /** Its digest's headline; null for none. */
@@ -100,7 +98,7 @@ export interface FocusAsk {
 }
 
 /** What a focus request is asked from (`planFocus`). */
-export interface FocusPlan {
+interface FocusPlan {
   /** The focus shown now; null for none. */
   readonly focus: string | null
   /** The thread's asks, oldest first. */

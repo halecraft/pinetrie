@@ -15,7 +15,7 @@ import {
   type ReorderAt,
   type ReorderRefusal,
   sameKey,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder, cardOrder, isOrdered } from "./card.ts"
 import { marginCards } from "./margin.ts"

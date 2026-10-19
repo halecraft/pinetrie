@@ -1,10 +1,5 @@
-import {
-  asPlaceFields,
-  entryId,
-  entryMargin,
-  placeOfFields,
-  threadIdFor,
-} from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
+import { asPlaceFields, entryMargin, placeOfFields } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
   marginFieldsNow,

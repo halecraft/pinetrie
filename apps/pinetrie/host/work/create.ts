@@ -7,15 +7,12 @@ import {
   atEntry,
   BASE_SNAPSHOT,
   type ErrCode,
-  forkEntry,
-  nearestRevision,
   type OwnLane,
   type Position,
   type ProjectKind,
   ROOT,
   type SnapshotId,
   type ThreadId,
-  type ThreadOrigin,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
@@ -45,6 +42,11 @@ import {
   planLaneRecords,
   sourceHistory,
 } from "@pinetrie/rules"
+import {
+  forkEntry,
+  nearestRevision,
+  type ThreadOrigin,
+} from "@pinetrie/threads"
 import type { Basics, LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"

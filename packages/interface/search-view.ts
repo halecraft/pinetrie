@@ -5,15 +5,14 @@
 // so no match is drawn twice. One match is one message, however often the
 // phrase is in it.
 
+import type { EntryId, WriterId } from "@pinetrie/core"
+import { displayName } from "@pinetrie/rules"
 import {
   type AskIndex,
-  type EntryId,
   entryAsk,
   type SpineNode,
   type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
-import { displayName } from "@pinetrie/rules"
+} from "@pinetrie/threads"
 import { askLine } from "./ask-words.ts"
 import { ago, count, plural } from "./counts.ts"
 import { speakerWords } from "./names.ts"
@@ -22,7 +21,7 @@ import { type SearchResult, type SnippetPart, snippet } from "./search.ts"
 /** How long a match's snippet is, in characters, before "…". */
 const SNIPPET = 140
 
-export type MatchRow =
+type MatchRow =
   | {
       readonly kind: "match"
       readonly id: EntryId

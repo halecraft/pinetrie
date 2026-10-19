@@ -15,7 +15,8 @@ import {
   formatSize,
   type ShellOutputView,
 } from "@earendil-works/pi-agent-core"
-import { FIND_TOOL, GREP_TOOL, shellWord } from "@pinetrie/core"
+import { shellWord } from "@pinetrie/core"
+import { FIND_TOOL, GREP_TOOL } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { SearchProgram, ToolContext } from "./lanes.ts"
 

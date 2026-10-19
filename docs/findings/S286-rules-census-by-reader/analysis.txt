@@ -1,0 +1,122 @@
+modules 88, lines 19315, exports 680
+
+== groups by who outside rules names a module's exports (source)
+  shared   modules  54  lines  14273  exports  533
+    accepted.ts access.ts allowance.ts archive.ts banner.ts base.ts blocks.ts board.ts canvas-index.ts canvas.ts card-history.ts card-title.ts card.ts commands.ts context.ts counts.ts digest.ts fact.ts focus.ts folder-records.ts held.ts in-place.ts latest-from.ts links.ts live.ts margin.ts mark.ts media.ts message.ts moves.ts names.ts notes.ts order.ts participant.ts pinned.ts place-steps.ts proposed.ts queue-hold.ts queue.ts rank.ts reach.ts records.ts relay.ts review.ts roots.ts run-end-report.ts seat.ts setup.ts shared.ts shares.ts stop.ts thread.ts work-strip.ts work.ts
+  host-pi  modules  12  lines   2633  exports   79
+    agent-commands.ts behind.ts canvas-pinned.ts config.ts disk.ts ignores.ts land.ts proposal.ts put-images.ts runs.ts ssh-news.ts update.ts
+  host     modules  17  lines   1988  exports   66
+    card-read.ts card-words.ts containers.ts copy.ts gate.ts move-history.ts open.ts removals.ts request.ts resolve.ts root.ts round.ts specs.ts spin-off.ts stack.ts startup.ts title.ts
+  none     modules   5  lines    421  exports    0
+    decode.ts history.ts markdown.ts pi-message.ts relay-codec.ts
+
+shared closed over value imports: 71 modules, 16338 of 19315 lines (85%)
+  host or host-pi modules taken in (17, 2065 lines): behind.ts[host-pi] canvas-pinned.ts[host-pi] card-words.ts[host] containers.ts[host] decode.ts[none] history.ts[none] land.ts[host-pi] markdown.ts[none] open.ts[host] pi-message.ts[none] proposal.ts[host-pi] relay-codec.ts[none] removals.ts[host] request.ts[host] ssh-news.ts[host-pi] stack.ts[host] update.ts[host-pi]
+
+shared closed over value and type imports: 72 modules, 16360 of 19315 lines (85%)
+  host or host-pi modules taken in (18, 2087 lines): behind.ts[host-pi] canvas-pinned.ts[host-pi] card-words.ts[host] config.ts[host-pi] containers.ts[host] decode.ts[none] history.ts[none] land.ts[host-pi] markdown.ts[none] open.ts[host] pi-message.ts[none] proposal.ts[host-pi] relay-codec.ts[none] removals.ts[host] request.ts[host] ssh-news.ts[host-pi] stack.ts[host] update.ts[host-pi]
+
+== edges from the shared side into host or host-pi modules (value imports)
+  notes.ts[shared] -> containers.ts[host]
+  digest.ts[shared] -> request.ts[host]
+  run-end-report.ts[shared] -> request.ts[host]
+  relay.ts[shared] -> request.ts[host]
+  pinned.ts[shared] -> card-words.ts[host]
+  context.ts[shared] -> canvas-pinned.ts[host-pi]
+  focus.ts[shared] -> request.ts[host]
+  moves.ts[shared] -> containers.ts[host]
+  message.ts[shared] -> behind.ts[host-pi]
+  message.ts[shared] -> canvas-pinned.ts[host-pi]
+  message.ts[shared] -> land.ts[host-pi]
+  message.ts[shared] -> ssh-news.ts[host-pi]
+  message.ts[shared] -> stack.ts[host]
+  message.ts[shared] -> update.ts[host-pi]
+  land.ts[host-pi] -> removals.ts[host]
+  land.ts[host-pi] -> request.ts[host]
+  pi-message.ts[none] -> proposal.ts[host-pi]
+  update.ts[host-pi] -> removals.ts[host]
+  proposal.ts[host-pi] -> open.ts[host]
+
+== shared modules with exports only the host (or host and pi) names, or none outside
+  accepted.ts          shared  10  host-pi   0  host   4  none   0
+  access.ts            shared   5  host-pi   0  host   8  none   3
+  allowance.ts         shared   2  host-pi   1  host   5  none   1
+  archive.ts           shared   1  host-pi   0  host   5  none   0
+  banner.ts            shared   5  host-pi   2  host   9  none   1
+  base.ts              shared   7  host-pi   0  host   6  none   1
+  blocks.ts            shared   4  host-pi   0  host   0  none   4
+  board.ts             shared   9  host-pi   0  host   4  none  11
+  canvas-index.ts      shared   9  host-pi   0  host   3  none   9
+  canvas.ts            shared   5  host-pi   2  host   4  none  14
+  card-history.ts      shared  13  host-pi   0  host   5  none   5
+  card-title.ts        shared   2  host-pi   0  host   1  none   0
+  card.ts              shared   4  host-pi   0  host   2  none   1
+  commands.ts          shared   4  host-pi   6  host   1  none   0
+  context.ts           shared   1  host-pi   3  host   0  none   1
+  counts.ts            shared   5  host-pi   0  host   0  none   1
+  digest.ts            shared   5  host-pi   2  host   6  none   2
+  fact.ts              shared   2  host-pi   1  host   4  none   4
+  focus.ts             shared   2  host-pi   1  host   4  none   4
+  folder-records.ts    shared   2  host-pi   0  host   4  none   0
+  held.ts              shared   2  host-pi   0  host   4  none   3
+  in-place.ts          shared   1  host-pi   0  host   3  none   0
+  latest-from.ts       shared   2  host-pi   0  host   2  none   0
+  links.ts             shared   2  host-pi   0  host   2  none   3
+  live.ts              shared   1  host-pi   0  host   3  none   1
+  margin.ts            shared   4  host-pi   0  host   0  none   0
+  mark.ts              shared   2  host-pi   0  host   1  none   0
+  media.ts             shared   1  host-pi   0  host   1  none   0
+  message.ts           shared   5  host-pi   4  host   7  none   2
+  moves.ts             shared   1  host-pi   0  host   6  none   4
+  names.ts             shared   2  host-pi   0  host   4  none   0
+  notes.ts             shared   4  host-pi   0  host   0  none   3
+  order.ts             shared   3  host-pi   0  host   0  none   2
+  participant.ts       shared   4  host-pi   0  host   3  none   0
+  pinned.ts            shared   3  host-pi   1  host   2  none   3
+  place-steps.ts       shared   1  host-pi   0  host   3  none   2
+  proposed.ts          shared   3  host-pi   0  host  10  none   2
+  queue-hold.ts        shared   2  host-pi   0  host   3  none   0
+  queue.ts             shared   7  host-pi   0  host   9  none   2
+  rank.ts              shared   1  host-pi   0  host   0  none   2
+  reach.ts             shared   3  host-pi   0  host   2  none   1
+  records.ts           shared   2  host-pi   0  host   4  none   1
+  relay.ts             shared   1  host-pi   3  host  14  none   9
+  review.ts            shared   6  host-pi   0  host   8  none   3
+  roots.ts             shared   2  host-pi   0  host   0  none   0
+  run-end-report.ts    shared   3  host-pi   0  host   5  none   1
+  seat.ts              shared   3  host-pi   0  host   2  none   0
+  setup.ts             shared   5  host-pi   1  host   1  none   0
+  shared.ts            shared   2  host-pi   0  host   7  none   1
+  shares.ts            shared   2  host-pi   0  host  10  none   6
+  stop.ts              shared   2  host-pi   1  host   4  none   1
+  thread.ts            shared   1  host-pi   0  host   0  none   0
+  work-strip.ts        shared   4  host-pi   0  host   0  none   0
+  work.ts              shared   7  host-pi   0  host   4  none   1
+
+== exports by who names them (source)
+   288 app
+   155 (none)
+    48 interface
+    30 app,reads
+    23 app,pi
+    22 pi
+    21 app,interface
+    19 web
+    16 reads
+     9 app,web
+     8 session
+     7 app,interface,reads
+     6 interface,reads,web
+     6 app,interface,web
+     6 interface,web
+     5 interface,reads
+     4 app,interface,reads,web
+     2 pi,reads
+     1 reads,web
+     1 app,session
+     1 app,core,reads
+     1 interface,reads,session,web
+     1 interface,pi
+
+exports no other package's source names: 154; nor any test: 134
+app names 390 exports of rules, from 101 files

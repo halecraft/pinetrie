@@ -1,7 +1,5 @@
 import {
-  type AgentWork,
   type CanvasId,
-  type CardRecord,
   canvasIdFor,
   entryId,
   threadIdFor,
@@ -9,8 +7,9 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { canvasCard } from "@pinetrie/core/fixtures"
 import { orderKeys, taskBoard, type Workflow } from "@pinetrie/rules"
+import type { AgentWork, CardRecord } from "@pinetrie/threads"
+import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {

@@ -7,9 +7,7 @@
 import {
   assertNever,
   type EntryId,
-  type SpineNode,
   type ThreadId,
-  threadLane,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -28,6 +26,7 @@ import {
   sendButton,
   speakerWords,
 } from "@pinetrie/interface"
+import { type SpineNode, threadLane } from "@pinetrie/threads"
 
 /** Who reads, and what they are about to send. */
 export interface Reader {

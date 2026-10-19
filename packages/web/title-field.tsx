@@ -1,8 +1,8 @@
 // web/title-field — the field a title is edited in: a root's, in the sidebar,
 // and a note column's. `planTitle` decides what a save sends.
 
-import { MAX_TITLE } from "@pinetrie/core"
 import { planTitle, renameKey, SIDEBAR_WORDS } from "@pinetrie/interface"
+import { MAX_TITLE } from "@pinetrie/threads"
 import { useLayoutEffect, useRef, useState } from "react"
 
 /**

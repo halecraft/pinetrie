@@ -2,16 +2,7 @@
 // the late steps: where it is, its tree, its end and its lane, and the names
 // a message about it uses.
 
-import {
-  type EntryId,
-  type Reach,
-  type ThreadId,
-  type ThreadLane,
-  type TreeIndex,
-  threadEnd,
-  threadLane,
-  type WriterId,
-} from "@pinetrie/core"
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
   readArchived,
   readLanes,
@@ -24,6 +15,13 @@ import {
 } from "@pinetrie/reads"
 import { displayName, NONE_BLANK, threadReach } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
+import {
+  type Reach,
+  type ThreadLane,
+  type TreeIndex,
+  threadEnd,
+  threadLane,
+} from "@pinetrie/threads"
 import type { Basics } from "./basics.ts"
 import { lateAwayNow } from "./later.ts"
 import type { StepDocs } from "./roots.ts"

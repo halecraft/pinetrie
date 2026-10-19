@@ -5,26 +5,15 @@
 // their results come in: one tree rebuilt each render would give every
 // memoised child new props.
 
-import {
-  type AgentWork,
-  type ArchivedCanvas,
-  ancestry,
-  type CanvasId,
-  type EntryId,
-  isBusy,
-  type LaneRecord,
-  type LaneView,
-  laneWork,
-  moreWork,
-  type ProposedChangesRecord,
-  projectRail,
-  type RailRow,
-  type RootId,
-  type ThreadId,
-  type ThreadName,
-  type TreeIndex,
-  threadFirstMessage,
-  type WriterId,
+import type {
+  CanvasId,
+  EntryId,
+  LaneRecord,
+  ProposedChangesRecord,
+  RootId,
+  ThreadId,
+  ThreadName,
+  WriterId,
 } from "@pinetrie/core"
 import {
   type AccessRecord,
@@ -32,6 +21,19 @@ import {
   proposedChangesStatus,
   type Workflow,
 } from "@pinetrie/rules"
+import {
+  type AgentWork,
+  type ArchivedCanvas,
+  ancestry,
+  isBusy,
+  type LaneView,
+  laneWork,
+  moreWork,
+  projectRail,
+  type RailRow,
+  type TreeIndex,
+  threadFirstMessage,
+} from "@pinetrie/threads"
 import { PENDING_TRACK } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
@@ -52,7 +54,7 @@ export interface ReadOnly {
 }
 
 /** One thread column drawn whole, of the canvas you are on or of a new canvas. */
-export interface ColumnSlot {
+interface ColumnSlot {
   readonly key: string
   readonly track: number
 }
@@ -241,7 +243,7 @@ export interface RailStub {
 }
 
 /** What the rail draws for the canvas you are on. */
-export interface CanvasRail {
+interface CanvasRail {
   readonly rows: readonly RailRow[]
   readonly stubs: readonly RailStub[]
 }

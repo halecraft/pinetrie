@@ -1,13 +1,11 @@
+import { threadIdFor, type WriterId, writerId } from "@pinetrie/core"
 import {
   type CardId,
   type PinnedCardRead,
   type PinnedView,
   textCardId,
-  threadIdFor,
-  type WriterId,
-  writerId,
-} from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+} from "@pinetrie/threads"
+import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { renderableMessage } from "./message.ts"
 import {

@@ -5,16 +5,21 @@
 
 import {
   agentAsk,
+  type CanvasId,
+  type NonEmpty,
+  nonEmpty,
+  type ThreadId,
+  type ValueWrite,
+  type WriterId,
+} from "@pinetrie/core"
+import {
   type BranchedFact,
   type BranchOut,
   branchesByProposal,
-  type CanvasId,
   type CardRecord,
   entryThread,
   indexAsks,
   messageProposal,
-  type NonEmpty,
-  nonEmpty,
   type Proposal,
   type ProposalState,
   type ProposedBranch,
@@ -23,13 +28,10 @@ import {
   runPrompt,
   type Send,
   type StartedRow,
-  type ThreadId,
   type ThreadRecord,
   type TreeIndex,
   threadEnd,
-  type ValueWrite,
-  type WriterId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { type OpenPlan, planBranchOpen } from "./open.ts"
 import { afterSteps, type PlaceStep } from "./place-steps.ts"
 
@@ -85,7 +87,7 @@ export type BranchOutRefusal =
   | Extract<OpenPlan, { kind: "refused" }>["why"]
 
 /** Everything a press opens: the threads' records, then one places change. */
-export interface Opening {
+interface Opening {
   readonly records: readonly ValueWrite<"session">[]
   readonly steps: readonly PlaceStep[]
 }

@@ -4,7 +4,8 @@
 // (`withHost`), positions and starts, and their model. A host whose agent has tools, and so lanes,
 // is `lane-hosts.ts`'s.
 //
-// Deliberately not in core/: core is pure domain logic and imports nothing.
+// Deliberately not in core/ or threads/: both are pure and import nothing
+// but core.
 // A test harness is neither.
 
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
@@ -14,30 +15,17 @@ import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
-  type ArchivedCanvas,
-  ancestry,
   atEntry,
   type CanvasId,
-  type CardCommand,
-  type CardId,
-  type CardRecord,
-  cardMove,
   type EntryId,
   ERR,
   entryId,
-  entryThread,
   type JjAcceptedRecord,
   type JjProposedChangesRecord,
-  type LaneView,
-  notesTarget,
   type Position,
-  parseMentions,
-  projectTranscript,
   ROOT,
   type RootId,
-  type SendMode,
   type ThreadId,
-  type TreeIndex,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import { type AgentDirBinding, bindAgentDir, scriptedModel } from "@pinetrie/pi"
@@ -79,6 +67,21 @@ import {
   newCardId,
   newThreadId,
 } from "@pinetrie/session/connect"
+import {
+  type ArchivedCanvas,
+  ancestry,
+  type CardCommand,
+  type CardId,
+  type CardRecord,
+  cardMove,
+  entryThread,
+  type LaneView,
+  notesTarget,
+  parseMentions,
+  projectTranscript,
+  type SendMode,
+  type TreeIndex,
+} from "@pinetrie/threads"
 import {
   type RunningHost,
   type StartHostOptions,

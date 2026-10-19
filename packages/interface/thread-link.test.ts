@@ -1,12 +1,9 @@
+import { canvasIdFor, entryId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type CardRecord,
-  canvasIdFor,
-  entryId,
   type TranscriptMessage,
-  threadIdFor,
   UNTICKED,
-  writerId,
-} from "@pinetrie/core"
+} from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import {
   crossCanvasLinks,

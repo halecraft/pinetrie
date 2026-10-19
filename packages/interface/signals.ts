@@ -10,20 +10,14 @@
 // sent, not left somewhere. A trace marks nothing yet: raising it is for
 // `attentionItems`, beside run-end reports and ready proposed changes.
 
-import type {
-  CanvasId,
-  CardId,
-  CardRecord,
-  EntryId,
-  TreeIndex,
-  WriterId,
-} from "@pinetrie/core"
+import type { CanvasId, EntryId, WriterId } from "@pinetrie/core"
 import {
   type CanvasIndex,
   canvasOfPlace,
   isOnCanvas,
   placeEnd,
 } from "@pinetrie/rules"
+import type { CardId, CardRecord, TreeIndex } from "@pinetrie/threads"
 import { attentionWords, type Level, type Status } from "./attention.ts"
 import { needsCard } from "./card-state.ts"
 import { type Layout, unlisted } from "./layout.ts"

@@ -1,12 +1,13 @@
 // e2e/browser/page — what the browser scenarios share: the send button's
 // words, menus, frames and render counts, a page made a person, and selectors.
 
-import { errorText, NOBODY } from "@pinetrie/core"
+import { errorText } from "@pinetrie/core"
 import {
   identityCodec,
   type ListWidth,
   recipientWords,
 } from "@pinetrie/interface"
+import { NOBODY } from "@pinetrie/threads"
 import { COMMIT_MARK } from "@pinetrie/web/commit-marks"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Browser } from "@playwright/test"

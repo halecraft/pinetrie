@@ -2,12 +2,11 @@ import {
   canvasIdFor,
   entryId,
   type JjProposedChangesRecord,
-  type ProposedChangesFact,
-  type QueuedFact,
   type ThreadName,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import type { ProposedChangesFact, QueuedFact } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { acceptedFact, actionFact } from "./fact.ts"
 import {
