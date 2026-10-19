@@ -19,6 +19,15 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
   since a change to any makes another image. A build
   lands in `$XDG_STATE_HOME/pinetrie/vm/images/<key>/`, unpacked into a
   temporary directory and checked against its `SHA256SUMS` first.
+- **An image records what it was built from:** `SOURCES.SHA256SUMS`
+  (`IMAGE_SOURCE_SUMS`), one hash per file of `IMAGE_FILES` in
+  `SHA256SUMS`' format, written beside the outputs before they are
+  installed. Two images are compared file by file long after their sources
+  changed (`changedImageFiles`); the current sources' record is made from
+  them, never read, since their image may not be built yet. An image built
+  before has none, and its change reads "its sources were not recorded".
+  `checkImageDir` checks only the outputs, so the record decides no image's
+  validity.
 - **Never run another distribution's `depmod`** on the modules: Debian's
   kmod has no zlib, skips `.ko.gz`, and writes an empty index (S128).
   `build.sh` keeps Alpine's own `modules.dep` and indexes, and checks each
@@ -65,7 +74,10 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   `--force` rebuilds), which `pnpm build` runs too. Where the lane VM
   cannot run (`vmHostRefusal`: not a Mac, no Apple silicon, macOS before
   13) nothing is built, and `vmBuildWords` says why and names `--force`,
-  which is refused there for now (S197).
+  which is refused there for now (S197). Built or already built, `pnpm
+  vm:build` ends with what happens to the lane VM: none running, it runs
+  this image, or which image it runs, what differs, and when this one
+  replaces it (`gatherRunningVm`, then `planVmVersion` as a host asks it).
 - **What boots the build is pinned** (`builder/pins.json`): the
   `linux-virt` apk the manifest names, so the builder boots the very
   kernel the image ships, and Alpine's minirootfs for `alpine-base`'s
@@ -171,7 +183,17 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   one message a line, on `control.sock`. `lease` (with the host's
   `SSH_AUTH_SOCK`) answers `slot`; `fill` answers `filled`; anything else is
   `refused` with a reason the host words (`launcherWords`). A lease lasts as
-  long as its connection.
+  long as its connection. One channel reads every reply, each with a
+  deadline (`launcherChannel`, `lease.ts`).
+- **`status` asks without a lease:** answered on any connection with the
+  VM's identity (the image, the launcher, the leases held, 0 before the VM
+  runs), from the one function the `slot` reply's identity comes from. A
+  connection takes no slot until it sends `lease`, and the idle stop counts
+  slots only, so asking keeps no VM alive. A launcher older than `status`
+  refuses it as `unreadable`: its image and launcher are read from its
+  command line in `ps` (`launcherFromCommandLine`, a launcher of this state
+  directory only, since the suites run theirs over the same binaries), its
+  holders not known.
 - **Each slot's ssh socket:** the guest's socat listens on
   `/run/pinetrie/ssh-<i>.sock` and connects to vsock `2400+i`, where the
   launcher connects it to the socket its lease named: the host's ssh
@@ -219,13 +241,22 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   host whose `imageKey` or launcher name differs, holding the only lease,
   sends `retire`: the launcher syncs, stops the VM and exits, and the host
   starts the current one. With other hosts' leases on it, the host joins it
-  and logs so, and the VM is replaced when the last of them stops. A host
+  and logs so, and the VM is replaced when the last of them stops.
+  `planVmVersion` takes the leases of hosts other than the asker
+  (`otherHolders`: a host's own lease is not counted, `vm:build` holds
+  none), so a host and `vm:build` ask it alike, and whether the launcher
+  can be retired apart from how many hold it: one that refuses `status`
+  takes `retire` yet does not say (`holders-unknown`). Every line about the
+  VM's version is `vmVersionWords`, or `vmKeptWords` for a host that
+  cannot start the new VM, each around `vmChangeWords`: both images and
+  what differs (the image files, an older launcher, or unrecorded
+  sources). A host
   that cannot start the current VM (no Xcode tools, `vmStartRefusal`) joins
   the old one and says what is missing; a missing image is built first. Without this, a host after an update joined
   the VM left running by the last one, for up to its 10 idle minutes.
 - **A launcher older than the VM's identity** sends a `slot` without it:
-  read with a null identity (`VmIdentity`), joined, and the log says how to
-  replace it, since it cannot take `retire`. A decoder that dropped such a
+  read with a null identity (`VmIdentity`), joined (`old-launcher`), and
+  the log says how to replace it, since it cannot take `retire`. A decoder that dropped such a
   reply left a host waiting for a slot that never came, with nothing logged.
 - **Every launcher reply has a deadline:** 30 s for a lease or a fill, 60 s
   for a retire; past it the host fails naming what it waited for. The host

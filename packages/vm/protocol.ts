@@ -21,6 +21,11 @@ export type ToLauncher =
    * lease is the only one, else refused as `busy`.
    */
   | { readonly kind: "retire" }
+  /**
+   * What the VM runs, and how many leases it holds: answered on any
+   * connection, taking no slot, so asking keeps no VM from its idle stop.
+   */
+  | { readonly kind: "status" }
 
 /** Why the launcher refused a message. */
 export type LauncherRefusal =
@@ -48,9 +53,18 @@ export interface VmIdentity {
   readonly image: string | null
   /** The launcher binary's name (`binaryName`). */
   readonly launcher: string | null
-  /** Leases held, this one included. */
+  /** Leases held: in a `slot` reply, the one it grants included. */
   readonly leases: number | null
 }
+
+/**
+ * The lane VM as found: none running, or what it runs. From a launcher
+ * that refuses `status`, `leases` is null, and `image` and `launcher` are
+ * what `ps` shows of it, null when it shows nothing.
+ */
+export type RunningVm =
+  | { readonly kind: "none" }
+  | ({ readonly kind: "running" } & VmIdentity)
 
 export type FromLauncher =
   | ({
@@ -59,6 +73,12 @@ export type FromLauncher =
       readonly docker: string
     } & VmIdentity)
   | { readonly kind: "filled" }
+  | {
+      readonly kind: "status"
+      readonly image: string
+      readonly launcher: string
+      readonly leases: number
+    }
   | ({ readonly kind: "refused" } & LauncherRefusal)
 
 export const encode = (message: ToLauncher | FromLauncher): string =>
@@ -95,6 +115,17 @@ export function decodeFromLauncher(line: string): FromLauncher | null {
     }
     case "filled":
       return { kind: "filled" }
+    case "status":
+      return typeof v.image === "string" &&
+        typeof v.launcher === "string" &&
+        Number.isInteger(v.leases)
+        ? {
+            kind: "status",
+            image: v.image,
+            launcher: v.launcher,
+            leases: Number(v.leases),
+          }
+        : null
     case "refused":
       switch (v.reason) {
         case "full":
@@ -135,6 +166,7 @@ export function decodeToLauncher(line: string): ToLauncher | null {
   }
   if (!isRecord(v)) return null
   if (v.kind === "retire") return { kind: "retire" }
+  if (v.kind === "status") return { kind: "status" }
   if (v.kind === "lease")
     return v.agent === null || typeof v.agent === "string"
       ? { kind: "lease", agent: v.agent }

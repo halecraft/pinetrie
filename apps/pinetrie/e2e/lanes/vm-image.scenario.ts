@@ -11,6 +11,9 @@ import path from "node:path"
 import {
   buildVmImageInVm,
   checkImageDir,
+  gatherChangedFiles,
+  gatherRunningVm,
+  leaseExtra,
   leaseVm,
   vmHostRefusal,
   vmStateDir,
@@ -60,10 +63,17 @@ async function run(check: Checks["check"]): Promise<void> {
       lines.slice(-5).join("\n"),
     )
     if (dir === null) return
+    // No record reads as null; a record unlike the sources lists files.
+    const changed = await gatherChangedFiles(stateDir, path.basename(dir))
+    check(
+      "the built image records its sources' hashes",
+      changed?.length === 0,
+      JSON.stringify(changed),
+    )
     // A lease that fails is the check's failure, not the scenario's error.
     const booted = await leaseVm({
       stateDir,
-      slots: 1,
+      slots: 2,
       agent: null,
       log: l => lines.push(l),
     }).then(
@@ -85,17 +95,43 @@ async function run(check: Checks["check"]): Promise<void> {
           "inspect",
           "--bootstrap",
         ]).catch((error: unknown) => String(error))
+        // Asked while this lease is held, so a status that took a slot
+        // would count two leases.
+        const status = await gatherRunningVm(stateDir).then(
+          r => r,
+          (error: unknown) => String(error),
+        )
+        const extra = await leaseExtra({
+          stateDir,
+          dirs: [],
+          sweep: async () => {},
+          log: l => lines.push(l),
+        }).then(
+          e => e,
+          (error: unknown) => String(error),
+        )
+        const extraSlot = typeof extra === "string" ? extra : extra.fill.slot
+        if (typeof extra !== "string") await extra.close()
         await lease.close()
         return {
           ok: os === "linux" && image === path.basename(dir),
           said: `${os} ${image}`,
           policy,
+          untaken:
+            typeof status !== "string" &&
+            status.kind === "running" &&
+            status.image === path.basename(dir) &&
+            status.leases === 1 &&
+            extraSlot === 1,
+          status: `${JSON.stringify(status)}; the next lease: slot ${extraSlot}`,
         }
       },
       (error: unknown) => ({
         ok: false,
         said: String(error),
         policy: String(error),
+        untaken: false,
+        status: String(error),
       }),
     )
     check("a lease boots the image it built", booted.ok, booted.said)
@@ -106,6 +142,11 @@ async function run(check: Checks["check"]): Promise<void> {
         .split("\n")
         .filter(l => /Space/.test(l))
         .join("; "),
+    )
+    check(
+      "a status names the booted image and its one lease, and takes no slot",
+      booted.untaken,
+      booted.status,
     )
   } finally {
     // A lease that failed may leave its launcher holding the connection, so

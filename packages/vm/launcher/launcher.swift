@@ -17,15 +17,18 @@
 // on the Mac and which one `container run` took away (S135).
 //
 // The lease protocol is JSON, one message a line, on control.sock; its
-// host's side is `packages/vm/protocol.ts`. A connection is a lease:
+// host's side is `packages/vm/protocol.ts`. A connection is a lease once it
+// sends `lease`:
 //   → {"kind":"lease","agent":<SSH_AUTH_SOCK or null>}
 //   ← {"kind":"slot","slot":<i>,"docker":<docker.sock>} | refused
 //   → {"kind":"fill","entries":[{"name","source","readOnly"}]}
 //   ← {"kind":"filled"} | refused
 //   → {"kind":"retire"}: stop the VM and exit, if this is the only lease
 //   ← the connection's end | {"kind":"refused","reason":"busy",…}
-// The slot reply also names the image and launcher the VM was started from,
-// and the leases it holds.
+//   → {"kind":"status"}, on any connection, taking no slot
+//   ← {"kind":"status"}
+// The slot and status replies also name the image and launcher the VM was
+// started from, and the leases it holds (`identity`).
 // A refusal is {"kind":"refused","reason":<code>, …}. When the connection
 // ends, the slot's share goes back to empty/ and the slot is free. A slot is
 // filled once: replacing a share cuts every bind mount into it (S130), and
@@ -450,14 +453,19 @@ func grant(_ lease: Lease) {
   lease.slot = i
   idle?.cancel()
   log("slot \(i) leased")
-  // What this VM was started from, and its leases: a host whose image or
-  // launcher is newer replaces it when it holds the only lease.
-  lease.send([
-    "kind": "slot", "slot": i, "docker": "\(state)/docker.sock",
+  lease.send(
+    identity().merging(["kind": "slot", "slot": i, "docker": "\(state)/docker.sock"]) { $1 })
+}
+
+/// What this VM was started from, and its leases, for the slot and status
+/// replies alike: a host whose image or launcher differs replaces the VM
+/// when it holds the only lease. Its leases are 0 before the VM runs.
+func identity() -> [String: Any] {
+  [
     "image": url(image).lastPathComponent,
     "launcher": url(CommandLine.arguments[0]).lastPathComponent,
     "leases": slots.filter { $0 != nil }.count,
-  ])
+  ]
 }
 
 func handle(_ lease: Lease, _ message: [String: Any]?) {
@@ -508,6 +516,8 @@ func handle(_ lease: Lease, _ message: [String: Any]?) {
       return
     }
     stopVM("retired by a host with a newer image or launcher")
+  case "status":
+    lease.send(identity().merging(["kind": "status"]) { $1 })
   default:
     lease.refuse("unreadable")
   }

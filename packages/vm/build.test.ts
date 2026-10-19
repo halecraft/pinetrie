@@ -4,9 +4,16 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { afterEach, describe, expect, test } from "vitest"
-import { installImage } from "./build.ts"
+import { installImage, readImageSourceSums } from "./build.ts"
 import { sha256Hex } from "./pinned.ts"
-import { type BuilderPins, IMAGE_OUTPUTS } from "./plan.ts"
+import {
+  type BuilderPins,
+  IMAGE_OUTPUTS,
+  IMAGE_SOURCE_SUMS,
+  type ImageSources,
+  imageSourceSums,
+  parseSums,
+} from "./plan.ts"
 
 const imageFile = (name: string) =>
   readFileSync(path.join(import.meta.dirname, "image", name), "utf8")
@@ -205,4 +212,25 @@ describe("installImage", () => {
     expect(readFileSync(path.join(there, "Image"), "utf8")).toBe("new:Image")
     expect(await readdir(root)).toEqual(["key"])
   })
+})
+
+test("an image's sources record is read from its directory, null when it has none", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-sums-"))
+  try {
+    expect(await readImageSourceSums(dir)).toBeNull()
+    const sources: ImageSources = {
+      "manifest.json": "{}",
+      "build.sh": "b",
+      init: "i",
+      clock: "c",
+      "stage1-init": "s",
+      "daemon.json": "{}",
+    }
+    await writeFile(path.join(dir, IMAGE_SOURCE_SUMS), imageSourceSums(sources))
+    expect(await readImageSourceSums(dir)).toEqual(
+      parseSums(imageSourceSums(sources)),
+    )
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

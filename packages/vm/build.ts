@@ -30,11 +30,16 @@ import {
 } from "./pinned.ts"
 import {
   type BuilderPins,
+  changedImageFiles,
   IMAGE_FILES,
   IMAGE_OUTPUTS,
+  IMAGE_SOURCE_SUMS,
+  type ImageFile,
   type ImageSources,
+  imageDir,
   imageKey,
   imageRefusal,
+  imageSourceSums,
   isBuildLogLine,
   parseSums,
   planLock,
@@ -73,6 +78,33 @@ export async function checkImageDir(dir: string): Promise<string | null> {
   for (const name of IMAGE_OUTPUTS)
     actual[name] = await fileSha256(path.join(dir, name))
   return imageRefusal(parseSums(sums), actual)
+}
+
+/** The image in `dir`'s record of its sources' hashes, or null when it has none. */
+export const readImageSourceSums = (
+  dir: string,
+): Promise<ReadonlyMap<string, string> | null> =>
+  readFile(path.join(dir, IMAGE_SOURCE_SUMS), "utf8").then(
+    parseSums,
+    () => null,
+  )
+
+/**
+ * The image files the running image `running` (its key) differs in from
+ * the current sources; null when it has no record, or is not known. The
+ * current image's record is made from the sources, not read: it may not
+ * be built yet.
+ */
+export async function gatherChangedFiles(
+  stateDir: string,
+  running: string | null,
+): Promise<readonly ImageFile[] | null> {
+  if (running === null) return null
+  const [record, sources] = await Promise.all([
+    readImageSourceSums(imageDir(stateDir, running)),
+    readImageSources(),
+  ])
+  return changedImageFiles(record, parseSums(imageSourceSums(sources)))
 }
 
 const exec = (program: string, args: readonly string[]) =>
@@ -339,6 +371,10 @@ export async function buildVmImageInVm(input: {
         )
       await mkdir(run.out)
       await exec("tar", ["-xf", run.disk.path, "-C", run.out])
+      await writeFile(
+        path.join(run.out, IMAGE_SOURCE_SUMS),
+        imageSourceSums(sources),
+      )
       const built = await installImage(run.out, run.image, input.force)
       return { dir: run.image, built }
     } finally {

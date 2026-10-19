@@ -37,9 +37,10 @@ async function gatherEntries(stateDir: string): Promise<readonly PruneEntry[]> {
 
 /**
  * The command lines of every running launcher, whatever its state
- * directory; null when `ps` cannot say.
+ * directory; null when `ps` cannot say. Read by the prune, and for a
+ * launcher that does not answer `status` (`gatherRunningVm`).
  */
-const runningLaunchers = (): Promise<readonly string[] | null> =>
+export const runningLaunchers = (): Promise<readonly string[] | null> =>
   new Promise(resolve =>
     execFile("ps", ["-axo", "command"], (error, stdout) =>
       resolve(

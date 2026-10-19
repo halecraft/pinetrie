@@ -57,6 +57,30 @@ export function parseSums(text: string): ReadonlyMap<string, string> {
   return sums
 }
 
+/** An image directory's record of its sources' hashes, beside `SHA256SUMS`, in its format. */
+export const IMAGE_SOURCE_SUMS = "SOURCES.SHA256SUMS"
+
+/** The record's text: one `sha256  name` line per file of `IMAGE_FILES`, in order. */
+export const imageSourceSums = (sources: ImageSources): string =>
+  IMAGE_FILES.map(
+    name =>
+      `${createHash("sha256").update(sources[name]).digest("hex")}  ${name}\n`,
+  ).join("")
+
+/**
+ * The image files whose hashes differ between two records (read with
+ * `parseSums`), in `IMAGE_FILES`' order; null when the running image has no
+ * record, as an image built before records were kept has none. A file
+ * named in one record only counts as changed.
+ */
+export function changedImageFiles(
+  running: ReadonlyMap<string, string> | null,
+  built: ReadonlyMap<string, string>,
+): readonly ImageFile[] | null {
+  if (running === null) return null
+  return IMAGE_FILES.filter(name => running.get(name) !== built.get(name))
+}
+
 /**
  * Why a built image cannot be used, or null: `SHA256SUMS` must name each
  * output with the hash `actual` gives it (null for a file that is missing).
@@ -123,6 +147,25 @@ export const launcherArgs = (f: LauncherFacts): readonly string[] => [
   LAUNCHER_DISKS.synchronization,
   LAUNCHER_DISKS.caching,
 ]
+
+/** A launcher's command line in `ps`: its binary's name, its state directory, and its image's key. */
+const LAUNCHER_LINE = /\/(launcher-[0-9a-f]+) (.+?) \2\/images\/([^ /]+) /
+
+/**
+ * The image and launcher a running launcher of `stateDir` names in its
+ * arguments (`launcherArgs`), or null for any other line. Launchers of
+ * other state directories run over the same binaries, the suites' among
+ * them, and are not this one.
+ */
+export function launcherFromCommandLine(
+  line: string,
+  stateDir: string,
+): { readonly image: string; readonly launcher: string } | null {
+  const m = LAUNCHER_LINE.exec(line)
+  if (m?.[1] === undefined || m[3] === undefined || m[2] !== stateDir)
+    return null
+  return { image: m[3], launcher: m[1] }
+}
 
 /** gvproxy's address for the Mac's loopback, in the VM's network. */
 export const GVPROXY_HOST_ADDRESS = "192.168.127.254"
@@ -375,44 +418,149 @@ export function vmBuildWords(
   }
 }
 
-/** What a host does with the VM it found running (`planVmVersion`). */
-export type VmVersion =
-  | { readonly kind: "current" }
-  /** Out of date, and this host its only lease holder: replace it. */
-  | { readonly kind: "retire" }
-  /** Out of date, but other hosts' lanes run on it: join it, and say so. */
-  | { readonly kind: "stale"; readonly leases: number }
-  /** A launcher older than `retire`: join it, and say how to replace it. */
-  | { readonly kind: "old-launcher" }
+/** Who asks what the lane VM runs: a host holding a lease on it, or `vm:build`, holding none. */
+export type VmAsker = "host" | "build"
 
 /**
- * Whether a running VM is the one this host would start: its image and its
- * launcher. One out of date is replaced only when no other host holds a
- * lease on it, so no other host's lanes are cut off.
+ * The leases on the VM held by hosts other than the asker, or null when the
+ * launcher did not say: a host's own lease is among `leases`, and
+ * `vm:build` holds none.
  */
-export function planVmVersion(
-  running: {
+export const otherHolders = (
+  leases: number | null,
+  asker: VmAsker,
+): number | null =>
+  leases === null ? null : asker === "host" ? leases - 1 : leases
+
+/** What the lane VM's image and launcher change from, and to. */
+export interface VmChange {
+  readonly from: {
     readonly image: string | null
     readonly launcher: string | null
-    readonly leases: number | null
-  },
-  want: { readonly image: string; readonly launcher: string },
-): VmVersion {
-  if (running.leases === null) return { kind: "old-launcher" }
-  if (running.image === want.image && running.launcher === want.launcher)
-    return { kind: "current" }
-  return running.leases <= 1
-    ? { kind: "retire" }
-    : { kind: "stale", leases: running.leases }
+  }
+  readonly to: { readonly image: string; readonly launcher: string }
+  /** The image files that changed; null when the running image's sources were not recorded. */
+  readonly changedFiles: readonly ImageFile[] | null
 }
 
-/** A host joining a VM whose launcher cannot be asked to retire, in its log. */
-export const OLD_LAUNCHER_WORDS =
-  "the lane VM's launcher is older than this host's and cannot be replaced from here: this host joins it. To replace it, stop every pine·trie host, then `pkill -TERM -f 'pinetrie/vm/bin/launcher-'`; it also stops by itself 10 minutes after its last host"
+/** What happens to the VM found running, and why (`planVmVersion`). */
+export type VmVersion =
+  | { readonly kind: "current"; readonly image: string }
+  /** Out of date, and no other host holds it: replaced now, or at the next host's start. */
+  | { readonly kind: "retire"; readonly change: VmChange }
+  /** Out of date, held by other hosts: replaced once the last of them stops. */
+  | {
+      readonly kind: "stale"
+      readonly change: VmChange
+      readonly others: number
+    }
+  /**
+   * Out of date, from a launcher that can be retired but did not say how
+   * many hosts hold it (it refused `status`): replaced at the start of a
+   * host that holds it alone.
+   */
+  | { readonly kind: "holders-unknown"; readonly change: VmChange }
+  /** A launcher too old to be retired: it stops by itself after its last host. */
+  | { readonly kind: "old-launcher"; readonly change: VmChange }
 
-/** A host joining an out-of-date VM, in its log. */
-export const staleVmWords = (leases: number, image: string): string =>
-  `the lane VM runs an older image or launcher, and ${leases - 1} other ${leases === 2 ? "host holds a lease" : "hosts hold leases"} on it: this host joins it, and the VM is replaced with ${image} when the last of them stops`
+/**
+ * Whether the VM running is the one the asker would start, its image and
+ * its launcher, and when one out of date is replaced: only when no other
+ * host holds a lease on it, so no other host's lanes are cut off. Whether
+ * the launcher can be retired and how many hosts hold it are apart: a
+ * launcher that refuses `status` takes `retire` yet does not say.
+ */
+export function planVmVersion(input: {
+  readonly running: {
+    readonly image: string | null
+    readonly launcher: string | null
+  }
+  /** The launcher takes `retire`: it sent the VM's identity. */
+  readonly retirable: boolean
+  readonly want: { readonly image: string; readonly launcher: string }
+  /** `otherHolders`. */
+  readonly othersHolding: number | null
+  readonly changedFiles: readonly ImageFile[] | null
+}): VmVersion {
+  const { running, want } = input
+  if (running.image === want.image && running.launcher === want.launcher)
+    return { kind: "current", image: want.image }
+  const change = { from: running, to: want, changedFiles: input.changedFiles }
+  if (!input.retirable) return { kind: "old-launcher", change }
+  if (input.othersHolding === null) return { kind: "holders-unknown", change }
+  return input.othersHolding === 0
+    ? { kind: "retire", change }
+    : { kind: "stale", change, others: input.othersHolding }
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+const listWords = (items: readonly string[]): string =>
+  items.length <= 1
+    ? items.join("")
+    : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+
+/**
+ * What the VM runs, against what the asker would start: both images and
+ * what differs between them. Every line about an out-of-date VM wraps it,
+ * after "the lane VM runs".
+ */
+export function vmChangeWords(c: VmChange): string {
+  const image =
+    c.from.image === c.to.image
+      ? `image ${c.to.image}`
+      : c.from.image === null
+        ? `an image its launcher does not name, rather than ${c.to.image}`
+        : `image ${c.from.image} rather than ${c.to.image}, ${
+            c.changedFiles === null
+              ? "whose sources were not recorded"
+              : c.changedFiles.length === 0
+                ? "from the same sources"
+                : `in which ${listWords(c.changedFiles)} ${c.changedFiles.length === 1 ? "differs" : "differ"}`
+          }`
+  return c.from.launcher === c.to.launcher
+    ? image
+    : `${image}, and its launcher is older`
+}
+
+const REPLACE_OLD_LAUNCHER =
+  "stop every pine·trie host, then `pkill -TERM -f 'pinetrie/vm/bin/launcher-'`"
+
+/** What happens to the VM found running, worded for the one asking. */
+export function vmVersionWords(v: VmVersion, asker: VmAsker): string {
+  if (v.kind === "current")
+    return asker === "host"
+      ? `the lane VM runs ${v.image}, this host's image and launcher`
+      : `the lane VM runs ${v.image}, this image`
+  const runs = `the lane VM runs ${vmChangeWords(v.change)}`
+  switch (v.kind) {
+    case "retire":
+      return asker === "host"
+        ? `${runs}: this host replaces it now`
+        : `${runs}: the next host to start replaces it`
+    case "stale": {
+      const hold = v.others === 1 ? "host holds a lease" : "hosts hold leases"
+      return asker === "host"
+        ? `${runs}, and ${v.others} other ${hold} on it: this host joins it, and it is replaced when the last of them stops`
+        : `${runs}, and ${v.others} ${hold} on it: it is replaced once the last of them stops`
+    }
+    case "holders-unknown":
+      return asker === "host"
+        ? `${runs}, and its launcher does not say how many hosts hold it: this host joins it`
+        : `${runs}: it is replaced at the start of a host that holds it alone (its launcher does not say how many hosts hold it)`
+    case "old-launcher":
+      return asker === "host"
+        ? `${runs}, from a launcher that cannot be replaced from here: this host joins it. To replace it, ${REPLACE_OLD_LAUNCHER}; it also stops by itself 10 minutes after its last host`
+        : `${runs}, from a launcher no host can replace: it stops by itself 10 minutes after its last host, and the next host to start replaces it. To replace it sooner, ${REPLACE_OLD_LAUNCHER}`
+  }
+}
+
+/** A host that found an out-of-date VM and cannot start the current one: it keeps the old one, and says why. */
+export const vmKeptWords = (change: VmChange, why: string): string =>
+  `the lane VM runs ${vmChangeWords(change)}, kept: ${why}`
+
+/** `vm:build`, finding no lane VM running. */
+export const vmNoneRunningWords = (image: string): string =>
+  `no lane VM is running: the next host starts it from ${image}`
 
 /** What a build does with `images/<key>.lock`. */
 type LockStep = "take" | "wait" | "break"

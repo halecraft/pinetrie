@@ -172,7 +172,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a VM other hosts hold is retired",
     file: "packages/vm/plan.ts",
-    from: "  return running.leases <= 1",
+    from: "  return input.othersHolding === 0",
     to: "  return true",
     command: unit,
     expect: "older, with other hosts on it: join it, and say so",
@@ -196,7 +196,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an older launcher is asked to retire",
     file: "packages/vm/plan.ts",
-    from: '  if (running.leases === null) return { kind: "old-launcher" }\n',
+    from: '  if (!input.retirable) return { kind: "old-launcher", change }\n',
     to: "",
     command: unit,
     expect: "a launcher older than its identity: join it",
@@ -316,6 +316,59 @@ export const mutations: readonly Mutation[] = [
     expect: "a missing image with no way to build its builder is refused",
   },
   {
+    name: "unknown holders are read as an old launcher",
+    file: "packages/vm/plan.ts",
+    from: "  if (!input.retirable) return",
+    to: "  if (!input.retirable || input.othersHolding === null) return",
+    command: unit,
+    expect:
+      "holders unknown from a launcher that can be retired: replaced by a host holding it alone",
+  },
+  {
+    name: "a host counts its own lease as another host's",
+    file: "packages/vm/plan.ts",
+    from: '  leases === null ? null : asker === "host" ? leases - 1 : leases',
+    to: "  leases",
+    command: unit,
+    expect:
+      "a leasing host's own lease is not another's, and vm:build holds none",
+  },
+  {
+    name: "a changed image file is ignored",
+    file: "packages/vm/plan.ts",
+    from: "  return IMAGE_FILES.filter(name => running.get(name) !== built.get(name))",
+    to: '  return IMAGE_FILES.filter(\n    name => name !== "init" && running.get(name) !== built.get(name),\n  )',
+    command: unit,
+    expect:
+      "changedImageFiles lists the files whose hashes differ, in order; a file in one record only counts; null without a running record",
+  },
+  {
+    name: "a launcher of any state directory is read as this one's",
+    file: "packages/vm/plan.ts",
+    from: "m[3] === undefined || m[2] !== stateDir)",
+    to: "m[3] === undefined)",
+    command: unit,
+    expect:
+      "launcherFromCommandLine reads this state directory's launcher only",
+  },
+  {
+    name: "the VM's change is worded without its changed files",
+    file: "packages/vm/plan.ts",
+    from: "                : `in which ${listWords(c.changedFiles)}",
+    to: "                : `in which some files",
+    command: unit,
+    expect: "the changed files, an older launcher, or unrecorded sources",
+  },
+  {
+    name: "the build records no sources",
+    file: "packages/vm/build.ts",
+    from: "      await writeFile(\n        path.join(run.out, IMAGE_SOURCE_SUMS),",
+    to: "      await writeFile(\n        path.join(run.out, `${IMAGE_SOURCE_SUMS}.unread`),",
+    suite: "lanes",
+    scenario: "vm-image",
+    expect: "the built image records its sources' hashes",
+  },
+  {
     name: "the builder loads no af_packet, so DHCP has no socket",
     file: "packages/vm/builder/pins.json",
     from: '    "drivers/char/hw_random/virtio-rng.ko.gz",\n    "net/packet/af_packet.ko.gz"\n',
@@ -350,5 +403,15 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "vm-image",
     expect: "the booted VM's Docker caps BuildKit's cache beside its images",
+  },
+  {
+    name: "the launcher's status takes a slot",
+    file: "packages/vm/launcher/launcher.swift",
+    from: '  case "status":\n',
+    to: '  case "status":\n    if let i = slots.firstIndex(where: { $0 == nil }) {\n      slots[i] = lease\n      lease.slot = i\n    }\n',
+    suite: "lanes",
+    scenario: "vm-image",
+    expect:
+      "a status names the booted image and its one lease, and takes no slot",
   },
 ]

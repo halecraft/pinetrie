@@ -556,8 +556,9 @@ Decided, and waiting for their turn:
   image when it has none, in a VM of its own: about 20 s, and 43 MB
   fetched once (ADR-0147). It needs Xcode's command line tools, and the
   Docker CLI with buildx for lane images, but no Docker engine. `pnpm
-  vm:build` builds it ahead (`--force` again); on Linux it says no image
-  is needed. Restart the host
+  vm:build` builds it ahead (`--force` again), then says which lane VM
+  runs, what differs from this image, and whether and when this image
+  replaces it; on Linux it says no image is needed. Restart the host
   to pick up changes to host code.
 - **`pnpm dev` serves React's production build** through Vite's dev
   server (`NODE_ENV=production`): hot reload stays, as a full page reload,

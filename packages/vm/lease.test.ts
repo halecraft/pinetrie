@@ -8,7 +8,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
 import { afterEach, expect, test } from "vitest"
-import { connect, leaseExtra, leaseOn } from "./lease.ts"
+import { connect, gatherRunningVm, leaseExtra, leaseOn } from "./lease.ts"
 import {
   decodeToLauncher,
   encode,
@@ -206,4 +206,32 @@ test("an extra lease: another slot of the same launcher, swept and filled with o
   expect(l.seen[2]).toEqual({ kind: "lease", agent: null })
   await extra.close()
   await host.close()
+})
+
+test("the running VM: none when nothing answers, else its status, asked without a lease", async () => {
+  const empty = await mkdtemp(path.join(tmpdir(), "pinetrie-lease-"))
+  closers.push(() => rm(empty, { recursive: true, force: true }))
+  expect(await gatherRunningVm(empty)).toEqual({ kind: "none" })
+  const l = await standIn(m =>
+    m.kind === "status"
+      ? { kind: "status", image: "img", launcher: "launcher-x", leases: 2 }
+      : null,
+  )
+  expect(await gatherRunningVm(path.dirname(l.control))).toEqual({
+    kind: "running",
+    image: "img",
+    launcher: "launcher-x",
+    leases: 2,
+  })
+  expect(l.seen).toEqual([{ kind: "status" }])
+})
+
+test("a launcher that refuses status is running, its holders not known", async () => {
+  const l = await standIn(() => ({ kind: "refused", reason: "unreadable" }))
+  expect(await gatherRunningVm(path.dirname(l.control))).toEqual({
+    kind: "running",
+    image: null,
+    launcher: null,
+    leases: null,
+  })
 })

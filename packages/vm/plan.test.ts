@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
   type BuilderPins,
+  changedImageFiles,
   type Fill,
   holdFill,
   IMAGE_FILES,
@@ -8,10 +9,13 @@ import {
   imageDir,
   imageKey,
   imageRefusal,
+  imageSourceSums,
   isBuildLogLine,
   kernelRelease,
   launcherArgs,
+  launcherFromCommandLine,
   NOTHING_HELD,
+  otherHolders,
   parseSums,
   planLock,
   planPrune,
@@ -24,14 +28,18 @@ import {
   type ShareDir,
   sharePath,
   slotRoot,
-  staleVmWords,
   type VmBuildFacts,
+  type VmChange,
   type VmFacts,
   vmBuildWords,
+  vmChangeWords,
   vmHostRefusal,
+  vmKeptWords,
   vmMemory,
+  vmNoneRunningWords,
   vmStartRefusal,
   vmStateDir,
+  vmVersionWords,
   vmWords,
 } from "./plan.ts"
 
@@ -475,29 +483,150 @@ test("isBuildLogLine: the build's and the builder's lines", () => {
   expect(isBuildLogLine("[    0.07] rtc-pl031 registered")).toBe(false)
 })
 
+describe("an image's record of its sources", () => {
+  const built = parseSums(imageSourceSums(sources))
+  test("a record written by imageSourceSums reads back through parseSums, one line per source", () => {
+    expect([...built.keys()]).toEqual([...IMAGE_FILES])
+    expect(changedImageFiles(built, built)).toEqual([])
+  })
+  test("changedImageFiles lists the files whose hashes differ, in order; a file in one record only counts; null without a running record", () => {
+    const running = parseSums(
+      imageSourceSums({ ...sources, "daemon.json": "{ }", init: "old" }),
+    )
+    expect(changedImageFiles(running, built)).toEqual(["init", "daemon.json"])
+    const fewer = new Map([...built].filter(([name]) => name !== "clock"))
+    expect(changedImageFiles(fewer, built)).toEqual(["clock"])
+    expect(changedImageFiles(null, built)).toBeNull()
+  })
+})
+
+test("launcherFromCommandLine reads this state directory's launcher only", () => {
+  const line = (state: string) =>
+    `/s m/bin/launcher-0a1b ${state} ${state}/images/k1 16 4294967296 8 /s m/bin/gvproxy-x fsync cached`
+  expect(launcherFromCommandLine(line("/s m"), "/s m")).toEqual({
+    image: "k1",
+    launcher: "launcher-0a1b",
+  })
+  expect(
+    launcherFromCommandLine(line("/tmp/pc-1/pinetrie/vm"), "/s m"),
+  ).toBeNull()
+  expect(launcherFromCommandLine(line("/s m/x"), "/s m")).toBeNull()
+  expect(launcherFromCommandLine("/usr/bin/vim notes", "/s m")).toBeNull()
+})
+
 describe("planVmVersion: join a current VM; replace an old one only when no other host holds it", () => {
   const want = { image: "new", launcher: "launcher-new" }
+  const plan = (
+    running: { image: string | null; launcher: string | null },
+    othersHolding: number | null,
+    retirable = true,
+  ) =>
+    planVmVersion({
+      running,
+      retirable,
+      want,
+      othersHolding,
+      changedFiles: ["init"],
+    })
   test("current", () => {
-    expect(planVmVersion({ ...want, leases: 3 }, want)).toEqual({
-      kind: "current",
-    })
+    expect(plan(want, 2)).toEqual({ kind: "current", image: "new" })
   })
-  test("an older image or launcher, this host its only lease: retire it", () => {
-    expect(planVmVersion({ ...want, image: "old", leases: 1 }, want)).toEqual({
+  test("an older image or launcher, held by no other host: retire it", () => {
+    expect(plan({ ...want, image: "old" }, 0)).toEqual({
       kind: "retire",
+      change: {
+        from: { ...want, image: "old" },
+        to: want,
+        changedFiles: ["init"],
+      },
     })
-    expect(
-      planVmVersion({ ...want, launcher: "launcher-old", leases: 1 }, want),
-    ).toEqual({ kind: "retire" })
+    expect(plan({ ...want, launcher: "launcher-old" }, 0).kind).toBe("retire")
   })
-  test("a launcher older than its identity: join it, and say how to replace it", () => {
-    expect(
-      planVmVersion({ image: null, launcher: null, leases: null }, want),
-    ).toEqual({ kind: "old-launcher" })
+  test("a leasing host's own lease is not another's, and vm:build holds none", () => {
+    expect(otherHolders(1, "host")).toBe(0)
+    expect(otherHolders(1, "build")).toBe(1)
+    expect(otherHolders(null, "host")).toBeNull()
+    expect(plan({ ...want, image: "old" }, otherHolders(1, "host")).kind).toBe(
+      "retire",
+    )
   })
   test("older, with other hosts on it: join it, and say so", () => {
-    const v = planVmVersion({ ...want, image: "old", leases: 3 }, want)
-    expect(v).toEqual({ kind: "stale", leases: 3 })
-    expect(staleVmWords(3, "new")).toContain("2 other hosts hold leases")
+    expect(plan({ ...want, image: "old" }, 2)).toMatchObject({
+      kind: "stale",
+      others: 2,
+    })
+  })
+  test("holders unknown from a launcher that can be retired: replaced by a host holding it alone", () => {
+    expect(plan({ ...want, image: "old" }, null).kind).toBe("holders-unknown")
+    expect(plan({ image: null, launcher: null }, null).kind).toBe(
+      "holders-unknown",
+    )
+  })
+  test("a launcher older than its identity: join it, and say how to replace it", () => {
+    expect(plan({ image: null, launcher: null }, null, false).kind).toBe(
+      "old-launcher",
+    )
+  })
+})
+
+describe("vmVersionWords: both images and what differs, for a host and for vm:build", () => {
+  const change = (c: Partial<VmChange>): VmChange => ({
+    from: { image: "aaaa", launcher: "launcher-old" },
+    to: { image: "bbbb", launcher: "launcher-old" },
+    changedFiles: ["init", "daemon.json"],
+    ...c,
+  })
+  test("the changed files, an older launcher, or unrecorded sources", () => {
+    expect(vmChangeWords(change({}))).toBe(
+      "image aaaa rather than bbbb, in which init and daemon.json differ",
+    )
+    expect(
+      vmChangeWords(
+        change({
+          from: { image: "bbbb", launcher: "launcher-old" },
+          to: { image: "bbbb", launcher: "launcher-new" },
+        }),
+      ),
+    ).toBe("image bbbb, and its launcher is older")
+    expect(vmChangeWords(change({ changedFiles: null }))).toBe(
+      "image aaaa rather than bbbb, whose sources were not recorded",
+    )
+  })
+  test("a host replacing, joining or keeping it", () => {
+    const c = change({})
+    expect(vmVersionWords({ kind: "retire", change: c }, "host")).toBe(
+      "the lane VM runs image aaaa rather than bbbb, in which init and daemon.json differ: this host replaces it now",
+    )
+    expect(
+      vmVersionWords({ kind: "stale", change: c, others: 1 }, "host"),
+    ).toContain(
+      "in which init and daemon.json differ, and 1 other host holds a lease on it: this host joins it",
+    )
+    expect(vmKeptWords(c, "no tools")).toBe(
+      "the lane VM runs image aaaa rather than bbbb, in which init and daemon.json differ, kept: no tools",
+    )
+  })
+  test("vm:build saying when it is replaced", () => {
+    const c = change({})
+    expect(vmVersionWords({ kind: "current", image: "bbbb" }, "build")).toBe(
+      "the lane VM runs bbbb, this image",
+    )
+    expect(vmVersionWords({ kind: "retire", change: c }, "build")).toMatch(
+      /init and daemon\.json differ: the next host to start replaces it$/,
+    )
+    expect(
+      vmVersionWords({ kind: "stale", change: c, others: 2 }, "build"),
+    ).toMatch(
+      /and 2 hosts hold leases on it: it is replaced once the last of them stops$/,
+    )
+    expect(
+      vmVersionWords({ kind: "holders-unknown", change: c }, "build"),
+    ).toContain("at the start of a host that holds it alone")
+    expect(
+      vmVersionWords({ kind: "old-launcher", change: c }, "build"),
+    ).toContain("stops by itself 10 minutes after its last host")
+    expect(vmNoneRunningWords("bbbb")).toBe(
+      "no lane VM is running: the next host starts it from bbbb",
+    )
   })
 })

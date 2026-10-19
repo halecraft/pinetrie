@@ -7,6 +7,7 @@ export {
   buildVmImageInVm,
   checkImageDir,
   gatherBuildFirst,
+  gatherChangedFiles,
   readBuilderPins,
   readImageSources,
 } from "./build.ts"
@@ -19,6 +20,7 @@ export {
 export { type Endable, type Kept, keepLease } from "./keep.ts"
 export {
   type ExtraLease,
+  gatherRunningVm,
   type Lease,
   launcherWords,
   leaseExtra,
@@ -44,6 +46,7 @@ export {
   type LauncherFacts,
   launcherArgs,
   NOTHING_HELD,
+  otherHolders,
   parseSums,
   planShares,
   planVm,
@@ -53,7 +56,6 @@ export {
   type ShareDir,
   sharePath,
   slotRoot,
-  staleVmWords,
   type VmBuildFacts,
   type VmBuildPlan,
   type VmFacts,
@@ -63,7 +65,9 @@ export {
   type VmVersion,
   vmBuildWords,
   vmHostRefusal,
+  vmNoneRunningWords,
   vmStateDir,
+  vmVersionWords,
   vmWords,
 } from "./plan.ts"
 export * from "./protocol.ts"

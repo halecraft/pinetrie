@@ -1,7 +1,8 @@
 // vm/lease — a host's lease on the lane VM. To a host the VM is a
 // Docker socket and a slot of shared directories: it gathers what decides
 // whether to start or join the VM (`planVm`), starts the launcher when need
-// be, takes a slot, and waits for Docker to answer.
+// be, takes a slot, and waits for Docker to answer. And what the VM runs,
+// asked without a lease (`gatherRunningVm`).
 
 import { spawn } from "node:child_process"
 import { openSync } from "node:fs"
@@ -15,6 +16,7 @@ import {
   buildVmImageInVm,
   checkImageDir,
   gatherBuildFirst,
+  gatherChangedFiles,
   readImageSources,
 } from "./build.ts"
 import { ensureGvproxy, gvproxyPath, readGvproxyPin } from "./gvproxy.ts"
@@ -23,15 +25,17 @@ import {
   imageDir,
   imageKey,
   launcherArgs,
-  OLD_LAUNCHER_WORDS,
+  launcherFromCommandLine,
+  otherHolders,
   planShares,
   planVm,
   planVmVersion,
   type ShareDir,
-  staleVmWords,
   type VmRefusal,
   vmBuildWords,
+  vmKeptWords,
   vmStartRefusal,
+  vmVersionWords,
   vmWords,
 } from "./plan.ts"
 import {
@@ -39,9 +43,11 @@ import {
   encode,
   type FromLauncher,
   type LauncherRefusal,
+  type RunningVm,
+  type ToLauncher,
   type VmIdentity,
 } from "./protocol.ts"
-import { pruneVmState } from "./prune.ts"
+import { pruneVmState, runningLaunchers } from "./prune.ts"
 import { BUILDER, buildBinary, gatherBinary, LAUNCHER } from "./swift.ts"
 
 export interface Lease {
@@ -147,20 +153,21 @@ async function until<T>(
  */
 export async function leaseVm(input: LeaseInput): Promise<Lease> {
   const { lease, want, canStart } = await leaseOnce(input)
-  const version = planVmVersion(lease.identity, want)
+  const { identity } = lease
+  const version = planVmVersion({
+    running: identity,
+    retirable: identity.image !== null,
+    want,
+    othersHolding: otherHolders(identity.leases, "host"),
+    changedFiles: await gatherChangedFiles(input.stateDir, identity.image),
+  })
   if (version.kind === "current") return lease
-  if (version.kind === "old-launcher") {
-    input.log(`[vm] ${OLD_LAUNCHER_WORDS}`)
-    return lease
-  }
-  if (version.kind === "stale") {
-    input.log(`[vm] ${staleVmWords(version.leases, want.image)}`)
+  if (version.kind !== "retire") {
+    input.log(`[vm] ${vmVersionWords(version, "host")}`)
     return lease
   }
   if (canStart !== null) {
-    input.log(
-      `[vm] the lane VM runs an older image or launcher, kept: ${canStart}`,
-    )
+    input.log(`[vm] ${vmKeptWords(version.change, canStart)}`)
     return lease
   }
   // Built while the old VM still runs, so its lanes stop only for the swap.
@@ -169,7 +176,7 @@ export async function leaseVm(input: LeaseInput): Promise<Lease> {
     null
   )
     await buildImage(input)
-  input.log("[vm] replacing the lane VM, which runs an older image or launcher")
+  input.log(`[vm] ${vmVersionWords(version, "host")}`)
   await lease.retire()
   const control = path.join(input.stateDir, "control.sock")
   await until("the old lane VM stopping", 60_000, async () => {
@@ -341,15 +348,62 @@ export async function vmProblem(stateDir: string): Promise<string | null> {
   return planned.kind === "refused" ? vmWords(planned.refusal) : null
 }
 
-export async function leaseOn(
-  socket: net.Socket,
-  input: {
-    readonly agent: string | null
-    readonly log: (l: string) => void
-    /** How long a lease's reply may take: 30 s unless a test says. */
-    readonly replyMs?: number
-  },
-): Promise<Lease> {
+/** How long a launcher may take to answer `status`. */
+const STATUS_MS = 5_000
+
+/**
+ * What the lane VM of `stateDir` runs, asked without a lease: `status`
+ * takes no slot, so it starts no VM and holds none from its idle stop. A
+ * launcher that refuses it is older, and is read from `ps`.
+ */
+export async function gatherRunningVm(stateDir: string): Promise<RunningVm> {
+  const socket = await connect(path.join(stateDir, "control.sock"))
+  if (socket === null) return { kind: "none" }
+  const channel = launcherChannel(socket)
+  try {
+    channel.send({ kind: "status" })
+    const m = await channel.next("a status", STATUS_MS)
+    if (m === null) return { kind: "none" }
+    if (m.kind === "status")
+      return {
+        kind: "running",
+        image: m.image,
+        launcher: m.launcher,
+        leases: m.leases,
+      }
+    if (m.kind !== "refused")
+      throw new Error(`the lane VM's launcher answered a status with ${m.kind}`)
+    const named =
+      (await runningLaunchers())
+        ?.map(line => launcherFromCommandLine(line, stateDir))
+        .find(l => l !== null) ?? null
+    return {
+      kind: "running",
+      image: named?.image ?? null,
+      launcher: named?.launcher ?? null,
+      leases: null,
+    }
+  } finally {
+    socket.destroy()
+  }
+}
+
+/**
+ * The launcher's side of one connection: its messages in order, each
+ * awaited with a deadline. A line that is no launcher message is skipped.
+ */
+function launcherChannel(socket: net.Socket): {
+  send(message: ToLauncher): void
+  /**
+   * The next message, or null when the connection ended. Waits at most
+   * `ms`, then fails naming `what`: a launcher that never answers must not
+   * hang the host's start.
+   */
+  next(what: string, ms: number): Promise<FromLauncher | null>
+  /** `next`, throwing on an end or a refusal (`VmRefused`, worded by `launcherWords`). */
+  reply(what: string, ms: number): Promise<FromLauncher>
+  readonly closed: Promise<void>
+} {
   const lines = createInterface({ input: socket })
   const queue: FromLauncher[] = []
   const waiters: ((m: FromLauncher | null) => void)[] = []
@@ -369,11 +423,6 @@ export async function leaseOn(
     }),
   )
   socket.on("error", () => {})
-  /**
-   * The launcher's next message, or null when the lease ended. Waits at most
-   * `ms`, then fails naming `what`: a launcher that never answers must not
-   * hang the host's start.
-   */
   const next = (what: string, ms: number): Promise<FromLauncher | null> => {
     if (queue.length > 0) return Promise.resolve(queue.shift() ?? null)
     if (ended) return Promise.resolve(null)
@@ -393,15 +442,33 @@ export async function leaseOn(
       waiters.push(waiter)
     })
   }
-  const reply = async (what: string, ms: number): Promise<FromLauncher> => {
-    const m = await next(what, ms)
-    if (m === null) throw new Error("the lane VM's launcher closed the lease")
-    if (m.kind === "refused") throw new VmRefused(launcherWords(m))
-    return m
+  return {
+    send: message => {
+      socket.write(encode(message))
+    },
+    next,
+    async reply(what, ms) {
+      const m = await next(what, ms)
+      if (m === null) throw new Error("the lane VM's launcher closed the lease")
+      if (m.kind === "refused") throw new VmRefused(launcherWords(m))
+      return m
+    },
+    closed,
   }
+}
 
+export async function leaseOn(
+  socket: net.Socket,
+  input: {
+    readonly agent: string | null
+    readonly log: (l: string) => void
+    /** How long a lease's reply may take: 30 s unless a test says. */
+    readonly replyMs?: number
+  },
+): Promise<Lease> {
+  const { send, next, reply, closed } = launcherChannel(socket)
   input.log("[vm] asking the lane VM's launcher for a slot")
-  socket.write(encode({ kind: "lease", agent: input.agent }))
+  send({ kind: "lease", agent: input.agent })
   const slot = await reply("a lease", input.replyMs ?? 30_000).catch(error => {
     socket.destroy()
     throw error
@@ -428,7 +495,7 @@ export async function leaseOn(
     ended: endedUnasked,
     async retire() {
       closing = true
-      socket.write(encode({ kind: "retire" }))
+      send({ kind: "retire" })
       const m = await next("a retire", 60_000)
       if (m?.kind === "refused") {
         closing = false
@@ -441,7 +508,7 @@ export async function leaseOn(
       filled = true
       await sweep(slot.slot)
       const entries = planShares(dirs)
-      socket.write(encode({ kind: "fill", entries }))
+      send({ kind: "fill", entries })
       const m = await reply("a fill", 30_000)
       if (m.kind !== "filled")
         throw new Error("the lane VM did not fill the slot")
