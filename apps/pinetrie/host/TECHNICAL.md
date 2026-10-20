@@ -59,7 +59,7 @@ knows of.
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs, its ledger and what each document stores beside its whole record (`storedSizes`) as one `OpenedStore`, which is what `startHost` takes |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
-| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`keep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
+| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`@pinetrie/folder`'s `planKeep`, carried out in `index.ts`), its reviews (`review.ts`), its records written (`record-writes.ts`), the only code that touches the project's folder (ADR-0142) |
 | `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for the project's folder), a dropped-events error at once |
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's proposed changes in your repo (ADR-0105), on the owner of your repo (§ Proposed changes), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
@@ -1820,6 +1820,18 @@ adapter's.
 
 - **Only `folder/` touches the project's folder** (ADR-0142); `@pinetrie/folder`
   decides for it, and lanehost's disks role does the copying.
+- **The adapter decides nothing it can hand to `@pinetrie/folder`**
+  (ADR-0193): a lane's states are read once (`laneStates`), and what a
+  read, a turn, getting the latest, a resolution, a write's commit or a
+  concurrent save records is the package's (`FolderRecords`:
+  `planStateRecords`, `planGetLatestRecords`, `planResolve`). The record
+  specs are `@pinetrie/rules`', which the package does not declare, so
+  `record-writes.ts`' `recordWrites` is the one place those records become
+  writes. A write's journal is written by the write itself, before each
+  step it names (`write.ts`). What still calls two of the package's
+  functions in a row does so across I/O the first asks for: a read's
+  then a merge's gathers (`merge.ts`, `review.ts`), the shown merge made
+  between its plan and its records, a concurrent save read in.
 - **The project's one queue** (`createQueue` in `index.ts`): the folder's
   reads run on it, and so does every time it gets the latest over a virtual base, from
   making the base to deleting it. A virtual base is named by its bases, so
@@ -1828,7 +1840,7 @@ adapter's.
   the queue (its `from` was read before), so it never waits on itself.
 - **A read** (`line.ts`, one at a time on the project's queue): gather (the last
   read's stamps, from the session's `folder-stamps.json`; the scan,
-  `scan.ts`), plan (`planLineRead`), execute (lanehost's `read-in` into a
+  `scan.ts`), plan (`@pinetrie/folder`'s `planLineRead`), execute (lanehost's `read-in` into a
   new state, `line-<uuidv7>`, its parent accepted work's newest). A read
   whose paths moved during their copy is read again, five times at most;
   nothing changed makes no state, but the first read of the project's folder makes one
@@ -1853,7 +1865,8 @@ adapter's.
   (snapshotted after the lane's `sync`, then diffed against the lane's
   newest: no state when no source path changed), each time it gets the latest (the path
   merge, `merge.ts`, on the graph's base, `virtual-base.ts` merging several
-  first; two parents). Getting the latest whose base's snapshot is missing is
+  first; two parents; `planLaneMerge` decides whether there is anything to
+  merge, and over which base). Getting the latest whose base's snapshot is missing is
   refused (`MergedOf`'s `refused`), before it makes anything, with words
   the card and the agent's `catch_up` show; a virtual base no record names
   is deleted once merged over. What differs between two states is `changes.ts`'s
@@ -1872,7 +1885,8 @@ adapter's.
   refuses a setup or publish to a folder project, and a restore to a jj
   one, in one place (`commands/lane.ts`).
 - **Proposed changes are the shown merge** (`folder/proposed.ts`,
-  ADR-0159): the lane's tip merged onto accepted work's newest
+  ADR-0159; planned by `@pinetrie/folder`'s `planShownMerge`, then
+  `planFolderRecords` once the merge is made): the lane's tip merged onto accepted work's newest
   (`mergeToState`, `merge.ts`, shared with getting the latest), made on the
   project's queue whenever either moves, on a scratch disk
   (`withScratch`, `scratch.ts`, which a virtual base and a restore's

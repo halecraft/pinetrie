@@ -26,10 +26,14 @@ import {
   folderNewest,
   folderStateHeld,
   isAncestor,
+  isRecorded,
   laneNewest,
+  laneStates,
   mergeBases,
   parentLane,
   planBase,
+  planLaneMerge,
+  planMergeBase,
   planState,
   type StateGraph,
   stateGraph,
@@ -489,6 +493,61 @@ test("laneNewest and folderStateHeld: a lane's newest state, and the state of ac
   expect(folderStateHeld(g.graph, t)).toBe(l0)
   expect(folderStateHeld(g.graph, b)).toBe(l0)
   expect(folderStateHeld(g.graph, l1)).toBe(l1)
+})
+
+test("laneStates: accepted work's newest, the lane's tip and the state its tip holds, read together; for no lane or one not begun, none of the lane's", () => {
+  const g = new Growing()
+  const l0 = g.add("line-0", { kind: "read" })
+  const s = g.add("start-1", { kind: "start", lane: LANE }, l0)
+  const t = g.add(
+    "turn-1",
+    { kind: "turn", lane: LANE, entry: entryId("e") },
+    s,
+  )
+  const l1 = g.add("line-1", { kind: "read" }, l0)
+  expect(laneStates(g.records, LANE)).toMatchObject({
+    newest: l1,
+    tip: t,
+    start: l0,
+  })
+  expect(laneStates(g.records, null)).toMatchObject({
+    newest: l1,
+    tip: null,
+    start: null,
+  })
+  expect(laneStates(g.records, threadIdFor("2"))).toMatchObject({
+    newest: l1,
+    tip: null,
+    start: null,
+  })
+})
+
+test("planLaneMerge: nothing when the lane's newest holds theirs already; else a merge over the base they share", () => {
+  const g = new Growing()
+  const l0 = g.add("line-0", { kind: "read" })
+  const s = g.add("start-1", { kind: "start", lane: LANE }, l0)
+  const l1 = g.add("line-1", { kind: "read" }, l0)
+  expect(planLaneMerge(g.records, LANE, l0)).toEqual({
+    kind: "nothing",
+    ours: s,
+  })
+  expect(planLaneMerge(g.records, LANE, l1)).toEqual({
+    kind: "merge",
+    ours: s,
+    plan: { kind: "state", state: l0 },
+  })
+  expect(() => planLaneMerge(g.records, threadIdFor("2"), l1)).toThrow()
+})
+
+test("isRecorded and planMergeBase: a state the records hold, and the base of two states over the graph the records make", () => {
+  const g = new Growing()
+  const l0 = g.add("line-0", { kind: "read" })
+  const s = g.add("start-1", { kind: "start", lane: LANE }, l0)
+  const l1 = g.add("line-1", { kind: "read" }, l0)
+  expect(isRecorded(g.records, s)).toBe(true)
+  expect(isRecorded(g.records, pointId("shown-0"))).toBe(false)
+  expect(planMergeBase(g.records, s, l1)).toEqual(planBase(g.graph, s, l1))
+  expect(planMergeBase(g.records, s, l1)).toEqual({ kind: "state", state: l0 })
 })
 
 describe("parentLane", () => {

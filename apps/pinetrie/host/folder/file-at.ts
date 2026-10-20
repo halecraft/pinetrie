@@ -3,12 +3,7 @@
 // that lane's proposed changes are computed against.
 
 import type { PointId, StateRecord } from "@pinetrie/core"
-import {
-  folderNewest,
-  folderStateHeld,
-  laneNewest,
-  stateGraph,
-} from "@pinetrie/folder"
+import { laneStates } from "@pinetrie/folder"
 import type { FileAt, FolderDisks, ReadSite } from "@pinetrie/lanes"
 
 /** The most a file read at a site may hold. */
@@ -23,12 +18,11 @@ function siteState(
   states: readonly StateRecord[],
   site: ReadSite,
 ): PointId | null {
-  const g = stateGraph(states)
-  if (site.kind === "accepted") return folderNewest(g)
-  const newest = laneNewest(g, site.lane)
-  if (newest === null) return null
-  if (site.kind === "start") return folderStateHeld(g, newest)
-  return g.states.get(newest)?.made.kind === "start" ? null : newest
+  if (site.kind === "accepted") return laneStates(states, null).newest
+  const { graph, tip, start } = laneStates(states, site.lane)
+  if (tip === null) return null
+  if (site.kind === "start") return start
+  return graph.states.get(tip)?.made.kind === "start" ? null : tip
 }
 
 export async function readFolderSiteFile(

@@ -93,7 +93,6 @@ export {
   BASE,
   type BaseRecord,
   effectiveBase,
-  type FolderBaseRecord,
   type FollowedBase,
   type ForkBegin,
   type LatestNow,

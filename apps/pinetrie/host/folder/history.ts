@@ -24,15 +24,12 @@ import {
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import {
-  folderStateHeld,
-  isAncestor,
-  laneNewest,
-  planBase,
+  isRecorded,
+  laneStates,
+  planGetLatestRecords,
+  planLaneMerge,
   planResolve,
-  planState,
-  type StateGraph,
-  stateGraph,
-  virtualBaseRecord,
+  planStateRecords,
 } from "@pinetrie/folder"
 import {
   type Edits,
@@ -48,19 +45,11 @@ import {
   STATES_MOUNT,
   type TurnCommitted,
 } from "@pinetrie/lanes"
-import {
-  CONFLICT,
-  conflictKey,
-  deleteRecord,
-  folderLatest,
-  latestSourceName,
-  mergedFrom,
-  STATE,
-  setRecord,
-} from "@pinetrie/rules"
+import { folderLatest, latestSourceName, mergedFrom } from "@pinetrie/rules"
 import { sourceChanges } from "./changes.ts"
 import { dropUnrecordedBase, mergeToState } from "./merge.ts"
 import type { FolderLane } from "./proven.ts"
+import { recordWrites } from "./record-writes.ts"
 import { baseMissing } from "./virtual-base.ts"
 
 /** A folder project's records of its history, as lane work reads and writes them. */
@@ -84,24 +73,6 @@ interface FolderHistoryDeps {
   readonly now: () => number
 }
 
-/** A state's record checked against the graph (`planState`); thrown with why when refused. */
-function stateWrite(
-  g: StateGraph,
-  record: StateRecord,
-): ValueWrite<"session">[] {
-  const planned = planState(g, record)
-  switch (planned.kind) {
-    case "record":
-      return [setRecord(STATE, planned.record)]
-    case "recorded":
-      return []
-    case "refused":
-      throw new Error(
-        `${record.id} cannot be recorded: ${JSON.stringify(planned)}`,
-      )
-  }
-}
-
 export function folderHistory(
   input: FolderHistoryDeps & {
     readonly lane: FolderLane
@@ -112,23 +83,17 @@ export function folderHistory(
   const lane = proven.lane
   const runners = { ...input.runners, runtime }
   const reader = { runtime, disks, own: input.own }
-  const graph = () => stateGraph(store.states())
+  /** The lane's states as recorded now. */
+  const states = () => laneStates(store.states(), lane)
 
   /** Snapshot the lane's disk as `state`, after its `sync`. */
   const snapshot = (state: PointId) =>
     executeOrThrow(planSnapshot({ lane, snapshot: snapshotId(state) }), runners)
 
-  /** The lane's newest state; thrown for a lane not begun. */
-  const newestOf = (g: StateGraph): PointId => {
-    const newest = laneNewest(g, lane)
-    if (newest === null) throw new Error(`${lane} has no state yet`)
-    return newest
-  }
-
-  /** `start` moved to the state of accepted work `of` holds, when there is one. */
-  const startOp = (g: StateGraph, of: PointId): LaneStatesOp[] => {
-    const held = folderStateHeld(g, of)
-    return held === null ? [] : [{ kind: "start", state: held }]
+  /** `start` moved to the state of accepted work the lane's newest holds, when there is one. */
+  const startOp = (records: readonly StateRecord[]): LaneStatesOp[] => {
+    const { start } = laneStates(records, lane)
+    return start === null ? [] : [{ kind: "start", state: start }]
   }
 
   const openConflicts = () => store.conflicts(lane).map(c => c.path)
@@ -139,8 +104,9 @@ export function folderHistory(
     readonly newest: PointId
     readonly paths: readonly string[]
   }> {
-    const g = graph()
-    const newest = newestOf(g)
+    const recorded = store.states()
+    const { tip: newest } = laneStates(recorded, lane)
+    if (newest === null) throw new Error(`${lane} has no state yet`)
     const state = turnStateId(input.newId())
     await snapshot(state)
     const paths = await sourceChanges(reader, newest, state)
@@ -152,13 +118,15 @@ export function folderHistory(
       return { committed: null, newest, paths }
     }
     await store.write(
-      stateWrite(g, {
-        id: state,
-        parents: [newest],
-        made: { kind: "turn", lane, entry: edits.entry },
-        at: input.now(),
-        by: null,
-      }),
+      recordWrites(
+        planStateRecords(recorded, {
+          id: state,
+          parents: [newest],
+          made: { kind: "turn", lane, entry: edits.entry },
+          at: input.now(),
+          by: null,
+        }),
+      ),
     )
     return { committed: state, newest, paths }
   }
@@ -183,7 +151,7 @@ export function folderHistory(
         throw new Error(`a folder lane cannot begin from ${start.kind}`)
       const state = startStateId(input.newId())
       await snapshot(state)
-      const g = graph()
+      const recorded = store.states()
       const record: StateRecord = {
         id: state,
         parents: [from],
@@ -191,18 +159,18 @@ export function folderHistory(
         at: input.now(),
         by: null,
       }
-      const writes = stateWrite(g, record)
+      const writes = recordWrites(planStateRecords(recorded, record))
       // Before the record is written, against the graph it will make: the
       // op renames a symlink over the last, so a fork run again repeats it
       // harmlessly.
-      for (const op of startOp(stateGraph([...store.states(), record]), state))
+      for (const op of startOp([...store.states(), record]))
         await disks.states(lane, op)
       return recordedStart(writes)
     },
 
     async keptSnapshot() {
-      const newest = laneNewest(graph(), lane)
-      return newest === null ? null : snapshotId(newest)
+      const { tip } = states()
+      return tip === null ? null : snapshotId(tip)
     },
 
     async commit(edits) {
@@ -221,9 +189,7 @@ export function folderHistory(
     },
 
     async base() {
-      const g = graph()
-      const newest = laneNewest(g, lane)
-      const start = newest === null ? null : folderStateHeld(g, newest)
+      const { start } = states()
       return start === null
         ? null
         : { base: { kind: "accepted" }, start, source: start }
@@ -237,16 +203,13 @@ export function folderHistory(
           "a folder project has no unfinished work to get the latest from",
         )
       if (edits !== null) await turn(edits)
-      const g = graph()
-      const ours = newestOf(g)
       const theirs = from.point
-      if (isAncestor(g, theirs, ours))
+      const merging = planLaneMerge(store.states(), lane, theirs)
+      const { ours } = merging
+      if (merging.kind === "nothing")
         return { kind: "nothing", ours, mark: null, follow: null }
-      const plan = planBase(g, ours, theirs)
-      if (plan === null)
-        throw new Error(
-          `${ours} and ${theirs} share no state: every state of a folder project descends from its first read`,
-        )
+      const { plan } = merging
+      const recorded = store.states()
       if ((await baseMissing(reader, plan)) !== null)
         return {
           kind: "refused",
@@ -271,40 +234,29 @@ export function folderHistory(
           markers: false,
           snapshot: () => snapshot(state),
         })
-        const conflicts = paths.map(path => ({
+        const records = planGetLatestRecords({
+          states: recorded,
           lane,
-          path,
-          base,
+          state,
           ours,
           theirs,
-        }))
-        const record: StateRecord = {
-          id: state,
-          parents: [ours, theirs],
-          made: { kind: "get-latest", lane },
+          plan,
+          base,
+          paths,
           at: input.now(),
-          by: null,
-        }
-        // A virtual base becomes a state only when a conflict names it.
-        const baseRecord =
-          plan.kind === "virtual" && paths.length > 0
-            ? stateWrite(g, virtualBaseRecord(plan, input.now()))
-            : []
-        await store.write([
-          ...baseRecord,
-          ...stateWrite(g, record),
-          ...conflicts.map(c => setRecord(CONFLICT, c)),
-        ])
-        await dropUnrecordedBase(runtime, plan, s => graph().states.has(s))
-        return { paths, conflicts }
+        })
+        await store.write(recordWrites(records))
+        await dropUnrecordedBase(runtime, plan, s =>
+          isRecorded(store.states(), s),
+        )
+        return { paths, conflicts: records.conflicts }
       }
       const { paths, conflicts } =
         plan.kind === "virtual"
           ? await input.queue.enqueue(mergeOver)
           : await mergeOver()
-      const after = graph()
       for (const op of [
-        ...startOp(after, state),
+        ...startOp(store.states()),
         ...conflicts.map(({ lane: _, ...c }) => ({
           kind: "conflict" as const,
           ...c,
@@ -345,7 +297,7 @@ export function folderHistory(
           : await disks.pathFacts(open[choose], [path])
       // plan
       const planned = planResolve({
-        graph: graph(),
+        states: store.states(),
         lane,
         path,
         open,
@@ -377,10 +329,7 @@ export function folderHistory(
           lane,
           snapshot: snapshotId(record.id),
         })
-      await store.write([
-        setRecord(STATE, record),
-        deleteRecord(CONFLICT, conflictKey(lane, path)),
-      ])
+      await store.write(recordWrites(planned.records))
       await disks.states(lane, { kind: "resolved", path })
       return { kind: "resolved" }
     },

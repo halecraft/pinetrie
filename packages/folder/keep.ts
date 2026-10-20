@@ -1,4 +1,4 @@
-// host/folder/keep — what a folder project keeps of its states, said once:
+// folder/keep — what a folder project keeps of its states, said once:
 // the snapshots nothing needs any more, to delete, and accepted work's
 // states the history may show, from one `liveStates` call over the records
 // and one listing of the snapshots there are. A state's record stays: merge
@@ -21,10 +21,10 @@ import {
   folderNewest,
   folderStateHeld,
   laneNewest,
-  liveStates,
   parentLane,
   stateGraph,
-} from "@pinetrie/folder"
+} from "./graph.ts"
+import { liveStates } from "./live.ts"
 
 /** What a folder project keeps, decided: the snapshots that go, and accepted work's states kept. */
 export interface KeepPlanned {

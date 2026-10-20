@@ -24,13 +24,7 @@ import {
   type WriterId,
   writeAsideDir,
 } from "@pinetrie/core"
-import {
-  folderNewest,
-  laneNewest,
-  planState,
-  type StateGraph,
-  shownMergeId,
-} from "./graph.ts"
+import { laneStates, planState, shownMergeId } from "./graph.ts"
 
 /** What an accept does, decided from the graph after its own read. */
 export type AcceptPlanned =
@@ -46,7 +40,7 @@ export type AcceptPlanned =
  * merge, its parents accepted work's newest and the lane's tip.
  */
 export function planAccept(input: {
-  readonly graph: StateGraph
+  readonly states: readonly StateRecord[]
   readonly proposed: FolderProposedChangesRecord | undefined
   readonly seen: ProposedChangesSeen | null
   /** Whether the shown merge's snapshot is there. */
@@ -55,11 +49,10 @@ export function planAccept(input: {
   readonly by: WriterId | null
 }): AcceptPlanned {
   const refused = (code: ErrCode): AcceptPlanned => ({ kind: "refused", code })
-  const { graph, proposed, seen } = input
+  const { proposed, seen } = input
   if (proposed === undefined || proposed.files.length === 0)
     return refused(ERR.NO_PROPOSED_CHANGES)
-  const start = folderNewest(graph)
-  const tip = laneNewest(graph, proposed.lane)
+  const { graph, newest: start, tip } = laneStates(input.states, proposed.lane)
   if (
     seen?.kind !== "folder" ||
     start === null ||
@@ -101,7 +94,7 @@ export type RestorePlanned =
  * anything is made.
  */
 export function planRestore(input: {
-  readonly graph: StateGraph
+  readonly states: readonly StateRecord[]
   /** Accepted work's record's `kept`. */
   readonly kept: readonly PointId[]
   readonly of: PointId
@@ -120,12 +113,12 @@ export function planRestore(input: {
     kind: "refused",
     code,
   })
-  const newest = folderNewest(input.graph)
+  const { graph, newest } = laneStates(input.states, null)
   if (newest === null || newest !== input.seen) return refused(ERR.NOT_AS_SHOWN)
   if (!input.kept.includes(input.of) || !input.ofMade)
     return refused(ERR.STATE_NOT_KEPT)
   if (input.changes.length === 0) return refused(ERR.NOTHING_TO_RESTORE)
-  const planned = planState(input.graph, {
+  const planned = planState(graph, {
     id: restoreStateId(input.uuid),
     parents: [newest],
     made: { kind: "restore", of: input.of },

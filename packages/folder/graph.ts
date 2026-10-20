@@ -24,6 +24,12 @@ export const stateGraph = (records: readonly StateRecord[]): StateGraph => ({
   states: new Map(records.map(r => [r.id, r])),
 })
 
+/** Whether `states` record `id`: a virtual base or a shown merge is a snapshot first, a state only once recorded. */
+export const isRecorded = (
+  states: readonly StateRecord[],
+  id: PointId,
+): boolean => states.some(r => r.id === id)
+
 /** `of` and every state below it, walking parents; empty for a state not in the graph. */
 export function ancestors(g: StateGraph, of: PointId): ReadonlySet<PointId> {
   const seen = new Set<PointId>()
@@ -111,6 +117,64 @@ export function folderNewest(g: StateGraph): PointId | null {
 }
 
 /**
+ * What a folder project's states say of one lane, read together: the graph,
+ * accepted work's newest state, the lane's newest, and the state of
+ * accepted work's line that newest holds. Each caller uses a different part.
+ */
+export interface LaneStates {
+  readonly graph: StateGraph
+  /** Accepted work's newest state (`folderNewest`); null before the project's folder's first read. */
+  readonly newest: PointId | null
+  /** The lane's newest state (`laneNewest`); null before its start, or for no lane. */
+  readonly tip: PointId | null
+  /** The state of accepted work's line its tip holds (`folderStateHeld`); null with no tip, or none held. */
+  readonly start: PointId | null
+}
+
+/** `records` read for `lane`; for no lane, accepted work's newest alone. */
+export function laneStates(
+  records: readonly StateRecord[],
+  lane: ThreadId | null,
+): LaneStates {
+  const graph = stateGraph(records)
+  const tip = lane === null ? null : laneNewest(graph, lane)
+  return {
+    graph,
+    newest: folderNewest(graph),
+    tip,
+    start: tip === null ? null : folderStateHeld(graph, tip),
+  }
+}
+
+/**
+ * How `lane` gets `theirs`: nothing when its newest holds it already; else
+ * merged over the base the two share (`planBase`). Thrown for a lane with no
+ * state, or two states that share none: every state of a folder project
+ * descends from its first read.
+ */
+export function planLaneMerge(
+  records: readonly StateRecord[],
+  lane: ThreadId,
+  theirs: PointId,
+):
+  | { readonly kind: "nothing"; readonly ours: PointId }
+  | {
+      readonly kind: "merge"
+      readonly ours: PointId
+      readonly plan: BasePlan
+    } {
+  const { graph, tip: ours } = laneStates(records, lane)
+  if (ours === null) throw new Error(`${lane} has no state yet`)
+  if (isAncestor(graph, theirs, ours)) return { kind: "nothing", ours }
+  const plan = planBase(graph, ours, theirs)
+  if (plan === null)
+    throw new Error(
+      `${ours} and ${theirs} share no state: every state of a folder project descends from its first read`,
+    )
+  return { kind: "merge", ours, plan }
+}
+
+/**
  * The lowest common ancestors of `a` and `b`, sorted: none below another,
  * and none when they share no state. The common ancestors are closed under
  * parents, so one of them is below another exactly when it is a parent of
@@ -172,6 +236,13 @@ export function planBase(
     merges,
   }
 }
+
+/** How the base of `a` and `b` is had, over the graph `states` make (`planBase`). */
+export const planMergeBase = (
+  states: readonly StateRecord[],
+  a: PointId,
+  b: PointId,
+): BasePlan | null => planBase(stateGraph(states), a, b)
 
 /**
  * A virtual base's record, recorded when a conflict names it so that every

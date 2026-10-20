@@ -1,6 +1,7 @@
 import { pointId, type StateRecord, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { planFolderRecords } from "./proposed.ts"
+import { shownMergeId } from "./graph.ts"
+import { planFolderRecords, planShownMerge } from "./proposed.ts"
 
 const LANE = threadIdFor("1")
 const state = (
@@ -50,6 +51,7 @@ test("planFolderRecords: the proposed changes against accepted work's newest, th
       getLatest: { tip: "start-a", to: "line-1", files: ["b.txt"] },
       work: "some",
     },
+    drop: null,
   })
 })
 
@@ -68,4 +70,58 @@ test("planFolderRecords: a description holds while it describes the same two sta
   expect(
     plan({ ...described, start: pointId("line-0") })?.proposed.description,
   ).toBeNull()
+})
+
+test("planFolderRecords: the shown merge a new record replaces is dropped, unless an accept made it a state", () => {
+  const before = {
+    kind: "folder",
+    lane: LANE,
+    start: pointId("line-0"),
+    tip: pointId("start-a"),
+    files: ["a.txt"],
+    conflicts: [],
+    description: null,
+    at: 1,
+  } as const
+  const was = shownMergeId(before.start, before.tip)
+  expect(plan(before)?.drop).toBe(was)
+  const shown = { ...before, start: pointId("line-1") }
+  const accepted = shownMergeId(shown.start, shown.tip)
+  expect(
+    planFolderRecords({
+      lane: LANE,
+      states: [
+        ...STATES,
+        state(accepted, { kind: "accept", lane: LANE }, "line-1", "start-a"),
+      ],
+      files: [],
+      brings: [],
+      worked: false,
+      conflicts: [],
+      before: shown,
+      now: 2,
+    })?.drop,
+  ).toBeNull()
+})
+
+test("planShownMerge: a lane not begun has none to show; one accepted work holds already shows accepted work's newest", () => {
+  expect(planShownMerge(STATES, threadIdFor("2"))).toEqual({
+    kind: "withdraw",
+  })
+  expect(planShownMerge(STATES, LANE)).toEqual({
+    kind: "build",
+    newest: "line-1",
+    tip: "start-a",
+    start: "line-0",
+    holds: false,
+    shown: shownMergeId(pointId("line-1"), pointId("start-a")),
+  })
+  const accepted = [
+    ...STATES,
+    state("line-2", { kind: "accept", lane: LANE }, "line-1", "start-a"),
+  ]
+  expect(planShownMerge(accepted, LANE)).toMatchObject({
+    holds: true,
+    shown: "line-2",
+  })
 })

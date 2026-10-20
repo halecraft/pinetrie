@@ -1,6 +1,6 @@
 // folder/resolve — a folder lane's conflict closed by a choice, decided as a
 // value: the merge step that puts the chosen version in the lane's disk,
-// and the state the lane records of it. The agent's tool and the page both
+// the state the lane records of it, and the conflict it closes. The agent's tool and the page both
 // take this path, so a resolution is always a state of the lane's own.
 
 import type {
@@ -13,7 +13,8 @@ import type {
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
-import { laneNewest, planState, type StateGraph } from "./graph.ts"
+import { laneStates } from "./graph.ts"
+import { type FolderRecords, planStateRecords } from "./records.ts"
 
 /** What closing a conflict does. */
 export type ResolvePlanned =
@@ -24,6 +25,8 @@ export type ResolvePlanned =
       readonly step: MergeStep | null
       /** The lane's state of the resolution, its one parent the lane's newest. */
       readonly record: StateRecord
+      /** What it records: that state, and the conflict closed. */
+      readonly records: FolderRecords
     }
 
 /**
@@ -34,7 +37,7 @@ export type ResolvePlanned =
  * no state, or two newest, can make it.
  */
 export function planResolve(input: {
-  readonly graph: StateGraph
+  readonly states: readonly StateRecord[]
   readonly lane: ThreadId
   readonly path: string
   readonly open: ConflictRecord | undefined
@@ -47,26 +50,27 @@ export function planResolve(input: {
 }): ResolvePlanned {
   const { lane, path, open } = input
   if (open === undefined) return { kind: "no-conflict" }
-  const newest = laneNewest(input.graph, lane)
-  const planned =
-    newest === null
-      ? null
-      : planState(input.graph, {
-          id: input.id,
-          parents: [newest],
-          made: { kind: "resolve", lane, path },
-          at: input.at,
-          by: input.by,
-        })
-  if (planned?.kind !== "record")
-    throw new Error(
-      `${lane}'s resolution of ${path} cannot be recorded: ${JSON.stringify(planned)}`,
-    )
+  const { tip } = laneStates(input.states, lane)
+  if (tip === null)
+    throw new Error(`${lane}'s resolution of ${path} has no state to be on`)
+  const record: StateRecord = {
+    id: input.id,
+    parents: [tip],
+    made: { kind: "resolve", lane, path },
+    at: input.at,
+    by: input.by,
+  }
+  const recorded = planStateRecords(input.states, record)
   const step: MergeStep | null =
     input.choose === "ours"
       ? null
       : input.chosen === null || input.chosen.kind === "absent"
         ? { kind: "delete", path }
         : { kind: "take", path }
-  return { kind: "resolve", step, record: planned.record }
+  return {
+    kind: "resolve",
+    step,
+    record,
+    records: { ...recorded, closed: [{ lane, path }] },
+  }
 }

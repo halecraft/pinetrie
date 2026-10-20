@@ -65,7 +65,7 @@ const seen = {
 
 const accept = (over: Partial<Parameters<typeof planAccept>[0]> = {}) =>
   planAccept({
-    graph: stateGraph(STATES),
+    states: STATES,
     proposed,
     seen,
     shownMade: true,
@@ -88,19 +88,19 @@ describe("planAccept", () => {
     })
   })
   test("a read since the review is not as shown, whatever it touched", () => {
-    const graph = stateGraph([...STATES, record(L2, { kind: "read" }, L1)])
-    expect(accept({ graph })).toEqual({
+    const states = [...STATES, record(L2, { kind: "read" }, L1)]
+    expect(accept({ states })).toEqual({
       kind: "refused",
       code: ERR.NOT_AS_SHOWN,
     })
   })
   test("a turn since the review is not as shown", () => {
-    const graph = stateGraph([
+    const states = [
       ...STATES,
       record(TURN2, { kind: "turn", lane: LANE, entry: "e-2" as never }, TURN),
-    ])
+    ]
     // The record is rebuilt with the new tip; the page saw the old one.
-    expect(accept({ graph, proposed: { ...proposed, tip: TURN2 } })).toEqual({
+    expect(accept({ states, proposed: { ...proposed, tip: TURN2 } })).toEqual({
       kind: "refused",
       code: ERR.NOT_AS_SHOWN,
     })
@@ -435,10 +435,11 @@ describe("a concurrent save", () => {
 })
 
 describe("planRestore", () => {
-  const graph = stateGraph([...STATES, record(L2, { kind: "read" }, L1)])
+  const states = [...STATES, record(L2, { kind: "read" }, L1)]
+  const graph = stateGraph(states)
   const restore = (over: Partial<Parameters<typeof planRestore>[0]> = {}) =>
     planRestore({
-      graph,
+      states,
       kept: [L2, L1],
       of: L1,
       ofMade: true,

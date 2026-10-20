@@ -1,6 +1,7 @@
 import {
   type CardCommand,
   commitId,
+  type FolderBaseRecord,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type JjProposedChangesRecord,
@@ -11,7 +12,6 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { FolderAcceptedRecord } from "./accepted.ts"
-import type { FolderBaseRecord } from "./base.ts"
 import {
   type LatestNow,
   latestNow,

@@ -83,6 +83,15 @@ export const mutations: readonly Mutation[] = [
       "a lane of its own with no fork record is refused before the adapter is asked",
   },
   {
+    name: "a folder operation's closed conflicts are not deleted",
+    file: "apps/pinetrie/host/folder/record-writes.ts",
+    from: "  ...records.closed.map(c =>\n    deleteRecord(CONFLICT, conflictKey(c.lane, c.path)),\n  ),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it",
+  },
+  {
     name: "a folder lane's start writes its state itself",
     file: "apps/pinetrie/host/folder/history.ts",
     from: "      return recordedStart(writes)",
@@ -106,33 +115,6 @@ export const mutations: readonly Mutation[] = [
     to: '        isImageMime(answer.content) ? answer.content : "text",\n',
     command: unit,
     expect: "every blob and review file is served sandboxed and unsniffed",
-  },
-  {
-    name: "planKeep sweeps what the live set keeps not, whether or not it exists",
-    file: "apps/pinetrie/host/folder/keep.ts",
-    from: "      id => input.exists.has(id) && !live.has(id),\n",
-    to: "      id => !live.has(id),\n",
-    command: unit,
-    expect:
-      "planKeep: a state whose snapshot is gone already is not swept again",
-  },
-  {
-    name: "planKeep keeps a live state whose snapshot is gone",
-    file: "apps/pinetrie/host/folder/keep.ts",
-    from: "  const has = (id: PointId) => live.has(id) && input.exists.has(id)\n",
-    to: "  const has = (id: PointId) => live.has(id)\n",
-    command: unit,
-    expect:
-      "planKeep: kept names no state whose snapshot is gone, nor one swept",
-  },
-  {
-    name: "planKeep's kept drops a concurrent save",
-    file: "apps/pinetrie/host/folder/keep.ts",
-    from: '    r => r.made.kind === "concurrent" && has(r.id),\n',
-    to: "    () => false,\n",
-    command: unit,
-    expect:
-      "planKeep: kept is accepted work's line kept, newest first, a concurrent save before the accept it was made on",
   },
   {
     name: "a restore's commit makes no snapshot",
@@ -202,15 +184,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "tidy's arguments",
   },
-  {
-    name: "the sweep deletes a lane's tip",
-    file: "packages/folder/live.ts",
-    from: "    live.add(lane.tip).add(lane.start)\n",
-    to: "    live.add(lane.start)\n",
-    command: unit,
-    expect:
-      "planKeep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept",
-  },
   // ── a folder lane's history ──
   {
     name: "a folder state is snapshotted without its lane's sync",
@@ -266,15 +239,6 @@ export const mutations: readonly Mutation[] = [
       "sourceChanges: a file rewritten as it was is dropped; one whose mode changed is kept",
   },
   {
-    name: "a resolution records no state",
-    file: "apps/pinetrie/host/folder/history.ts",
-    from: "        setRecord(STATE, record),\n",
-    to: "",
-    command: unit,
-    expect:
-      "a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it",
-  },
-  {
     name: "a folder lane's fork restores from its source's snapshot",
     file: "apps/pinetrie/host/folder/history.ts",
     from: '      forkSetup(start.kind === "accepted" ? snapshotId(start.point) : null, []),',
@@ -311,19 +275,10 @@ export const mutations: readonly Mutation[] = [
       "scanFolder never enters an accept's reserved names at the root, and stamps them deeper down",
   },
   {
-    name: "a read with its stamps lost keeps what was deleted since",
-    file: "apps/pinetrie/host/folder/line.ts",
-    from: "      from: last === null ? null : newest,",
-    to: "      from: newest,",
-    command: unit,
-    expect:
-      "with the last read's stamps lost, a read copies everything into an empty disk, on accepted work's line",
-  },
-  {
     name: "a read's stamps are kept before its state is recorded",
     file: "apps/pinetrie/host/folder/line.ts",
-    from: "      await deps.writeState(planned.record)\n      await writeStamps(planned.stamps)\n",
-    to: "      await writeStamps(planned.stamps)\n      await deps.writeState(planned.record)\n",
+    from: "      await deps.write(planned.records)\n      await writeStamps(planned.stamps)\n",
+    to: "      await writeStamps(planned.stamps)\n      await deps.write(planned.records)\n",
     command: unit,
     expect:
       "a read whose paths moved is read again; its stamps are kept only once its state is recorded",

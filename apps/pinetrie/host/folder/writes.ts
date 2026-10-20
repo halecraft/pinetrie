@@ -45,21 +45,16 @@ import {
   planAsides,
   planNames,
   planRestore,
-  planState,
+  planStateRecords,
   planWriteSteps,
   shownMergeId,
-  stateGraph,
 } from "@pinetrie/folder"
 import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
-import {
-  deleteRecord,
-  FOLDER_WRITE_JOURNAL,
-  STATE,
-  setRecord,
-} from "@pinetrie/rules"
+import { deleteRecord, FOLDER_WRITE_JOURNAL, setRecord } from "@pinetrie/rules"
 import type { ActRefusal } from "../work/destination.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
 import type { FolderLine } from "./line.ts"
+import { recordWrites } from "./record-writes.ts"
 import { folderStamp } from "./scan.ts"
 import { withScratch } from "./scratch.ts"
 import {
@@ -190,13 +185,7 @@ export function createFolderWrites(deps: {
           snapshot: snapshotId(record.id),
         }),
       )
-    const planned = planState(stateGraph(deps.states()), record)
-    if (planned.kind === "refused")
-      throw new Error(
-        `the written state cannot be recorded: ${JSON.stringify(planned)}`,
-      )
-    if (planned.kind === "record")
-      await deps.write([setRecord(STATE, planned.record)])
+    await deps.write(recordWrites(planStateRecords(deps.states(), record)))
     await rm(at(writeStageDir(journal.id)), { recursive: true, force: true })
     const stamps = new Map<string, FolderStamp>(
       (await deps.line.stamps()) ?? [],
@@ -341,7 +330,7 @@ export function createFolderWrites(deps: {
       proposed === undefined ? null : shownMergeId(proposed.start, proposed.tip)
     // plan
     const planned = planAccept({
-      graph: stateGraph(deps.states()),
+      states: deps.states(),
       proposed,
       seen,
       shownMade:
@@ -380,7 +369,7 @@ export function createFolderWrites(deps: {
     const ofMade = await reader.runtime.snapshotExists(snapshotId(of))
     // plan
     const planned = planRestore({
-      graph: stateGraph(deps.states()),
+      states: deps.states(),
       kept: deps.kept(),
       of,
       ofMade,
@@ -454,18 +443,17 @@ export function createFolderWrites(deps: {
         })
         // Still being written: the next quiet read takes it.
         if (answer.kind === "moved") continue
-        const recorded = planState(stateGraph(deps.states()), {
-          id: state,
-          parents: [save.on],
-          made: { kind: "concurrent", path: save.path },
-          at: deps.now(),
-          by: null,
-        })
-        if (recorded.kind !== "record")
-          throw new Error(
-            `a concurrent save cannot be recorded: ${JSON.stringify(recorded)}`,
-          )
-        await deps.write([setRecord(STATE, recorded.record)])
+        await deps.write(
+          recordWrites(
+            planStateRecords(deps.states(), {
+              id: state,
+              parents: [save.on],
+              made: { kind: "concurrent", path: save.path },
+              at: deps.now(),
+              by: null,
+            }),
+          ),
+        )
         await unlink(at(save.aside))
         deps.log(
           `[host] ${save.path} was written through a file held across an accept: kept as a concurrent save (${state})`,

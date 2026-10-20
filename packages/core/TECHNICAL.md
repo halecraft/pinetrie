@@ -13,7 +13,8 @@ the highest package that all its users can import (ADR-0180). A stored
 shape's type is rules', beside its spec; it is core's only when core's own
 code names it, or a package below rules does: one that declares core and
 not rules (`lanes`, `jj`, `folder`, `schema`, `protocol`, `config`,
-`docker`, `lanehost`). So `LaneRecord`, `JjBaseRecord` and `StateRecord`
+`docker`, `lanehost`). So `LaneRecord`, `JjBaseRecord`, `FolderBaseRecord`
+(which `@pinetrie/folder`'s `planFolderRecords` builds) and `StateRecord`
 are here, and `SeatRecord` and `SetupRecord` are rules'. What a stored
 shape says, and how the host changes it, is `@pinetrie/rules`', whoever
 reads it. Core also holds the few

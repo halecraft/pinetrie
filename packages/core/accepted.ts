@@ -1,8 +1,9 @@
 // core/accepted — a jj project's accepted work and a thread's base, as
-// recorded, and what a catch-up would change. jj builds these records and
-// rules decodes them; the union of each with its folder half is rules'.
+// recorded, and what a catch-up would change; and a folder lane's base. jj
+// and the folder package build these records and rules decodes them; the
+// union of each base with the other is rules'.
 
-import type { CommitId, ThreadBase } from "./bases.ts"
+import type { CommitId, PointId, ThreadBase } from "./bases.ts"
 import type { ThreadId } from "./ids.ts"
 import type { FilesTouched } from "./proposed.ts"
 
@@ -107,6 +108,26 @@ export interface JjBaseRecord {
    * untraced start, or one jj could not diff. A thread is told its base has new
    * work only with `some`, and caught up quietly only with `none`.
    */
+  readonly work: FilesTouched
+}
+
+/**
+ * A folder lane's base: accepted work's state it began on or last caught up
+ * with. A folder project has no WIP, so its base is always accepted work.
+ */
+export interface FolderBaseRecord {
+  readonly kind: "folder"
+  readonly lane: ThreadId
+  readonly start: PointId
+  /**
+   * What catching up would change, read at the lane's newest state and your
+   * folder's then; null when accepted work had not moved.
+   */
+  readonly getLatest: {
+    readonly tip: PointId
+    readonly to: PointId
+    readonly files: readonly string[]
+  } | null
   readonly work: FilesTouched
 }
 

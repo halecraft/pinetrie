@@ -9,7 +9,7 @@ import {
   type EntryId,
   ERR,
   type ErrCode,
-  type FilesTouched,
+  type FolderBaseRecord,
   type ForkStart,
   forkParent,
   type JjAcceptedRecord,
@@ -89,26 +89,6 @@ const BaseRecordSchema = Type.Union([JjBaseSchema, FolderBaseSchema])
  * page reads. At start the host deletes those of the other kind.
  */
 export type BaseRecord = JjBaseRecord | FolderBaseRecord
-
-/**
- * A folder lane's base: accepted work's state it began on or last caught up
- * with. A folder project has no WIP, so its base is always accepted work.
- */
-export interface FolderBaseRecord {
-  readonly kind: "folder"
-  readonly lane: ThreadId
-  readonly start: PointId
-  /**
-   * What catching up would change, read at the lane's newest state and your
-   * folder's then; null when accepted work had not moved.
-   */
-  readonly getLatest: {
-    readonly tip: PointId
-    readonly to: PointId
-    readonly files: readonly string[]
-  } | null
-  readonly work: FilesTouched
-}
 
 /**
  * Each lane's base, as its history says it, of the project's kind, at the

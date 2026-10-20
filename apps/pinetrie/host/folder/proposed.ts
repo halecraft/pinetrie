@@ -19,13 +19,12 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import {
-  folderNewest,
-  folderStateHeld,
-  isAncestor,
-  laneNewest,
-  planBase,
+  isRecorded,
+  planFolderRecords,
+  planMergeBase,
+  planShownMerge,
   shownMergeId,
-  stateGraph,
+  shownPoint,
 } from "@pinetrie/folder"
 import type { Keeper } from "@pinetrie/keeper"
 import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
@@ -34,7 +33,6 @@ import {
   answerDiff,
   BASE,
   deleteRecord,
-  type FolderBaseRecord,
   MAX_DIFF_BYTES,
   PROPOSED_CHANGES,
   planReviewRead,
@@ -57,58 +55,6 @@ import type { FolderWrites } from "./writes.ts"
 
 /** The most of proposed changes' diff a description reads. */
 const DESCRIBE_DIFF_BYTES = 200_000
-
-/**
- * A lane's proposed changes and base records from what the graph says now; null
- * for a lane that has not begun, or a project before its first read.
- */
-export function planFolderRecords(input: {
-  readonly lane: ThreadId
-  readonly states: readonly StateRecord[]
-  /** The proposed changes' files: the source paths differing between accepted work's newest and the shown merge. */
-  readonly files: readonly string[]
-  /** What catching up would change in the lane: the source paths differing between its newest and the shown merge. */
-  readonly brings: readonly string[]
-  /** Whether the lane changed anything since its start. */
-  readonly worked: boolean
-  readonly conflicts: readonly string[]
-  readonly before: FolderProposedChangesRecord | undefined
-  readonly now: number
-}): {
-  readonly proposed: FolderProposedChangesRecord
-  readonly base: FolderBaseRecord
-} | null {
-  const g = stateGraph(input.states)
-  const newest = folderNewest(g)
-  const tip = laneNewest(g, input.lane)
-  const start = tip === null ? null : folderStateHeld(g, tip)
-  if (newest === null || tip === null || start === null) return null
-  const { before } = input
-  return {
-    proposed: {
-      kind: "folder",
-      lane: input.lane,
-      start: newest,
-      tip,
-      files: input.files,
-      conflicts: input.conflicts,
-      // A description holds while it describes the same two states.
-      description:
-        before?.start === newest && before.tip === tip
-          ? before.description
-          : null,
-      at: input.now,
-    },
-    base: {
-      kind: "folder",
-      lane: input.lane,
-      start,
-      getLatest:
-        start === newest ? null : { tip, to: newest, files: input.brings },
-      work: input.worked ? "some" : "none",
-    },
-  }
-}
 
 interface FolderProposedChanges extends ProposedChangesActs {
   /** Every folder lane's proposed changes and base built again: accepted work moved. */
@@ -137,13 +83,6 @@ type ShownReader = StateReader & {
 }
 
 /**
- * The state a folder proposed changes record shows: its shown merge, or
- * its tip when it holds no work, which has none.
- */
-export const shownPoint = (r: FolderProposedChangesRecord): PointId =>
-  r.files.length === 0 ? r.tip : shownMergeId(r.start, r.tip)
-
-/**
  * `tip` merged onto `newest` as their shown merge, unless it is made
  * already and `known` holds its conflicts: on a scratch disk
  * (`withScratch`), on the project's queue. Null when their
@@ -159,7 +98,7 @@ export async function makeShownMerge(
   const shown = shownMergeId(newest, tip)
   const made = await reader.runtime.snapshotExists(snapshotId(shown))
   if (made && known !== null) return { paths: known }
-  const plan = planBase(stateGraph(states()), newest, tip)
+  const plan = planMergeBase(states(), newest, tip)
   if (plan === null || (await baseMissing(reader, plan)) !== null) return null
   if (made)
     await reader.runtime.disk({
@@ -188,9 +127,7 @@ export async function makeShownMerge(
     )
     return { paths }
   } finally {
-    await dropUnrecordedBase(reader.runtime, plan, s =>
-      stateGraph(states()).states.has(s),
-    )
+    await dropUnrecordedBase(reader.runtime, plan, s => isRecorded(states(), s))
   }
 }
 
@@ -220,27 +157,23 @@ export function startFolderProposedChanges(deps: {
 
   /** `lane`'s proposed changes and base built again, on the project's queue already. */
   async function rebuildNow(lane: ThreadId): Promise<void> {
-    // gather
+    // gather, then plan what to read
     const states = deps.states()
-    const g = stateGraph(states)
-    const newest = folderNewest(g)
-    const tip = laneNewest(g, lane)
-    const start = tip === null ? null : folderStateHeld(g, tip)
-    if (newest === null || tip === null || start === null) return withdraw(lane)
+    const shown = planShownMerge(states, lane)
+    if (shown.kind === "withdraw") return withdraw(lane)
+    const { newest, tip, start } = shown
     const before = folderRecord(lane)
     const changes = (a: PointId, b: PointId) =>
       a === b ? Promise.resolve([]) : sourceChanges(reader, a, b)
     const worked = await changes(start, tip)
-    // A tip accepted work holds already has nothing to show.
-    const holds = isAncestor(g, tip, newest)
-    const merged = holds
+    const merged = shown.holds
       ? { paths: [] }
       : await makeShownMerge(
           reader,
           deps.states,
           newest,
           tip,
-          before?.start === newest && before.tip === tip
+          before !== undefined && before.start === newest && before.tip === tip
             ? before.conflicts.filter(p => !deps.conflicts(lane).includes(p))
             : null,
         )
@@ -250,10 +183,9 @@ export function startFolderProposedChanges(deps: {
       )
       return
     }
-    const shown = holds ? newest : shownMergeId(newest, tip)
     const [files, brings] = await Promise.all([
-      changes(newest, shown),
-      changes(tip, shown),
+      changes(newest, shown.shown),
+      changes(tip, shown.shown),
     ])
     // plan
     const planned = planFolderRecords({
@@ -272,19 +204,10 @@ export function startFolderProposedChanges(deps: {
       setRecord(PROPOSED_CHANGES, planned.proposed),
       setRecord(BASE, planned.base),
     ])
-    // The shown merge it replaces goes, unless an accept made it a state.
-    const was =
-      before === undefined || before.files.length === 0
-        ? null
-        : shownMergeId(before.start, before.tip)
-    if (
-      was !== null &&
-      was !== shownPoint(planned.proposed) &&
-      !stateGraph(deps.states()).states.has(was)
-    )
+    if (planned.drop !== null)
       await reader.runtime.disk({
         kind: "delete-snapshots",
-        ids: [snapshotId(was)],
+        ids: [snapshotId(planned.drop)],
       })
     deps.baseChanged(lane)
   }

@@ -6,6 +6,133 @@ const graph = "packages/folder/graph.ts"
 const merge = "packages/folder/merge.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a folder operation planned whole ──
+  {
+    name: "no state is recorded",
+    file: "packages/folder/graph.ts",
+    from: "): boolean => states.some(r => r.id === id)\n",
+    to: "): boolean => false\n",
+    command: unit,
+    expect:
+      "isRecorded and planMergeBase: a state the records hold, and the base of two states over the graph the records make",
+  },
+  {
+    name: "a tip accepted work holds is shown as a merge",
+    file: "packages/folder/proposed.ts",
+    from: "  const holds = isAncestor(graph, tip, newest)\n",
+    to: "  const holds = false\n",
+    command: unit,
+    expect:
+      "planShownMerge: a lane not begun has none to show; one accepted work holds already shows accepted work's newest",
+  },
+  {
+    name: "an accepted shown merge is dropped",
+    file: "packages/folder/proposed.ts",
+    from: "was !== null && was !== shownPoint(proposed) && !graph.states.has(was)",
+    to: "was !== null && was !== shownPoint(proposed)",
+    command: unit,
+    expect:
+      "planFolderRecords: the shown merge a new record replaces is dropped, unless an accept made it a state",
+  },
+  {
+    name: "a lane holding theirs merges it again",
+    file: "packages/folder/graph.ts",
+    from: '  if (isAncestor(graph, theirs, ours)) return { kind: "nothing", ours }\n',
+    to: "",
+    command: unit,
+    expect:
+      "planLaneMerge: nothing when the lane's newest holds theirs already; else a merge over the base they share",
+  },
+  {
+    name: "the sweep deletes a lane's tip",
+    file: "packages/folder/live.ts",
+    from: "    live.add(lane.tip).add(lane.start)\n",
+    to: "    live.add(lane.start)\n",
+    command: unit,
+    expect:
+      "planKeep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept",
+  },
+  {
+    name: "planKeep sweeps what the live set keeps not, whether or not it exists",
+    file: "packages/folder/keep.ts",
+    from: "      id => input.exists.has(id) && !live.has(id),\n",
+    to: "      id => !live.has(id),\n",
+    command: unit,
+    expect:
+      "planKeep: a state whose snapshot is gone already is not swept again",
+  },
+  {
+    name: "planKeep keeps a live state whose snapshot is gone",
+    file: "packages/folder/keep.ts",
+    from: "  const has = (id: PointId) => live.has(id) && input.exists.has(id)\n",
+    to: "  const has = (id: PointId) => live.has(id)\n",
+    command: unit,
+    expect:
+      "planKeep: kept names no state whose snapshot is gone, nor one swept",
+  },
+  {
+    name: "planKeep's kept drops a concurrent save",
+    file: "packages/folder/keep.ts",
+    from: '    r => r.made.kind === "concurrent" && has(r.id),\n',
+    to: "    () => false,\n",
+    command: unit,
+    expect:
+      "planKeep: kept is accepted work's line kept, newest first, a concurrent save before the accept it was made on",
+  },
+  {
+    name: "a read with its stamps lost keeps what was deleted since",
+    file: "packages/folder/line.ts",
+    from: "      from: last === null ? null : newest,",
+    to: "      from: newest,",
+    command: unit,
+    expect:
+      "with the last read's stamps lost, a read copies everything into an empty disk, on accepted work's line",
+  },
+  {
+    name: "a resolution records no state",
+    file: "packages/folder/resolve.ts",
+    from: "    records: { ...recorded, closed: [{ lane, path }] },\n",
+    to: "    records: { ...recorded, states: [], closed: [{ lane, path }] },\n",
+    command: unit,
+    expect:
+      "planResolve: ours takes no step, and records a resolve on the lane's newest",
+  },
+  {
+    name: "a resolution closes no conflict",
+    file: "packages/folder/resolve.ts",
+    from: "    records: { ...recorded, closed: [{ lane, path }] },\n",
+    to: "    records: { ...recorded, closed: [] },\n",
+    command: unit,
+    expect:
+      "planResolve: ours takes no step, and records a resolve on the lane's newest, the conflict closed",
+  },
+  {
+    name: "a virtual base no conflict names is recorded",
+    file: "packages/folder/records.ts",
+    from: '    input.plan.kind === "virtual" && input.paths.length > 0\n',
+    to: '    input.plan.kind === "virtual"\n',
+    command: unit,
+    expect:
+      "planGetLatestRecords: the merge's state on both sides, a conflict per path, and a virtual base's state only when a conflict names it",
+  },
+  {
+    name: "a state recorded already is recorded again",
+    file: "packages/folder/records.ts",
+    from: '    case "recorded":\n      return NO_RECORDS\n',
+    to: '    case "recorded":\n      return { ...NO_RECORDS, states: [record] }\n',
+    command: unit,
+    expect:
+      "planStateRecords: a new state is recorded, one recorded with the same parents is not, and a refused one throws",
+  },
+  {
+    name: "a lane's start is read as its tip",
+    file: "packages/folder/graph.ts",
+    from: "    start: tip === null ? null : folderStateHeld(graph, tip),\n",
+    to: "    start: tip,\n",
+    command: unit,
+    expect:
+      "laneStates: accepted work's newest, the lane's tip and the state its tip holds, read together",
+  },
   {
     name: "pairRenames pairs a candidate with two equal partners",
     file: "packages/folder/review.ts",

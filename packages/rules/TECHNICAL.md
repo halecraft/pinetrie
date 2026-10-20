@@ -32,8 +32,8 @@ record, are core's; the trailer format and the proposed changes' facts and decis
 are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.
 A record's type is beside its spec (`SeatRecord` beside `SEAT`), unless
 core or a package below rules names it: `LaneRecord` and `JjBaseRecord`
-are core's, since jj names them, and `BaseRecord`, the union of
-`JjBaseRecord` and `FolderBaseRecord`, is here.
+are core's, since jj names them, `FolderBaseRecord` since the folder
+package does, and `BaseRecord`, the union of the two, is here.
 
 ## Where things are
 

@@ -30,13 +30,14 @@ import {
   writerId,
 } from "@pinetrie/core"
 import {
-  folderNewest,
   isAncestor,
-  laneNewest,
-  planBase,
+  type KeepPlanned,
+  type LaneStates,
+  laneStates,
+  planKeep,
+  planMergeBase,
   type StateGraph,
   shownMergeId,
-  stateGraph,
 } from "@pinetrie/folder"
 import { projectDisks } from "@pinetrie/lanehost"
 import {
@@ -64,16 +65,15 @@ import {
   FOLDER_WRITE_JOURNAL,
   type ReviewAnswer,
   STATE,
-  setRecord,
 } from "@pinetrie/rules"
 import { afterAll, describe, expect, test } from "vitest"
 import { sourceChanges } from "./changes.ts"
 import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
-import { type KeepPlanned, planKeep } from "./keep.ts"
 import { createFolderLine } from "./line.ts"
 import { makeShownMerge } from "./proposed.ts"
 import type { FolderLane } from "./proven.ts"
+import { recordWrites } from "./record-writes.ts"
 import { readFolderFile, readFolderReview } from "./review.ts"
 import { createFolderWrites } from "./writes.ts"
 
@@ -119,6 +119,8 @@ type FolderRig = HistoryRig & {
   snapshotExists(state: PointId): Promise<boolean>
   deleteSnapshot(state: PointId): Promise<void>
   graph(): StateGraph
+  /** What the states say of `lane`, or of accepted work alone (`laneStates`). */
+  states(lane: ThreadId | null): LaneStates
 }
 
 async function makeRig(): Promise<FolderRig> {
@@ -225,7 +227,7 @@ async function makeRig(): Promise<FolderRig> {
     queue: project,
     stampsFile: path.join(dir, "folder-stamps.json"),
     states: store.states,
-    writeState: r => store.write([setRecord(STATE, r)]),
+    write: r => store.write(recordWrites(r)),
     newId,
     now: () => ids,
     moved: () => {},
@@ -255,7 +257,7 @@ async function makeRig(): Promise<FolderRig> {
     moved: () => {},
     log: () => {},
   })
-  const graph = () => stateGraph(store.states())
+  const graph = () => laneStates(store.states(), null).graph
   let lanes = 0
   const started: ThreadId[] = []
 
@@ -378,6 +380,7 @@ async function makeRig(): Promise<FolderRig> {
     deleteSnapshot: state =>
       runtime.disk({ kind: "delete-snapshots", ids: [snapshotId(state)] }),
     graph,
+    states: lane => laneStates(store.states(), lane),
 
     fileAt: (site, p) =>
       readFolderSiteFile({ states: store.states, disks: folderDisks }, site, p),
@@ -402,7 +405,7 @@ async function makeRig(): Promise<FolderRig> {
       // The proposed changes as the host shows them: the lane's tip merged
       // onto accepted work's newest, read after the folder's last save.
       const newest = await line.read()
-      const tip = laneNewest(graph(), lane)
+      const { tip } = laneStates(store.states(), lane)
       if (tip === null) throw new Error("nothing to accept")
       const merged = await project.enqueue(() =>
         makeShownMerge(reader, store.states, newest, tip, null),
@@ -425,7 +428,7 @@ async function makeRig(): Promise<FolderRig> {
       )
       if (answer.kind !== "done")
         throw new Error(`the accept was refused: ${JSON.stringify(answer)}`)
-      const accepted = folderNewest(graph())
+      const accepted = laneStates(store.states(), null).newest
       if (accepted === null)
         throw new Error("no accepted work after the accept")
       return accepted
@@ -480,7 +483,7 @@ describe.skipIf(!onBtrfs)(
           ),
         ).toEqual({ kind: "resolved" })
         expect(await lane.read("a.txt")).toBe("one\ntwo (yours)\nthree\n")
-        const resolved = laneNewest(rig.graph(), lane.lane)
+        const resolved = rig.states(lane.lane).tip
         if (resolved === null) throw new Error("the lane has no state")
         expect(rig.graph().states.get(resolved)?.made).toEqual({
           kind: "resolve",
@@ -602,7 +605,7 @@ describe.skipIf(!onBtrfs)(
           follow: null,
         })
         expect(rig.graph().states.size).toBe(states)
-        expect(laneNewest(rig.graph(), branch.lane)).toBe(b1)
+        expect(rig.states(branch.lane).tip).toBe(b1)
         expect(await branch.read("a.txt")).toBe(lines("P", "B"))
       } finally {
         await rig.close()
@@ -639,9 +642,13 @@ describe.skipIf(!onBtrfs)(
         await lane.withHistory(h =>
           h.resolve("a.txt", "ours", { kind: "agent" }),
         )
-      const upToDate = laneNewest(rig.graph(), lane.lane)
+      const upToDate = rig.states(lane.lane).tip
       if (upToDate === null) throw new Error("the lane has no state")
-      const plan = planBase(rig.graph(), upToDate, theirs)
+      const plan = planMergeBase(
+        [...rig.graph().states.values()],
+        upToDate,
+        theirs,
+      )
       if (plan?.kind !== "virtual") throw new Error("no criss-cross")
       return { lane, theirs, upToDate, base: plan.name }
     }
@@ -761,7 +768,7 @@ describe.skipIf(!onBtrfs)(
         })
         await rig.sweep(5)
         expect(await rig.restore(first, second)).toEqual({ kind: "done" })
-        const newest = folderNewest(rig.graph())
+        const newest = rig.states(null).newest
         if (newest === null) throw new Error("no accepted work")
         expect(rig.graph().states.get(newest)?.made).toEqual({
           kind: "restore",
@@ -817,7 +824,7 @@ describe.skipIf(!onBtrfs)(
         expect(await rig.snapshotExists(open.record.id)).toBe(false)
         await rig.recover()
         expect(await rig.snapshotExists(open.record.id)).toBe(true)
-        expect(folderNewest(rig.graph())).toBe(open.record.id)
+        expect(rig.states(null).newest).toBe(open.record.id)
         expect(await rig.folderFile("a.txt")).toBe("one\n")
       } finally {
         await rig.close()
@@ -837,7 +844,7 @@ describe.skipIf(!onBtrfs)(
         if (open === undefined) throw new Error("no journal kept")
         await rig.recover()
         expect(await rig.snapshotExists(open.record.id)).toBe(false)
-        expect(folderNewest(rig.graph())).toBe(second)
+        expect(rig.states(null).newest).toBe(second)
         expect(await rig.folderFile("a.txt")).toBe("two\n")
       } finally {
         await rig.close()

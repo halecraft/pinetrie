@@ -8,7 +8,6 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { stateGraph } from "./graph.ts"
 import { planResolve } from "./resolve.ts"
 
 const LANE = threadIdFor("1")
@@ -23,7 +22,7 @@ const record = (
   at: 0,
   by: null,
 })
-const graph = stateGraph([
+const states = [
   record("line-1", { kind: "read" }),
   record("start-1", { kind: "start", lane: LANE }, "line-1"),
   record(
@@ -33,7 +32,7 @@ const graph = stateGraph([
   ),
   record("line-2", { kind: "read" }, "line-1"),
   record("catch-up-1", { kind: "get-latest", lane: LANE }, "turn-1", "line-2"),
-])
+]
 const open: ConflictRecord = {
   lane: LANE,
   path: "a.txt",
@@ -44,7 +43,7 @@ const open: ConflictRecord = {
 const FILE: PathFact = { kind: "file", exec: false, content: "text", size: 3 }
 const resolve = (over: Partial<Parameters<typeof planResolve>[0]> = {}) =>
   planResolve({
-    graph,
+    states,
     lane: LANE,
     path: "a.txt",
     open,
@@ -56,16 +55,22 @@ const resolve = (over: Partial<Parameters<typeof planResolve>[0]> = {}) =>
     ...over,
   })
 
-test("planResolve: ours takes no step, and records a resolve on the lane's newest", () => {
+test("planResolve: ours takes no step, and records a resolve on the lane's newest, the conflict closed", () => {
+  const record = {
+    id: "resolve-1",
+    parents: ["catch-up-1"],
+    made: { kind: "resolve", lane: LANE, path: "a.txt" },
+    at: 1,
+    by: null,
+  }
   expect(resolve({ choose: "ours", chosen: null })).toEqual({
     kind: "resolve",
     step: null,
-    record: {
-      id: "resolve-1",
-      parents: ["catch-up-1"],
-      made: { kind: "resolve", lane: LANE, path: "a.txt" },
-      at: 1,
-      by: null,
+    record,
+    records: {
+      states: [record],
+      conflicts: [],
+      closed: [{ lane: LANE, path: "a.txt" }],
     },
   })
 })

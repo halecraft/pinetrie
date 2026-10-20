@@ -12,10 +12,9 @@ import {
   type FolderStamp,
   lineStateId,
   type PointId,
-  type ReadPath,
   type StateRecord,
 } from "@pinetrie/core"
-import { folderNewest, planRead, planState, stateGraph } from "@pinetrie/folder"
+import { type FolderRecords, planLineRead } from "@pinetrie/folder"
 import type { FolderDisks, LaneQueue } from "@pinetrie/lanes"
 import { decodeFolderStamps, encodeFolderStamps } from "@pinetrie/rules"
 import { replaceFile } from "../replace-file.ts"
@@ -23,71 +22,6 @@ import { scanFolder } from "./scan.ts"
 
 /** How many reads in a row may find a path moved before the read gives up. */
 const READ_TRIES = 5
-
-/** What a read does, decided from what it gathered. */
-type LineRead =
-  /** The project's folder holds what accepted work's newest state holds. */
-  | { readonly kind: "current"; readonly newest: PointId }
-  | {
-      readonly kind: "read"
-      readonly call: Parameters<FolderDisks["readIn"]>[0]
-      readonly record: StateRecord
-      readonly stamps: ReadonlyMap<string, FolderStamp>
-    }
-
-/**
- * The read to make. With no stamps kept (none, or none since a read was
- * lost), a read copies every path into an empty disk, so nothing deleted
- * since lingers; else only what changed, on accepted work's newest state. The
- * first read makes a state even of an empty folder: a lane needs one to
- * start from.
- */
-export function planLineRead(input: {
-  readonly states: readonly StateRecord[]
-  readonly last: ReadonlyMap<string, FolderStamp> | null
-  readonly scan: ReadonlyMap<string, FolderStamp>
-  /** The new state's id, if one is made. */
-  readonly state: PointId
-  readonly at: number
-}): LineRead {
-  const { scan, state } = input
-  const graph = stateGraph(input.states)
-  const newest = folderNewest(graph)
-  const last = newest === null ? null : input.last
-  const plan = planRead(last ?? new Map(), scan)
-  if (newest !== null && last !== null && plan === null)
-    return { kind: "current", newest }
-  const stamped = (paths: readonly string[]): ReadPath[] =>
-    paths.flatMap(p => {
-      const s = scan.get(p)
-      return s === undefined
-        ? []
-        : [{ path: p, stamp: { size: s.size, ctimeNs: s.ctimeNs } }]
-    })
-  const record: StateRecord = {
-    id: state,
-    parents: newest === null ? [] : [newest],
-    made: { kind: "read" },
-    at: input.at,
-    by: null,
-  }
-  const planned = planState(graph, record)
-  if (planned.kind !== "record")
-    throw new Error(`a read's state is refused: ${JSON.stringify(planned)}`)
-  return {
-    kind: "read",
-    call: {
-      from: last === null ? null : newest,
-      state,
-      paths: stamped(
-        last === null ? [...scan.keys()].sort() : (plan?.changed ?? []),
-      ),
-      deleted: last === null ? [] : (plan?.deleted ?? []),
-    },
-    record: planned.record,
-    stamps: scan,
-  }
-}
 
 export interface FolderLine {
   /** The project's folder read, after any read before it: its newest state then. */
@@ -115,7 +49,8 @@ export function createFolderLine(deps: {
   /** The session's file of the last read's stamps (`SessionFiles.folderStamps`). */
   readonly stampsFile: string
   readonly states: () => readonly StateRecord[]
-  readonly writeState: (record: StateRecord) => Promise<void>
+  /** A read's records written (`recordWrites`). */
+  readonly write: (records: FolderRecords) => Promise<void>
   readonly newId: () => string
   readonly now: () => number
   /** A read made a state: accepted work moved. */
@@ -169,10 +104,10 @@ export function createFolderLine(deps: {
         moved = answer.paths
         continue
       }
-      await deps.writeState(planned.record)
+      await deps.write(planned.records)
       await writeStamps(planned.stamps)
-      deps.moved(planned.record.id)
-      return planned.record.id
+      deps.moved(planned.call.state)
+      return planned.call.state
     }
     throw new Error(
       `the project's folder kept changing while it was read: ${moved.slice(0, 5).join(", ")}`,

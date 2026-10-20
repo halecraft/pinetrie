@@ -4,8 +4,11 @@ A folder project's history, decided as values (ADR-0142): its graph of
 states and their merge bases (`graph.ts`), the path merge's plan
 (`merge.ts`), the snapshots kept (`live.ts`), a write into the project's
 folder, an accept's or a restore's (`accept.ts`, ADR-0159, ADR-0165), a
-conflict closed by a choice (`resolve.ts`), and a review of two states
-(`review.ts`, ADR-0165). It declares only
+conflict closed by a choice (`resolve.ts`), a review of two states
+(`review.ts`, ADR-0165), a read of the project's folder into its line
+(`line.ts`), what is kept (`keep.ts`), a lane's proposed changes and base
+records (`proposed.ts`), and what each operation records (`records.ts`).
+It declares only
 `@pinetrie/core` (`workspace.test.ts`) and does no I/O: lanehost's disks
 role carries out what it decides, through the folder adapter, and the
 host's `apps/pinetrie/host/folder/` is the only code that touches your
@@ -15,7 +18,54 @@ lanehost declares only core and channel.
 
 For an operation the host carries out, this package exports one plan,
 its facts and its result, and keeps the helpers that plan builds on out of
-its index (`docs/01-architecture.md`, One plan per operation).
+its index (`docs/01-architecture.md`, One plan per operation). `index.ts`
+exports by name only what another package imports; a name only this
+package and its tests use is imported from its module.
+
+## What an operation reads and records
+
+- **A lane's states are read together** (`laneStates`, `graph.ts`): the
+  graph, accepted work's newest, the lane's tip and the state of accepted
+  work's line that tip holds. Every caller uses a different part of the
+  four, so none walks `stateGraph`, `folderNewest`, `laneNewest` and
+  `folderStateHeld` itself; those stay in their module. Every plan the
+  host calls takes the state records, never a graph it built
+  (`planAccept`, `planRestore`, `planResolve`, `planStateRecords`; a base
+  over two states is `planMergeBase`), and whether a snapshot is a
+  recorded state is `isRecorded`: a virtual base and a shown merge are
+  snapshots first, states only once recorded.
+- **What an operation records is a value** (`FolderRecords`,
+  `records.ts`): the states it makes, the conflicts it opens, and those it
+  closes. A state is checked against the graph first (`planStateRecords`:
+  one recorded with the same parents is nothing, a refused one throws,
+  since every caller proposes a state the graph must take). Getting the
+  latest records its merge's state, a conflict per path left conflicted,
+  and a virtual base's state only when a conflict names it
+  (`planGetLatestRecords`); a resolution its state and the conflict it
+  closes (`planResolve`). The record specs are `@pinetrie/rules`', which
+  this package does not declare (ADR-0180), so the host turns
+  `FolderRecords` into writes in one function
+  (`apps/pinetrie/host/folder/record-writes.ts`).
+- **Whether a lane has anything to merge** (`planLaneMerge`): nothing when
+  its newest holds theirs already; else the merge over the base they
+  share (`planBase`), thrown for two states that share none.
+- **A lane's proposed changes are planned in two phases**
+  (`proposed.ts`): what to read (`planShownMerge`: none to show for a lane
+  not begun, accepted work's newest when it holds the tip already, else
+  the shown merge), then, once the host made the merge and read the paths,
+  the records (`planFolderRecords`), with the shown merge the new record
+  replaces to delete (`drop`), unless an accept made it a state. Only an
+  accept records a shown merge, on the project's queue, where proposed
+  changes are built too, so the states read at the start hold. The base
+  record's type (`FolderBaseRecord`) is core's, as the jj half's is.
+- **A read of the project's folder** (`planLineRead`, `line.ts`): with no
+  stamps kept, every path copied into an empty disk; else only what
+  changed (`planRead`), on accepted work's newest; nothing changed makes no
+  state, but the first read makes one even of an empty folder. The disks
+  role's call is the plan's (`ReadInCall`).
+- **What is kept** (`planKeep`, `keep.ts`): the snapshots the live set
+  keeps not, to delete, and accepted work's states the history may show,
+  newest first, each concurrent save before the accept it was made on.
 
 ## The graph (`graph.ts`)
 

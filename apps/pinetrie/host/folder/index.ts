@@ -18,6 +18,7 @@ import {
   snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
+import { planKeep } from "@pinetrie/folder"
 import {
   createQueue,
   laneIgnores,
@@ -37,7 +38,6 @@ import {
   FOLDER_WRITE_JOURNAL,
   STATE,
   setIfChanged,
-  setRecord,
 } from "@pinetrie/rules"
 import { failed } from "../basics.ts"
 import { createDescriber } from "../describe.ts"
@@ -45,10 +45,10 @@ import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
 import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
-import { planKeep } from "./keep.ts"
 import { createFolderLine } from "./line.ts"
 import { startFolderProposedChanges } from "./proposed.ts"
 import { proveFolderLane } from "./proven.ts"
+import { recordWrites } from "./record-writes.ts"
 import { watchFolder } from "./watch.ts"
 import { createFolderWrites } from "./writes.ts"
 
@@ -93,7 +93,7 @@ export function startFolderProject(dir: {
         queue,
         stampsFile: files.folderStamps,
         states: store.states,
-        writeState: r => records.writeValues([setRecord(STATE, r)]),
+        write: r => records.writeValues(recordWrites(r)),
         newId: basics.newId,
         now: basics.now,
         moved,

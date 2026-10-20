@@ -265,9 +265,9 @@ export const mutations: readonly Mutation[] = [
   // ── a folder project, in the lanes suite ──
   {
     name: "a folder lane's proposed changes hold no file",
-    file: "apps/pinetrie/host/folder/proposed.ts",
-    from: "      files: input.files,\n",
-    to: "      files: [],\n",
+    file: "packages/folder/proposed.ts",
+    from: "    files: input.files,\n",
+    to: "    files: [],\n",
     suite: "lanes",
     scenario: "folder",
     expect:
