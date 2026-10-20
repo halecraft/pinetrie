@@ -9,7 +9,7 @@ import { pageDir, thisInstall } from "@pinetrie/install"
 import { STAMP_FILE } from "@pinetrie/web/stamp"
 
 /** Vite's dev server, as the host uses it. */
-export interface LivePage {
+interface LivePage {
   readonly middlewares: (req: IncomingMessage, res: ServerResponse) => void
   close(): Promise<void>
 }

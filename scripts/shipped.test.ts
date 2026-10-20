@@ -7,7 +7,7 @@ import { parseSync } from "oxc-parser"
 import { describe, expect, test } from "vitest"
 import { OBSERVER_SOURCE_DIRS } from "../packages/lanehost/index.ts"
 import { reachable } from "./imports.ts"
-import { gatherPackage } from "./package.ts"
+import { gatherPackage, importGraph, shippedSources } from "./package.ts"
 import { type Node, walk } from "./sources.ts"
 
 const IMPORTING = [
@@ -58,13 +58,8 @@ test("tsPathStrings: a path ending in .ts, in a string or a template, not a sent
 describe("the package's shipped files", () => {
   const root = path.join(import.meta.dirname, "..")
   const g = gatherPackage(root)
-  const graph = new Map(
-    [...g.targets].map(([file, targets]) => [
-      file,
-      [...targets.values()].flatMap(t => (t.kind === "file" ? [t.path] : [])),
-    ]),
-  )
-  const shipped = [...reachable(graph, g.entries)]
+  const graph = importGraph(g)
+  const shipped = shippedSources(g)
 
   test("no shipped file names a .ts path in a string, outside @pinetrie/install", () => {
     const named = shipped

@@ -6,7 +6,6 @@
   "exports": {
     "./commit-marks": "./commit-marks.ts",
     "./copy": "./copy.ts",
-    "./package.json": "./package.json",
     "./stamp": "./stamp.ts",
     "./storage-keys": "./storage-keys.ts"
   },

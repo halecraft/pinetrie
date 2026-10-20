@@ -60,7 +60,7 @@ export type PackagePlan =
   | { readonly kind: "refused"; readonly why: readonly string[] }
 
 /** What the package starts from: the command, and every script pine·trie runs by path. */
-export const ENTRIES: readonly string[] = [
+const ENTRIES: readonly string[] = [
   "apps/pinetrie/bin.ts",
   ...SCRIPT_ENTRIES.map(e => `${e}.ts`),
 ]
@@ -124,7 +124,7 @@ const isShippedPageFile = (file: string) =>
   file.startsWith(`${PAGE}/dist/`) && !file.endsWith("/inputs.json")
 
 /** A third-party specifier's package name. */
-export const packageName = (specifier: string): string =>
+const packageName = (specifier: string): string =>
   specifier
     .split("/")
     .slice(0, specifier.startsWith("@") ? 2 : 1)
@@ -139,16 +139,27 @@ const relativeImport = (from: string, to: string): string => {
   return rel.startsWith(".") ? rel : `./${rel}`
 }
 
-/** The package `gathered` makes: pure. */
-export function planPackage(g: Gathered): PackagePlan {
-  const why: string[] = []
-  const graph = new Map(
+/** Each source, and the repo files it loads. */
+export const importGraph = (
+  g: Pick<Gathered, "targets">,
+): ReadonlyMap<string, readonly string[]> =>
+  new Map(
     [...g.targets].map(([file, targets]) => [
       file,
       [...targets.values()].flatMap(t => (t.kind === "file" ? [t.path] : [])),
     ]),
   )
-  const shipped = [...reachable(graph, g.entries)].toSorted()
+
+/** The sources the package ships: every one its entries reach, sorted. */
+export const shippedSources = (
+  g: Pick<Gathered, "targets" | "entries">,
+): readonly string[] => [...reachable(importGraph(g), g.entries)].toSorted()
+
+/** The package `gathered` makes: pure. */
+export function planPackage(g: Gathered): PackagePlan {
+  const why: string[] = []
+  const graph = importGraph(g)
+  const shipped = shippedSources(g)
 
   for (const file of reachable(graph, [HELPER]))
     for (const read of selfReads(file, g.sources.get(file) ?? ""))
