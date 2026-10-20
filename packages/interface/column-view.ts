@@ -510,7 +510,7 @@ export const identityWords = (identity: HeadIdentity): string =>
       : CHAT_HANDLE
 
 /** A chat's handle, where an agent's name would be: it has none. */
-export const CHAT_HANDLE = "chat"
+const CHAT_HANDLE = "chat"
 
 /** Who started a thread, and how long before `now`: its details' line. */
 export const startedWords = (

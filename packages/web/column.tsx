@@ -1455,8 +1455,7 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
 /**
  * The column's handle: who works in it (its lane's name, a lane about to
  * start, or "chat") with its mark, the one part of the header a drag starts
- * from. Its mark pulses while the lane runs. A column with no card (none
- * moves it) draws the same words, with no handle.
+ * from (`ColumnHandle`). Its mark pulses while the lane runs.
  */
 function HeadHandle({
   card,
@@ -1488,14 +1487,7 @@ function HeadHandle({
     identity.kind === "none"
       ? "head-chat"
       : `agent-name${identity.kind === "pending" ? " pending" : ""}`
-  return card === null ? (
-    <span
-      className={`head-handle ${className}`}
-      data-thread={identity.kind === "agent" ? identity.name : undefined}
-    >
-      {inner}
-    </span>
-  ) : (
+  return (
     <ColumnHandle
       card={card}
       className={className}

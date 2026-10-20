@@ -48,15 +48,9 @@ export function FoldedStrip(p: {
     <>
       <div className="folded-start">{p.start}</div>
       <div className="folded-title">
-        {p.card === null ? (
-          <span className="head-handle" title={title}>
-            {inner}
-          </span>
-        ) : (
-          <ColumnHandle card={p.card} title={title}>
-            {inner}
-          </ColumnHandle>
-        )}
+        <ColumnHandle card={p.card} title={title}>
+          {inner}
+        </ColumnHandle>
         {p.status}
       </div>
     </>

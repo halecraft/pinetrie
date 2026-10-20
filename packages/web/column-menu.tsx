@@ -60,10 +60,11 @@ export function ColumnHeadStart(p: {
 /**
  * A column's handle: its mark and name, folded or not, the only part of its
  * head a drag starts from, so no press there is also a click. `title` says
- * more of it, a strip's focus.
+ * more of it, a strip's focus. With no card (the canvas column, a column no
+ * card holds) it draws the same, and nothing drags it.
  */
 export function ColumnHandle(p: {
-  card: CardId
+  card: CardId | null
   title?: string
   className?: string
   /** Its thread's name, which the browser suite finds a column by. */
@@ -72,7 +73,7 @@ export function ColumnHandle(p: {
 }) {
   return (
     <span
-      {...dragProps({ kind: "card", card: p.card })}
+      {...(p.card === null ? {} : dragProps({ kind: "card", card: p.card }))}
       className={`head-handle${p.className === undefined ? "" : ` ${p.className}`}`}
       data-thread={p.thread}
       title={p.title}
