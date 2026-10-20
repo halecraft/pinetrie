@@ -1455,6 +1455,12 @@ composer*).
 - **The agent can reply in several threads at once**: `readAgentActivity`
   returns every running lane. The rail pulses at each tip, and each column
   streams the runs whose tip is on its path.
+- **Every rail mark keyed by an entry goes through `railSpots` or
+  `railRings`** (pulses, rings, your cards' pips, open columns' ends). A lane's
+  tip or a thread's end is a tool's result while the model answers it, and
+  stays one when a run stops there; a result has no dot, so the mark goes on
+  the nearest message above it, its call's. Keyed by the raw entry, the rail
+  stops pulsing while the model thinks and drops a reader's ring.
 - **The composer decides before sending, as the host will.** The column's
   thread names its lane (`threadLane`), over `readLanes` and `readParticipants`,
   the reads the host decides from; its end is the column's anchor. `planSend` (`send.ts`)

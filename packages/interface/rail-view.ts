@@ -1,6 +1,11 @@
 // interface/rail-view — the view's part of the rail's stretches (`compactRail`).
 
-import type { AgentRun, EntryId, RailRow } from "@pinetrie/core"
+import {
+  type EntryId,
+  nearestMessage,
+  type RailRow,
+  type TreeIndex,
+} from "@pinetrie/core"
 import { type DigestRecord, digestText } from "@pinetrie/rules"
 import { railLandmarks } from "./rail.ts"
 import type { SearchResult } from "./search.ts"
@@ -11,28 +16,68 @@ import type { WorkStats } from "./work-stats.ts"
 export const RAIL_LABEL = "this canvas's conversation map"
 
 /**
+ * The dots that carry what is marked at `ids`: a message's own, and for any
+ * other entry the nearest message above it (`nearestMessage`). A lane's tip
+ * or a thread's end is a tool's result while the model answers it, and stays
+ * one when a run stops there, and a result has no dot of its own. An entry
+ * under no message has none, and is dropped.
+ */
+export function railSpots(
+  index: TreeIndex,
+  ids: Iterable<EntryId | null>,
+): ReadonlySet<EntryId> {
+  const spots = new Set<EntryId>()
+  for (const id of ids) {
+    const at = id === null ? null : nearestMessage(index, id)
+    if (at !== null) spots.add(at)
+  }
+  return spots
+}
+
+/**
+ * The rings, each thread end's readers on the dot that carries it
+ * (`railSpots`): two ends with one dot ring it with both ends' readers, each
+ * once.
+ */
+export function railRings<T>(
+  index: TreeIndex,
+  reading: ReadonlyMap<EntryId, readonly T[]>,
+): ReadonlyMap<EntryId, readonly T[]> {
+  const rings = new Map<EntryId, readonly T[]>()
+  for (const [end, readers] of reading) {
+    const at = nearestMessage(index, end)
+    if (at !== null)
+      rings.set(at, [...new Set([...(rings.get(at) ?? []), ...readers])])
+  }
+  return rings
+}
+
+/**
  * The messages this view draws on their own, never inside a stretch: thread
- * ends someone else is reading, running lanes' tips, each open
- * column's end, and each thread end holding a card of yours, whose dot
- * carries its mark. A column's end is kept because an anchored column can end
+ * ends someone else is reading, running lanes' tips, each open column's end,
+ * and each thread end holding a card of yours, whose dot carries its mark,
+ * each at its dot (`railSpots`). A column's end is kept because an anchored column can end
  * mid-stretch: inside one, half of it would be on the column's path and half
  * not, and where the column ends would not show. The columns fold around the
  * same messages (`railLandmarks`), without the rings: a thread end on a
  * column's path is the column's own end.
  */
 export function railKeep(input: {
-  /** Thread ends others are reading: the rings' keys. */
+  /** The rings (`railRings`). */
   readonly rings: ReadonlyMap<EntryId, unknown>
-  readonly activity: readonly AgentRun[]
+  /** Running lanes' tips. */
+  readonly pulses: ReadonlySet<EntryId>
   /** Each open column's end (`ColumnView.tipId`). */
-  readonly ends: Iterable<EntryId | null>
+  readonly ends: ReadonlySet<EntryId>
   /** Thread ends holding a card of yours (`UnsentSignals.ends`). */
   readonly cards: ReadonlySet<EntryId>
 }): ReadonlySet<EntryId> {
-  const keep = new Set([...input.rings.keys(), ...input.cards])
-  for (const run of input.activity) keep.add(run.tip)
-  for (const end of input.ends) if (end !== null) keep.add(end)
-  return keep
+  return new Set([
+    ...input.rings.keys(),
+    ...input.cards,
+    ...input.pulses,
+    ...input.ends,
+  ])
 }
 
 const NO_RINGS: ReadonlyMap<EntryId, unknown> = new Map()

@@ -2292,8 +2292,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a rail dot never pulses",
     file: "packages/web/rail.tsx",
-    from: '        p.activity.some(run => run.tip === p.id) ? "pulse" : "",',
-    to: '        "",',
+    from: '      className={["rail-dot", p.pulse ? "pulse" : ""]',
+    to: '      className={["rail-dot", ""]',
     suite: "browser",
     scenario: "page",
     expect:

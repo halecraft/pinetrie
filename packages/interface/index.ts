@@ -618,6 +618,8 @@ export {
   RAIL_LABEL,
   railItems,
   railKeep,
+  railRings,
+  railSpots,
   railView,
   type StretchFill,
   stretchFill,

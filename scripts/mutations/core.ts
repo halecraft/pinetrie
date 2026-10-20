@@ -11,6 +11,22 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a tool's result stands for itself",
+    file: tree,
+    from: "    if (entryMessage(index, at) !== null) return at\n",
+    to: "    return at\n",
+    command: unit,
+    expect: "a message stands for itself, a result for the message above it",
+  },
+  {
+    name: "an entry under no message stands for its root",
+    file: tree,
+    from: "    if (entryMessage(index, at) !== null) return at\n  return null\n",
+    to: "    if (entryMessage(index, at) !== null) return at\n  return ancestry(index, id).path.at(-1) ?? null\n",
+    command: unit,
+    expect: "none when no entry up to the root is a message",
+  },
+  {
     name: "a call's intent goes unread",
     file: "packages/core/tree.ts",
     from: "    ...(intent === undefined ? {} : { intent }),\n",

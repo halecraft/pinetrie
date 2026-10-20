@@ -105,6 +105,7 @@ import {
   type ReviewPrefs,
   type RootDrag,
   type RowMemory,
+  railSpots,
   railStubWords,
   readHeldLanes,
   readSessionFacts,
@@ -901,20 +902,38 @@ export function App({
     [mine, filled, layout, archivedCanvases, canvases, index],
   )
   const mineOnRail = useMemo(
-    () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
-    [unsent.ends, colorOf, session.writer],
+    () => ({
+      ends: railSpots(index, unsent.ends),
+      color: colorOf(session.writer),
+    }),
+    [index, unsent.ends, colorOf, session.writer],
   )
-  // Each column's end, for the rail: one array while the views are the same.
-  const ends = useMemo(() => views.map(v => v.tipId), [views])
+  const pulses = useMemo(
+    () =>
+      railSpots(
+        index,
+        activity.map(run => run.tip),
+      ),
+    [index, activity],
+  )
+  // Each column's end, for the rail: one set while the views are the same.
+  const ends = useMemo(
+    () =>
+      railSpots(
+        index,
+        views.map(v => v.tipId),
+      ),
+    [index, views],
+  )
   // What no fold hides in this tab's columns: the rail's landmarks.
   const landmarks = useMemo(
     () =>
       columnLandmarks(rail, {
-        activity,
+        pulses,
         ends,
         cards: mineOnRail.ends,
       }),
-    [rail, activity, ends, mineOnRail.ends],
+    [rail, pulses, ends, mineOnRail.ends],
   )
 
   // `App` writes presence and reads none: a read here would render every
@@ -1794,7 +1813,6 @@ export function App({
                             first message will be. */}
                             {rail.length > 0 ? (
                               <LiveRail
-                                activity={activity}
                                 asks={asks}
                                 digests={digests}
                                 revisions={workFacts.revisions}
@@ -1804,6 +1822,7 @@ export function App({
                                 names={nameOf}
                                 onPick={openAt}
                                 open={shown}
+                                pulses={pulses}
                                 matches={searchResult}
                                 rows={rail}
                                 session={session}

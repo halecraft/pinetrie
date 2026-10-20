@@ -253,6 +253,17 @@ export function entryMessage(
   return entry === undefined ? null : renderableMessage(entry)
 }
 
+/**
+ * The message that stands for `id` where only messages are drawn: `id` when
+ * it is one (`entryMessage`), else its nearest ancestor that is, as a tool's
+ * result stands under its call. Null when none up to the root is.
+ */
+export function nearestMessage(index: TreeIndex, id: EntryId): EntryId | null {
+  for (const at of ancestry(index, id).path)
+    if (entryMessage(index, at) !== null) return at
+  return null
+}
+
 /** One call, before its result is paired with it. */
 function callOf(id: string, name: string, args: unknown): ToolCall {
   const subject = callSubject(name, args)
@@ -781,10 +792,7 @@ export function projectRail(
   index: TreeIndex,
   root: EntryId,
 ): readonly RailRow[] {
-  const visible = (id: EntryId): boolean => {
-    const entry = index.entries[id]
-    return entry !== undefined && renderableMessage(entry) !== null
-  }
+  const visible = (id: EntryId): boolean => entryMessage(index, id) !== null
   // Children as the rail sees them: through any non-message entry.
   const visibleChildren = (ids: readonly EntryId[]): EntryId[] => {
     const out: EntryId[] = []

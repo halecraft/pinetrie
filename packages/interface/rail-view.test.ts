@@ -1,9 +1,17 @@
-import { entryId, threadIdFor } from "@pinetrie/core"
-import { expect, test } from "vitest"
+import { entryId, indexTree } from "@pinetrie/core"
+import {
+  entriesById,
+  entry,
+  personMessage,
+  toolResultMessage,
+} from "@pinetrie/core/fixtures"
+import { describe, expect, test } from "vitest"
 import {
   capsulePick,
   railItems,
   railKeep,
+  railRings,
+  railSpots,
   railView,
   stretchFill,
   stretchWords,
@@ -13,11 +21,48 @@ import {
 test("railKeep: rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
     rings: new Map([[entryId("r"), []]]),
-    activity: [{ lane: threadIdFor("s"), tip: entryId("t") }],
-    ends: [entryId("e"), null],
+    pulses: new Set([entryId("t")]),
+    ends: new Set([entryId("e")]),
     cards: new Set([entryId("c")]),
   })
   expect([...keep].sort()).toEqual(["c", "e", "r", "t"])
+})
+
+describe("the dots that carry rail marks", () => {
+  const index = indexTree(
+    entriesById([
+      entry("1-c", null, undefined, { type: "compaction" }),
+      entry("2-p", "1-c", personMessage("p", { author: "A" })),
+      entry("3-a", "2-p", {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }],
+      }),
+      entry("4-r", "3-a", toolResultMessage()),
+    ]),
+  )
+  const id = entryId
+
+  test("railSpots: a tool's result is marked at its call, a message at itself", () => {
+    expect([...railSpots(index, [id("4-r"), id("2-p"), null])]).toEqual([
+      "3-a",
+      "2-p",
+    ])
+  })
+
+  test("railSpots: an entry under no message has no dot", () => {
+    expect([...railSpots(index, [id("1-c")])]).toEqual([])
+  })
+
+  test("railRings: ends sharing a dot ring it with their readers, each once", () => {
+    const rings = railRings(
+      index,
+      new Map([
+        [id("4-r"), ["ada", "bea"]],
+        [id("3-a"), ["bea", "cy"]],
+      ]),
+    )
+    expect([...rings]).toEqual([["3-a", ["ada", "bea", "cy"]]])
+  })
 })
 
 test("stretchWords: a long ask's capsule leads with its ask, then its digest as written", () => {

@@ -8,7 +8,6 @@
 // same, so a branch looks the same everywhere.
 
 import type {
-  AgentRun,
   AskIndex,
   EntryId,
   RailRow,
@@ -28,6 +27,7 @@ import {
   type RailStub,
   railItems,
   railKeep,
+  railRings,
   railScroll,
   railView,
   type SearchResult,
@@ -78,7 +78,7 @@ export function Rail({
   stubs = [],
   onLink,
   open,
-  activity,
+  pulses,
   onPick,
   here,
   mine,
@@ -94,8 +94,11 @@ export function Rail({
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
   open: ReadonlySet<EntryId>
-  /** Every running lane: each tip pulses, whether or not a column shows it. */
-  activity: readonly AgentRun[]
+  /**
+   * Running lanes' tips at their dots (`railSpots`): each pulses, whether or
+   * not a column shows it.
+   */
+  pulses: ReadonlySet<EntryId>
   onPick: (id: EntryId) => void
   /** Others reading each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<EntryId, readonly { name: string; color: string }[]>
@@ -175,7 +178,6 @@ export function Rail({
             />
           ) : (
             <Dot
-              activity={activity}
               id={it.ids[0]}
               key={it.ids[0]}
               mine={marks.mine}
@@ -183,6 +185,7 @@ export function Rail({
               onPick={onPick}
               open={marks.open}
               people={here.get(it.ids[0]) ?? []}
+              pulse={pulses.has(it.ids[0])}
               across={it.across}
               slot={it.slot}
               track={it.track}
@@ -386,32 +389,32 @@ export function LiveRail({
   asks: AskIndex
   /** The turns' revisions, whose paths a capsule counts. */
   revisions: ReadonlyMap<EntryId, RevisionRecord>
-  /** Each open column's end (`ColumnView.tipId`). */
-  ends: readonly (EntryId | null)[]
+  /** Each open column's end at its dot (`railSpots`). */
+  ends: ReadonlySet<EntryId>
   names: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
 } & Omit<ComponentProps<typeof Rail>, "items" | "here" | "nameOf">) {
   const reading = useOthersReading(session.presence, session.writer)
+  const { index, pulses, mine } = rail
   const here = useMemo(
     () =>
       new Map(
-        [...reading].map(([end, writers]) => [
-          end,
+        [...railRings(index, reading)].map(([at, writers]) => [
+          at,
           writers.map(w => ({ name: nameFor(names, w), color: colorOf(w) })),
         ]),
       ),
-    [reading, names, colorOf],
+    [index, reading, names, colorOf],
   )
-  const { index, activity, mine } = rail
   const items = useMemo(
     () =>
       compactRail(
         index,
         rows,
-        railKeep({ rings: here, activity, ends, cards: mine.ends }),
+        railKeep({ rings: here, pulses, ends, cards: mine.ends }),
         { asks, revisions },
       ),
-    [index, rows, here, activity, ends, mine.ends, asks, revisions],
+    [index, rows, here, pulses, ends, mine.ends, asks, revisions],
   )
   return (
     <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
@@ -448,7 +451,7 @@ function Dot(p: {
   open: boolean
   /** Your colour when a card of yours waits at this end; null otherwise. */
   mine: string | null
-  activity: readonly AgentRun[]
+  pulse: boolean
   people: readonly { name: string; color: string }[]
   /** Its matches while searching (`RailMarks.matches`), else null. */
   matches: number | null
@@ -463,10 +466,7 @@ function Dot(p: {
   return (
     <button
       aria-label="open this message's thread"
-      className={[
-        "rail-dot",
-        p.activity.some(run => run.tip === p.id) ? "pulse" : "",
-      ]
+      className={["rail-dot", p.pulse ? "pulse" : ""]
         .filter(c => c !== "")
         .join(" ")}
       data-entry={p.id}

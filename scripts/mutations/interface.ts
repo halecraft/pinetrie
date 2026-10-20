@@ -1992,11 +1992,39 @@ export const mutations: readonly Mutation[] = [
   {
     name: "railKeep drops your cards' ends",
     file: "packages/interface/rail-view.ts",
-    from: "  const keep = new Set([...input.rings.keys(), ...input.cards])",
-    to: "  const keep = new Set([...input.rings.keys()])",
+    from: "    ...input.cards,\n",
+    to: "",
     command: unit,
     expect: "railKeep: rings, running tips",
   },
+  {
+    name: "a mark stays at a tool's result, which has no dot",
+    file: "packages/interface/rail-view.ts",
+    from: "    const at = id === null ? null : nearestMessage(index, id)\n",
+    to: "    const at = id\n",
+    command: unit,
+    expect:
+      "railSpots: a tool's result is marked at its call, a message at itself",
+  },
+  {
+    name: "a ring stays at a tool's result, which has no dot",
+    file: "packages/interface/rail-view.ts",
+    from: "    const at = nearestMessage(index, end)\n",
+    to: "    const at = end\n",
+    command: unit,
+    expect:
+      "railRings: ends sharing a dot ring it with their readers, each once",
+  },
+  {
+    name: "a reader of two ends on one dot is named twice",
+    file: "packages/interface/rail-view.ts",
+    from: "      rings.set(at, [...new Set([...(rings.get(at) ?? []), ...readers])])",
+    to: "      rings.set(at, [...(rings.get(at) ?? []), ...readers])",
+    command: unit,
+    expect:
+      "railRings: ends sharing a dot ring it with their readers, each once",
+  },
+
   {
     name: "the board marks no item",
     file: "packages/interface/thread-card.ts",

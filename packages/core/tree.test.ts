@@ -29,6 +29,7 @@ import {
   messageImages,
   messageToolCalls,
   messageWriters,
+  nearestMessage,
   newestOnPath,
   type PinnedView,
   pinnedInView,
@@ -826,6 +827,26 @@ describe("conflictAskTime", () => {
 
   test("an ask stays a fact past a compaction, and a result that did not ask is none", () => {
     expect(conflictAskTime(index, entryId("4-r"))).toBe(20)
+  })
+})
+
+describe("nearestMessage", () => {
+  const index = indexTree(
+    entriesById([
+      entry("1-c", null, undefined, { type: "compaction" }),
+      entry("2-p", "1-c", personMessage("p", { author: "A" })),
+      entry("3-r", "2-p", toolResultMessage()),
+      entry("4-r", "3-r", toolResultMessage({ toolCallId: "c2" })),
+    ]),
+  )
+
+  test("a message stands for itself, a result for the message above it", () => {
+    expect(nearestMessage(index, entryId("2-p"))).toBe("2-p")
+    expect(nearestMessage(index, entryId("4-r"))).toBe("2-p")
+  })
+
+  test("none when no entry up to the root is a message", () => {
+    expect(nearestMessage(index, entryId("1-c"))).toBeNull()
   })
 })
 
