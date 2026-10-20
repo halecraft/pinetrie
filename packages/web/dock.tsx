@@ -29,6 +29,7 @@ import {
   nextWords,
   type QueuedCard,
   type QueueHead,
+  queuedCardsDrawn,
   queueHead,
   queueHeadPlan,
   type Reader,
@@ -121,6 +122,7 @@ export function Dock(p: {
         })
   const plan = head === null ? null : queueHeadPlan(head)
   const mark = plan?.mark
+  const drawn = queuedCardsDrawn(queued, head?.next ?? null)
   const addToQueue = () => {
     if (lane === null || p.queueAt === null) return
     p.onAct({
@@ -175,9 +177,9 @@ export function Dock(p: {
           )}
         </div>
       )}
-      {queued.length > 0 && (
+      {drawn.length > 0 && (
         <div className="queue-cards">
-          {queued.map(c =>
+          {drawn.map(c =>
             c.kind === "fact" ? (
               // The host's fact, waiting for the run's end: a dock draws its
               // cards normal (`DETAIL_ON`), and nobody edits or moves it.
@@ -195,7 +197,7 @@ export function Dock(p: {
               >
                 {c.kind === "reference" ? (
                   <QueuedReference
-                    among={queued}
+                    among={drawn}
                     card={c}
                     held={lane?.heldBy != null}
                     me={p.session.writer}
@@ -205,7 +207,7 @@ export function Dock(p: {
                   />
                 ) : (
                   <QueuedCardEditor
-                    among={queued}
+                    among={drawn}
                     card={c}
                     latestSources={p.latestSources}
                     held={lane?.heldBy != null}

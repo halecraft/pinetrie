@@ -1532,6 +1532,13 @@ composer*).
   `queueHead` adds the lane, the holder and the message cards queued, and
   `queueHeadPlan` decides the one button (stop, send queue, resume), the
   ⋯ items (resume, hold, release, unqueue all) and where ▸ sits.
+  `queuedCardsDrawn` leaves out the top card when it carries a command
+  and goes now (`sending`, nobody typing): the host takes it off the queue
+  only in the change that carries its command out, after a merge or a
+  split's start, so drawn it would flash for that long, while the work
+  strip says what it does. Typed in, held, or behind another card, it is
+  drawn. On the conflicted path the resolution run's start (another
+  document) can still reach the tab before the card's removal, for a frame.
   `nextWords`, `nextButtonWords` and `nextItemWords` word them. The dock
   computes it, not `columnView`: it needs presence's typing (S59). Each
   button and item is a `ColumnAct` (`hold-queue`, `unqueue-all`) or a

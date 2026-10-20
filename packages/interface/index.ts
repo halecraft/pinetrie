@@ -473,6 +473,7 @@ export {
   nextItemWords,
   nextWords,
   type QueueHead,
+  queuedCardsDrawn,
   queueHead,
   queueHeadPlan,
 } from "./next.ts"

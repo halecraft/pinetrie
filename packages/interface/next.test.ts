@@ -12,6 +12,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, personMessage } from "@pinetrie/core/fixtures"
+import type { QueuedText } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { entry, indexEntries } from "./fixtures.ts"
 import {
@@ -21,6 +22,7 @@ import {
   nextButtonWords,
   nextWords,
   type QueueHead,
+  queuedCardsDrawn,
   queueHead,
   queueHeadPlan,
 } from "./next.ts"
@@ -60,7 +62,7 @@ const lane = (over: Partial<LaneView> = {}): LaneView => ({
   ...over,
 })
 
-const queued = (id: string, order: string): TextCard => ({
+const queued = (id: string, order: string): QueuedText => ({
   kind: "text",
   id: textCardId(id),
   owner: ADA,
@@ -234,4 +236,30 @@ test("words: who holds or stopped it, and send queue (n)", () => {
   }
   expect(nextButtonWords("send-queue", held).label).toBe("send queue (3)")
   expect(nextButtonWords("stop", held).className).toBe("stop")
+})
+
+describe("queuedCardsDrawn: the dock leaves out a command card going now", () => {
+  const getLatest: QueuedText = {
+    ...queued(cardIdFor("c1"), "a"),
+    content: { command: "get-latest", unsent: null, origin: null },
+  }
+  const message = queued(cardIdFor("c2"), "b")
+  const ids = (next: Next | null, cards = [getLatest, message]) =>
+    queuedCardsDrawn(cards, next).map(c => c.id)
+  test("a command card going now is not drawn", () => {
+    expect(ids({ kind: "sending", top: C1, typing: false })).toEqual([C2])
+  })
+  test("a command card someone types in is drawn", () => {
+    expect(ids({ kind: "sending", top: C1, typing: true })).toEqual([C1, C2])
+  })
+  test("a command card behind a hold is drawn", () => {
+    expect(
+      ids({ kind: "held", by: BEA, top: C1, count: 1, resumable: false }),
+    ).toEqual([C1, C2])
+  })
+  test("a message card going now is drawn", () => {
+    expect(
+      ids({ kind: "sending", top: C2, typing: false }, [message, getLatest]),
+    ).toEqual([C2, C1])
+  })
 })

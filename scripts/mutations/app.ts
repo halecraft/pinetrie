@@ -2139,8 +2139,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "queued cards are not drawn",
     file: "packages/web/dock.tsx",
-    from: "          {queued.map(c =>",
-    to: "          {queued.slice(0, 0).map(c =>",
+    from: "          {drawn.map(c =>",
+    to: "          {drawn.slice(0, 0).map(c =>",
     suite: "browser",
     scenario: "page",
     expect:

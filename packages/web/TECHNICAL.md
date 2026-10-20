@@ -914,6 +914,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     (`.card-editor.queued:not(:focus-within)`). A component that swapped a
     face for the editor would remount the box and lose the caret, which
     Alt+↑ must keep.
+  - **The dock draws `queuedCardsDrawn`**, not the whole queue: a card
+    with a command that goes now is left out (`@pinetrie/interface`,
+    *What happens next is `laneNext`*). ↑ and ↓ move a card among the cards drawn.
   - **"+ add to queue"** is the `queue-new` act with `hold-if-idle`, which
     arms the new card's focus; its box claims it once drawn (*A card's
     focus*).

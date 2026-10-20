@@ -18,6 +18,7 @@ import {
   displayName,
   isQueuedMessage,
   planNextQueuedCardPop,
+  type QueuedCard,
   queuedOn,
   runStopper,
 } from "@pinetrie/rules"
@@ -133,6 +134,25 @@ export function queueHead(lane: LaneView, facts: NextFacts): QueueHead {
     heldBy: lane.heldBy,
     messages: queuedOn(facts.cards, lane.name).filter(isQueuedMessage).length,
   }
+}
+
+/**
+ * The queued cards a dock draws: all but a card with a command that goes now.
+ * The host takes such a card off the queue only once its command is carried
+ * out (a merge, a split's start), so drawn it would show for that long and
+ * vanish, while the work strip already says what it does. One someone types
+ * in, or behind a hold or another card, is drawn: it can still be edited,
+ * moved or unqueued.
+ */
+export function queuedCardsDrawn(
+  queued: readonly QueuedCard[],
+  next: Next | null,
+): readonly QueuedCard[] {
+  if (next?.kind !== "sending" || next.typing) return queued
+  return queued.filter(
+    c =>
+      !(c.id === next.top && c.kind === "text" && c.content.command !== null),
+  )
 }
 
 /** The one button a queue header shows, by the request or act it is. */
