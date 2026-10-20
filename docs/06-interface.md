@@ -392,12 +392,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A strip is its column's header turned on its side** (ADR-0137,
   ADR-0198), in the header's order: **⇥** where the header's ⇤ is, so a
   second click lands on it, the column's box, its mark, its name at the
-  header's size, in its colour, and its dot. Folding turns the name 90°
+  header's size, in its colour, and its status button. Only ⇥ and the
+  status button unfold it, the latter with its details open (ADR-0200).
+  Folding turns the name 90°
   into the strip, its mark and its box moving with it and ⇤ flipping into
   ⇥ where it stands, while the rest of the column
   fades and the columns after it close up; unfolding turns it back. Only a
-  fold you ask for moves; under reduced motion, nothing does. The whole
-  strip drags, as a header does.
+  fold you ask for moves; under reduced motion, nothing does. Its mark
+  and name drag, as a header's do.
 - **Every column has a box, everyone's** (ADR-0198): a checkbox after its
   toggle, folded or not, on a thread, a note column or a media column.
   Anyone who may change the canvas ticks it, for everyone, and the undo
@@ -443,14 +445,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   their inventory, the row says "Bea has it" and opens nothing. A thread that started from unfinished work says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
-- **A column's header is one line** (ADR-0198): its toggle, its box, its
-  mark and name, its dot, then its density, its pin, who is reading, and
-  ⋯. A press on the name or the free space after it opens its details,
-  and a second closes them. Closed, under the line is only what asks
-  something of you: a raised "needs you" or "worth a read" row, and an ssh
-  request for its owner. Open, the details hold its focus, its fork row,
-  the agents line, its proposed changes with their buttons, and what
-  follows.
+- **A column's header is one line** (ADR-0198, ADR-0200): its toggle, its
+  box, its mark and name, its status button, then who is reading, and ⋯.
+  The mark and name are its handle: they drag it, and a press there does
+  nothing else. A chat's handle reads "chat". The status button holds its
+  dot, a word while something is raised for you (needs you, conflicts,
+  ready, worth a read), and a chevron; it opens the details, and a second
+  press closes them. Closed, under the line is only an ssh request for
+  its owner. Open, the details hold the run-end row, its focus, its fork
+  row, the agents line, its density, its proposed changes with their
+  buttons, and what follows. Pinning a first card is its ⋯'s **Pin a
+  card**; a note or media column's ⋯ starts with **Rename**.
 - **A column's dot is its thread's status** (ADR-0198), the same value
   folded or not, and the one the sidebar and the board read: an amber dot
   when it needs you (a run's end, an ask about a conflict, an ssh
@@ -458,7 +463,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   they are ready to accept, a dim amber dot for worth a read, a ring in
   the agent's colour while it works, a grey ring once accepted, and a faint
   dot with nothing to say. What is not raised for you (a thread you do not
-  follow, a report you read) is drawn grey. Its title says why.
+  follow, a report you read) is drawn grey. Its title says why, in the
+  same words wherever a status is titled.
 - **A named agent's details say what its thread is doing now** (ADR-0173):
   its focus, first in them, one line cut to the column with the whole of
   it in its title, "written by a model". A model names it after each of the thread's runs, once the
@@ -469,16 +475,15 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no such row. A focus follows the digests' setting. A thread's preview
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
-- **A column's header says what its thread's last run needs from you**
-  (ADR-0175), on a row under its line: "needs you: asks whether to drop
-  the v1 table", "worth a read: Bea stopped it", in the sidebar's words and
-  for its followers alone, as its dot is. It stays until the next run
-  starts: read past or dismissed, its amber turns grey and it moves into
-  the details (ADR-0198). A press brings the run's last entry into view. A
-  run that was done, or a stop you made, shows nothing; a folded strip
-  shows it as its dot.
-- **A column's line opens its details** (ADR-0073, ADR-0198), and a
-  second click on it closes them; a chevron after the name turns as they
+- **A column's details say what its thread's last run needs from you**
+  (ADR-0175, ADR-0200), on their first row: "needs you: asks whether to
+  drop the v1 table", "worth a read: Bea stopped it", in the sidebar's
+  words and for its followers alone, as its dot is; the status button
+  says its level in a word. It stays until the next run starts: read past
+  or dismissed, its amber turns grey. A press brings the run's last entry
+  into view. A run that was done, or a stop you made, shows nothing.
+- **A column's status button opens its details** (ADR-0073, ADR-0198,
+  ADR-0200), and a second press closes them; its chevron turns as they
   open. They show the thread's icon magnified, which spins in as they open
   and again at a click, its name, "started by Ada · 3 h ago", where it
   works, what it is working on, and what its base has new, in full. Where
@@ -517,8 +522,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Columns are reordered by dragging their headers, for everyone**: the
   canvas's order is shared, and a drag moves a card on it. Whichever column
   is first shows its whole path, so moving a branch to the far left makes it
-  read as the trunk. The whole header is the handle: a press on its name or
-  a button that moves 5 px drags, one that does not is its click. With focus
+  read as the trunk. Its mark and name are the handle (ADR-0200), and
+  nothing else in the header drags, so no press is both a drag and a
+  click. With focus
   anywhere in a column outside a text box, Alt+← and Alt+→ move it one
   place, and it is scrolled into view.
 - **Every drag in the page is one kind of drag** (ADR-0134): a column's, a

@@ -16,6 +16,9 @@ const menuOf = (
     unstarted: false,
     folded: false,
     ticked: false,
+    details: false,
+    pin: false,
+    renamable: false,
   }).menu
 
 test("a column's ⋯ makes its card wide, or narrow again, for everyone", () => {
@@ -33,7 +36,9 @@ test("a thread's ⋯ copies it here or into your inventory, and takes it; it lis
   const card = threadIdFor("a")
   const sections = menuOf(card)
   expect(sections.map(s => s.key)).toEqual(["canvas", "thread", "trash"])
-  expect(sections[1]?.items.map(i => [i.label, i.intent])).toEqual([
+  expect(
+    sections[1]?.items.map(i => [i.label, i.kind === "intent" && i.intent]),
+  ).toEqual([
     ["Copy to this canvas", { kind: "copy-thread", source: card, to: "here" }],
     [
       "Copy to your inventory",
@@ -50,6 +55,7 @@ test("a column's ⋯ ends in Move to trash for a reader who may write, and offer
       key: "trash",
       items: [
         {
+          kind: "intent",
           key: "trash",
           label: "Move to trash",
           title: expect.any(String),
@@ -71,6 +77,9 @@ test("a column's head starts with its toggle: it folds a started thread or a not
       unstarted,
       folded: false,
       ticked: false,
+      details: false,
+      pin: false,
+      renamable: false,
     })
   for (const [card, writable] of [
     [thread, true],
@@ -88,7 +97,10 @@ test("a column's head starts with its toggle: it folds a started thread or a not
     className: "trash-column",
   })
   expect(unstarted.toggle?.intent).toEqual(
-    unstarted.menu.at(-1)?.items[0]?.intent,
+    (() => {
+      const item = unstarted.menu.at(-1)?.items[0]
+      return item?.kind === "intent" ? item.intent : undefined
+    })(),
   )
   expect(head(thread, true, false).toggle).toBeNull()
 })
@@ -102,6 +114,9 @@ test("folded, a column's head unfolds it from the same toggle, keeps its box, an
     unstarted: false,
     folded: true,
     ticked: true,
+    details: false,
+    pin: false,
+    renamable: false,
   })
   expect(folded.toggle).toEqual({
     words: foldToggle(true),
@@ -121,6 +136,9 @@ test("a column's box asks the other state, for everyone; a reader who may not ch
       unstarted: false,
       folded: false,
       ticked,
+      details: false,
+      pin: false,
+      renamable: false,
     }).box
   expect(box(false, true).intent).toEqual({
     kind: "card-tick",
@@ -133,4 +151,40 @@ test("a column's box asks the other state, for everyone; a reader who may not ch
     ticked: false,
   })
   expect(box(true, false)).toMatchObject({ ticked: true, intent: null })
+})
+
+const head = (over: Partial<Parameters<typeof columnHead>[0]> = {}) =>
+  columnHead({
+    card: NOTES,
+    width: 1,
+    writable: true,
+    unstarted: false,
+    folded: false,
+    ticked: false,
+    details: false,
+    pin: false,
+    renamable: false,
+    ...over,
+  })
+
+test("a list column's ⋯ starts with Rename for a reader who may write; a thread's offers Pin a card when it may pin", () => {
+  const first = (h: ReturnType<typeof head>) =>
+    h.menu[0]?.items.map(i => i.kind)
+  expect(first(head({ renamable: true }))).toEqual(["rename", "intent"])
+  expect(first(head())).toEqual(["intent"])
+  expect(first(head({ card: threadIdFor("a"), pin: true }))).toEqual([
+    "pin",
+    "intent",
+  ])
+})
+
+test("a column's status button asks its details' other state, folded or not", () => {
+  const card = threadIdFor("a")
+  for (const folded of [false, true])
+    for (const details of [false, true])
+      expect(head({ card, folded, details }).status).toEqual({
+        kind: "column",
+        column: { kind: "card", card },
+        act: { kind: "details", open: !details },
+      })
 })

@@ -2,8 +2,14 @@ import { entryId, threadIdFor, writerId } from "@pinetrie/core"
 import type { RunEndReport, RunEndReportRecord } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
-import { type AttentionInput, standingRunEnds } from "./attention.ts"
+import {
+  type AttentionInput,
+  attentionItems,
+  standingRunEnds,
+  threadStatus,
+} from "./attention.ts"
 import { columnStatus } from "./column-status.ts"
+import { statusWords } from "./signals.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
@@ -54,6 +60,29 @@ const statusOf = (report: RunEndReport, over: Partial<AttentionInput> = {}) =>
     }).get(A),
     nameOf,
   )
+
+test("a status's title reads as its run-end row does, in the sidebar, a dot and a status button", () => {
+  const facts: AttentionInput = {
+    me: ADA,
+    writers: new Map([[A, [ADA, BEA]]]),
+    runEndReports: new Map([[A, record(needsYou)]]),
+    strips: new Map(),
+    openProposed: [],
+    sshAsks: [],
+    owner: null,
+    person: person(),
+    busy: new Set(),
+    archived: new Set(),
+  }
+  const status = threadStatus({
+    items: attentionItems(facts),
+    runEnds: standingRunEnds(facts),
+    strips: new Map(),
+    work: new Map(),
+    runEndReports: facts.runEndReports,
+  }).get(A)
+  expect(status && statusWords(status, nameOf)).toBe(statusOf(needsYou)?.words)
+})
 
 describe("columnStatus", () => {
   test("a run that needs you shows its reason in the header", () => {

@@ -1,14 +1,18 @@
 // web/column-menu — a card column's head as `columnHead` decides, a thread's,
 // a note column's and a media column's alike, folded or not: its start, the
 // toggle (⇤ or ⇥, or a bin on a thread not yet started) and the card's box;
-// and, unfolded, its ⋯ at the end.
+// its handle, the one part a drag starts from; and, unfolded, its ⋯ at the
+// end.
 
+import type { CardId } from "@pinetrie/core"
 import {
   COLUMN_MENU_LABEL,
   type ColumnHead,
   type ColumnMenuSection,
   type Intent,
 } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
+import type { ReactNode } from "react"
 import { IconButton } from "./button.tsx"
 import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
@@ -53,10 +57,41 @@ export function ColumnHeadStart(p: {
   )
 }
 
-/** An unfolded head's ⋯: what changes the canvas everyone shares. */
+/**
+ * A column's handle: its mark and name, folded or not, the only part of its
+ * head a drag starts from, so no press there is also a click. `title` says
+ * more of it, a strip's focus.
+ */
+export function ColumnHandle(p: {
+  card: CardId
+  title?: string
+  className?: string
+  /** Its thread's name, which the browser suite finds a column by. */
+  thread?: string
+  children: ReactNode
+}) {
+  return (
+    <span
+      {...dragProps({ kind: "card", card: p.card })}
+      className={`head-handle${p.className === undefined ? "" : ` ${p.className}`}`}
+      data-thread={p.thread}
+      title={p.title}
+    >
+      {p.children}
+    </span>
+  )
+}
+
+/**
+ * An unfolded head's ⋯: what changes the canvas everyone shares. Rename and
+ * Pin a card open what the page draws itself; a column without them passes
+ * nothing.
+ */
 export function ColumnMenu(p: {
   sections: readonly ColumnMenuSection[]
   onIntent: (intent: Intent) => void
+  onRename?: () => void
+  onPin?: () => void
 }) {
   if (p.sections.length === 0) return null
   return (
@@ -71,14 +106,18 @@ export function ColumnMenu(p: {
           title: item.title,
           // Take has one icon wherever it is offered.
           label:
-            item.intent.kind === "put-away" ? (
+            item.kind === "intent" && item.intent.kind === "put-away" ? (
               <>
                 <InventoryIcon way="take" /> {item.label}
               </>
             ) : (
               item.label
             ),
-          onChoose: () => p.onIntent(item.intent),
+          onChoose: () => {
+            if (item.kind === "intent") p.onIntent(item.intent)
+            else if (item.kind === "rename") p.onRename?.()
+            else p.onPin?.()
+          },
         })),
       }))}
       trigger="⋯"

@@ -1,57 +1,64 @@
 // web/folded-strip — what a folded column draws, a card's column or the canvas
 // column: its header turned on its side, in the header's order. Its start
 // (`start`: the toggle, and a card's box) sits where the unfolded header's
-// does, so the toggle stays under the pointer; then one button that unfolds
-// it, holding its mark, its name on its side, its detail and its dot. The
-// name and mark are where a fold's turn lands (`data-fold-name`,
-// `data-fold-mark`): at the header's size, so the turn ends on them exactly.
+// does, so the toggle stays under the pointer; then its handle, holding its
+// mark, its name on its side and its detail, which a drag starts from and a
+// click does nothing on; then a card's status button. Only the toggle and the
+// status button unfold it. The name and mark are where a fold's turn lands
+// (`data-fold-name`, `data-fold-mark`): at the header's size, so the turn ends
+// on them exactly.
 
-import {
-  type ControlWords,
-  type FoldedMark,
-  stripTitle,
-} from "@pinetrie/interface"
+import type { CardId } from "@pinetrie/core"
+import type { FoldedMark } from "@pinetrie/interface"
 import type { ReactNode } from "react"
-import { Button } from "./button.tsx"
+import { ColumnHandle } from "./column-menu.tsx"
 import { ThreadMark } from "./thread-mark.tsx"
 
 export function FoldedStrip(p: {
   /** The toggle, and a card's box: what the unfolded header starts with. */
   start: ReactNode
-  unfold: ControlWords
+  /** Its card, whose handle it draws; null for the canvas column, which no drag moves. */
+  card: CardId | null
   mark: FoldedMark
   name: string
   detail: string | null
-  /** What the tooltip says before how to unfold: a thread's focus. */
+  /** The handle's title: a thread's focus; null for none. */
   hint: string | null
-  /** Its status's dot, after its name; null for none. */
-  dot: ReactNode
-  onUnfold: () => void
+  /** Its status button, after its name; null for none. */
+  status: ReactNode
 }) {
+  const inner = (
+    <>
+      {p.mark.kind === "thread" && (
+        <ThreadMark
+          icon={p.mark.icon}
+          folds
+          running={false}
+          working={undefined}
+        />
+      )}
+      <span className="folded-name" data-fold-name="">
+        {p.name}
+      </span>
+      {p.detail !== null && <span className="folded-detail">{p.detail}</span>}
+    </>
+  )
+  const title = p.hint ?? undefined
   return (
     <>
       <div className="folded-start">{p.start}</div>
-      <Button
-        look="plain"
-        aria-label={`${p.unfold.title}: ${p.name}`}
-        className="folded-title"
-        onClick={p.onUnfold}
-        title={stripTitle(p.unfold, p.hint)}
-      >
-        {p.mark.kind === "thread" && (
-          <ThreadMark
-            icon={p.mark.icon}
-            folds
-            running={false}
-            working={undefined}
-          />
+      <div className="folded-title">
+        {p.card === null ? (
+          <span className="head-handle" title={title}>
+            {inner}
+          </span>
+        ) : (
+          <ColumnHandle card={p.card} title={title}>
+            {inner}
+          </ColumnHandle>
         )}
-        <span className="folded-name" data-fold-name="">
-          {p.name}
-        </span>
-        {p.detail !== null && <span className="folded-detail">{p.detail}</span>}
-        {p.dot}
-      </Button>
+        {p.status}
+      </div>
     </>
   )
 }

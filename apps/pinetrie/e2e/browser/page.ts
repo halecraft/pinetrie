@@ -114,7 +114,7 @@ export async function openNote(p: Page, card: string): Promise<string> {
     )
     .catch(() => {})
   for (const folded of await p
-    .locator('.folded-column[data-kind="note-column"] .folded-title')
+    .locator('.folded-column[data-kind="note-column"] .unfold')
     .all())
     await folded.click().catch(() => {})
   await p
@@ -359,6 +359,17 @@ export const col = (n: number) => `.column[data-position="${n}"]`
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
 /**
+ * Open `column`'s details, where its density and fork row are: its status
+ * button opens them. Nothing when they are open already.
+ */
+export const openDetails = (p: Page, column: string) =>
+  p
+    .click(`${column} .head-status-button[aria-expanded="false"]`, {
+      timeout: 5_000,
+    })
+    .catch(() => {})
+
+/**
  * Read column `n` raw: every message and tool row, which the
  * checks written before densities look at once a run has ended. A column
  * opens in story, folding each ask's work; the choice is kept with it. Its
@@ -366,6 +377,7 @@ export const msg = (text: string) =>
  */
 export async function readRaw(p: Page, n = 0): Promise<void> {
   const raw = `${col(n)} .density-choice[data-density="raw"]`
+  await openDetails(p, col(n))
   const shown = await p.waitForSelector(raw, { timeout: 15_000 }).then(
     () => true,
     () => false,

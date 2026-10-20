@@ -416,17 +416,30 @@
         background: var(--banner-ground); }
       .thread-mark .thread-icon[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
       .thread-mark .thread-icon[data-fade][data-loaded] { opacity: 1; }
-      /* The header's line, the name and the space after it, opens and
-         closes its details (ADR-0198). Its chevron is drawn here, so the
-         line's text is the mark and the name. */
-      .column-head .head-line { flex: 1 1 auto; min-width: 0; align-self: stretch; display: inline-flex;
-        align-items: center; justify-content: flex-start; }
-      .column-head button.head-line::after { content: "▸"; display: inline-block;
-        font-size: var(--font-xs); color: var(--text-quiet); transition: transform .15s ease-out, color .15s; }
-      .column-head button.head-line[aria-expanded="true"]::after { transform: rotate(90deg); }
-      .column-head button.head-line:hover::after,
-      .column-head button.head-line:focus-visible::after { color: var(--text); }
+      /* A column's handle (ADR-0200): its mark and name, folded or not, the
+         only part of its head a drag starts from; no press there clicks. */
+      .head-handle { min-width: 0; cursor: grab; }
+      .column-head .head-handle { flex: 0 1 auto; overflow: hidden; }
       .column-head .agent-name.pending { color: var(--text-faint); font-weight: 400; font-style: italic; }
+      .column-head .head-chat { display: inline-flex; align-items: center; font-size: var(--font-lg);
+        color: var(--text-faint); }
+      /* The status button, after the name: its dot, the word a raised status
+         says, and a chevron turned while the details are open. `.column-head
+         button`'s reset beats a class alone, so each rule names its head. */
+      :is(.column-head, .folded-column) .head-status-button { flex: 0 0 auto; display: inline-flex;
+        align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-4);
+        border-radius: var(--radius-lg); font-size: var(--font-sm); color: var(--text-faint); }
+      :is(.column-head, .folded-column) .head-status-button::after { content: "▸"; font-size: var(--font-xs);
+        color: var(--text-quiet); transition: transform .15s ease-out, color .15s; }
+      :is(.column-head, .folded-column) .head-status-button[aria-expanded="true"]::after { transform: rotate(90deg); }
+      :is(.column-head, .folded-column) .head-status-button:hover,
+      :is(.column-head, .folded-column) .head-status-button:focus-visible { color: var(--text); background: var(--raised); }
+      :is(.column-head, .folded-column) .head-status-button:hover::after { color: var(--text); }
+      .head-status-button[data-level="needs-you"] .head-status-word { color: var(--attention); }
+      .head-status-button[data-level="conflicts"] .head-status-word { color: var(--danger); }
+      .head-status-button[data-level="ready"] .head-status-word { color: var(--attention); }
+      .head-status-button[data-level="worth-a-read"] .head-status-word {
+        color: color-mix(in srgb, var(--attention) 73%, var(--text-faint)); }
       /* What the line opens: everything the header holds but what asks
          something of you. */
       .column-head .head-details { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -550,15 +563,16 @@
       /* Its own background, isolated, is what a banner's black blends with
          (the `.thread-mark` rule). */
       .folded-title { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--strip-gap);
-        padding: var(--strip-pad) 0; border-radius: 0; color: var(--text-muted);
-        isolation: isolate; background: var(--page); }
-      .folded-title:hover, .folded-title:focus-visible { color: var(--text); background: var(--raised); }
-      .folded-title > .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }
+        padding: var(--strip-pad) 0; color: var(--text-muted); isolation: isolate; background: var(--page); }
+      .folded-title > .head-handle { display: flex; flex-direction: column; align-items: center;
+        gap: var(--strip-gap); }
+      .folded-title .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }
+      .folded-column .head-status-button { padding: var(--space-2) var(--space-1); }
       .folded-name, .folded-detail { writing-mode: vertical-rl; white-space: nowrap; overflow: hidden;
         text-overflow: ellipsis; max-height: var(--strip-name-max); }
       .folded-name { font-weight: 600; }
       .folded-column[data-kind="thread"] .folded-name,
-      .folded-column[data-kind="thread"] .folded-title > .thread-mark { font-size: var(--font-lg); color: var(--track, var(--agent)); }
+      .folded-column[data-kind="thread"] .folded-title .thread-mark { font-size: var(--font-lg); color: var(--track, var(--agent)); }
       .folded-column[data-kind="note-column"] .folded-name { font-size: var(--font-md); color: var(--text-soft); }
       .canvas-column.folded-column .folded-name { font-size: var(--font-xl); color: var(--text); }
       .folded-detail { font-size: var(--font-xs); color: var(--text-faint); }
@@ -1047,9 +1061,9 @@
       /* Its head is a `.column-head`, a thread's row: its mark in the square
          a thread's takes, so the two names line up side by side. */
       .note-column-mark { font-size: var(--font-lg); color: var(--text-faint); }
-      .column-head .note-column-title { flex: 1; min-width: 0; text-align: left; font-size: var(--font-lg);
-        font-weight: 600; color: var(--text-soft); cursor: text; }
-      .column-head .note-column-title:disabled { cursor: default; }
+      .column-head .note-column-title { flex: 1; min-width: 0; display: inline-flex; align-items: center;
+        gap: var(--space-6); font-size: var(--font-lg); font-weight: 600; color: var(--text-soft);
+        white-space: nowrap; }
       /* Renamed, its field holds the row's height, the name where it was. */
       .column-head .open-title-input { box-sizing: border-box; height: 1.5rem; margin: 0 0 0 calc(-1 * var(--space-5) - 1px);
         padding: 0 var(--space-5); font-size: var(--font-lg); font-weight: 600; }

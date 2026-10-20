@@ -499,13 +499,26 @@ describe("planIntent", () => {
       { kind: "density", card: C, density: "outline" },
     ],
     [
-      "details",
-      { kind: "details", open: true },
-      { kind: "details", card: C, open: true },
+      "details closing",
+      { kind: "details", open: false },
+      { kind: "details", card: C, open: false },
     ],
   ] as const)("a column's %s is your view of its card", (_, act, change) => {
     expect(plan(column(act, CARD_C))).toEqual([onR1(change)])
     expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
+  })
+
+  test("opening a folded column's details unfolds it, with its motion, then opens them; an unfolded one's only opens them", () => {
+    const moving = (change: object) => ({ ...onR1(change), moves: true })
+    expect(plan(column({ kind: "details", open: true }, CARD_C))).toEqual([
+      moving({ kind: "fold", card: C, unfolded: true }),
+      onR1({ kind: "details", card: C, open: true }),
+    ])
+    expect(
+      plan(
+        column({ kind: "details", open: true }, { kind: "card", card: TRUNK }),
+      ),
+    ).toEqual([onR1({ kind: "details", card: TRUNK, open: true })])
   })
 
   test("a fold you ask for is your view of the canvas you are on, and moves; off a canvas, nothing", () => {

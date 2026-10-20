@@ -1524,7 +1524,7 @@ test.each([
       pinning: false,
       pinned: 0,
     },
-    "header",
+    "menu",
   ],
   [
     {

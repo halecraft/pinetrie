@@ -24,7 +24,7 @@ import {
   isOnCanvas,
   placeEnd,
 } from "@pinetrie/rules"
-import type { Level, Status } from "./attention.ts"
+import { attentionWords, type Level, type Status } from "./attention.ts"
 import { needsCard } from "./card-state.ts"
 import { type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
@@ -36,22 +36,54 @@ import { AGENT_PREFILL } from "./message-tools.ts"
  */
 export type Signal = "unsent" | Level | "done"
 
-const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
-  unsent: "you have an unsent message here",
-  accepted: "accepted",
-  running: "the agent is working",
-  "worth-a-read": "worth a read",
-  ready: "ready to accept",
-  conflicts: "conflicts with accepted work",
-  "needs-you": "needs you",
-  done: "the agent has finished",
+/**
+ * A signal's words, its mark's name and title, and the word a column's
+ * status button says while it is raised for you; null where the dot says
+ * enough.
+ */
+interface SignalWording {
+  readonly words: string
+  readonly short: string | null
+}
+
+const SIGNAL_WORDS: Readonly<Record<Signal, SignalWording>> = {
+  unsent: { words: "you have an unsent message here", short: null },
+  accepted: { words: "accepted", short: null },
+  running: { words: "the agent is working", short: null },
+  "worth-a-read": { words: "worth a read", short: "worth a read" },
+  ready: { words: "ready to accept", short: "ready" },
+  conflicts: { words: "conflicts with accepted work", short: "conflicts" },
+  "needs-you": { words: "needs you", short: "needs you" },
+  done: { words: "the agent has finished", short: null },
 }
 
 /** What a column's dot says with no status: a grey dot. */
 export const NO_STATUS_WORDS = "nothing here asks anything of you"
 
 /** What a signal says, its mark's name and title: the one place each is worded. */
-export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
+export const signalWords = (signal: Signal): string =>
+  SIGNAL_WORDS[signal].words
+
+/** A signal's words, then why: "needs you: asks whether to drop the v1 table". */
+export const reasonedWords = (signal: Signal, reason: string | null): string =>
+  reason === null ? signalWords(signal) : `${signalWords(signal)}: ${reason}`
+
+/**
+ * A status's title, wherever one is drawn: a column's dot and status
+ * button, a canvas's mark in the sidebar and on the board.
+ */
+export const statusWords = (
+  status: Status,
+  nameOf: (writer: WriterId) => string,
+): string =>
+  reasonedWords(
+    status.level,
+    status.item === null ? null : attentionWords(status.item.raised, nameOf),
+  )
+
+/** The word a column's status button says: its level's, while raised for you; null otherwise. */
+export const statusWord = (status: Status | null): string | null =>
+  status?.raised === true ? SIGNAL_WORDS[status.level].short : null
 
 /** ▦'s mark's title: what the canvases not in the sidebar raise. */
 export const elsewhereWords = (level: Level): string =>

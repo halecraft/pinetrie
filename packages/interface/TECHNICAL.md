@@ -531,10 +531,18 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `fold` intent, on a started thread or a list column; a bin, ADR-0177, on
   a thread not yet started for a reader who may write, and nothing for one
   who may not); its box (`HeadBox`: ticked, and a `card-tick` asking the
-  other state, null for a reader who may not change the canvas); and,
-  unfolded only, its ⋯. The ⋯ ends in a `trash` section, Move to trash, on
-  every column for a reader who may write; the bin and it ask one `trash`
-  intent, built once.
+  other state, null for a reader who may not change the canvas); its status
+  button's intent (`status`: the details' other state, folded or not); and,
+  unfolded only, its ⋯. The ⋯'s items are shaped as the sidebar's
+  (`ColumnMenuItem`): an `intent`, or a `rename` or `pin` the page opens
+  itself, a list column's Rename for a reader who may write and a thread's
+  Pin a card where `newPinPlace` says `menu` (ADR-0200). The ⋯ ends in a
+  `trash` section, Move to trash, on every column for a reader who may
+  write; the bin and it ask one `trash` intent, built once.
+- **Opening a folded column's details unfolds it first** (`unfoldFirst`,
+  `intent.ts`, ADR-0200): the `details` act's plan is the unfold, with its
+  motion, then the details change, so the status button on a strip and in
+  a header ask one thing.
 - **A ticked column starts folded for whoever has not opened its canvas**
   (ADR-0198): `defaultView` unfolds `firstUnticked`, and `resolveLayout`
   keeps the canvas you are on's default view once its cards are drawn
@@ -817,11 +825,11 @@ pending.
   while its lane is idle and its canvas not archived, and whether it is
   still `raised`. `attentionItems` keeps the raised ones; a column's status
   line (`columnStatus`, on `HeadIdentity`'s agent case) shows any, `quiet`
-  once read or dismissed, and only in the open details once quiet. So the
+  once read or dismissed, first in the column's details (ADR-0200). So the
   sidebar and the column cannot disagree.
-  The line's words are `columnStatusWords`: the level's signal words, then
-  `attentionWords`' reason. Selector: `.head-status[data-level]`, with
-  `data-quiet`.
+  The line's words are `reasonedWords`: the level's signal words, then
+  `attentionWords`' reason, as every status's title is (`statusWords`,
+  *Signals*). Selector: `.head-status[data-level]`, with `data-quiet`.
 - **`attentionItems` decides what is raised**, pure: a thread's run-end report and its
   open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its canvas not archived.
@@ -1452,7 +1460,8 @@ composer*).
   is the one place its words are decided: the thread's `FocusRecord`, a
   model's (`kind: "model"`), else the first line of how the thread began
   (`threadOpening`, `kind: "opening"`), else null. The header, a thread's
-  preview and the folded strip's tooltip (`stripTitle`) take it, and
+  preview and the folded strip's handle's title (`foldedWords`' `hint`)
+  take it, and
   `focusTitle` words its tooltip. `ThreadFace.first` is `threadOpening`
   too, never computed again.
 - **The header's icon is its named agent's, by type**: `HeadIdentity`'s
@@ -1790,7 +1799,11 @@ alike, so no function maps one to the other. `statusSignal` maps a
 thread's or a canvas's status to its mark: its level (running while its
 agent works, ADR-0069), drawn quiet when not raised, and done while a
 finished run fades over nothing raised. A column with no status draws a
-grey dot worded by `NO_STATUS_WORDS`.
+grey dot worded by `NO_STATUS_WORDS`. A status's title is `statusWords`,
+its signal's words and then its item's reason (`reasonedWords`), the one
+place a dot, a status button, a canvas's mark and a run-end row are titled;
+`SIGNAL_WORDS` also holds each level's `short` word, which a status button
+says while raised (`statusWord`, ADR-0200).
 
 ### The unsent signal (ADR-0048, step 2)
 

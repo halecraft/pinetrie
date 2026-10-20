@@ -86,12 +86,11 @@ export function CanvasColumn(p: {
         data-canvas={view.canvas}
       >
         <FoldedStrip
+          card={null}
           detail={pinnedCountWords(p.pins.length)}
-          dot={null}
           hint={null}
           mark={NO_MARK}
           name={view.label}
-          onUnfold={() => fold(true)}
           start={
             <IconButton
               label={UNFOLD_CANVAS.title}
@@ -102,7 +101,7 @@ export function CanvasColumn(p: {
               {UNFOLD_CANVAS.label}
             </IconButton>
           }
-          unfold={UNFOLD_CANVAS}
+          status={null}
         />
       </section>
     )

@@ -15,6 +15,7 @@ import {
   type PlaceOnBoard,
   placeOnBoard,
 } from "./canvas-column-view.ts"
+import { RENAME } from "./card-words.ts"
 import type { WorkStripState } from "./host-rules.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, sameHere, sidebarList } from "./layout.ts"
@@ -291,7 +292,7 @@ export const SIDEBAR_WORDS = {
   closeNew: "close this new canvas; nothing has been written",
   closeLabel: "Close",
   rename: {
-    label: "Rename",
+    label: RENAME,
     title: "change this canvas's title for everyone",
   },
   retitle: {

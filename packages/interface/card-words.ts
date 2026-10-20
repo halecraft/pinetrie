@@ -235,6 +235,10 @@ export const noticeKey = (notice: CardNotice): string =>
 
 /** A column's button that opens a box for a new pinned card. */
 export const NEW_PIN = "+ pin"
+/** The ⋯ item that opens the same box. */
+export const PIN_A_CARD = "Pin a card"
+/** What a ⋯'s rename says, a canvas's in the sidebar and a list column's alike. */
+export const RENAME = "Rename"
 export const NEW_PIN_TITLE =
   "write a new card pinned to the top of the column: the agent reads it on every run"
 

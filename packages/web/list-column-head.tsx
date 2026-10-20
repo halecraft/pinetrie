@@ -1,7 +1,7 @@
 // web/list-column-head — a list column's header, a note column's or a media
-// column's: its fold and its box (`columnHead`), its kind's icon, its title
-// (anyone who may write renames it), how many it holds, and its ⋯. A drag
-// handle, as a thread column's header is.
+// column's: its fold and its box (`columnHead`), its kind's icon and title,
+// its handle, how many it holds, and its ⋯, whose Rename opens the title's
+// field for anyone who may write.
 
 import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/core"
 import {
@@ -12,10 +12,8 @@ import {
   type ListKind,
   type ReadOnly,
 } from "@pinetrie/interface"
-import { dragProps } from "@pinetrie/web-core"
 import { useState } from "react"
-import { Button } from "./button.tsx"
-import { ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
+import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"
 
 /** What each list column's header calls it. */
@@ -39,52 +37,55 @@ export function ListColumnHead(p: {
 }) {
   const [renaming, setRenaming] = useState(false)
   const name = NAME[p.kind]
+  const writable = p.readOnly === null
   const head = columnHead({
     card: p.card,
     width: p.width,
-    writable: p.readOnly === null,
+    writable,
     unstarted: false,
     folded: false,
     ticked: p.ticked,
+    details: false,
+    pin: false,
+    renamable: writable,
   })
   return (
-    <header
-      className="column-head"
-      data-column-head=""
-      {...dragProps({ kind: "card", card: p.card })}
-    >
+    <header className="column-head" data-column-head="">
       <div className="head-row">
         <ColumnHeadStart head={head} onIntent={p.onIntent} />
-        <span aria-hidden="true" className="note-column-mark">
-          {KIND_ICON[p.kind]}
-        </span>
-        {renaming && p.readOnly === null ? (
-          <TitleField
-            label={`title for this ${name}`}
-            onEnd={() => setRenaming(false)}
-            onSend={title =>
-              p.onIntent({
-                kind: "rename",
-                of: { kind: "card", card: p.card },
-                title,
-              })
-            }
-            placeholder={p.title}
-            stored={p.titled}
-          />
+        {renaming && writable ? (
+          <>
+            <span aria-hidden="true" className="note-column-mark">
+              {KIND_ICON[p.kind]}
+            </span>
+            <TitleField
+              label={`title for this ${name}`}
+              onEnd={() => setRenaming(false)}
+              onSend={title =>
+                p.onIntent({
+                  kind: "rename",
+                  of: { kind: "card", card: p.card },
+                  title,
+                })
+              }
+              placeholder={p.title}
+              stored={p.titled}
+            />
+          </>
         ) : (
-          <Button
-            look="plain"
-            className="note-column-title"
-            disabled={p.readOnly !== null}
-            onClick={() => setRenaming(true)}
-            title={`rename this ${name}`}
-          >
+          <ColumnHandle card={p.card} className="note-column-title">
+            <span aria-hidden="true" className="note-column-mark">
+              {KIND_ICON[p.kind]}
+            </span>
             <span data-fold-name="">{p.title}</span>
-          </Button>
+          </ColumnHandle>
         )}
         <span className="note-count">{countWords(p.kind, p.count)}</span>
-        <ColumnMenu onIntent={p.onIntent} sections={head.menu} />
+        <ColumnMenu
+          onIntent={p.onIntent}
+          onRename={() => setRenaming(true)}
+          sections={head.menu}
+        />
       </div>
     </header>
   )

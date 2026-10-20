@@ -69,6 +69,7 @@ import {
   launchBrowser,
   OWN_MENU,
   openBoard,
+  openDetails as openDetailsOf,
   openFromBoard,
   openNote,
   openProfile,
@@ -229,13 +230,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const stillMsg = (scope: string) =>
         `${scope} .msg:has(> .text > p:only-child:has-text(${JSON.stringify(STILL)}))`
       const col = (n: number) => `.column[data-position="${n}"]`
-      /** Open a column's details, where its fork row is: its line opens them. */
-      const openDetails = (column: string) =>
-        page
-          .click(`${column} .head-line[aria-expanded="false"]`, {
-            timeout: 5_000,
-          })
-          .catch(() => {})
+      /** Open a column's details, where its fork row is. */
+      const openDetails = (column: string) => openDetailsOf(page, column)
       // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
       // smallest element holding the text, which is that paragraph.
       const msg = (text: string) =>
@@ -802,7 +798,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `.folded-column[data-card="${card}"] .column-box`,
         )
         await page
-          .click(`.folded-column[data-card="${card}"] .folded-title`, {
+          .click(`.folded-column[data-card="${card}"] .unfold`, {
             timeout: 15_000,
           })
           .catch(() => {})
@@ -824,8 +820,51 @@ async function run(check: Checks["check"]): Promise<void> {
             },
           )
           .catch(() => {})
-        // The line opens the details, and a second press closes them.
-        const line = `.column[data-card="${card}"] .head-line`
+        // Folded again, its status button unfolds it with its details open.
+        await page.click(`.column[data-card="${card}"] .fold`).catch(() => {})
+        await page
+          .click(`.folded-column[data-card="${card}"] .head-status-button`, {
+            timeout: 15_000,
+          })
+          .catch(() => {})
+        const unfoldedOpen = await page
+          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
+            timeout: 10_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a strip's status button unfolds its column with its details open",
+          unfoldedOpen,
+        )
+        await page
+          .click(
+            `.column[data-card="${card}"] .head-status-button[aria-expanded="true"]`,
+          )
+          .catch(() => {})
+        await page
+          .waitForFunction(
+            () => document.getAnimations().every(a => a.id !== "fold"),
+            undefined,
+            { timeout: 15_000 },
+          )
+          .catch(() => {})
+        // A press on the name, the handle, opens nothing.
+        await page
+          .click(`.column[data-card="${card}"] .head-handle`)
+          .catch(() => {})
+        const nameOpened =
+          (await page
+            .locator(`.column[data-card="${card}"] .head-details`)
+            .count()) > 0
+        check(
+          "a press on a column's name, its handle, opens nothing",
+          !nameOpened,
+        )
+        // The status button opens the details, and a second press closes them.
+        const line = `.column[data-card="${card}"] .head-status-button`
         await page.click(line).catch(() => {})
         const opened = await page
           .waitForSelector(`.column[data-card="${card}"] .head-details`, {
@@ -846,7 +885,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a press on a column's line opens its details, and a second closes them",
+          "a press on a column's status button opens its details, and a second closes them",
           opened && closed,
           JSON.stringify({ opened, closed }),
         )
@@ -865,15 +904,15 @@ async function run(check: Checks["check"]): Promise<void> {
       // ── moving a column: drag its header, or Alt+arrows ───────────────────
       const keys = () =>
         page.$$eval(".column", ns => ns.map(n => n.getAttribute("data-key")))
-      /** Press column `n`'s header, and move to `dx` px into column `into`. */
+      /** Press column `n`'s handle, and move to `dx` px into column `into`. */
       const dragHeader = async (n: number, into: number, dx: number) => {
-        const head = await page.locator(`${col(n)} .column-head`).boundingBox()
+        const head = await page
+          .locator(`${col(n)} .column-head .head-handle`)
+          .boundingBox()
         const target = await page.locator(col(into)).boundingBox()
         if (head === null || target === null) return false
-        // The header's own padding, under its line: no button of its own, so
-        // the press is the header's, whatever the line starts with.
-        const y = head.y + head.height - 2
-        await page.mouse.move(head.x + 40, y)
+        const y = head.y + head.height / 2
+        await page.mouse.move(head.x + Math.min(20, head.width / 2), y)
         await page.mouse.down()
         await page.mouse.move(target.x + dx, y, { steps: 12 })
         return true
@@ -894,6 +933,11 @@ async function run(check: Checks["check"]): Promise<void> {
             .map(n => n.getAttribute("data-position"))
             .join(),
         }))
+      // Wide enough that the third column's handle, after its toggle and
+      // box, is in the window: a press outside it presses nothing.
+      const narrow = page.viewportSize()
+      if (narrow !== null)
+        await page.setViewportSize({ ...narrow, width: 1700 })
       const unmoved = await keys()
       const pressed = await dragHeader(2, 0, 60)
       const mid = await marked()
@@ -944,6 +988,7 @@ async function run(check: Checks["check"]): Promise<void> {
           [unmoved[2], unmoved[0], unmoved[1], ...unmoved.slice(3)].join(),
         `${unmoved.length} columns`,
       )
+      if (narrow !== null) await page.setViewportSize(narrow)
       await page.waitForFunction(
         c =>
           document
@@ -4199,7 +4244,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("Enter")
       }
       if ((await page.$(".canvas-column.folded-column")) !== null)
-        await press(".canvas-column.folded-column .folded-title")
+        await press(".canvas-column.folded-column .unfold")
       const trashRow = `.canvas-trash .trash-row[data-card="${branchCard}"]`
       await press(".canvas-trash summary").catch(() => {})
       const listed = await appears(trashRow)
@@ -4410,9 +4455,13 @@ async function run(check: Checks["check"]): Promise<void> {
         cut >= 0 && back >= 0,
         `cut ${cut} ms, back ${back} ms`,
       )
-      // Its title, renamed from its header, for everyone.
+      // Its title, renamed from its ⋯, for everyone.
       const notesColumn = `.note-column:has(textarea[data-card="${noted}"])`
-      await page.click(`${notesColumn} .note-column-title`)
+      await chooseFromMenu(
+        page,
+        `${notesColumn} .column-menu`,
+        ".column-rename",
+      )
       const titleBox = `${notesColumn} .open-title-input`
       await page.waitForSelector(titleBox, { timeout: 10_000 })
       await page.fill(titleBox, "Ideas")
@@ -4428,12 +4477,12 @@ async function run(check: Checks["check"]): Promise<void> {
       await page
         .waitForFunction(
           s => document.querySelector(s)?.textContent === "Ideas",
-          `${notesColumn} .note-column-title`,
+          `${notesColumn} .note-column-title [data-fold-name]`,
           { timeout: 10_000 },
         )
         .catch(() => {})
       const shownTitle = await page
-        .textContent(`${notesColumn} .note-column-title`)
+        .textContent(`${notesColumn} .note-column-title [data-fold-name]`)
         .catch(() => null)
       check(
         "a note column is renamed from its header, for everyone",
@@ -4441,13 +4490,12 @@ async function run(check: Checks["check"]): Promise<void> {
         `${columnRenamed} ms; ${[...readCardTitles(host.session).values()].map(r => r.title).join()}; shown ${shownTitle}`,
       )
 
-      // "+ pin", in the conversation below, which has no pinned
-      // card: the header offers it, and the box it opens in the strip makes a
-      // pinned card. Enter there is a new line; Alt+↑ hands the card to the
-      // strip, focused there, and closes the box; the card stays pinned, and
-      // "+ pin" moves into the strip. It is the strip's only card, so
-      // nothing moves.
-      await page.click(`${col(1)} .column-head .new-pin`)
+      // Pin a card, in the conversation below, which has no pinned card:
+      // its ⋯ offers it, and the box it opens in the strip makes a pinned
+      // card. Enter there is a new line; Alt+↑ hands the card to the strip,
+      // focused there, and closes the box; the card stays pinned, and "+ pin"
+      // is the strip's. It is the strip's only card, so nothing moves.
+      await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-pin")
       const pinningBox = `${col(1)} .pinned-strip .new-card .input`
       const pinFocused = await page
         .waitForFunction(
@@ -4744,7 +4792,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // its end closes a menu as it scrolls, so it opens again until it is
       // measured. Moved onto the canvas, the column arrives folded.
       await page
-        .click(`.folded-column[data-card="${farThread}"] .folded-title`, {
+        .click(`.folded-column[data-card="${farThread}"] .unfold`, {
           timeout: 15_000,
         })
         .catch(() => {})
@@ -4848,7 +4896,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )?.[0] ?? ""
       if (copy !== "")
         await page
-          .click(`.folded-column[data-card="${copy}"] .folded-title`, {
+          .click(`.folded-column[data-card="${copy}"] .unfold`, {
             timeout: 15_000,
           })
           .catch(() => {})

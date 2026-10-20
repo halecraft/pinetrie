@@ -342,7 +342,6 @@ export {
   mediaColumnGlance,
   NO_MARK,
   noteColumnGlance,
-  stripTitle,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
 export { jjWordsIn, wordsIn } from "./folder-words.ts"
@@ -719,9 +718,12 @@ export {
   holdsText,
   NO_STATUS_WORDS,
   ownCards,
+  reasonedWords,
   type Signal,
   signalWords,
   statusSignal,
+  statusWord,
+  statusWords,
   unsentSignals,
   withFilled,
 } from "./signals.ts"

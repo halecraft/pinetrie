@@ -502,9 +502,15 @@ export function baseWords(base: BaseRecord | undefined): string | null {
 }
 
 /** A column's identity, after its mark: the thread's name, or a new agent not yet named. */
-export const identityWords = (
-  identity: Exclude<HeadIdentity, { kind: "none" }>,
-): string => (identity.kind === "agent" ? identity.name : "new agent")
+export const identityWords = (identity: HeadIdentity): string =>
+  identity.kind === "agent"
+    ? identity.name
+    : identity.kind === "pending"
+      ? "new agent"
+      : CHAT_HANDLE
+
+/** A chat's handle, where an agent's name would be: it has none. */
+export const CHAT_HANDLE = "chat"
 
 /** Who started a thread, and how long before `now`: its details' line. */
 export const startedWords = (
@@ -515,9 +521,9 @@ export const startedWords = (
 /** The details' button that reveals where the thread's lane started. */
 export const START_WORDS = "where it started"
 
-/** The title of a thread's name, which opens or closes its details. */
+/** What a column's status button does, after the status's own words. */
 export const detailsTitle = (open: boolean): string =>
-  open ? "hide this thread's details" : "show this thread's details"
+  open ? "hide this column's details" : "show this column's details"
 
 /**
  * `head` is `headLane`'s. Only a named agent carries `details`, an icon and
@@ -1020,17 +1026,17 @@ export function composerPlace(
 }
 
 /**
- * Where a column offers "+ pin", which opens a box that pins a new card:
- * in its header while the thread has no pinned card, since the empty strip
- * shows only while a card is dragged; in the strip once it has one. None
- * while that box is open, and none where no card can be pinned.
+ * Where a column offers to pin a new card, which opens a box for it: its ⋯'s
+ * Pin a card while the thread has no pinned card, since the empty strip
+ * shows only while a card is dragged; the strip's "+ pin" once it has one.
+ * None while that box is open, and none where no card can be pinned.
  */
 export const newPinPlace = (f: {
   readonly canPin: boolean
   readonly pinning: boolean
   readonly pinned: number
-}): "header" | "strip" | null =>
-  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"
+}): "menu" | "strip" | null =>
+  !f.canPin || f.pinning ? null : f.pinned === 0 ? "menu" : "strip"
 
 /**
  * What a column draws above a run's prompt for the context the run read:

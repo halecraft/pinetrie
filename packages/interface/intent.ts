@@ -49,6 +49,7 @@ import {
 } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
+import { keptTaskView } from "./canvas-columns.ts"
 import {
   afterUndo,
   canvasSpot,
@@ -777,7 +778,10 @@ function planColumn(
     case "density":
       return reading({ kind: "density", density: act.density })
     case "details":
-      return reading({ kind: "details", open: act.open })
+      return [
+        ...(act.open ? unfoldFirst(column, state) : []),
+        ...reading({ kind: "details", open: act.open }),
+      ]
     case "queue": {
       const now = findTextCard(state.cards, act.card)
       return now === undefined
@@ -940,6 +944,34 @@ function planOpenIn(
   if (state.index.entries[entry] !== undefined)
     return planOpenEntry(entry, state)
   return [...showCanvas(canvas), { kind: "open-when-held", entry }]
+}
+
+/**
+ * Opening a folded column's details unfolds it first, with its motion: the
+ * status button on a strip asks for the details, as the header's does. An
+ * unfolded column, or one off the canvas you are on, needs nothing.
+ */
+function unfoldFirst(
+  column: ColumnKey,
+  state: Pick<IntentState, "canvases" | "layout">,
+): readonly Effect[] {
+  const active = state.layout.active
+  if (column.kind !== "card" || active?.kind !== "canvas") return []
+  const { card } = column
+  const view = keptTaskView(
+    state.layout.canvases,
+    active.canvas,
+    state.canvases.index.cardsOn.get(active.canvas) ?? [],
+  )
+  return view.cards.get(card)?.unfolded === true
+    ? []
+    : [
+        foldViewEffect(state, active.canvas, {
+          kind: "fold",
+          card,
+          unfolded: true,
+        }),
+      ]
 }
 
 /**

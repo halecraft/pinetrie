@@ -64,6 +64,7 @@ import {
   OWN_MENU,
   oneFrame,
   openBoard,
+  openDetails,
   openFromBoard,
   PANE_VIEWPORT,
   railCount,
@@ -471,7 +472,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `${JSON.stringify({ landed, left, foldOpen })}`,
         )
 
-        // 8. A column's density is kept with it across a reload.
+        // 8. A column's density is kept with it across a reload. It is in
+        // the column's details.
+        await openDetails(ap, col(0))
         await ap.click(`${col(0)} .density-choice[data-density="outline"]`)
         await ap.reload({ waitUntil: "domcontentloaded" })
         const kept = await ap
@@ -1631,7 +1634,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await toolIdle()
         // The proposed changes are in the column's details: its line opens them.
         await tp
-          .click(`${col(0)} .head-line[aria-expanded="false"]`, {
+          .click(`${col(0)} .head-status-button[aria-expanded="false"]`, {
             timeout: 2_000,
           })
           .catch(() => {})

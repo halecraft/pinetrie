@@ -261,14 +261,32 @@ export const mutations: readonly Mutation[] = [
     expect: "a column's box ticked on its strip is ticked on its header",
   },
   {
-    name: "a column's line never closes its details",
-    file: "packages/web/column.tsx",
-    from: "      onClick={() => onToggle(!open)}\n",
-    to: "      onClick={() => onToggle(true)}\n",
+    name: "a column's status button never closes its details",
+    file: "packages/web/root-signals.tsx",
+    from: "      onClick={p.onPress}\n",
+    to: "      onClick={() => {\n        if (!p.open) p.onPress()\n      }}\n",
     suite: "browser",
     scenario: "page",
     expect:
-      "a press on a column's line opens its details, and a second closes them",
+      "a press on a column's status button opens its details, and a second closes them",
+  },
+  {
+    name: "a press on a column's name opens its details",
+    file: "packages/web/column-menu.tsx",
+    from: "      data-thread={p.thread}\n",
+    to: '      data-thread={p.thread}\n      onClick={e =>\n        e.currentTarget\n          .closest(".column-head")\n          ?.querySelector<HTMLElement>(".head-status-button")\n          ?.click()\n      }\n',
+    suite: "browser",
+    scenario: "page",
+    expect: "a press on a column's name, its handle, opens nothing",
+  },
+  {
+    name: "a strip's status button does nothing",
+    file: "packages/web/folded-column.tsx",
+    from: "              onPress={() => p.onIntent(head.status)}\n",
+    to: "              onPress={() => {}}\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "a strip's status button unfolds its column with its details open",
   },
   {
     name: "a column's bin does nothing",
@@ -2999,8 +3017,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column's rename sends nothing",
     file: "packages/web/list-column-head.tsx",
-    from: '              p.onIntent({\n                kind: "rename",',
-    to: '              void ({\n                kind: "rename",',
+    from: '                p.onIntent({\n                  kind: "rename",',
+    to: '                void ({\n                  kind: "rename",',
     suite: "browser",
     scenario: "page",
     expect: "a note column is renamed from its header, for everyone",
@@ -3038,8 +3056,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's ⋯ copies nothing",
     file: "packages/web/column-menu.tsx",
-    from: "          onChoose: () => p.onIntent(item.intent),\n",
-    to: '          onChoose: () => item.intent.kind === "copy-thread" || p.onIntent(item.intent),\n',
+    from: '            if (item.kind === "intent") p.onIntent(item.intent)\n',
+    to: '            if (item.kind === "intent" && item.intent.kind !== "copy-thread") p.onIntent(item.intent)\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -3048,8 +3066,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's Move to trash does nothing",
     file: "packages/web/column-menu.tsx",
-    from: "          onChoose: () => p.onIntent(item.intent),\n",
-    to: '          onChoose: () => item.intent.kind === "trash" || p.onIntent(item.intent),\n',
+    from: '            if (item.kind === "intent") p.onIntent(item.intent)\n',
+    to: '            if (item.kind === "intent" && item.intent.kind !== "trash") p.onIntent(item.intent)\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -3270,8 +3288,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a strip's mark row is taller than the geometry a fold reads",
     file: "packages/web/index.html",
-    from: "      .folded-title > .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }\n",
-    to: "      .folded-title > .thread-mark { flex: 0 0 calc(var(--strip-mark) + 4px); height: calc(var(--strip-mark) + 4px); }\n",
+    from: "      .folded-title .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }\n",
+    to: "      .folded-title .thread-mark { flex: 0 0 calc(var(--strip-mark) + 4px); height: calc(var(--strip-mark) + 4px); }\n",
     suite: "browser",
     scenario: "page",
     expect: "a fold turns the column's name onto its strip's, in its colour",

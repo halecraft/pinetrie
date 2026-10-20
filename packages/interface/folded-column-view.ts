@@ -104,12 +104,6 @@ export const foldedWords = (glance: FoldedGlance): FoldedWords =>
         hint: null,
       }
 
-/** A folded strip's tooltip: its hint, then how to unfold it. */
-export const stripTitle = (
-  unfold: ControlWords,
-  hint: string | null,
-): string => (hint === null ? unfold.title : `${hint}\n${unfold.title}`)
-
 /**
  * What heads a folded strip above its name: a thread's mark (its icon, or ✦
  * with none), drawn as the column's header draws it; or no mark at all. Every

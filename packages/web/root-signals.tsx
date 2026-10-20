@@ -13,7 +13,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import {
-  attentionWords,
+  detailsTitle,
   moving,
   NO_STATUS_WORDS,
   type OpenMenus,
@@ -21,14 +21,18 @@ import {
   peopleIn,
   readerHeading,
   readersByCanvas,
+  type Signal,
   type Status,
   signalWords,
   statusSignal,
+  statusWord,
+  statusWords,
   toggleOpenMenu,
   withOpenMenus,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import { useMemo, useState } from "react"
+import { Button } from "./button.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
@@ -54,21 +58,25 @@ export const RootStatus = (p: StatusProps) => statusMark(p)
 function statusMark({ status, arrived, done, nameOf }: StatusProps) {
   const signal = statusSignal(status, moving(done, Date.now()))
   if (signal === null) return null
-  const why =
-    status === null || status.item === null
-      ? null
-      : attentionWords(status.item.raised, w => nameFor(nameOf, w))
   return (
     <SignalMark
       arrived={status === null ? done : arrived}
       quiet={status !== null && !status.raised}
       signal={signal}
-      title={
-        why === null ? signalWords(signal) : `${signalWords(signal)}: ${why}`
-      }
+      title={titleOf(status, signal, nameOf)}
     />
   )
 }
+
+/** A mark's title: its status's (`statusWords`), or its signal's alone, a ✓ fading with none. */
+const titleOf = (
+  status: Status | null,
+  signal: Signal,
+  nameOf: ReadonlyMap<WriterId, string>,
+): string =>
+  status === null || signal === "done"
+    ? signalWords(signal)
+    : statusWords(status, w => nameFor(nameOf, w))
 
 /**
  * A column's dot, after its name, folded or not: its thread's status
@@ -86,6 +94,42 @@ export function ColumnDot(p: StatusProps) {
         title={NO_STATUS_WORDS}
       />
     )
+  )
+}
+
+/**
+ * A column's status button, after its name, folded or not: its dot, the
+ * word a raised status says (`statusWord`; none in a strip, where the title
+ * holds it), and a chevron turned while its details are open. `onPress`
+ * asks for them (`columnHead`'s `status`).
+ */
+export function StatusButton(
+  p: StatusProps & {
+    open: boolean
+    /** Its word drawn, not only in its title: the unfolded header's. */
+    worded: boolean
+    detailsId?: string
+    onPress: () => void
+  },
+) {
+  const word = p.worded ? statusWord(p.status) : null
+  const why =
+    p.status === null
+      ? NO_STATUS_WORDS
+      : statusWords(p.status, w => nameFor(p.nameOf, w))
+  return (
+    <Button
+      look="plain"
+      aria-controls={p.open ? p.detailsId : undefined}
+      aria-expanded={p.open}
+      className="head-status-button"
+      data-level={p.status?.raised === true ? p.status.level : undefined}
+      onClick={p.onPress}
+      title={`${why}\n${detailsTitle(p.open)}`}
+    >
+      <ColumnDot {...p} />
+      {word !== null && <span className="head-status-word">{word}</span>}
+    </Button>
   )
 }
 

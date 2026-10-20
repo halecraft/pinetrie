@@ -25,6 +25,11 @@
   - ADR-0175: the run-end status row shows under the header only while raised;
     read or dismissed, it is in the details, and the dot carries its level.
   - ADR-0177: an unstarted thread's bin takes the fold toggle's place.
+- **Amended by:**
+  - ADR-0200: the drag handle is the mark and name, not the whole header or
+    strip; the status button, not the line, opens the details; a raised
+    run-end status is a word on that button, its row in the details; density
+    and + pin leave the line.
 
 **Context.**
 

@@ -5,6 +5,7 @@ import {
   canvasIdFor,
   cardIdOfKind,
   type EntryLike,
+  entryId,
   rootIdFor,
   type TextCard,
   type ThreadId,
@@ -26,6 +27,8 @@ import {
   type Signal,
   signalWords,
   statusSignal,
+  statusWord,
+  statusWords,
   unsentSignals,
   withFilled,
 } from "./signals.ts"
@@ -279,5 +282,41 @@ describe("unsentSignals", () => {
     })
     expect([...m.canvases]).toEqual([K("g1")])
     expect(m.elsewhere).toBe(false)
+  })
+})
+
+describe("a status's words", () => {
+  const item = {
+    lane: _TEST_THREAD,
+    end: entryId("e"),
+    level: "needs-you",
+    raised: {
+      kind: "run-end",
+      report: { kind: "model-said", urgency: "needs-you", reason: "asks why" },
+      ask: entryId("p"),
+    },
+  } as const
+  const nameOf = (w: string) => w
+
+  test("a status's title is its level's words, then its item's reason", () => {
+    expect(
+      statusWords({ level: "needs-you", raised: true, item }, nameOf),
+    ).toBe("needs you: asks why")
+    expect(
+      statusWords({ level: "running", raised: true, item: null }, nameOf),
+    ).toBe("the agent is working")
+  })
+
+  test("a status button says a word only while its status is raised, and none for running or accepted", () => {
+    const of = (level: (typeof LEVELS)[number], raised = true) =>
+      statusWord({ level, raised, item: null })
+    expect(of("needs-you")).toBe("needs you")
+    expect(of("conflicts")).toBe("conflicts")
+    expect(of("ready")).toBe("ready")
+    expect(of("worth-a-read")).toBe("worth a read")
+    expect(of("running")).toBeNull()
+    expect(of("accepted")).toBeNull()
+    expect(of("needs-you", false)).toBeNull()
+    expect(statusWord(null)).toBeNull()
   })
 })

@@ -1,20 +1,33 @@
 // interface/column-menu — a card column's head, folded or not, as values. It
 // starts with its toggle, ⇤ or ⇥, yours alone, or the bin on a thread not yet
-// started, and the card's box, everyone's; an unfolded head ends in its ⋯,
-// what changes the canvas everyone shares, ending in its trash.
+// started, and the card's box, everyone's; after its name, its status button,
+// which opens its details; an unfolded head ends in its ⋯, what changes the
+// canvas everyone shares, ending in its trash.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
 import { moveWords } from "./card-frame.ts"
-import type { ControlWords } from "./card-words.ts"
+import {
+  type ControlWords,
+  NEW_PIN_TITLE,
+  PIN_A_CARD,
+  RENAME,
+} from "./card-words.ts"
 import { foldToggle } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
 
-export interface ColumnMenuItem {
+/**
+ * An item of a column's ⋯: one that asks an intent, or one the page opens
+ * itself (its title field, its pin box), as the sidebar's Rename is.
+ */
+export type ColumnMenuItem = {
   readonly key: string
   readonly label: string
   readonly title: string
-  readonly intent: Intent
-}
+} & (
+  | { readonly kind: "intent"; readonly intent: Intent }
+  | { readonly kind: "rename" }
+  | { readonly kind: "pin" }
+)
 
 /** A run of a column's ⋯: the canvas's own items, a thread's, or its trash. */
 export interface ColumnMenuSection {
@@ -46,6 +59,11 @@ export interface ColumnHead {
   readonly box: HeadBox
   /** ⋯, unfolded only: a column is unfolded to act on it. */
   readonly menu: readonly ColumnMenuSection[]
+  /**
+   * What its status button asks: the details' other state. Opening a folded
+   * column's details unfolds it first (`unfoldFirst`, `intent.ts`).
+   */
+  readonly status: Intent
 }
 
 /** The title of the bin and of Move to trash: the card goes to the canvas's trash, for everyone. */
@@ -94,6 +112,12 @@ export function columnHead(input: {
   readonly unstarted: boolean
   readonly folded: boolean
   readonly ticked: boolean
+  /** Its details are open. */
+  readonly details: boolean
+  /** Its ⋯ offers Pin a card (`newPinPlace` says `menu`). */
+  readonly pin: boolean
+  /** Its ⋯ offers Rename: a list column a reader may write. */
+  readonly renamable: boolean
 }): ColumnHead {
   const { card, folded, ticked, writable } = input
   return {
@@ -111,6 +135,11 @@ export function columnHead(input: {
       intent: writable ? { kind: "card-tick", card, ticked: !ticked } : null,
     },
     menu: folded ? [] : columnMenu(input),
+    status: {
+      kind: "column",
+      column: { kind: "card", card },
+      act: { kind: "details", open: !input.details },
+    },
   }
 }
 
@@ -124,12 +153,35 @@ function columnMenu(input: {
   readonly card: CardId
   readonly width: CardWidth
   readonly writable: boolean
+  readonly pin: boolean
+  readonly renamable: boolean
 }): readonly ColumnMenuSection[] {
   const wide = input.width === 2
   const canvas: ColumnMenuSection = {
     key: "canvas",
     items: [
+      ...(input.renamable
+        ? [
+            {
+              kind: "rename",
+              key: "rename",
+              label: RENAME,
+              title: "change this column's title, for everyone",
+            } as const,
+          ]
+        : []),
+      ...(input.pin
+        ? [
+            {
+              kind: "pin",
+              key: "pin",
+              label: PIN_A_CARD,
+              title: NEW_PIN_TITLE,
+            } as const,
+          ]
+        : []),
       {
+        kind: "intent",
         key: "width",
         label: wide ? "Make narrow" : "Make wide",
         title: wide
@@ -145,6 +197,7 @@ function columnMenu(input: {
           key: "trash",
           items: [
             {
+              kind: "intent",
               key: "trash",
               label: "Move to trash",
               title: TRASH_COLUMN,
@@ -162,18 +215,21 @@ function columnMenu(input: {
       key: "thread",
       items: [
         {
+          kind: "intent",
           key: "copy",
           label: "Copy to this canvas",
           title: "a new thread forked at this one's end, just after it",
           intent: { kind: "copy-thread", source, to: "here" },
         },
         {
+          kind: "intent",
           key: "copy-inventory",
           label: "Copy to your inventory",
           title: "a new thread forked at this one's end, in your inventory",
           intent: { kind: "copy-thread", source, to: "inventory" },
         },
         {
+          kind: "intent",
           key: "take",
           label: moveWords("inventory").label,
           title:

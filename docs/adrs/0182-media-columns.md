@@ -22,6 +22,7 @@ Numbered 0181 until 2026-10-19, when two files held that number.
 - **Amended by:**
   - ADR-0183: the canvas list names each note column and media column by its
     id too, so the agent can read it; an image is read through `read_card`.
+  - ADR-0200: a list column's title renames from its ⋯, not a click.
 
 **Context.**
 

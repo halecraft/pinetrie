@@ -62,7 +62,6 @@ import {
   type Density,
   type DigestRecord,
   densityWords,
-  detailsTitle,
   earlierWords,
   effectiveBase,
   endTraces,
@@ -84,8 +83,6 @@ import {
   type MediaColumnView,
   type Moments,
   marginCards,
-  NEW_PIN,
-  NEW_PIN_TITLE,
   newPinPlace,
   noModelLine,
   noticeKey,
@@ -132,7 +129,6 @@ import { newCardId } from "@pinetrie/session/connect"
 import {
   behind,
   columnSpot,
-  dragProps,
   keepSpot,
   type ScreenMemory,
   type SeenEnd,
@@ -151,7 +147,7 @@ import {
 } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { NewCardBox } from "./card-editor.tsx"
-import { ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
+import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
@@ -172,7 +168,7 @@ import { Pane } from "./pane.tsx"
 import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
-import { ColumnDot } from "./root-signals.tsx"
+import { StatusButton } from "./root-signals.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadMark } from "./thread-mark.tsx"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -350,17 +346,6 @@ export function Column(p: ColumnProps) {
   const writable = p.readOnly === null
   // Open details stay open, through a reload too, as a density does.
   const detailsOpen = p.column.details === true
-  const head =
-    card === null
-      ? null
-      : columnHead({
-          card,
-          width: p.width,
-          writable,
-          unstarted,
-          folded: false,
-          ticked: p.ticked,
-        })
   // What this column's reader asks, a message's acts among it: the one
   // handler every message shares, so none of them redraws when this column
   // does.
@@ -967,6 +952,20 @@ export function Column(p: ColumnProps) {
     pinned: pinned.length,
   })
   const openPin = () => setPinning(true)
+  const head =
+    card === null
+      ? null
+      : columnHead({
+          card,
+          width: p.width,
+          writable,
+          unstarted,
+          folded: false,
+          ticked: p.ticked,
+          details: detailsOpen,
+          pin: newPin === "menu",
+          renamable: false,
+        })
   // Your traces where your cards were at this thread's end, when someone
   // else moved them while you were away. Drawn in a page you can
   // see, a trace is seen: the host deletes it, and this column keeps drawing
@@ -1019,34 +1018,36 @@ export function Column(p: ColumnProps) {
             className="column-head"
             data-color={colors.slot(p.track)}
             data-column-head={card === null ? undefined : ""}
-            {...(card === null ? {} : dragProps({ kind: "card", card }))}
           >
             <div className="head-row">
               {head !== null && (
                 <ColumnHeadStart head={head} onIntent={p.onIntent} />
               )}
-              <HeadLine
-                detailsId={detailsId}
+              <HeadHandle
+                card={card}
                 identity={shows.identity}
-                onToggle={open => {
-                  if (open) setOpenedHere(true)
-                  // No `PLACED`, unlike density: this changes the viewport's
-                  // height, not the content's, and `useFollow`'s resize step
-                  // keeps a column at its end there.
-                  act({ kind: "details", open })
-                }}
-                open={detailsOpen}
                 running={running}
                 working={working}
               />
-              {card !== null && isThreadId(card) && (
-                <ColumnDot
+              {head !== null && card !== null && isThreadId(card) && (
+                <StatusButton
                   arrived={p.threadArrivals.arrived.get(card) ?? null}
+                  detailsId={detailsId}
                   done={p.threadArrivals.done.get(card) ?? null}
                   nameOf={p.nameOf}
+                  onPress={() => {
+                    // No `PLACED`, unlike density: this changes the
+                    // viewport's height, not the content's, and
+                    // `useFollow`'s resize step keeps a column at its end.
+                    if (!detailsOpen) setOpenedHere(true)
+                    p.onIntent(head.status)
+                  }}
+                  open={detailsOpen}
                   status={p.statuses.get(card) ?? null}
+                  worded
                 />
               )}
+              <span className="head-space" />
               {p.matches !== null && (
                 <span className="match-count">{p.matches.count}</span>
               )}
@@ -1058,27 +1059,6 @@ export function Column(p: ColumnProps) {
                   {shows.behind.mark}
                 </span>
               )}
-              {newPin === "header" && (
-                <Button
-                  look="plain"
-                  className="new-pin"
-                  onClick={openPin}
-                  title={NEW_PIN_TITLE}
-                >
-                  {NEW_PIN}
-                </Button>
-              )}
-              {view.nodes.length > 0 && (
-                <DensityControl
-                  density={density}
-                  onChoose={d => {
-                    act({ kind: "density", density: d })
-                    // The reader's own move: at the end, it stays there, and
-                    // no floor holds the change (`follow.ts`).
-                    body.current?.dispatchEvent(new Event(PLACED))
-                  }}
-                />
-              )}
               {view.tipId !== null && (
                 <SeenBy
                   colorOf={p.colorOf}
@@ -1089,16 +1069,15 @@ export function Column(p: ColumnProps) {
                 />
               )}
               {head !== null && (
-                <ColumnMenu onIntent={p.onIntent} sections={head.menu} />
+                <ColumnMenu
+                  onIntent={p.onIntent}
+                  onPin={openPin}
+                  sections={head.menu}
+                />
               )}
             </div>
-            {/* Closed, the header shows only what asks something of you:
-            a raised run-end status, and an ssh ask for its owner. */}
-            {shows.identity.kind === "agent" &&
-              shows.identity.status !== null &&
-              (detailsOpen || !shows.identity.status.quiet) && (
-                <StatusRow onOpen={openAt} status={shows.identity.status} />
-              )}
+            {/* Closed, under the line is only what waits on your answer:
+            an ssh ask, for its owner. */}
             {shows.access !== null && lane.kind === "lane" && (
               <AccessRowView
                 acting={acting.access.get(lane.name) ?? null}
@@ -1110,6 +1089,10 @@ export function Column(p: ColumnProps) {
             )}
             {detailsOpen && (
               <div className="head-details" id={detailsId}>
+                {shows.identity.kind === "agent" &&
+                  shows.identity.status !== null && (
+                    <StatusRow onOpen={openAt} status={shows.identity.status} />
+                  )}
                 {shows.identity.kind === "agent" &&
                   shows.identity.focus !== null && (
                     <div
@@ -1129,6 +1112,17 @@ export function Column(p: ColumnProps) {
                   // Other threads' agents in this thread, and what agents
                   // talking from it spent.
                   <div className="agents-row">{agentsWords(agentsLine)}</div>
+                )}
+                {view.nodes.length > 0 && (
+                  <DensityControl
+                    density={density}
+                    onChoose={d => {
+                      act({ kind: "density", density: d })
+                      // The reader's own move: at the end, it stays there,
+                      // and no floor holds the change (`follow.ts`).
+                      body.current?.dispatchEvent(new Event(PLACED))
+                    }}
+                  />
                 )}
                 <WorkStripView
                   act={actOnProposedChanges}
@@ -1459,38 +1453,24 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
 }
 
 /**
- * The header's line after its start: who works in the column (its lane's
- * name, a lane about to start, or nothing, in a chat) and the free space
- * after it, one button that opens or closes the details. Its mark pulses
- * while the lane runs. The chevron is CSS, so its text is the mark and the
- * name alone.
+ * The column's handle: who works in it (its lane's name, a lane about to
+ * start, or "chat") with its mark, the one part of the header a drag starts
+ * from. Its mark pulses while the lane runs. A column with no card (none
+ * moves it) draws the same words, with no handle.
  */
-function HeadLine({
+function HeadHandle({
+  card,
   identity,
-  detailsId,
-  open,
-  onToggle,
   running,
   working,
 }: {
+  card: CardId | null
   identity: HeadIdentity
-  /** The details' element id, for `aria-controls`. */
-  detailsId: string
-  open: boolean
-  onToggle: (open: boolean) => void
   running: boolean
   working: string | undefined
 }) {
-  return (
-    <Button
-      look="plain"
-      aria-controls={open ? detailsId : undefined}
-      aria-expanded={open}
-      className={`head-line${identity.kind === "none" ? "" : " agent-name"}${identity.kind === "pending" ? " pending" : ""}`}
-      data-thread={identity.kind === "agent" ? identity.name : undefined}
-      onClick={() => onToggle(!open)}
-      title={detailsTitle(open)}
-    >
+  const inner = (
+    <>
       {identity.kind !== "none" && (
         <>
           <ThreadMark
@@ -1499,10 +1479,30 @@ function HeadLine({
             running={running}
             working={working}
           />{" "}
-          <span data-fold-name="">{identityWords(identity)}</span>
         </>
       )}
-    </Button>
+      <span data-fold-name="">{identityWords(identity)}</span>
+    </>
+  )
+  const className =
+    identity.kind === "none"
+      ? "head-chat"
+      : `agent-name${identity.kind === "pending" ? " pending" : ""}`
+  return card === null ? (
+    <span
+      className={`head-handle ${className}`}
+      data-thread={identity.kind === "agent" ? identity.name : undefined}
+    >
+      {inner}
+    </span>
+  ) : (
+    <ColumnHandle
+      card={card}
+      className={className}
+      thread={identity.kind === "agent" ? identity.name : undefined}
+    >
+      {inner}
+    </ColumnHandle>
   )
 }
 

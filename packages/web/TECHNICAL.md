@@ -510,15 +510,16 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 
 - **A folded column is a `.folded-column`** (`folded-column.tsx`), never a
   `.column`: a strip with `data-card` and `data-kind` (`thread` or
-  `note-column`, as the wide `Column` and `NoteColumn` carry too), which a
-  click unfolds. So `.column` counts whole thread columns, and the browser
-  suite counts with it. The whole strip is the drag handle
-  (`data-column-head`), as an unfolded header is; `data-ticked` marks its
-  box ticked. The folded canvas column is a
-  `.canvas-column.folded-column`. Both draw one `FoldedStrip`
-  (`folded-strip.tsx`): its start (`.folded-start`: ⇥ and a card's box),
-  then one `.folded-title` button holding the mark `foldedMark` decides,
-  the name on its side, the detail and the dot.
+  `note-column`, as the wide `Column` and `NoteColumn` carry too), which
+  its ⇥ and its status button unfold, the latter with its details open. So
+  `.column` counts whole thread columns, and the browser suite counts with
+  it. Its handle is its mark and name (`ColumnHandle`), as an unfolded
+  header's is; `data-ticked` marks its box ticked. The folded canvas column
+  is a `.canvas-column.folded-column`, unfolded from ⇥ alone. Both draw one
+  `FoldedStrip` (`folded-strip.tsx`): its start (`.folded-start`: ⇥ and a
+  card's box), then `.folded-title`, holding the handle (the mark
+  `foldedMark` decides, the name on its side, the detail; its title the
+  focus) and a card's status button.
 - **A strip is its header turned on its side** (ADR-0137, ADR-0198): in
   the header's order, ⇥ where the header's ⇤ is (the same top border, its
   row the header's height), a thread's mark and its name at the header's
@@ -575,18 +576,27 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   asking which. The toggle is centred in a strip's width from the column's
   left edge (`.head-row > :first-child`), so a fold leaves it under the
   pointer.
-- **The header is one line; a press on it opens the rest** (ADR-0198):
-  after its start, `HeadLine` (`.head-line.agent-name`) is the name and the
-  free space after it, one disclosure button over the column's `details`.
-  Closed, under the line are only what asks something of you: a raised
-  run-end status (`.head-status`) and an ssh ask (`AccessRowView`). Open,
-  `.head-details` holds the focus, the fork row, the agents line and the
-  work strip, and `ThreadDetailsPanel` shows under the header as before.
+- **A column drags by its handle alone** (`ColumnHandle`,
+  `column-menu.tsx`, ADR-0200): `.head-handle`, its mark and name (a
+  thread's `.agent-name` with `data-thread`, a chat's "chat", a list
+  column's icon and title), folded or not, carries `dragProps`, and no press
+  on it clicks anything. Nothing else in a header or a strip is a handle, so
+  a drag and a click never share an element. `.column-head` keeps
+  `data-column-head`, which the lift's look reads.
+- **The header is one line; its status button opens the rest** (ADR-0198,
+  ADR-0200): after the handle, `StatusButton` (`.head-status-button`,
+  `root-signals.tsx`, `aria-expanded`) holds the dot, the word a raised
+  status says (`.head-status-word`, `statusWord`) and a chevron, and asks
+  `columnHead`'s `status`. Closed, under the line is only an ssh ask
+  (`AccessRowView`). Open, `.head-details` holds the run-end row
+  (`.head-status`), the focus, the fork row, the agents line, the density
+  and the work strip, and `ThreadDetailsPanel` shows under the header as
+  before. + pin is the ⋯'s Pin a card until the thread has a pinned card.
 - **A column's dot is its thread's status** (`ColumnDot`,
   `root-signals.tsx`): a `SignalMark` of `statusSignal`, `data-quiet` when
   not raised for you, or `.signal[data-signal="none"]` with nothing to
-  say. Folded or not, it is the same value (`threadStatus`, through
-  `ThreadGlance.status` for a strip). A note column's header is a
+  say, titled by `statusWords`. Folded or not, it is the same value
+  (`threadStatus`, through `ThreadGlance.status` for a strip). A note column's header is a
   `.column-head` with a thread's `.head-row`, so it takes the same button
   reset, row height and top border (its `--track` is grey), and its ▤ sits
   in the square a thread's mark takes: a rule written for `.note-column-*`
