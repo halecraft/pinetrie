@@ -285,7 +285,6 @@ export function InventoryPanel(p: {
           label={CLOSE_INVENTORY.title}
           className="inventory-close"
           onClick={() => act({ kind: "close" })}
-          title={CLOSE_INVENTORY.title}
         >
           {CLOSE_INVENTORY.label}
         </IconButton>

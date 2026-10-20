@@ -120,7 +120,6 @@ export function CanvasColumn(p: {
           label={FOLD_CANVAS.title}
           className={FOLD_CANVAS.className}
           onClick={() => fold(false)}
-          title={FOLD_CANVAS.title}
         >
           {FOLD_CANVAS.label}
         </IconButton>

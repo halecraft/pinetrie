@@ -177,7 +177,6 @@ export function CardFrame(p: {
               label={CLOSE_CARD.title}
               className="close-card"
               onClick={p.onClose}
-              title={CLOSE_CARD.title}
             >
               {CLOSE_CARD.label}
             </IconButton>
@@ -197,7 +196,6 @@ export function CardFrame(p: {
                 label={CLEAR_COMMAND}
                 className="card-command-clear"
                 onClick={p.onClearCommand}
-                title={CLEAR_COMMAND}
               >
                 ×
               </IconButton>
@@ -225,7 +223,6 @@ export function CardFrame(p: {
                     onClick={() => {
                       if (t.act !== null) p.onAct(t.act)
                     }}
-                    title={w.title}
                   >
                     {w.label}
                   </IconButton>
@@ -282,7 +279,6 @@ function TrashButton(p: { onTrash: () => void }) {
       label={TRASH_CARD_TITLE}
       className="trash-card"
       onClick={p.onTrash}
-      title={TRASH_CARD_TITLE}
     >
       <TrashIcon />
     </IconButton>

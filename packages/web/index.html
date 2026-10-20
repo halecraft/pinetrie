@@ -134,7 +134,7 @@
          `infinity` makes the switch a step: any finite factor leaves a grey
          for a fill at the threshold. Under `:where`, so a rule that must win
          over another colour names `var(--on-fill)` itself. */
-      :where(.initial, .inbox-badge, .menu-badge, .match-text mark, .card-frame .primary,
+      :where(.initial, .inbox-badge, .menu-badge, .match-text mark, .card-frame .card-action,
         .access-approve) { --on-fill: oklch(from var(--fill) clamp(0.178, (0.56 - l) * infinity, 1) 0 0);
         color: var(--on-fill); }
       .actions button, .tools button { color: var(--text-muted);
@@ -1110,8 +1110,9 @@
       .card-share { display: flex; align-items: center; gap: var(--space-4); }
       .card-share .share-file { padding: var(--space-1) var(--space-5); font-size: var(--font-xs); }
       .share-status { color: var(--text-faint); font-size: var(--font-xs); }
-      .card-frame .primary { --fill: var(--tone); background: var(--fill); border-color: var(--tone); }
-      .card-frame .primary:disabled { opacity: .5; }
+      /* A card's main action (send, put), filled in its place's tone. */
+      .card-frame .card-action { --fill: var(--tone); background: var(--fill); border-color: var(--tone); }
+      .card-frame .card-action:disabled { opacity: .5; }
       .read-only { display: flex; gap: var(--space-6); align-items: center; justify-content: flex-end;
         margin-top: var(--space-5); font-size: var(--font-md); color: var(--text-muted); }
 

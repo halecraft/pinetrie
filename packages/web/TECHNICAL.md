@@ -437,7 +437,8 @@ Every button the page draws is a `Button` or an `IconButton`.
 - **`type` is `button` unless given,** so no button submits a form by
   accident. A form's submit names `type="submit"`.
 - **`IconButton`** shows only a glyph or an icon. Its `label` is the name
-  read aloud in the glyph's place.
+  read aloud in the glyph's place, and its tooltip unless a `title` says
+  more (the copy button's "copied", a rail dot's readers).
 - **Class names stay as they were.** The browser suite locates buttons by
   them, and `data-look` adds an attribute without taking one away.
 

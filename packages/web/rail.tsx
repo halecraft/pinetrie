@@ -562,7 +562,6 @@ function Capsule(p: {
         borderColor: color,
         background: FILL[fill](color),
       }}
-      title={label}
     />
   )
 }

@@ -19,15 +19,17 @@ export function Button({ look, type = "button", ...rest }: ButtonProps) {
 
 /**
  * A button that shows only a glyph or an icon, clear unless given a look.
- * `label` is its name, read aloud in the glyph's place.
+ * `label` is its name, read aloud in the glyph's place, and its tooltip
+ * unless `title` says more.
  */
 export function IconButton({
   label,
   look = "plain",
+  title = label,
   ...rest
 }: Omit<ButtonProps, "look" | "aria-label"> & {
   readonly label: string
   readonly look?: ButtonLook
 }) {
-  return <Button {...rest} aria-label={label} look={look} />
+  return <Button {...rest} aria-label={label} look={look} title={title} />
 }

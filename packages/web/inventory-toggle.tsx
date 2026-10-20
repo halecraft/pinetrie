@@ -27,7 +27,6 @@ export function InventoryToggle({
       className="inventory-toggle"
       {...dropProps({ kind: "inventory", slot: null })}
       onClick={onToggle}
-      title={words.label}
     >
       <InventoryIcon />
       {count > 0 && (

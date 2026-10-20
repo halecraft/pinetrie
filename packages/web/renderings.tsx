@@ -113,7 +113,7 @@ export function PutButton(p: { card: CardRecord | null }) {
   return (
     <Button
       look="primary"
-      className="put primary"
+      className="put card-action"
       disabled={column === null || card === null}
       onClick={() => {
         if (column !== null && card !== null)
@@ -226,7 +226,6 @@ function NormalFrame(p: {
             label={CLOSE_CARD.title}
             className="close-card"
             onClick={p.onClose}
-            title={CLOSE_CARD.title}
           >
             {CLOSE_CARD.label}
           </IconButton>

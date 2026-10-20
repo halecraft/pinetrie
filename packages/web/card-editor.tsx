@@ -388,7 +388,7 @@ export function CardEditor(p: {
                 )}
                 <Button
                   look="primary"
-                  className="send primary"
+                  className="send card-action"
                   disabled={button.disabled}
                   onClick={() => void submit()}
                   title={button.title ?? undefined}

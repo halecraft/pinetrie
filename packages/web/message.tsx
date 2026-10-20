@@ -278,7 +278,6 @@ function Tools({
           label="open a branch here"
           className="branch"
           onClick={() => onAct(branch)}
-          title="open a branch here"
         >
           →
         </IconButton>

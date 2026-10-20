@@ -33,7 +33,6 @@ export function ColumnHeadEnd(p: {
           label={button.words.title}
           className={button.words.className}
           onClick={() => p.onIntent(button.intent)}
-          title={button.words.title}
         >
           {button.intent.kind === "trash" ? <TrashIcon /> : button.words.label}
         </IconButton>

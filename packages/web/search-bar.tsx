@@ -36,7 +36,6 @@ export function SearchToggle({
         onIntent({ kind: "search", act: { kind: open ? "close" : "open" } })
       }
       ref={toggle}
-      title={title}
     >
       🔍
     </IconButton>
@@ -89,7 +88,6 @@ export function SearchBar({
               onIntent({ kind: "search", act: { kind: "clear" } })
               field.current?.focus()
             }}
-            title={SEARCH_CLEAR}
           >
             ⌫
           </IconButton>

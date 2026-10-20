@@ -121,7 +121,6 @@ function ReviewPaneView(p: ReviewPaneProps) {
         data-pref={pref}
         key={pref}
         onClick={() => setPrefs({ ...prefs, [pref]: !prefs[pref] })}
-        title={words.label}
       >
         {words.glyph}
       </IconButton>

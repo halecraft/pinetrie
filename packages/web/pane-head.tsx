@@ -31,12 +31,7 @@ export function PaneHead({
       {line !== undefined && <span className="pane-line">{line}</span>}
       {title !== undefined && <span className="pane-title">{title}</span>}
       {extra}
-      <IconButton
-        label={words.label}
-        className="pane-close"
-        onClick={close}
-        title={words.label}
-      >
+      <IconButton label={words.label} className="pane-close" onClick={close}>
         {words.glyph}
       </IconButton>
     </div>
