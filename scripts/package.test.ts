@@ -31,8 +31,12 @@ function gathered(
       ["ws", "8.22.0"],
       ["vite", "8.3.4"],
       ["@earendil-works/pi-coding-agent", "0.99.2"],
+      ["@gotgenes/pi-anthropic-auth", "3.4.3"],
     ]),
-    deepPackages: ["@earendil-works/pi-coding-agent"],
+    unimported: [
+      "@earendil-works/pi-coding-agent",
+      "@gotgenes/pi-anthropic-auth",
+    ],
     version: "1.2.3",
     description: "d",
     ...more,
@@ -93,7 +97,7 @@ describe("planPackage", () => {
     ])
   })
 
-  test("dependencies are what shipped files import, and what deep.ts declares, at the workspace's versions", () => {
+  test("dependencies are what shipped files import, and what no import names, at the workspace's versions", () => {
     const plan = made(
       planPackage(
         gathered(
@@ -111,6 +115,7 @@ describe("planPackage", () => {
     )
     expect(plan.manifest.dependencies).toEqual({
       "@earendil-works/pi-coding-agent": "0.99.2",
+      "@gotgenes/pi-anthropic-auth": "3.4.3",
       ws: "8.22.0",
     })
     expect(plan.manifest).toMatchObject({

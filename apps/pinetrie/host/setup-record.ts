@@ -1,5 +1,6 @@
 // host/setup-record — what the setup page shows, decided from the settled
-// config and what the model setup loaded: the one `pinetrie.setup` value.
+// config and what the model setup loaded (who shapes a subscription's
+// requests among it): the one `pinetrie.setup` value.
 // The startup lines word the same report (`startup-lines.ts`), with the same
 // words (`setup-words.ts` in `@pinetrie/interface`).
 
@@ -23,7 +24,7 @@ export function planSetupRecord(input: {
   readonly origins: readonly ConfigOrigin[] | null
   readonly setup: Pick<
     PiSetup,
-    "credentials" | "refusedPackages" | "contextFiles"
+    "credentials" | "refusedPackages" | "contextFiles" | "subscription"
   >
   readonly session: SetupSession | null
 }): SetupRecord {
@@ -52,6 +53,7 @@ export function planSetupRecord(input: {
     }),
     refusedPackages: setup.refusedPackages,
     contextFiles: setup.contextFiles,
+    subscription: setup.subscription,
     session: input.session,
   }
 }

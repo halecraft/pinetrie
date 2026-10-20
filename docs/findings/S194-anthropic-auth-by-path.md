@@ -1,7 +1,7 @@
 # S194 — `pi-anthropic-auth`, loaded by path, shapes a subscription request with pine·trie's `auth.json`; it reads its own config through `~/.pi` unless `PI_CODING_AGENT_DIR` names pine·trie's directory
 
 - **Status:** Answered
-- **Led to:** ADR-0146
+- **Led to:** ADR-0146, ADR-0192
 
 **Question.** S23 found that a Claude subscription token works only through
 `pi-anthropic-auth`'s `anthropic` provider. ADR-0146 loads extensions only

@@ -57,6 +57,7 @@ import {
   type QueuedText,
   SETUP,
   type SetupSession,
+  SUBSCRIPTION_SETTING,
   setIfChanged,
 } from "@pinetrie/rules"
 import {
@@ -167,7 +168,11 @@ import {
 } from "./start-checklist.ts"
 import { lineProgress } from "./start-terminal.ts"
 import { recover, recoverRoot } from "./startup.ts"
-import { agentReadyLine, reportLines } from "./startup-lines.ts"
+import {
+  agentReadyLine,
+  reportLines,
+  subscriptionLines,
+} from "./startup-lines.ts"
 import { type OpenedStore, openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
@@ -606,7 +611,11 @@ async function openHost(
   const piSetup = await loadPiSetup({
     model:
       model.kind === "configured"
-        ? { kind: "configured", model: settled.model.value }
+        ? {
+            kind: "configured",
+            model: settled.model.value,
+            subscriptionShaping: settled[SUBSCRIPTION_SETTING].value,
+          }
         : model,
     places: {
       configDir: where.dirs.config,
@@ -626,6 +635,7 @@ async function openHost(
   })
   for (const p of piSetup.refusedPackages)
     log(`[host] ${p} is not a folder: the package is not loaded`)
+  for (const line of subscriptionLines(piSetup.subscription)) log(line)
   const setupRecordNow = (r: HostReport) =>
     planSetupRecord({
       report: r,

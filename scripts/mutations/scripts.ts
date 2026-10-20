@@ -712,13 +712,13 @@ export const mutations: readonly Mutation[] = [
       "each import of a file becomes its .js path, a type-only one stays as stripped, and no other position moves",
   },
   {
-    name: "the package leaves out what deep.ts reaches",
+    name: "the package leaves out what no import names",
     file: "scripts/package.ts",
-    from: "  const thirdParty = new Set<string>(g.deepPackages)\n",
+    from: "  const thirdParty = new Set<string>(g.unimported)\n",
     to: "  const thirdParty = new Set<string>()\n",
     command: packageBuild,
     expect:
-      "dependencies are what shipped files import, and what deep.ts declares, at the workspace's versions",
+      "dependencies are what shipped files import, and what no import names, at the workspace's versions",
   },
   {
     name: "the page ships its stamp",

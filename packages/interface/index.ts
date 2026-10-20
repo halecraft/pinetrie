@@ -729,6 +729,7 @@ export {
   originWords,
   refusalWords,
   setupPageWords,
+  subscriptionWords,
 } from "./setup-words.ts"
 export {
   canvasIcons,

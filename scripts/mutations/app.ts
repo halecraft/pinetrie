@@ -3353,6 +3353,15 @@ export const mutations: readonly Mutation[] = [
   },
   // ── the npm package, installed ──
   {
+    name: "the package leaves out the pi-anthropic-auth it ships",
+    file: "packages/pi/unimported-packages.ts",
+    from: "  ANTHROPIC_AUTH.package,\n] as const\n",
+    to: "] as const\n",
+    suite: "lanes",
+    scenario: "package",
+    expect: "the installed pinetrie loads the pi-anthropic-auth it ships",
+  },
+  {
     name: "the package's imports are left naming .ts",
     file: "scripts/package.ts",
     from: "          text: JSON.stringify(relativeImport(file, shippedPath(target.path))),",

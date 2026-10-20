@@ -8,6 +8,7 @@ import {
 import { configText, tableProblems } from "@pinetrie/config/testing"
 import { DEFAULT_REPO } from "@pinetrie/jj"
 import { NO_GRANTS } from "@pinetrie/lanes"
+import { SUBSCRIPTION_SETTING } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   decodeAuthority,
@@ -119,6 +120,32 @@ describe("where each setting may come from", () => {
     expect(copy.refusals.map(r => [r.key, r.why])).toEqual([
       ["lanes.vm.slots", "not-here"],
     ])
+  })
+
+  test("a project's anthropic.subscription is refused: it runs code on the host", () => {
+    const copy = decodeProject(
+      SETTINGS,
+      projectCopy(
+        "accepted",
+        "pinetrie.json",
+        read({ [SUBSCRIPTION_SETTING]: false }),
+      ),
+    )
+    expect(copy.refusals.map(r => [r.key, r.why])).toEqual([
+      [SUBSCRIPTION_SETTING, "not-here"],
+    ])
+  })
+
+  test("a machine's false turns anthropic.subscription off, whatever yours says", () => {
+    const report = settleHost(
+      {
+        ...START,
+        system: system({ [SUBSCRIPTION_SETTING]: false }),
+        user: user({ [SUBSCRIPTION_SETTING]: true }),
+      },
+      {},
+    )
+    expect(report.settled[SUBSCRIPTION_SETTING].value).toBe(false)
   })
 
   test("a project's packages are refused: they run code on the host", () => {

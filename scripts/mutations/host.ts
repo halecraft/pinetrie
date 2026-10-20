@@ -2211,6 +2211,24 @@ export const mutations: readonly Mutation[] = [
     expect: "a model from PINETRIE_MODEL names the variable",
   },
   {
+    name: "the machine cannot turn the shipped pi-anthropic-auth off",
+    file: "apps/pinetrie/host/settings.ts",
+    from: '      order: ["user"],\n    }),\n    ["system"],\n  ),\n  skills:',
+    to: '      order: ["user"],\n    }),\n    [],\n  ),\n  skills:',
+    command: unit,
+    expect:
+      "a machine's false turns anthropic.subscription off, whatever yours says",
+  },
+  {
+    name: "a project may turn the shipped pi-anthropic-auth off",
+    file: "apps/pinetrie/host/settings.ts",
+    from: '      order: ["user"],\n    }),\n    ["system"],\n  ),\n  skills:',
+    to: '      order: ["user", { project: "accepted" }],\n    }),\n    ["system"],\n  ),\n  skills:',
+    command: unit,
+    expect:
+      "a project's anthropic.subscription is refused: it runs code on the host",
+  },
+  {
     name: "your config's bookmark wins over the project's working copy",
     file: "apps/pinetrie/host/settings.ts",
     from: '    fallback: DEFAULT_REPO.acceptedBookmark,\n    describe: "accepted work\'s bookmark",\n    order: ["user", { project: "working" }, "local"],',

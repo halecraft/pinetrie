@@ -26,6 +26,9 @@
 - **Amended by:**
   - ADR-0149: the local layer is keyed by the session's name from the
     registry, not by the project folder's name.
+  - ADR-0192: a Claude subscription works with no package listed; a listed
+    copy of `pi-anthropic-auth` replaces the one pine·trie ships, and
+    `anthropic.subscription` turns it off.
 
 **Context.**
 

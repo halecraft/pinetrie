@@ -695,6 +695,9 @@ export {
   type SetupModel,
   type SetupRecord,
   type SetupSession,
+  type SetupSubscription,
+  type Shaping,
+  SUBSCRIPTION_SETTING,
 } from "./setup.ts"
 export {
   laneReads,

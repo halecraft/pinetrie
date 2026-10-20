@@ -58,6 +58,7 @@ import {
   isCommandLabel,
   type ModelRef,
   modelRef,
+  SUBSCRIPTION_SETTING,
   type TitleConfig,
 } from "@pinetrie/rules"
 import {
@@ -119,6 +120,15 @@ export const SETTINGS = defineTable({
       "pi packages, by folder: their skills, prompts and provider extensions",
     layers: ["system", "user"],
   }),
+  [SUBSCRIPTION_SETTING]: limited(
+    pick(flag(), {
+      fallback: true,
+      describe:
+        "whether pine·trie's own pi-anthropic-auth shapes a Claude subscription's requests, so they count against your plan",
+      order: ["user"],
+    }),
+    ["system"],
+  ),
   skills: join(list(listedPath), {
     describe: "folders of skills, beside those in packages",
     layers: everywhere,

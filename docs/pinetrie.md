@@ -324,7 +324,7 @@ context file.
 ```json
 {
   "model": "anthropic/claude-opus-5-5",
-  "packages": ["/Users/you/.local/share/ai/duane", "/Users/you/.local/share/ai/npm/node_modules/@gotgenes/pi-anthropic-auth"],
+  "packages": ["/Users/you/.local/share/ai/duane"],
   "skills": ["/Users/you/skills"]
 }
 ```
@@ -336,10 +336,18 @@ context file.
   sign-out <provider>`. From a clone, `pnpm sign-in` is the same. Credentials go in
   `$XDG_DATA_HOME/pinetrie/auth.json`, written only by sign-in. A key in a
   provider's environment variable works too.
+- **A Claude subscription works once signed in** (ADR-0192): pine·trie
+  ships `@gotgenes/pi-anthropic-auth`, whose provider shapes a
+  subscription's requests so they count against your plan, and loads it.
+  A copy you list in `packages` replaces it, for a newer release than the
+  one pine·trie ships. `"anthropic.subscription": false` in your file turns
+  it off, and in the machine's file turns it off for everyone; a project
+  may not set it. The setup page and the host's startup lines say which
+  copy shapes `anthropic`, and warn when you are signed in with a
+  subscription and nothing does.
 - **`packages`** lists pi packages by folder: their skills and prompts are
-  commands, and their extensions' providers apply (a Claude subscription
-  needs `pi-anthropic-auth`'s). Nothing is installed: a package that is not
-  a folder is refused. **`skills`** and **`prompts`** list folders of
+  commands, and their extensions' providers apply. Nothing is installed: a
+  package that is not a folder is refused. **`skills`** and **`prompts`** list folders of
   loose ones; `skills/` and `prompts/` beside your `pinetrie.json` load
   too, as does `AGENTS.md` there.
 - **Custom providers** are pi's `models.json`, beside your `pinetrie.json`.
@@ -353,7 +361,9 @@ Coming from pi, one line of `~/.pi/agent/settings.json` at a time:
 - an `npm:` package is installed into a folder of yours (`npm install
   --prefix ~/.local/share/ai/npm --legacy-peer-deps <name>`; pi's loader
   resolves its pi imports to pine·trie's own) and listed by path. One that
-  only adds tools (`pi-mcp-adapter`) gives pine·trie nothing;
+  only adds tools (`pi-mcp-adapter`) gives pine·trie nothing, and
+  `pi-anthropic-auth` is already shipped: list it only for a newer release,
+  which then replaces pine·trie's;
 - `enabledModels`, `retry`, `theme` and `tuiMode` are pi's alone;
 - copy `~/.pi/agent/models.json` beside `pinetrie.json` for custom
   providers;

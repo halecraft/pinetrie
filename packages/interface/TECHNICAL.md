@@ -1604,13 +1604,17 @@ composer*).
 
 - **`setupView` decides the page** from the host's `pinetrie.setup` record
   and the commands it published: the model or why there is none, who is
-  signed in, each config file and what it refused, every setting, the
-  refused packages and commands, and the context files. Null before a host
-  wrote its record.
+  signed in and who shapes a Claude subscription's requests (with a warning
+  when one is signed in and nothing does, ADR-0192), each config file and
+  what it refused, every setting, the refused packages and commands, and
+  the context files. Null before a host wrote its record.
 - **Every setting is listed generically**, its key, value, origin and what
   it is (`describe`), so a setting the host adds shows with no page code.
 - **`setup-words.ts` is the one wording** of a layer, a file's state, a
-  refusal, an origin and why there is no model: the host's startup lines
+  refusal, an origin, why there is no model, and who shapes a subscription
+  with its warning (`subscriptionWords`, which alone decides whether to
+  warn, from the record's own extension and provider names and
+  `SUBSCRIPTION_SETTING`, so no word repeats a name the record holds): the host's startup lines
   (`apps/pinetrie/host/startup-lines.ts`) import the same functions, so the
   terminal and the page never word one fact two ways.
 - **A send that needs a model the host has not** is refused before it is

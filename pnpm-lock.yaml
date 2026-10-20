@@ -233,6 +233,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 0.99.2
         version: 0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0)
+      '@gotgenes/pi-anthropic-auth':
+        specifier: 3.4.3
+        version: 3.4.3(@earendil-works/pi-ai@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.22.0))(@earendil-works/pi-coding-agent@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0))
       '@kyneta/schema':
         specifier: 4.0.0
         version: 4.0.0
@@ -768,6 +771,13 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
+
+  '@gotgenes/pi-anthropic-auth@3.4.3':
+    resolution: {integrity: sha512-w2WwBxUKY4pLOHYvVdkR39lDrFgRrETIs3Oh5iCK461nL5MhKjW18iBjBD9DkTJlcavKZkrRvRvQnLz9o8DVMg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@earendil-works/pi-ai': '>=0.86.0'
+      '@earendil-works/pi-coding-agent': '>=0.86.0'
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -2701,6 +2711,11 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  '@gotgenes/pi-anthropic-auth@3.4.3(@earendil-works/pi-ai@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.22.0))(@earendil-works/pi-coding-agent@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0))':
+    dependencies:
+      '@earendil-works/pi-ai': 0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.22.0)
+      '@earendil-works/pi-coding-agent': 0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0)
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

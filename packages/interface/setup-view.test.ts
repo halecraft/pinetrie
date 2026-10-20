@@ -32,6 +32,7 @@ const RECORD: SetupRecord = {
   ],
   refusedPackages: ["/gone"],
   contextFiles: ["/p/AGENTS.md"],
+  subscription: null,
   session: null,
 }
 
@@ -44,6 +45,26 @@ describe("setupView", () => {
     expect(setupView(RECORD, [])?.model).toEqual({
       line: "anthropic/claude-opus-5-5 (from $PINETRIE_MODEL)",
       none: false,
+    })
+  })
+
+  test("an unshaped subscription warns, and says what to do", () => {
+    const view = setupView(
+      {
+        ...RECORD,
+        subscription: {
+          package: "@gotgenes/pi-anthropic-auth",
+          provider: "anthropic",
+          shaping: { kind: "off" },
+          unshaped: true,
+        },
+      },
+      [],
+    )
+    expect(view?.subscription).toEqual({
+      line: "none: anthropic.subscription is false",
+      warning:
+        "anthropic is signed in with a subscription, and nothing shapes its requests: every run on an anthropic model fails. Set anthropic.subscription to true, or list @gotgenes/pi-anthropic-auth in packages.",
     })
   })
 

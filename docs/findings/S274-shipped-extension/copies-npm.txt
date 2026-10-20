@@ -1,0 +1,2 @@
+npm: pi-coding-agent copies (count version)
+      1 0.99.2

@@ -94,6 +94,7 @@ const deps = (
       settings: [],
       session: null,
       refusedPackages: [],
+      subscription: null,
       contextFiles: [],
     },
     ensureNames: async () => {},

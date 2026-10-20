@@ -5,7 +5,8 @@
 // `exports` map, so a package specifier is refused. A file URL bypasses the
 // map. Every such import is collected here, so a change in pi's files
 // breaks this one file, and each package it reaches is declared in
-// `deep-packages.ts`, which the package build reads for its dependencies.
+// `unimported-packages.ts`, which the package build reads for its
+// dependencies.
 //
 // Verified export maps at 0.99.2:
 //   @earendil-works/pi-agent-core  -> ".", "./node", "./harness/context",
@@ -35,7 +36,9 @@
 // stable symlink in the repo, so this does not bake in a pnpm content hash;
 // the types are gone from the built package, whose layout is npm's.
 
-import { type DeepPackage, deepPackageDir } from "./deep-packages.ts"
+import path from "node:path"
+import { pathToFileURL } from "node:url"
+import { type DeepPackage, packageFolder } from "./unimported-packages.ts"
 
 type UsageModule =
   typeof import("./node_modules/@earendil-works/pi-agent-core/dist/harness/utils/usage.js")
@@ -59,7 +62,7 @@ type ImageResizeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js")
 
 const deep = (pkg: DeepPackage, file: string): Promise<unknown> =>
-  import(new URL(file, deepPackageDir(pkg)).href)
+  import(pathToFileURL(path.join(packageFolder(pkg), file)).href)
 
 const AGENT_CORE = "@earendil-works/pi-agent-core"
 const CODING_AGENT = "@earendil-works/pi-coding-agent"

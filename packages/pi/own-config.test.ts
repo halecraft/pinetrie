@@ -53,7 +53,7 @@ const EXTENSION = path.join(import.meta.dirname, "fixtures", "agent-dir-ext")
 
 const loaded = () =>
   loadModelSetup(
-    { kind: "configured", model: null },
+    { kind: "configured", model: null, subscriptionShaping: false },
     {
       cwd: project,
       places,

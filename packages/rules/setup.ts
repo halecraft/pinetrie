@@ -17,6 +17,9 @@ import type { RecordSpec } from "./records.ts"
 /** The one `pinetrie.setup` value's key. */
 export const SETUP_KEY = "setup"
 
+/** The setting that turns pine·trie's own pi-anthropic-auth off. */
+export const SUBSCRIPTION_SETTING = "anthropic.subscription"
+
 /** One of `values`, as a schema: the type and its schema share one list. */
 const Layer = choiceSchema(CONFIG_LAYERS)
 
@@ -63,6 +66,30 @@ interface SetupCredential {
   readonly source: string
 }
 
+/** Who shapes the provider's subscription requests. */
+export type Shaping =
+  /** `version` is null when its manifest names none, as for each kind. */
+  | { readonly kind: "shipped"; readonly version: string | null }
+  | {
+      readonly kind: "listed"
+      /** The listed package's folder. */
+      readonly path: string
+      readonly version: string | null
+    }
+  /** `anthropic.subscription` is false. */
+  | { readonly kind: "off" }
+
+/** The shaping of a provider's subscription requests, as the host loaded it. */
+export interface SetupSubscription {
+  /** The extension's npm name. */
+  readonly package: string
+  /** The provider whose requests it shapes. */
+  readonly provider: string
+  readonly shaping: Shaping
+  /** The provider's credential is a subscription, and no loaded package registered the provider. */
+  readonly unshaped: boolean
+}
+
 /** One setting as settled, for the setup page: nothing in config is secret. */
 interface SetupSetting {
   readonly key: string
@@ -90,6 +117,8 @@ export interface SetupRecord {
   /** Listed packages that are not folders, never loaded. */
   readonly refusedPackages: readonly string[]
   readonly contextFiles: readonly string[]
+  /** Who shapes a subscription's requests; null for a suite's named or scripted model, which no config shapes. */
+  readonly subscription: SetupSubscription | null
   /** The session served, found by its folder's real path; null with no project. */
   readonly session: SetupSession | null
 }
@@ -142,6 +171,26 @@ const SetupRecordSchema = Type.Object({
   ),
   refusedPackages: Type.Array(Type.String()),
   contextFiles: Type.Array(Type.String()),
+  subscription: Type.Union([
+    Type.Object({
+      package: Type.String(),
+      provider: Type.String(),
+      shaping: Type.Union([
+        Type.Object({
+          kind: Type.Literal("shipped"),
+          version: Type.Union([Type.String(), Type.Null()]),
+        }),
+        Type.Object({
+          kind: Type.Literal("listed"),
+          path: Type.String(),
+          version: Type.Union([Type.String(), Type.Null()]),
+        }),
+        Type.Object({ kind: Type.Literal("off") }),
+      ]),
+      unshaped: Type.Boolean(),
+    }),
+    Type.Null(),
+  ]),
   session: Type.Union([
     Type.Object({ name: Type.String(), path: Type.String() }),
     Type.Null(),

@@ -21,7 +21,7 @@ wires them.
 | `host-refused.ts` | `HostRefused`, the one error a start throws as a refusal |
 | `replace-file.ts` | a file of the host's own written whole, through a temporary file renamed over it: the session registry, a folder's stamps, the start's times |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
-| `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
+| `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded, who shapes a subscription's requests among it |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
 | `places.ts` | the one writer of the places document (ADR-0059, ADR-0048 step 6): `Places.change(cause, body)`, one change under its cause, whose `OpenChange` writes steps in one batch (`apply`, in an undo step when given one) or carries Kyneta's revert (`revert`), each followed by `rev` in a batch of its own; and the change's close as a value (`planClose`), carried out by `executeClose`: the texts of the text cards it removed, after their records (a client destroys its copy of a text only once it has seen both go, S64), then the cards' history and traces, the listeners, and the runs a take stops |
@@ -671,10 +671,19 @@ as it first loads (§ Roots: steps, leases and the upkeep).
 - **A session's directories are removed with `rmdir`,** never a
   recursive delete: when an attach replaces a folder's own empty session,
   a file written since it was found empty refuses the attach, and stays.
+- **`anthropic.subscription` is a flag only your file sets**
+  (`SUBSCRIPTION_SETTING`, `@pinetrie/rules`' key, which the setup words
+  name too), true by default; the machine's file narrows it, so its `false`
+  wins over yours, and a project's is refused, since it runs code on the
+  host (ADR-0192). `startHost` passes it on the configured model choice,
+  the one that loads the shipped `pi-anthropic-auth`
+  (`packages/pi/TECHNICAL.md`).
 - **A starting host says what it read** (`startup-lines.ts`). `server.ts`
   logs the project, the session (found, attached and where it was, or
   new) and the store, `startHost` each config file (with
   `(none)` when missing, `(not read)` when broken) and each refusal, then
+  who shapes a Claude subscription's requests, and the warning when it is
+  signed in and nothing does (`subscriptionLines`, ADR-0192), then
   the roots it opened, then `agent ready` with the model and where it came
   from (a file, or `$PINETRIE_MODEL`), or `no model:` and why; and
   `server.ts` the URL and invites, then, with no model, the setup page's

@@ -4,7 +4,12 @@
 // loads it before lane work, and `createAgent` builds every harness from it.
 
 import path from "node:path"
-import { labelCommands, type ModelLine, type ModelRef } from "@pinetrie/rules"
+import {
+  labelCommands,
+  type ModelLine,
+  type ModelRef,
+  type SetupSubscription,
+} from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
@@ -43,6 +48,8 @@ export interface PiSetup extends CommandFiles, Banners {
   }[]
   /** The context files the model is given. */
   readonly contextFiles: readonly string[]
+  /** Who shapes a subscription's requests; null for a named or scripted model. */
+  readonly subscription: SetupSubscription | null
   /**
    * One request outside every thread, with no tools and no session
    * (`complete` in `config.ts`), on the title model for `purpose` `title`,
@@ -126,6 +133,7 @@ export async function loadPiSetup(options: PiSetupOptions): Promise<PiSetup> {
       refusedPackages: setup.refusedPackages,
       credentials: setup.credentials,
       contextFiles: (setup.contextFiles ?? []).map(f => f.path),
+      subscription: setup.subscription,
       complete: ({ purpose, ...request }) =>
         complete(
           setup,

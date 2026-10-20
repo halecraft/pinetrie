@@ -25,22 +25,12 @@ import {
   substituteArgs,
 } from "./deep.ts"
 import { blobSha256 } from "./images.ts"
+import { readManifest } from "./manifest.ts"
 
 type Loader = Awaited<ReturnType<typeof openLoader>>
 type Skill = ReturnType<Loader["getSkills"]>["skills"][number]
 type Template = ReturnType<Loader["getPrompts"]>["prompts"][number]
 type Diagnostic = ReturnType<Loader["getSkills"]>["diagnostics"][number]
-
-const readJsonName = async (file: string): Promise<string | null> => {
-  try {
-    const parsed = JSON.parse(await readFile(file, "utf8")) as {
-      name?: unknown
-    }
-    return typeof parsed.name === "string" ? parsed.name : null
-  } catch {
-    return null
-  }
-}
 
 /** What the config listed for pi's loader: package folders, and folders of skills or prompts with the layer that listed each. */
 export interface Listing {
@@ -106,11 +96,12 @@ async function namesOf(
     plugin:
       root === null
         ? null
-        : await readJsonName(path.join(root, ".claude-plugin", "plugin.json")),
+        : (await readManifest(path.join(root, ".claude-plugin", "plugin.json")))
+            .name,
     packageName:
       root === null
         ? null
-        : await readJsonName(path.join(root, "package.json")),
+        : (await readManifest(path.join(root, "package.json"))).name,
     scope: origin.scope,
   }
 }

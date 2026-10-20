@@ -17,7 +17,12 @@ const report = settleHost(
   {},
 )
 
-const NOTHING = { credentials: [], refusedPackages: [], contextFiles: [] }
+const NOTHING = {
+  credentials: [],
+  refusedPackages: [],
+  contextFiles: [],
+  subscription: null,
+}
 
 test("the setup record carries every refusal, and every setting with its origin", () => {
   const record = planSetupRecord({

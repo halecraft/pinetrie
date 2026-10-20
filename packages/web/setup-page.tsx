@@ -1,6 +1,7 @@
 // web/setup-page — what the host read of its config, and what it loaded: the
-// model or why there is none, who is signed in, each config file and what it
-// refused, every setting, the commands and the context files. A page of its
+// model or why there is none, who is signed in and who shapes a
+// subscription's requests, each config file and what it refused, every
+// setting, the commands and the context files. A page of its
 // own, opened from the menu your avatar opens (`account-menu.tsx`). Every
 // label is `setupView`'s (`@pinetrie/interface`).
 
@@ -26,6 +27,17 @@ export function SetupPage({ view }: { readonly view: SetupView | null }) {
               <li key={c}>{c}</li>
             ))}
           </ul>
+        )}
+        {view.subscription !== null && (
+          <>
+            <h3>{W.subscription}</h3>
+            <p>{view.subscription.line}</p>
+            {view.subscription.warning !== null && (
+              <ul className="setup-refusals">
+                <li>{view.subscription.warning}</li>
+              </ul>
+            )}
+          </>
         )}
         <p className="setup-hint">{W.signInHint}</p>
       </section>

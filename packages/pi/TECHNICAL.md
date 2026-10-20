@@ -86,7 +86,9 @@ kept, so the next call asks again. That stays sound because the host runs
 | `stream.ts` | pi's events as `StreamEvent`s (`harnessStreamEvent`) |
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
-| `config.ts` | the model, its setup (`loadModelSetup`), and `complete` |
+| `config.ts` | the model, its setup (`loadModelSetup`), who shapes a subscription's requests (`ShippedChoice`, `isUnshaped`), and `complete` |
+| `unimported-packages.ts` | the dependencies no import names (`UNIMPORTED_PACKAGES`: `DEEP_PACKAGES` and `ANTHROPIC_AUTH`), and a package's own folder (`packageFolder`); it loads no pi, so the package build reads it |
+| `manifest.ts` | a `package.json` or `plugin.json`'s name and version (`readManifest`) |
 | `pi-setup.ts` | the model setup, loaded (`PiSetup`) |
 | `agent-dir.ts` | pi's agent directory bound to pine·trie's config directory, once per process (`bindAgentDir`) |
 | `auth.ts` | signing in and out (`providerAuth`), the sign-in argument's plan (`planSignIn`), and a notice's terminal words |
@@ -387,8 +389,11 @@ never cuts the newest, so a prompt within it is kept whole (S106).
 pine·trie reads nothing of pi's directories. What the host's config settled
 is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
 - **`planModelSetup` is the plan, pure:** `auth.json` and `models.json` from
-  pine·trie's places; the loader's agent directory is pine·trie's config
-  directory; its extension paths are the listed packages, its skill paths
+  pine·trie's places; who shapes a subscription's requests (below), from
+  which the shipped extension's folder is derived; the loader's agent
+  directory is pine·trie's config directory; its extension paths are that
+  folder, when the shipped copy shapes them, then the listed packages; its
+  skill paths
   the listed skill folders, then `skills/` in the config directory, then
   pine·trie's own; its prompt paths the listed prompt folders, then
   `prompts/`. A listed folder that does not exist is left out, and a
@@ -414,14 +419,39 @@ is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
   one config directory, and a unit test file binds one folder.
 - **Only provider registrations are applied,** as before: an extension's
   tools, commands, handlers and UI hooks are pi's coding agent's, and
-  pine·trie emits none of its events. A Claude subscription works only
-  through `pi-anthropic-auth`'s provider (S23); listed by path, it carries
-  the token from pine·trie's `auth.json` with its billing header (S194). A
-  package installed anywhere loads against pine·trie's own pi: pi's
-  extension loader aliases `@earendil-works/*` to the host's copy.
+  pine·trie emits none of its events. A package installed anywhere loads
+  against pine·trie's own pi: pi's extension loader aliases
+  `@earendil-works/*` to the host's copy.
+- **pine·trie ships `pi-anthropic-auth` and loads it** (ADR-0192). A Claude
+  subscription works only through its provider (S23): it carries the token
+  from pine·trie's `auth.json` with its billing header (S194), and passes
+  any other key's request through untouched. It is a dependency of this
+  package (`ANTHROPIC_AUTH`), found by `packageFolder`, and loaded from the
+  install's own dependencies under npm and pnpm alike (S274).
+  - **Who shapes, decided first** (`planModelSetup`): a named or scripted
+    model, none (`ShippedChoice` `unloaded`: the config's shaping does not
+    apply, and the record says nothing); else a listed package whose
+    `package.json` names the extension (`listed`), loaded in the shipped
+    one's place; else none when `anthropic.subscription` is false (`off`);
+    else the shipped copy (`shipped`). The extension paths are derived from
+    that one value, so two copies never load together: the extension's own
+    source warns that two break sign-in and refresh.
+  - **Only the configured choice carries the setting**
+    (`ModelChoice.subscriptionShaping`, required there): a configured host
+    that forgets it does not compile, and a suite's model cannot be given
+    one.
+  - **`isUnshaped` warns** when the provider's credential is a subscription
+    (`isUsingOAuth`, which reads pi's snapshot, with no request) and no
+    loaded package registered the provider. The setup record, page and
+    startup lines say who shapes, and this warning
+    (`ModelSetup.subscription`, null for a named or scripted model).
+  - A listed package under another name that registers `anthropic` loads
+    after the shipped copy; what pi makes of two registrations of one
+    provider is not measured, so such a person turns the setting off.
 
 `ModelChoice` is one of three:
-- **`configured`:** the model the host's config settled, or null.
+- **`configured`:** the model the host's config settled, or null, and
+  whether the shipped `pi-anthropic-auth` loads (`subscriptionShaping`).
   `modelState` decides from the facts the executor gathers: none named
   (`unset`), not among pi's models nor `models.json`'s (`not-found`), or
   no credential for its provider (`no-credential`, from
@@ -1083,17 +1113,22 @@ a counter.
 ### `deep.ts`
 
 Reaches pi entry points that are absent from its `exports` map, by file,
-from each pi package's own folder (`deep-packages.ts`' `deepPackageDir`,
-which resolves the package as Node does: pnpm keeps each in a store
-folder of its own, npm keeps them side by side): `createAgentHarness`, `addUsage`/`emptyUsage`,
+from each pi package's own folder (`unimported-packages.ts`'
+`packageFolder`, which finds the package's `package.json` with Node's
+`findPackageJSON` from the module's own real path: pnpm keeps each package
+in a store folder of its own, npm keeps them side by side, and pnpm links
+a global install into place, where nothing resolves from the link's path,
+S274): `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, `SettingsManager` and `DefaultResourceLoader` (only
 through `openRuntime` and `openLoader`), and `buildSystemPromptSections` and
 `diffSystemPromptSections`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`.
-`deep()` takes only a package `DEEP_PACKAGES` lists, by its type, and the
-package build reads that list for the dependencies no import names. A file
+`deep()` takes only a package `DEEP_PACKAGES` lists, by its type. The
+package build reads `UNIMPORTED_PACKAGES`, which joins that list and the
+shipped extension, for the dependencies no import names: a new one is
+added there once, and the build cannot miss it. A file
 pi moves fails as `ERR_MODULE_NOT_FOUND` at import time; its type paths
 (relative, into this package's `node_modules`) fail at compile time.
 

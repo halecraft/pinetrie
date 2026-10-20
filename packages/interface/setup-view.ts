@@ -12,12 +12,18 @@ import {
   originWords,
   refusalWords,
   setupPageWords,
+  subscriptionWords,
 } from "./setup-words.ts"
 
 export interface SetupView {
   /** The model and where it came from, or why there is none. */
   readonly model: { readonly line: string; readonly none: boolean }
   readonly credentials: readonly string[]
+  /** Who shapes a subscription's requests, and the warning when nothing does; null for a suite's model. */
+  readonly subscription: {
+    readonly line: string
+    readonly warning: string | null
+  } | null
   readonly files: readonly { readonly layer: string; readonly file: string }[]
   readonly refusals: readonly string[]
   /** Every setting, generically: a new one shows with no code of its own. */
@@ -56,6 +62,10 @@ export function setupView(
     credentials: record.credentials.map(
       c => `${c.provider}: ${credentialWords(c.source)}`,
     ),
+    subscription:
+      record.subscription === null
+        ? null
+        : subscriptionWords(record.subscription),
     files: record.files.map(f => ({
       layer:
         f.layer === "local" && record.session !== null

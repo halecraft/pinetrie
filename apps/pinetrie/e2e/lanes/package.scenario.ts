@@ -1,8 +1,9 @@
 // e2e/lanes/package — the npm package as a person gets it: built
 // (`scripts/package.ts`), packed, and installed by npm into an empty
 // project, the layout that puts its dependencies beside it rather than
-// inside. Its own `pinetrie serve` draws the page and gets lanes ready, and
-// a lane started from it runs its bundled helper and lanehost's scripts.
+// inside. Its own `pinetrie serve` loads the pi-anthropic-auth it ships,
+// draws the page and gets lanes ready, and a lane started from it runs its
+// bundled helper and lanehost's scripts.
 // The scripted model is the suites', so that lane is started by the suite's
 // host over the installed package's files.
 
@@ -16,7 +17,7 @@ import {
 } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
-import { ROOT } from "@pinetrie/core"
+import { PRODUCT_NAME, ROOT } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
 import { committedProject, join, START_AGENT, waitFor } from "../harness.ts"
@@ -99,6 +100,16 @@ async function packageSection(
     await waitFor(
       () => exited || lines.some(l => l.includes("[host] listening")),
       60_000,
+    )
+    // Its host is configured with no model, so it loads the shipped copy.
+    check(
+      "the installed pinetrie loads the pi-anthropic-auth it ships",
+      lines.some(
+        l =>
+          l.startsWith("[host] anthropic") &&
+          l.includes(`shipped with ${PRODUCT_NAME}`),
+      ),
+      lines.filter(l => l.includes("anthropic")).join(" | "),
     )
     const url = /listening\s+(\S+)/.exec(
       lines.find(l => l.includes("[host] listening")) ?? "",

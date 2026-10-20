@@ -33,6 +33,9 @@ pinetrie tidy [folder]           # cut a repo's operation log to a window
 pinetrie session rename <old> <new>
 ```
 
+A Claude subscription works once you sign in to `anthropic`: pine·trie
+ships the pi extension its requests need, so there is nothing to install.
+
 A start draws a checklist of what it does, each step with what it is
 expected to take. The first start, and any after an update that changes an
 image, builds the lanes' images for a few minutes; once it says

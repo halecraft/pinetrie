@@ -15,6 +15,8 @@ Numbered ADR-0186 until 2026-10-19, when two files held ADR-0186.
   - ADR-0190: the lane helper is the one script built as a bundle, its
     third-party packages inside it; the package is MIT, for macOS and Linux,
     on arm64 and x86_64.
+  - ADR-0192: the published package's dependencies include the extension
+    pine·trie ships, which no import names, from a list the build reads.
 
 **Context.**
 

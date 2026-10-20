@@ -4968,4 +4968,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an image dropped after another lands just before the next; in another column, at that spot",
   },
+  {
+    name: "an unshaped subscription is not warned of",
+    file: "packages/interface/setup-words.ts",
+    from: "    warning: s.unshaped\n",
+    to: "    warning: false\n",
+    command: unit,
+    expect: "an unshaped subscription warns, and says what to do",
+  },
 ]

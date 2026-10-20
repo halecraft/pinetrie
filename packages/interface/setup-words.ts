@@ -3,13 +3,19 @@
 // host's startup lines both say them through these, so the terminal and the
 // page never word one fact two ways.
 
-import type {
-  ConfigFileState,
-  ConfigLayer,
-  ConfigOrigin,
-  ConfigRefusal,
+import {
+  type ConfigFileState,
+  type ConfigLayer,
+  type ConfigOrigin,
+  type ConfigRefusal,
+  PRODUCT_NAME,
 } from "@pinetrie/core"
-import type { NoModel, SetupSession } from "@pinetrie/rules"
+import {
+  type NoModel,
+  type SetupSession,
+  type SetupSubscription,
+  SUBSCRIPTION_SETTING,
+} from "@pinetrie/rules"
 
 const LAYER_NAMES: Readonly<Record<ConfigLayer, string>> = {
   system: "the machine's file",
@@ -93,6 +99,32 @@ export function credentialWords(source: string): string {
   }
 }
 
+/** Who shapes the provider's subscription requests, and the warning when one is signed in and nothing does. */
+export function subscriptionWords(s: SetupSubscription): {
+  readonly line: string
+  readonly warning: string | null
+} {
+  return {
+    line: shapingLine(s),
+    warning: s.unshaped
+      ? `${s.provider} is signed in with a subscription, and nothing shapes its requests: every run on an ${s.provider} model fails. Set ${SUBSCRIPTION_SETTING} to true, or list ${s.package} in packages.`
+      : null,
+  }
+}
+
+function shapingLine(s: SetupSubscription): string {
+  const versioned = (version: string | null) =>
+    version === null ? s.package : `${s.package} ${version}`
+  switch (s.shaping.kind) {
+    case "shipped":
+      return `${versioned(s.shaping.version)}, shipped with ${PRODUCT_NAME}`
+    case "listed":
+      return `${versioned(s.shaping.version)}, from ${s.shaping.path}`
+    case "off":
+      return `none: ${SUBSCRIPTION_SETTING} is false`
+  }
+}
+
 /** The setup page's own words. */
 export const setupPageWords = {
   model: "Model",
@@ -100,6 +132,7 @@ export const setupPageWords = {
   signInHint:
     "pinetrie sign-in <provider> on this host's machine: a subscription in a browser, or an API key",
   noCredential: "No provider has a credential yet.",
+  subscription: "Claude subscription",
   files: "Config files",
   refusals: "Not taken",
   settings: "Settings",

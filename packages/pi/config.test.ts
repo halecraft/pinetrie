@@ -1,6 +1,8 @@
 // The model setup: commands from the listed packages, the plan of what pi's
 // code is given, and why a host has no model.
 
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import { labelCommands } from "@pinetrie/rules"
 import { expect, test } from "vitest"
@@ -9,16 +11,19 @@ import { commandOrigin } from "./commands.ts"
 import {
   imageModelFor,
   isOwnContextFile,
+  isUnshaped,
   loadModelSetup,
   type ModelChoice,
   modelState,
   NO_RESOURCES,
   planModelSetup,
   type ResourceLists,
+  type ShippedChoice,
   titleModel,
 } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"
 import { testPlaces } from "./start-pi.ts"
+import { ANTHROPIC_AUTH } from "./unimported-packages.ts"
 
 const fixtures = path.join(import.meta.dirname, "fixtures")
 const FIXTURE_PACKAGES = ["fixture-pkg", "other-pkg"].map(p =>
@@ -154,7 +159,11 @@ test("titleModel: the named model, else the describe model, and whether pi had t
 })
 
 test("a configured host with no model named has none, and says why", async () => {
-  const setup = await setupWith({ kind: "configured", model: null })
+  const setup = await setupWith({
+    kind: "configured",
+    model: null,
+    subscriptionShaping: false,
+  })
   expect(setup.model).toEqual({ kind: "none", why: "unset", named: null })
   expect(setup.describeModel).toBeNull()
 })
@@ -187,15 +196,74 @@ function describe_plan() {
     credentials: "/home/ada/.local/share/pinetrie/auth.json",
     models: "/home/ada/.config/pinetrie/models.json",
   }
-  const plan = (lists: ResourceLists, exists: (p: string) => boolean) =>
+  const plan = (
+    lists: ResourceLists,
+    exists: (p: string) => boolean,
+    shipped: ShippedChoice = { kind: "off" },
+    manifests = new Map<string, { name: string; version: string }>(),
+  ) =>
     planModelSetup({
       places,
       lists,
       project: "/home/ada/proj",
       pinetrieSkills: "/pinetrie/skills",
-      loads: true,
+      shipped,
+      manifests,
       exists,
     })
+  const SHIPPED: ShippedChoice = {
+    kind: "on",
+    dir: "/pinetrie/node_modules/@gotgenes/pi-anthropic-auth",
+    version: "3.4.3",
+  }
+  const listedCopy = new Map([
+    ["/pkgs/newer-auth", { name: ANTHROPIC_AUTH.package, version: "3.5.0" }],
+  ])
+
+  test("the shipped copy comes first, before the listed packages", () => {
+    const p = plan(
+      { ...NO_RESOURCES, packages: ["/pkgs/duane"] },
+      () => true,
+      SHIPPED,
+    )
+    expect(p.loader?.extensionPaths).toEqual([SHIPPED.dir, "/pkgs/duane"])
+    expect(p.shaping).toEqual({ ...SHIPPED, kind: "shipped" })
+  })
+
+  test("a listed copy of pi-anthropic-auth replaces the shipped one", () => {
+    const p = plan(
+      { ...NO_RESOURCES, packages: ["/pkgs/duane", "/pkgs/newer-auth"] },
+      () => true,
+      SHIPPED,
+      listedCopy,
+    )
+    expect(p.loader?.extensionPaths).toEqual([
+      "/pkgs/duane",
+      "/pkgs/newer-auth",
+    ])
+    expect(p.shaping).toEqual({
+      kind: "listed",
+      path: "/pkgs/newer-auth",
+      version: "3.5.0",
+    })
+  })
+
+  test("with anthropic.subscription off, no copy loads", () => {
+    const p = plan(NO_RESOURCES, () => true, { kind: "off" })
+    expect(p.loader?.extensionPaths).toEqual([])
+    expect(p.shaping).toEqual({ kind: "off" })
+  })
+
+  test("a scripted model loads what is listed, and no shipped copy", () => {
+    const p = plan(
+      { ...NO_RESOURCES, packages: ["/pkgs/newer-auth"] },
+      () => true,
+      { kind: "unloaded" },
+      listedCopy,
+    )
+    expect(p.loader?.extensionPaths).toEqual(["/pkgs/newer-auth"])
+    expect(p.shaping).toBeNull()
+  })
 
   test("the loader is given pine·trie's config directory, its lists, and nothing it did not list", () => {
     const p = plan(
@@ -242,6 +310,49 @@ function describe_plan() {
   })
 }
 
+test("a subscription is unshaped only when nothing registered its provider", () => {
+  const facts = { provider: "anthropic", subscription: true }
+  expect(isUnshaped({ ...facts, registered: [] })).toBe(true)
+  expect(isUnshaped({ ...facts, registered: ["openai"] })).toBe(true)
+  expect(isUnshaped({ ...facts, registered: ["anthropic"] })).toBe(false)
+  expect(isUnshaped({ ...facts, subscription: false, registered: [] })).toBe(
+    false,
+  )
+})
+
+test("the shipped copy loads, registers anthropic, and leaves a subscription shaped", async () => {
+  const data = mkdtempSync(path.join(tmpdir(), "pinetrie-shipped-"))
+  const credentials = path.join(data, "auth.json")
+  writeFileSync(
+    credentials,
+    JSON.stringify({
+      anthropic: {
+        type: "oauth",
+        access: "sk-ant-oat01-TEST",
+        refresh: "sk-ant-ort01-TEST",
+        expires: 4_000_000_000_000,
+      },
+    }),
+  )
+  const places = { ...testPlaces(), credentials }
+  const setup = await loadModelSetup(
+    { kind: "configured", model: null, subscriptionShaping: true },
+    {
+      cwd: fixtures,
+      places,
+      binding: bindAgentDir(places.configDir),
+      lists: NO_RESOURCES,
+      skillsDir: SKILLS,
+    },
+  )
+  expect(setup.subscription).toMatchObject({
+    package: ANTHROPIC_AUTH.package,
+    provider: ANTHROPIC_AUTH.provider,
+    shaping: { kind: "shipped" },
+    unshaped: false,
+  })
+})
+
 test("a command is labelled by what pine·trie listed: a package's root, else the layer that listed its folder", () => {
   const listing = {
     packages: ["/ai/duane", "/ai/pstack"],
@@ -264,7 +375,7 @@ test("loading the setup unbound, or taking its model without asking whether ther
   const places = testPlaces()
   const unbound = () =>
     loadModelSetup(
-      { kind: "configured", model: null },
+      { kind: "configured", model: null, subscriptionShaping: false },
       // @ts-expect-error: pi's agent directory must be bound first
       { cwd: fixtures, places, lists: NO_RESOURCES, skillsDir: SKILLS },
     )
@@ -272,4 +383,16 @@ test("loading the setup unbound, or taking its model without asking whether ther
     // @ts-expect-error: a host may have no model
     setup.model.model.id
   expect([typeof unbound, typeof unswitched]).toEqual(["function", "function"])
+})
+
+test("a configured choice without subscriptionShaping, or a scripted one with it, does not compile", () => {
+  // @ts-expect-error: a configured host says whether the shipped copy loads
+  const configured: ModelChoice = { kind: "configured", model: null }
+  const suite: ModelChoice = {
+    kind: "scripted",
+    script: scriptedModel(),
+    // @ts-expect-error: a suite's model is never shaped by the config
+    subscriptionShaping: true,
+  }
+  expect([configured.kind, suite.kind]).toEqual(["configured", "scripted"])
 })

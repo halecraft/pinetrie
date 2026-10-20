@@ -17,7 +17,7 @@ import { createRequire, isBuiltin, stripTypeScriptTypes } from "node:module"
 import path from "node:path"
 import { parseSync } from "oxc-parser"
 import { SCRIPT_ENTRIES } from "../packages/install/index.ts"
-import { DEEP_PACKAGES } from "../packages/pi/deep-packages.ts"
+import { UNIMPORTED_PACKAGES } from "../packages/pi/unimported-packages.ts"
 import { loadedImports, reachable } from "./imports.ts"
 import { isNode, type Node, readSources, walk } from "./sources.ts"
 
@@ -40,8 +40,8 @@ export interface Gathered {
   readonly targets: ReadonlyMap<string, ReadonlyMap<string, Target>>
   /** Each third-party package the workspace declares, at its version. */
   readonly declared: ReadonlyMap<string, string>
-  /** The packages `packages/pi/deep.ts` loads by file, which no import names. */
-  readonly deepPackages: readonly string[]
+  /** The packages no import names (`UNIMPORTED_PACKAGES`). */
+  readonly unimported: readonly string[]
   /** The root manifest's version and description. */
   readonly version: string
   readonly description: string
@@ -168,7 +168,7 @@ export function planPackage(g: Gathered): PackagePlan {
       )
 
   const written = new Map<string, string>()
-  const thirdParty = new Set<string>(g.deepPackages)
+  const thirdParty = new Set<string>(g.unimported)
   for (const file of shipped) {
     const text = g.sources.get(file)
     if (text === undefined || !file.endsWith(".ts")) {
@@ -305,7 +305,7 @@ export function gatherPackage(root: string): Gathered {
       .toSorted(),
     targets,
     declared,
-    deepPackages: DEEP_PACKAGES,
+    unimported: UNIMPORTED_PACKAGES,
     version: rootManifest.version,
     description: rootManifest.description,
   }

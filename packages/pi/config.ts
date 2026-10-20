@@ -8,7 +8,8 @@
 // extension's provider registrations are applied: its tools, commands,
 // handlers and UI hooks belong to pi's coding agent, and pine·trie emits none
 // of its events. A Claude subscription works only through the provider
-// `pi-anthropic-auth` registers.
+// `pi-anthropic-auth` registers, which pine·trie ships and loads unless a
+// listed copy replaces it or `anthropic.subscription` turns it off.
 
 import { stat } from "node:fs/promises"
 import path from "node:path"
@@ -19,7 +20,13 @@ import {
   type Models as ImageModels,
 } from "@earendil-works/pi-ai"
 import { type ConfigLayer, isWithin } from "@pinetrie/core"
-import type { GatheredCommand, ModelRef, NoModel } from "@pinetrie/rules"
+import type {
+  GatheredCommand,
+  ModelRef,
+  NoModel,
+  SetupSubscription,
+  Shaping,
+} from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
 import { gatherCommands, type Listing, pinetrieCommands } from "./commands.ts"
 import {
@@ -28,16 +35,23 @@ import {
   openLoader,
   openRuntime,
 } from "./deep.ts"
+import { type Manifest, readManifest } from "./manifest.ts"
 import {
   describeFaux,
   runFaux,
   type ScriptedModel,
   scriptedImages,
 } from "./scripted.ts"
+import { ANTHROPIC_AUTH, packageFolder } from "./unimported-packages.ts"
 
 export type ModelChoice =
   /** The model the host's config settled; null when nothing names one. */
-  | { readonly kind: "configured"; readonly model: ModelRef | null }
+  | {
+      readonly kind: "configured"
+      readonly model: ModelRef | null
+      /** `anthropic.subscription`: whether the pi-anthropic-auth pine·trie ships loads. */
+      readonly subscriptionShaping: boolean
+    }
   /** A model named outright, with no packages' providers. For suites that call a real model. */
   | {
       readonly kind: "named"
@@ -101,11 +115,64 @@ export function modelState<M>(input: {
   return { kind: "model", model: found }
 }
 
+/** What the shipped pi-anthropic-auth may be, decided from the model choice. */
+export type ShippedChoice =
+  /** A named or scripted model: the config's shaping does not apply. */
+  | { readonly kind: "unloaded" }
+  /** `anthropic.subscription` is false. */
+  | { readonly kind: "off" }
+  | {
+      readonly kind: "on"
+      readonly dir: string
+      readonly version: string | null
+    }
+
+/** The shaping as planned: the shipped copy's folder stays on pi's side. */
+type PlannedShaping =
+  | (Extract<Shaping, { readonly kind: "shipped" }> & { readonly dir: string })
+  | Exclude<Shaping, { readonly kind: "shipped" }>
+
+/**
+ * Who shapes the subscription's requests: a listed copy of the extension
+ * (by its manifest's name) before the shipped one, which `off` turns off.
+ * Null for a named or scripted model.
+ */
+function planShaping(
+  shipped: ShippedChoice,
+  packages: readonly string[],
+  manifests: ReadonlyMap<string, Manifest>,
+): PlannedShaping | null {
+  if (shipped.kind === "unloaded") return null
+  for (const p of packages) {
+    const manifest = manifests.get(p)
+    if (manifest?.name === ANTHROPIC_AUTH.package)
+      return { kind: "listed", path: p, version: manifest.version }
+  }
+  return shipped.kind === "off"
+    ? { kind: "off" }
+    : { kind: "shipped", dir: shipped.dir, version: shipped.version }
+}
+
+/** The extension folders the shaping adds before the listed packages. */
+const shippedPaths = (shaping: PlannedShaping | null): readonly string[] =>
+  shaping?.kind === "shipped" ? [shaping.dir] : []
+
+/** Whether a subscription is signed in for the provider and no loaded package registered it. */
+export function isUnshaped(facts: {
+  readonly provider: string
+  readonly subscription: boolean
+  readonly registered: readonly string[]
+}): boolean {
+  return facts.subscription && !facts.registered.includes(facts.provider)
+}
+
 /** What `planModelSetup` decides: every path pi's code is given. */
 interface ModelSetupPlan {
   readonly runtime: { readonly authPath: string; readonly modelsPath: string }
-  /** Null when there is nothing to load: no package, skill or prompt listed. */
+  /** Null when there is nothing to load: a named or scripted model with nothing listed. */
   readonly loader: LoaderOptions | null
+  /** Who shapes the subscription's requests; the loader's extension paths follow from it. */
+  readonly shaping: PlannedShaping | null
   readonly listing: Listing
   /** Listed packages that are not folders: never given to pi, which would install them. */
   readonly refused: readonly string[]
@@ -120,9 +187,11 @@ export const isOwnContextFile = (
   path.dirname(file) === configDir || isWithin(path.dirname(file), project)
 
 /**
- * Every path pi's code is given. A listed folder that does not exist is
- * left out (a package is also refused, with its path), and `configDir`'s
- * `skills/` and `prompts/` come after the listed ones, as the person's.
+ * Who shapes a subscription's requests, then every path pi's code is
+ * given: the shipped extension's folder, when it shapes them, before the
+ * listed packages. A listed folder that does not exist is left out (a
+ * package is also refused, with its path), and `configDir`'s `skills/` and
+ * `prompts/` come after the listed ones, as the person's.
  */
 export function planModelSetup(input: {
   readonly places: ModelPlaces
@@ -130,8 +199,14 @@ export function planModelSetup(input: {
   readonly project: string
   /** pine·trie's own skills: after every other, so pi keeps a person's first. */
   readonly pinetrieSkills: string
-  /** Whether `pinetrie.json`'s skills and prompts load at all: a suite's scripted model without lists loads nothing. */
-  readonly loads: boolean
+  /**
+   * The shipped extension, decided from the model choice. `unloaded` (a
+   * suite's named or scripted model) also loads nothing of pi's unless
+   * something is listed.
+   */
+  readonly shipped: ShippedChoice
+  /** Each existing listed package's `package.json`. */
+  readonly manifests: ReadonlyMap<string, Manifest>
   readonly exists: (p: string) => boolean
 }): ModelSetupPlan {
   const { places, lists, project, exists } = input
@@ -145,21 +220,24 @@ export function planModelSetup(input: {
     ...own("prompts"),
   ]
   const packages = lists.packages.filter(exists)
+  const shaping = planShaping(input.shipped, packages, input.manifests)
   const loads =
-    input.loads || packages.length + skills.length + prompts.length > 0
+    input.shipped.kind !== "unloaded" ||
+    packages.length + skills.length + prompts.length > 0
   return {
     runtime: { authPath: places.credentials, modelsPath: places.models },
     loader: loads
       ? {
           cwd: project,
           agentDir: places.configDir,
-          extensionPaths: packages,
+          extensionPaths: [...shippedPaths(shaping), ...packages],
           skillPaths: [...skills.map(f => f.path), input.pinetrieSkills],
           promptPaths: prompts.map(f => f.path),
           keepContextFile: file =>
             isOwnContextFile(file, project, places.configDir),
         }
       : null,
+    shaping,
     listing: { packages, loose: [...skills, ...prompts] },
     refused: lists.packages.filter(p => !exists(p)),
   }
@@ -285,6 +363,8 @@ export interface ModelSetup {
     readonly provider: string
     readonly source: string
   }[]
+  /** Who shapes a subscription's requests; null for a named or scripted model. */
+  readonly subscription: SetupSubscription | null
 }
 
 /**
@@ -304,6 +384,32 @@ const exists = (p: string) =>
     () => true,
     () => false,
   )
+
+/** The shipped extension for `choice`: its folder and version when the configured choice loads it. */
+async function shippedChoice(choice: ModelChoice): Promise<ShippedChoice> {
+  if (choice.kind !== "configured") return { kind: "unloaded" }
+  if (!choice.subscriptionShaping) return { kind: "off" }
+  const dir = packageFolder(ANTHROPIC_AUTH.package)
+  const { version } = await readManifest(path.join(dir, "package.json"))
+  return { kind: "on", dir, version }
+}
+
+/** The shaping as the setup record stores it: without the shipped copy's folder. */
+const storedShaping = (shaping: PlannedShaping): Shaping =>
+  shaping.kind === "shipped"
+    ? { kind: "shipped", version: shaping.version }
+    : shaping
+
+/** Every provider the loaded packages registered, by name. */
+const registeredProviders = (
+  loader: Awaited<ReturnType<typeof openLoader>>,
+): readonly string[] => {
+  const { runtime } = loader.getExtensions()
+  return [
+    ...runtime.pendingProviderRegistrations.map(r => r.name),
+    ...runtime.pendingNativeProviderRegistrations.map(r => r.provider.id),
+  ]
+}
 
 export async function loadModelSetup(
   choice: ModelChoice,
@@ -331,13 +437,19 @@ export async function loadModelSetup(
   ]
   const found = new Set<string>()
   for (const p of listed) if (await exists(p)) found.add(p)
+  const manifests = new Map<string, Manifest>()
+  for (const p of where.lists.packages)
+    if (found.has(p))
+      manifests.set(p, await readManifest(path.join(p, "package.json")))
+  const shipped = await shippedChoice(choice)
   // --- plan ---------------------------------------------------------------
   const plan = planModelSetup({
     places: where.places,
     lists: where.lists,
     project: where.cwd,
     pinetrieSkills: where.skillsDir,
-    loads: choice.kind === "configured",
+    shipped,
+    manifests,
     exists: p => found.has(p),
   })
   // --- execute ------------------------------------------------------------
@@ -381,6 +493,7 @@ export async function loadModelSetup(
         },
         refusedPackages,
         credentials: [],
+        subscription: null,
         ...resources,
       }
     }
@@ -396,6 +509,7 @@ export async function loadModelSetup(
         images: runtimeImages(models),
         refusedPackages,
         credentials: credentialsIn(models),
+        subscription: null,
         ...resources,
       }
     }
@@ -420,6 +534,20 @@ export async function loadModelSetup(
         images: runtimeImages(models),
         refusedPackages,
         credentials: credentialsIn(models),
+        subscription:
+          plan.shaping === null
+            ? null
+            : {
+                package: ANTHROPIC_AUTH.package,
+                provider: ANTHROPIC_AUTH.provider,
+                shaping: storedShaping(plan.shaping),
+                unshaped: isUnshaped({
+                  provider: ANTHROPIC_AUTH.provider,
+                  subscription: models.isUsingOAuth(ANTHROPIC_AUTH.provider),
+                  registered:
+                    loader === null ? [] : registeredProviders(loader),
+                }),
+              },
         ...resources,
       }
     }

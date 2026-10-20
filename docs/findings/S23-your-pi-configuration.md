@@ -1,7 +1,8 @@
 # S23 — a person's pi configuration inside pine·trie
 
 - **Status:** Answered
-- **Led to:** ADR-0022, ADR-0036, ADR-0046, ADR-0107, ADR-0121, ADR-0146
+- **Led to:** ADR-0022, ADR-0036, ADR-0046, ADR-0107, ADR-0121, ADR-0146,
+  ADR-0192
 
 **Answers.**
 1. **pi's own loader loads a person's pi packages unchanged.**

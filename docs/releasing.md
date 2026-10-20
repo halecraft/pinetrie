@@ -18,8 +18,16 @@ nor GitLab, so npm's trusted publishing and provenance are not available.
 - the other files of each shipped package (Containerfiles, the lane notes,
   skills, the VM's sources), and the page's build without its stamp;
 - a `package.json` whose dependencies are what the shipped files import,
-  and what `packages/pi/deep-packages.ts` declares, at the versions the
+  and what no import names (`UNIMPORTED_PACKAGES`,
+  `packages/pi/unimported-packages.ts`: pi's packages `deep.ts` loads by
+  file, and the shipped `pi-anthropic-auth`), at the versions the
   workspace declares.
+
+A release that bumps pi checks `@gotgenes/pi-anthropic-auth`'s peer range
+against it, and runs S275's probe
+(`docs/findings/S275-subscription-accepted/probe.mjs`) with a subscription
+signed in: a subscription works only while Anthropic accepts the request
+the pinned pair shapes.
 
 It runs on Node 24 only, the major whose stripper was measured, and
 refuses a shipped file that imports a computed name or a package nothing

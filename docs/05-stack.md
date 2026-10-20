@@ -67,6 +67,10 @@ release is `docs/releasing.md`.
 ## pnpm, with Kyneta from the registry
 
 Kyneta is the registry's `4.0.0`, as pi is its `0.99.2`, pinned exactly.
+So is `@gotgenes/pi-anthropic-auth` (`3.4.3`), the pi extension a Claude
+subscription needs, which pine·trie ships and gives pi's loader by folder
+(ADR-0192): no import names it, so `packages/pi/unimported-packages.ts`
+lists it for the package build.
 pnpm's `node_modules` is strict, so a package reaches only what it
 declares: that is what enforces every package boundary
 (`docs/01-architecture.md`). A Kyneta package's peer dependencies are met

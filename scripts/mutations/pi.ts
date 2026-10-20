@@ -2,6 +2,7 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
+const config = ["pnpm", "exec", "vitest", "run", "packages/pi/config.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -1145,11 +1146,62 @@ export const mutations: readonly Mutation[] = [
       "a commit ending a reply writes the root, waits for the store, then deletes the frames",
   },
   {
-    name: "deep.ts finds pi beside itself, as pnpm lays it out",
-    file: "packages/pi/deep-packages.ts",
-    from: "  const marker = `/node_modules/${pkg}/`\n",
-    to: "  const marker = `/packages/pi/node_modules/${pkg}/`\n",
+    name: "a package's folder is the one above its own",
+    file: "packages/pi/unimported-packages.ts",
+    from: "  return path.dirname(manifest)\n",
+    to: "  return path.dirname(path.dirname(manifest))\n",
     command: unit,
-    expect: "each package deep.ts declares resolves to its own folder",
+    expect:
+      "each unimported package resolves to its own folder, its manifest naming it",
+  },
+  {
+    name: "the shipped copy is planned and never loaded",
+    file: "packages/pi/config.ts",
+    from: '  shaping?.kind === "shipped" ? [shaping.dir] : []\n',
+    to: "  []\n",
+    command: config,
+    expect: "the shipped copy comes first, before the listed packages",
+  },
+  {
+    name: "a listed copy is matched by its folder, not its name",
+    file: "packages/pi/config.ts",
+    from: "    if (manifest?.name === ANTHROPIC_AUTH.package)\n",
+    to: "    if (p === ANTHROPIC_AUTH.package)\n",
+    command: config,
+    expect: "a listed copy of pi-anthropic-auth replaces the shipped one",
+  },
+  {
+    name: "anthropic.subscription off still ships the copy",
+    file: "packages/pi/config.ts",
+    from: '  return shipped.kind === "off"\n    ? { kind: "off" }\n    : { kind: "shipped", dir: shipped.dir, version: shipped.version }\n',
+    to: '  return shipped.kind === "off"\n    ? { kind: "shipped", dir: "/off", version: null }\n    : { kind: "shipped", dir: shipped.dir, version: shipped.version }\n',
+    command: config,
+    expect: "with anthropic.subscription off, no copy loads",
+  },
+  {
+    name: "a scripted model loads the shipped copy",
+    file: "packages/pi/config.ts",
+    from: '  if (shipped.kind === "unloaded") return null\n',
+    to: '  if (shipped.kind === "unloaded")\n    return { kind: "shipped", dir: "/shipped", version: null }\n',
+    command: config,
+    expect: "a scripted model loads what is listed, and no shipped copy",
+  },
+  {
+    name: "a subscription is unshaped whatever registered its provider",
+    file: "packages/pi/config.ts",
+    from: "  return facts.subscription && !facts.registered.includes(facts.provider)\n",
+    to: "  return facts.subscription\n",
+    command: config,
+    expect:
+      "a subscription is unshaped only when nothing registered its provider",
+  },
+  {
+    name: "the shipped copy's registrations are not counted",
+    file: "packages/pi/config.ts",
+    from: "    ...runtime.pendingProviderRegistrations.map(r => r.name),\n",
+    to: "",
+    command: config,
+    expect:
+      "the shipped copy loads, registers anthropic, and leaves a subscription shaped",
   },
 ]

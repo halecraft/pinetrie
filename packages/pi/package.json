@@ -10,6 +10,7 @@
     "@earendil-works/pi-agent-core": "0.99.2",
     "@earendil-works/pi-ai": "0.99.2",
     "@earendil-works/pi-coding-agent": "0.99.2",
+    "@gotgenes/pi-anthropic-auth": "3.4.3",
     "@kyneta/schema": "4.0.0",
     "@pinetrie/channel": "workspace:*",
     "@pinetrie/core": "workspace:*",

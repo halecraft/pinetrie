@@ -18,8 +18,9 @@ import {
   noModelWords,
   originWords,
   refusalWords,
+  subscriptionWords,
 } from "@pinetrie/interface"
-import type { ModelLine } from "@pinetrie/rules"
+import type { ModelLine, SetupSubscription } from "@pinetrie/rules"
 import type {
   AllowedHost,
   DroppedIdentity,
@@ -114,6 +115,18 @@ export function agentReadyLine(agent: {
       : `model ${model.label}${origins === null ? "" : ` (${originWords(origins)})`}`
   const tools = agent.tools === null ? "off" : `on, in ${agent.tools}`
   return `[host] agent ready — ${which}; tools ${tools}`
+}
+
+/** Who shapes a subscription's requests, and the warning when nothing does; none for a suite's model. */
+export function subscriptionLines(
+  s: SetupSubscription | null,
+): readonly string[] {
+  if (s === null) return []
+  const words = subscriptionWords(s)
+  return [
+    line(s.provider, words.line),
+    ...(words.warning === null ? [] : [`[host] ${words.warning}`]),
+  ]
 }
 
 /** Where the setup page is, said when the host has no model. */

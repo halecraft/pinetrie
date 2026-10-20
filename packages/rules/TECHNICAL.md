@@ -1373,8 +1373,19 @@ the setup page name.
 It holds only what no other record publishes: each layer's file and state,
 every refusal, every setting with its value as JSON text and its origins,
 the model or why there is none, the providers with a credential and where
-it is (never the credential), the refused packages and the context files.
-The commands are `pinetrie.commands`'.
+it is (never the credential), the refused packages, the context files, and
+who shapes a Claude subscription's requests (`SetupSubscription`, ADR-0192:
+the extension and its provider by name, a `Shaping` of `shipped`, `listed`
+or `off`, and whether a subscription is signed in with nothing shaping it;
+null for a suite's named or scripted model). The commands are
+`pinetrie.commands`'.
+
+- `SUBSCRIPTION_SETTING` is the key of the setting that turns the shipped
+  extension off: the host's table and the setup words both read it, so
+  the two never spell it apart.
+- The schema writes `Shaping`'s literals itself, with no list beside it:
+  `SETUP`'s decode hands the schema's `Static` where a `SetupRecord` is
+  expected, so `tsc` refuses a schema that drifts from the type.
 
 - `ModelLine` is the model as pi's setup states it; `SetupModel` is the
   same with its origins. `NoModel`, why there is none, is built from
