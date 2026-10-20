@@ -1,4 +1,4 @@
-// S280's driver: the shell and the wrapper in one. It loads attr.bpf.c,
+// S283's driver: the shell and the wrapper in one. It loads attr.bpf.c,
 // makes the watched pipe, feeds four steps (tagging itself with each, as the
 // wrapper would tag the shell), and checks each byte the reader got against
 // the attribution events. A byte's value is the step that wrote it ('0' for

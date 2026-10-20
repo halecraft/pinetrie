@@ -1,7 +1,7 @@
 import { entryId, threadIdFor } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import type { Item, Level } from "./attention.ts"
+import type { Item, RunEndLevel } from "./attention.ts"
 import {
   type InboxSection,
   inboxCount,
@@ -9,7 +9,7 @@ import {
   inboxWords,
 } from "./inbox-view.ts"
 
-const report = (lane: string, level: Level): Item => ({
+const report = (lane: string, level: RunEndLevel): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
   level,
@@ -22,8 +22,8 @@ const report = (lane: string, level: Level): Item => ({
 const proposed = (lane: string): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
-  level: "needs-you",
-  raised: { kind: "ready", source: cardIdFor("c1") },
+  level: "ready",
+  raised: { kind: "proposed", state: "ready", source: cardIdFor("c1") },
 })
 
 const view = (

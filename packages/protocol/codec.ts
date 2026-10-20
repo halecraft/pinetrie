@@ -569,6 +569,23 @@ export function decodeCommand(
         }
       : refused(ERR.UNKNOWN_KIND, `a card is 1 or 2 columns wide, not ${width}`)
   }
+  if (kind === "card-tick") {
+    const card = parseCardId(text(wire?.cardId))
+    if (card === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a tick must name its card")
+    const canvas = text(wire?.canvas)
+    if (!isCanvasId(canvas))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvas}`)
+    const mode = text(wire?.mode)
+    return mode === "ticked" || mode === "unticked"
+      ? {
+          kind,
+          card,
+          at: { kind: "canvas", canvas },
+          ticked: mode === "ticked",
+        }
+      : refused(ERR.UNKNOWN_KIND, `a box is ticked or unticked, not ${mode}`)
+  }
   if (kind === "set-command") {
     const card = parseCardId(text(wire?.cardId))
     if (card === undefined)
@@ -1359,6 +1376,14 @@ export function encodeIntent(id: string, intent: Intent): Command {
         cardId: intent.card,
         canvas: intent.at.canvas,
         mode: String(intent.width),
+      })
+    case "card-tick":
+      return command({
+        id,
+        kind: "card-tick",
+        cardId: intent.card,
+        canvas: intent.at.canvas,
+        mode: intent.ticked ? "ticked" : "unticked",
       })
     case "set-command":
       return command({

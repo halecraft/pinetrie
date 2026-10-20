@@ -4,11 +4,11 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   type NoteColumnId,
   rootIdFor,
   type ThreadId,
   threadIdFor,
+  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -23,6 +23,7 @@ import {
   type CardView,
   canvasColumns,
   defaultView,
+  firstUnticked,
   heldByOthers,
   openColumns,
   type YourCanvasView,
@@ -54,7 +55,7 @@ const canvasFor = (
             owner: ADA,
             placer: ADA,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
         : {
             kind: "thread",
@@ -62,7 +63,7 @@ const canvasFor = (
             owner: ADA,
             placer: ADA,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
     }),
     CANVAS,
@@ -98,6 +99,17 @@ const shape = (columns: readonly CardColumn[]) =>
       ? [c.kind, c.card, c.folded]
       : [c.column.mode.kind, c.column.key, c.folded],
   )
+
+test("a canvas's default view unfolds its first unticked card; none, with every box ticked", () => {
+  const cards = canvasFor([TRUNK, N1, C])
+  const tick = (card: CardOnCanvas): CardOnCanvas =>
+    ({ ...card, content: { ticked: true } }) as CardOnCanvas
+  expect(firstUnticked(cards)).toBe(TRUNK)
+  expect(
+    firstUnticked([tick(cards[0] as CardOnCanvas), ...cards.slice(1)]),
+  ).toBe(N1)
+  expect(firstUnticked(cards.map(tick))).toBeNull()
+})
 
 describe("canvasColumns", () => {
   test("every card is a column in the canvas's order, the first alone unfolded by default", () => {
@@ -242,7 +254,7 @@ describe("canvasColumns", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "inventory", holder },
-      content: NO_CONTENT,
+      content: UNTICKED,
     })
     expect(heldByOthers([card(BEA)], ADA)).toEqual(new Map([[TRUNK, BEA]]))
     expect(heldByOthers([card(ADA)], ADA)).toEqual(new Map())

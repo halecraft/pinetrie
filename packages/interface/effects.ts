@@ -38,7 +38,7 @@ import type {
   Slots,
 } from "@pinetrie/session"
 import type { Raised } from "./attention.ts"
-import { heldByOthers } from "./canvas-columns.ts"
+import { firstUnticked, heldByOthers } from "./canvas-columns.ts"
 import type { Canvases } from "./canvases.ts"
 import type { Quote } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
@@ -350,7 +350,7 @@ const viewAction = (
 ): LayoutAction => ({
   kind: "view",
   canvas,
-  first: state.canvases.index.cardsOn.get(canvas)?.[0]?.id ?? null,
+  first: firstUnticked(state.canvases.index.cardsOn.get(canvas) ?? []),
   change,
 })
 

@@ -149,6 +149,7 @@ export function runsIn(command: Gated): readonly RunAt[] {
     case "paste":
     case "reorder":
     case "card-width":
+    case "card-tick":
     case "spin-off":
     case "undo-move":
     case "set-command":

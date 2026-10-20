@@ -88,9 +88,14 @@ beside it (ADR-0081, turned sideways).
   needs nothing from you (cards behind a held queue wait for a person, and
   draw no ring, ADR-0113); a filled
   amber dot when something there needs you, which pulses three times as it
-  arrives and then stays still; a dim amber dot when something is worth a
-  read; and, when a run you follow ends with nothing to do, a ✓ that fades.
-  Its title says why ("needs you: asks whether to drop the v1 table").
+  arrives and then stays still; a red dot when changes there conflict and an
+  amber ring when they are ready to accept, which pulse as they arrive too;
+  a dim amber dot when something is worth a read; and, when a run you
+  follow ends with nothing to do, a ✓ that fades.
+  Its title says why ("needs you: asks whether to drop the v1 table",
+  "changes conflict with accepted work"). The mark is the highest of its
+  threads' statuses raised for you, in one order with a column's dot
+  (ADR-0198), so what needs you shows over a thread at work.
   Reading the thread to its end, on any device of yours, clears it; work
   ready to accept clears when it is accepted, or with **Dismiss** in the item's
   `⋯`. A page that loads draws every mark still: only a change you see
@@ -378,15 +383,28 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A canvas opens on its canvas**: every card on it, as columns, in an order
   everyone shares. A thread card's column is its thread's path; a note
   column's is its notes. Each is **folded** for you until you open it: a
-  narrow strip in its place, which a click unfolds. Folding (**⇤**, at
-  the end of a column's header) is yours alone, and moves nothing for
+  narrow strip in its place, which a click unfolds. A canvas you have not
+  opened in this tab starts with its first column whose box is not ticked
+  unfolded, and keeps that view once its columns are drawn, so a box
+  someone ticks later folds nothing under you (ADR-0198). Folding (**⇤**,
+  first in a column's header) is yours alone, and moves nothing for
   anyone else.
-- **A strip is its column's header turned on its side** (ADR-0137): a
-  thread's mark, then its name at the header's size, in its colour. Folding
-  turns the name 90° into the strip, its mark moving with it, while the
-  rest of the column fades and the columns after it close up; unfolding
-  turns it back. Only a fold you ask for moves; under reduced motion,
-  nothing does.
+- **A strip is its column's header turned on its side** (ADR-0137,
+  ADR-0198), in the header's order: **⇥** where the header's ⇤ is, so a
+  second click lands on it, the column's box, its mark, its name at the
+  header's size, in its colour, and its dot. Folding turns the name 90°
+  into the strip, its mark moving with it, while the rest of the column
+  fades and the columns after it close up; unfolding turns it back. Only a
+  fold you ask for moves; under reduced motion, nothing does. The whole
+  strip drags, as a header does.
+- **Every column has a box, everyone's** (ADR-0198): a checkbox after its
+  toggle, folded or not, on a thread, a note column or a media column.
+  Anyone who may change the canvas ticks it, for everyone, and the undo
+  key takes a tick back; on a read-only canvas it is drawn and cannot be
+  changed. It means what its people mean, done or set aside: the page
+  only dims a ticked column's name, and the canvas list an agent is told
+  marks it "box ticked", which the agent's rules say is the person's own
+  mark, which may mean done, or handled for now. Ticking folds nothing.
 - **The canvas column comes first**, folded the same way: the canvas's title,
   which anyone renames there, **Move to ▸** among the board's states, who is
   reading, the cards pinned to the canvas, and the canvas list its agents
@@ -424,10 +442,25 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   their inventory, the row says "Bea has it" and opens nothing. A thread that started from unfinished work says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
-- **A named agent's header says what its thread is doing now** (ADR-0173):
-  its focus, on a row of its own between the agent's row and the fork's,
-  one line cut to the column with the whole of it in its title, "written by
-  a model". A model names it after each of the thread's runs, once the
+- **A column's header is one line** (ADR-0198): its toggle, its box, its
+  mark and name, its dot, then its density, its pin, who is reading, and
+  ⋯. A press on the name or the free space after it opens its details,
+  and a second closes them. Closed, under the line is only what asks
+  something of you: a raised "needs you" or "worth a read" row, and an ssh
+  request for its owner. Open, the details hold its focus, its fork row,
+  the agents line, its proposed changes with their buttons, and what
+  follows.
+- **A column's dot is its thread's status** (ADR-0198), the same value
+  folded or not, and the one the sidebar and the board read: an amber dot
+  when it needs you (a run's end, an ask about a conflict, an ssh
+  request), red when its proposed changes conflict, an amber ring when
+  they are ready to accept, a dim amber dot for worth a read, a ring in
+  the agent's colour while it works, a grey ring once accepted, and a faint
+  dot with nothing to say. What is not raised for you (a thread you do not
+  follow, a report you read) is drawn grey. Its title says why.
+- **A named agent's details say what its thread is doing now** (ADR-0173):
+  its focus, first in them, one line cut to the column with the whole of
+  it in its title, "written by a model". A model names it after each of the thread's runs, once the
   run's summary is written, from the thread's asks and their headlines; it
   stays while the work goes on, and changes when the thread moves to a new
   phase. Until a thread's first run ends, the row shows its first message's
@@ -436,13 +469,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
 - **A column's header says what its thread's last run needs from you**
-  (ADR-0175), on a row under its focus: "needs you: asks whether to drop
+  (ADR-0175), on a row under its line: "needs you: asks whether to drop
   the v1 table", "worth a read: Bea stopped it", in the sidebar's words and
   for its followers alone, as its dot is. It stays until the next run
-  starts: read past or dismissed, its amber turns grey. A press brings the
-  run's last entry into view. A run that was done, or a stop you made,
-  shows nothing, and neither does a folded strip.
-- **A thread's name opens its details** (ADR-0073), under the header, and a
+  starts: read past or dismissed, its amber turns grey and it moves into
+  the details (ADR-0198). A press brings the run's last entry into view. A
+  run that was done, or a stop you made, shows nothing; a folded strip
+  shows it as its dot.
+- **A column's line opens its details** (ADR-0073, ADR-0198), and a
   second click on it closes them; a chevron after the name turns as they
   open. They show the thread's icon magnified, which spins in as they open
   and again at a click, its name, "started by Ada · 3 h ago", where it
@@ -469,15 +503,16 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column grows as replies arrive.** It shows one thread to its end,
   including the agent's reply (`threadEnd`, ADR-0117). A branch, which
   starts another thread, however new, never pulls it away.
-- **Every unfolded column's header ends in ⋯ and one button** (ADR-0161,
-  ADR-0134): **⇤** on a started thread or a note column, which folds it
-  for you, and a **bin** on a thread not yet started, which trashes it
+- **Every column's header starts with its toggle, and an unfolded one
+  ends in ⋯** (ADR-0161, ADR-0134, ADR-0198): **⇤** on a started thread or
+  a list column, which folds it for you (**⇥** in the same place unfolds
+  it), and a **bin** on a thread not yet started, which trashes it
   (ADR-0177).
   Its ⋯ holds what changes the canvas for everyone: its width, one or two
   columns wide; a thread's copies and its take; and last **Move to
   trash**, on every column, even where the bin repeats it. ⋯ is everyone's, and
-  the head's button is yours or loses nothing. A folded strip has
-  neither: unfold it first.
+  the head's toggle is yours or loses nothing. A folded strip has no ⋯:
+  unfold it first.
 - **Columns are reordered by dragging their headers, for everyone**: the
   canvas's order is shared, and a drag moves a card on it. Whichever column
   is first shows its whole path, so moving a branch to the far left makes it

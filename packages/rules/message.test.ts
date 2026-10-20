@@ -697,12 +697,13 @@ describe("a host tool's result as a fact", () => {
     return m?.role === "toolResult" ? m : undefined
   }
 
-  test("an ask_about_conflict the host took is asked, from its details alone", () => {
-    expect(
-      renderableMessage(result(CONFLICT_TOOL, { asked: true })),
-    ).toMatchObject({ role: "toolResult", asked: true })
-    expect(read(result(CONFLICT_TOOL, undefined))?.asked).toBeUndefined()
-    expect(read(result("bash", { asked: true }))?.asked).toBeUndefined()
+  test("a stored ask_about_conflict result that says it asked decodes, as no fact", () => {
+    expect(read(result(CONFLICT_TOOL, { asked: true }))).toEqual({
+      role: "toolResult",
+      content: [{ type: "text", text: "Asked." }],
+      toolCallId: cardIdFor("c1"),
+      isError: false,
+    })
   })
 
   test("a catch_up result carries the commits it merged", () => {

@@ -12,7 +12,6 @@ import {
   INVENTORY_SLOTS,
   indexAsks,
   indexTree,
-  NO_CONTENT,
   rootIdFor,
   type Sha256,
   type TextCard,
@@ -20,6 +19,7 @@ import {
   type ThreadCard,
   textCardId,
   threadIdFor,
+  UNTICKED,
   type WriterId,
   workflowStateIdFor,
   writerId,
@@ -150,7 +150,7 @@ const inventoryOf = (holder: WriterId): ThreadCard => ({
   owner: ME,
   placer: holder,
   place: { kind: "inventory", holder },
-  content: NO_CONTENT,
+  content: UNTICKED,
 })
 /** A link to a thread on `canvas`'s canvas. */
 const linkOn = (canvas: CanvasId) =>
@@ -435,7 +435,7 @@ describe("planIntent", () => {
       owner: ME,
       placer: ME,
       place: { kind: "canvas", canvas: R1_ID, order: "zz", width: 1 },
-      content: NO_CONTENT,
+      content: UNTICKED,
     }
     const state = at(onRoot("1-r1"), undefined, {
       ...NO_CARDS,
@@ -613,6 +613,21 @@ describe("planIntent", () => {
     expect(plan({ kind: "card-width", card: F, width: 2 })).toEqual([])
   })
 
+  test("a tick is asked of the host, from the canvas the card is on; a card on none, nothing", () => {
+    expect(plan({ kind: "card-tick", card: C, ticked: true })).toEqual([
+      {
+        kind: "request",
+        intent: {
+          kind: "card-tick",
+          card: C,
+          at: { kind: "canvas", canvas: R1_ID },
+          ticked: true,
+        },
+      },
+    ])
+    expect(plan({ kind: "card-tick", card: F, ticked: true })).toEqual([])
+  })
+
   test("a move reorders the column's card on the canvas, for everyone; a branch's or a new canvas's has nowhere to move", () => {
     const move = (card: CardId, to: number): Intent => ({
       kind: "move-column",
@@ -747,7 +762,7 @@ describe("planIntent", () => {
         owner: ME,
         placer: ME,
         place: { kind: "inventory", holder: ME },
-        content: NO_CONTENT,
+        content: UNTICKED,
       }
       const state = at(onRoot("1-r1"), indexAsks(index), {
         ...NO_CARDS,

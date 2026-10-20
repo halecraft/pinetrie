@@ -22,6 +22,7 @@ export type {
   TraceRecord,
   WorkflowState,
   WorkStripButton,
+  WorkStripState,
 } from "@pinetrie/rules"
 export {
   BLOCK_PROPERTY,

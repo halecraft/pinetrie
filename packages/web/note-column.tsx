@@ -29,6 +29,8 @@ export function NoteColumn(p: {
   view: NoteColumnView
   /** How many columns wide its card is drawn. */
   width: CardWidth
+  /** Its card's box (`ColumnContent`). */
+  ticked: boolean
   reader: Reader
   readOnly: ReadOnly | null
   seats: readonly SeatRecord[]
@@ -65,6 +67,7 @@ export function NoteColumn(p: {
         readOnly={p.readOnly}
         title={view.title}
         titled={view.titled}
+        ticked={p.ticked}
         width={p.width}
       />
       <div className="note-column-notes">

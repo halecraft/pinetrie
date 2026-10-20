@@ -72,6 +72,7 @@ type SharedColumnProps = Omit<
   | "track"
   | "view"
   | "width"
+  | "ticked"
 >
 
 /** Each thread column drawn whole, as the tab projected it, by its key. */
@@ -161,6 +162,7 @@ export function Strip(p: {
         track={projected.track}
         view={projected.view}
         matches={projected.matches}
+        ticked={item.ticked}
         width={item?.width ?? 1}
       />
     )
@@ -185,8 +187,12 @@ export function Strip(p: {
       return (
         <FoldedColumn
           drop={canvasDrop(glanceCardId(folded))}
+          arrivals={p.shared.threadArrivals}
           glance={folded}
           key={glanceCardId(folded)}
+          nameOf={p.shared.nameOf}
+          ticked={item.ticked}
+          writable={readOnly === null}
           track={
             folded.kind === "thread" ? p.threadTrackOf(folded.thread) : null
           }
@@ -210,6 +216,7 @@ export function Strip(p: {
             reader={p.reader}
             seats={p.shared.seats}
             session={p.shared.session}
+            ticked={item.ticked}
             view={notes}
             width={item.width}
           />
@@ -227,6 +234,7 @@ export function Strip(p: {
             reader={p.reader}
             seats={p.shared.seats}
             session={p.shared.session}
+            ticked={item.ticked}
             view={media}
             width={item.width}
           />

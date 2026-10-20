@@ -64,6 +64,8 @@ const StoredCard = Schema.struct.json({
   origin: Schema.string(),
   /** An image's versions, as JSON (`ImageVersion`). */
   versions: Schema.string(),
+  /** A thread's, a note column's or a media column's box: `1` ticked, "" not. */
+  ticked: Schema.string(),
 })
 
 const placesSchema = Schema.struct({

@@ -1,14 +1,22 @@
 import { type CardId, cardIdOfKind, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { columnHeadEnd } from "./column-menu.ts"
-import { FOLD } from "./folded-column-view.ts"
+import { columnHead } from "./column-menu.ts"
+import { foldToggle } from "./folded-column-view.ts"
 
 const NOTES = cardIdOfKind("note-column", "n")
 const menuOf = (
   card: CardId = threadIdFor("a"),
   width: 1 | 2 = 1,
   writable = true,
-) => columnHeadEnd({ card, width, writable, unstarted: false }).menu
+) =>
+  columnHead({
+    card,
+    width,
+    writable,
+    unstarted: false,
+    folded: false,
+    ticked: false,
+  }).menu
 
 test("a column's ⋯ makes its card wide, or narrow again, for everyone", () => {
   const card = threadIdFor("a")
@@ -53,27 +61,76 @@ test("a column's ⋯ ends in Move to trash for a reader who may write, and offer
   }
 })
 
-test("a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin", () => {
+test("a column's head starts with its toggle: it folds a started thread or a note column, and trashes a thread not yet started with its bin", () => {
   const thread = threadIdFor("a")
   const head = (card: CardId, unstarted: boolean, writable: boolean) =>
-    columnHeadEnd({ card, width: 1, writable, unstarted })
+    columnHead({
+      card,
+      width: 1,
+      writable,
+      unstarted,
+      folded: false,
+      ticked: false,
+    })
   for (const [card, writable] of [
     [thread, true],
     [thread, false],
     [NOTES, true],
     [NOTES, false],
   ] as const)
-    expect(head(card, false, writable).button).toEqual({
-      words: FOLD,
+    expect(head(card, false, writable).toggle).toEqual({
+      words: foldToggle(false),
       intent: { kind: "fold", card, unfolded: false },
     })
   const unstarted = head(thread, true, true)
-  expect(unstarted.button?.words).toMatchObject({
+  expect(unstarted.toggle?.words).toMatchObject({
     label: "trash",
     className: "trash-column",
   })
-  expect(unstarted.button?.intent).toEqual(
+  expect(unstarted.toggle?.intent).toEqual(
     unstarted.menu.at(-1)?.items[0]?.intent,
   )
-  expect(head(thread, true, false).button).toBeNull()
+  expect(head(thread, true, false).toggle).toBeNull()
+})
+
+test("folded, a column's head unfolds it from the same toggle, keeps its box, and has no ⋯", () => {
+  const card = threadIdFor("a")
+  const folded = columnHead({
+    card,
+    width: 1,
+    writable: true,
+    unstarted: false,
+    folded: true,
+    ticked: true,
+  })
+  expect(folded.toggle).toEqual({
+    words: foldToggle(true),
+    intent: { kind: "fold", card, unfolded: true },
+  })
+  expect(folded.box.ticked).toBe(true)
+  expect(folded.menu).toEqual([])
+})
+
+test("a column's box asks the other state, for everyone; a reader who may not change the canvas sees it and cannot change it", () => {
+  const card = threadIdFor("a")
+  const box = (ticked: boolean, writable: boolean) =>
+    columnHead({
+      card,
+      width: 1,
+      writable,
+      unstarted: false,
+      folded: false,
+      ticked,
+    }).box
+  expect(box(false, true).intent).toEqual({
+    kind: "card-tick",
+    card,
+    ticked: true,
+  })
+  expect(box(true, true).intent).toEqual({
+    kind: "card-tick",
+    card,
+    ticked: false,
+  })
+  expect(box(true, false)).toMatchObject({ ticked: true, intent: null })
 })

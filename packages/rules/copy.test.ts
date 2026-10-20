@@ -4,10 +4,10 @@ import {
   entryId,
   INVENTORY_SLOTS,
   indexTree,
-  NO_CONTENT,
   rootIdFor,
   type ThreadRecord,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
@@ -80,7 +80,7 @@ describe("planCopy", () => {
         owner: ADA,
         placer: ADA,
         place: { kind: "canvas", canvas: CANVAS, width: 1 },
-        content: NO_CONTENT,
+        content: UNTICKED,
       },
     })
     // Into the copier's own inventory.

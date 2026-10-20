@@ -8,6 +8,7 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  type ColumnContent,
   type ContentOf,
   type EntryId,
   type IdOf,
@@ -29,6 +30,7 @@ import {
   type ThreadId,
   type TreeIndex,
   threadEnd,
+  UNTICKED,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -71,6 +73,8 @@ const StoredCard = Type.Object({
   origin: Type.Optional(Type.String()),
   /** An image's versions, as JSON; absent before images. */
   versions: Type.Optional(Type.String()),
+  /** A column's box: "1" ticked, "" not; absent before ticks. */
+  ticked: Type.Optional(Type.String()),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -96,6 +100,7 @@ interface StoredCardFields {
   readonly quote: string
   readonly origin: string
   readonly versions: string
+  readonly ticked: string
 }
 
 const isCommand = (s: string): s is CardCommand =>
@@ -112,6 +117,7 @@ type ContentFields = Pick<
   | "quote"
   | "origin"
   | "versions"
+  | "ticked"
 >
 
 type ContentColumn = keyof ContentFields
@@ -125,6 +131,7 @@ const NO_CONTENT_FIELDS: ContentFields = {
   quote: "",
   origin: "",
   versions: "",
+  ticked: "",
 }
 
 /** How one kind's content is stored: the columns it holds, and their codec. */
@@ -135,6 +142,20 @@ interface ContentCodec<K extends PlacedKind> {
   /** Its columns -> its content; undefined for a value this build cannot read. */
   readonly decode: (fields: ContentFields) => ContentOf[K] | undefined
 }
+
+/** A column's card: its box, "1" ticked and "" not; a row stored before ticks reads "". */
+const COLUMN_CODEC = {
+  columns: ["ticked"],
+  encode: (c: ColumnContent): Partial<ContentFields> => ({
+    ticked: c.ticked ? "1" : "",
+  }),
+  decode: (f: ContentFields): ColumnContent | undefined =>
+    f.ticked === "1"
+      ? { ticked: true }
+      : f.ticked === ""
+        ? UNTICKED
+        : undefined,
+} as const
 
 /**
  * Each kind's content as the places document stores it: a row
@@ -170,9 +191,9 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
         : { address, quote: f.quote }
     },
   },
-  thread: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  thread: COLUMN_CODEC,
   canvas: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
-  "note-column": { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  "note-column": COLUMN_CODEC,
   fact: {
     columns: ["fact"],
     encode: c => ({ fact: encodeQueuedFact(c.fact) }),
@@ -189,7 +210,7 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
       return relay === undefined ? undefined : { relay }
     },
   },
-  media: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  media: COLUMN_CODEC,
   image: {
     columns: ["versions"],
     encode: c => ({ versions: JSON.stringify(c.versions) }),
@@ -313,6 +334,7 @@ export const decodeCard = (
       quote: c.quote ?? "",
       origin: c.origin ?? "",
       versions: c.versions ?? "",
+      ticked: c.ticked ?? "",
     }
     const of = kindedId(card)
     switch (of.kind) {

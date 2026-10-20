@@ -16,11 +16,14 @@ export function SignalMark({
   color,
   arrived = null,
   title,
+  quiet = false,
 }: {
   signal: Signal
   color?: string
   arrived?: number | null
   title?: string
+  /** A status not raised for you (`Status.raised`): drawn grey. */
+  quiet?: boolean
 }) {
   const words = signalWords(signal)
   return (
@@ -28,6 +31,7 @@ export function SignalMark({
       aria-label={words}
       className="signal"
       data-arrived={moving(arrived, Date.now()) ? "" : undefined}
+      data-quiet={quiet ? "" : undefined}
       data-signal={signal}
       // A new arrival is a new element, so its pulse plays again.
       key={arrived ?? "still"}

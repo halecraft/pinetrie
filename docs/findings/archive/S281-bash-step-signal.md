@@ -2,13 +2,13 @@
 
 - **Status:** Answered
 
-Measured in a lane (Debian 13, bash 5.2.37) and, end to end with S280's
+Measured in a lane (Debian 13, bash 5.2.37) and, end to end with S283's
 kernel side, in a QEMU guest on the lane VM's kernel (Linux 6.18.57) with
 Alpine's bash 5.3.3.
 
 ## Brief
 
-**Question.** S280's attribution needs the shell's tag to change as it
+**Question.** S283's attribution needs the shell's tag to change as it
 moves from one top-level statement to the next. pi runs a command as
 `bash -c <command>`, stdin closed, stdout and stderr pipes, with an
 environment its caller may add to. Can a `DEBUG` trap, installed through
@@ -45,7 +45,7 @@ pine·trie watched it.
 
 **Throw away.** The probe (`docs/findings/archive/S281-bash-step-signal/`), unless
 a plan builds on it. It runs in the lane, on Debian 13's bash 5.2.37: the
-trap's behaviour is bash's, not the kernel's, so S280's kernel side is not
+trap's behaviour is bash's, not the kernel's, so S283's kernel side is not
 repeated.
 
 ## Answers
@@ -58,7 +58,7 @@ see is also one the parse names. The kill criterion is not met, on the
 condition that the host runs a command whose parse holds any construct
 listed below without the trap, and shows its output undivided.
 
-The end-to-end run needed one change to S280's probe: on 6.18 the write
+The end-to-end run needed one change to S283's probe: on 6.18 the write
 system call inlines `vfs_write` into `ksys_write`, so a kprobe there saw
 10 of 55 marker writes. The marker is
 taken at tmpfs's `shmem_file_write_iter`, reached through the file's
@@ -75,7 +75,7 @@ trap '{ [[ -n ${FUNCNAME-} || -n ${BASH_SOURCE-} ]] ||
 ```
 
 - **The kernel retags the task that writes the marker,** with that task's
-  own count of signals, and every task it starts inherits it (S280's
+  own count of signals, and every task it starts inherits it (S283's
   rule). The host finds signal k of task t as t's k-th line in the
   marker file, whatever order tasks' lines fall in.
 - **`set -T`** makes subshells, `&` jobs, `coproc`s and command
@@ -95,7 +95,7 @@ trap '{ [[ -n ${FUNCNAME-} || -n ${BASH_SOURCE-} ]] ||
 
 ### Q1: coverage
 
-`guest.py`: 49 statements, one of each kind, under real bash with S280's
+`guest.py`: 49 statements, one of each kind, under real bash with S283's
 attribution; a line names its statement (`S<n>`), and its bytes must carry
 a signal whose `$LINENO` is in that statement's lines.
 
@@ -213,9 +213,9 @@ a real lane.
 - `transparent.py`: Q3 and Q4, every case with no trap and with each trap.
 - `guest.py`: the 49 statements, the two preludes, and the check of what
   the guest printed.
-- `attr.bpf.c`, `attr.h`: S280's kernel side, tagged by marker writes,
+- `attr.bpf.c`, `attr.h`: S283's kernel side, tagged by marker writes,
   with the counters that found `vfs_write` inlined.
 - `drive.c`: runs bash as pi does, under each prelude, and prints the
   stream, the events and the marker file.
-- `init`, `Containerfile`, `run.sh`: the guest, as in S280, with Alpine's
+- `init`, `Containerfile`, `run.sh`: the guest, as in S283, with Alpine's
   bash.

@@ -80,6 +80,7 @@ import {
   planCardReorder,
   planCardSpend,
   planCardSpinOff,
+  planCardTick,
   planCardWidth,
   planImagesPut,
   planImageVersion,
@@ -407,6 +408,20 @@ export function createCardCommands(deps: CardCommandDeps) {
       canvases: CanvasIndex,
     ): Promise<Settled> {
       const plan = planCardWidth({ ...cardFacts(writer, canvases), change })
+      return moved(plan, writer, NO_WHY)
+    },
+
+    /**
+     * A column's box ticked or cleared on its canvas, as one step of the
+     * sender's history of moves in its canvas, as a width is. The state it
+     * has already writes nothing.
+     */
+    cardTick(
+      writer: WriterId,
+      change: Extract<Intent, { kind: "card-tick" }>,
+      canvases: CanvasIndex,
+    ): Promise<Settled> {
+      const plan = planCardTick({ ...cardFacts(writer, canvases), change })
       return moved(plan, writer, NO_WHY)
     },
 

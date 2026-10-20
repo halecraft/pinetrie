@@ -7,13 +7,13 @@ import {
   cardIdOfKind,
   type EntryId,
   entryId,
-  NO_CONTENT,
   type PlaceKey,
   placeKey,
   rootIdFor,
   type TextCard,
   type TextPlace,
   threadIdFor,
+  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -170,7 +170,7 @@ describe("planProvenance: each card's history", () => {
         owner: ADA,
         placer,
         place,
-        content: NO_CONTENT,
+        content: UNTICKED,
       }) as const
     const on = (canvas: typeof TEST_CANVAS) =>
       ({ kind: "canvas", canvas, order: "1", width: 1 }) as const
@@ -526,7 +526,7 @@ test("planTrashSweep: a card on a surface a deleted card owns goes with it, tras
       kind: "trash",
       left: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
     },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const trashedThread: CardRecord = {
     kind: "thread",
@@ -537,7 +537,7 @@ test("planTrashSweep: a card on a surface a deleted card owns goes with it, tras
       kind: "trash",
       left: { kind: "canvas", canvas: TEST_CANVAS, order: "b", width: 1 },
     },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const note = {
     ...card({ kind: "note", column, order: "a" }),

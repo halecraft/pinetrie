@@ -173,7 +173,7 @@ export function boardView(input: BoardViewInput): BoardView {
   })
   /** The signals of `canvases`, from each one's status and proposed changes. */
   const stateSignals = (canvases: readonly CanvasId[]): StateSignals => ({
-    working: canvases.filter(t => headOf(t).status?.kind === "working").length,
+    working: canvases.filter(t => headOf(t).status?.level === "running").length,
     ready: canvases.filter(t => headOf(t).ready.length > 0).length,
     canvases,
   })

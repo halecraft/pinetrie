@@ -169,13 +169,9 @@ describe("ask_about_conflict", () => {
       threadContext(threadIdFor("0123456789abcdef"), BACKGROUND_CONTEXT),
     )
 
-  test("with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask", async () => {
-    const taken = await ask(true)
-    expect(taken.content[0]?.text).toContain("Asked. Stop here")
-    expect(taken.details).toEqual({ asked: true })
-    const refused = await ask(false)
-    expect(refused.content[0]?.text).toBe(NO_CONFLICTS)
-    expect(refused.details).toBeUndefined()
+  test("with a conflict in the copy, it asks; with none, there is nothing to ask", async () => {
+    expect((await ask(true)).content[0]?.text).toContain("Asked. Stop here")
+    expect((await ask(false)).content[0]?.text).toBe(NO_CONFLICTS)
   })
 })
 

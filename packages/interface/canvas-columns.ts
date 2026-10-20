@@ -59,8 +59,16 @@ export interface YourCanvasView {
 }
 
 /**
- * A canvas's view before you change it: only its first card unfolded, since a
- * canvas can hold many threads, and the canvas column folded.
+ * The card a canvas's default view unfolds: its first whose box is not
+ * ticked, since a ticked column is one its people set aside; null for none.
+ */
+export const firstUnticked = (cards: readonly CardOnCanvas[]): CardId | null =>
+  cards.find(c => !c.content.ticked)?.id ?? null
+
+/**
+ * A canvas's view before you change it: only `first` unfolded
+ * (`firstUnticked`), since a canvas can hold many threads, and the canvas
+ * column folded.
  */
 export const defaultView = (first: CardId | null): YourCanvasView => ({
   cards: first === null ? new Map() : new Map([[first, { unfolded: true }]]),
@@ -72,7 +80,7 @@ export const keptTaskView = (
   views: ReadonlyMap<string, YourCanvasView>,
   canvas: string,
   cards: readonly CardOnCanvas[],
-): YourCanvasView => views.get(canvas) ?? defaultView(cards[0]?.id ?? null)
+): YourCanvasView => views.get(canvas) ?? defaultView(firstUnticked(cards))
 
 /** One column of a canvas, as the strip draws it. */
 export type CardColumn =
@@ -82,18 +90,24 @@ export type CardColumn =
       readonly column: Column
       readonly folded: boolean
       readonly width: CardWidth
+      /** Its card's box, everyone's (`ColumnContent`). */
+      readonly ticked: boolean
     }
   | {
       readonly kind: "notes"
       readonly card: NoteColumnId
       readonly folded: boolean
       readonly width: CardWidth
+      /** Its card's box, everyone's (`ColumnContent`). */
+      readonly ticked: boolean
     }
   | {
       readonly kind: "media"
       readonly card: MediaId
       readonly folded: boolean
       readonly width: CardWidth
+      /** Its card's box, everyone's (`ColumnContent`). */
+      readonly ticked: boolean
     }
 
 /**
@@ -169,6 +183,7 @@ function cardColumn(
   const { index } = facts
   const folded = seen?.unfolded !== true
   const width = c.place.width
+  const { ticked } = c.content
   switch (c.kind) {
     case "thread": {
       const opening = facts.unstarted.get(c.id)
@@ -194,6 +209,7 @@ function cardColumn(
           },
           folded,
           width,
+          ticked,
         }
       const anchor = threadAnchor(index, facts.lanes, c.id)
       if (anchor === null) return null
@@ -206,12 +222,12 @@ function cardColumn(
         ...(above === null ? {} : { foldAbove: above }),
         mode: BOUND,
       }
-      return { kind: "thread", card: c.id, column, folded, width }
+      return { kind: "thread", card: c.id, column, folded, width, ticked }
     }
     case "note-column":
-      return { kind: "notes", card: c.id, folded, width }
+      return { kind: "notes", card: c.id, folded, width, ticked }
     case "media":
-      return { kind: "media", card: c.id, folded, width }
+      return { kind: "media", card: c.id, folded, width, ticked }
     // A new kind of canvas card does not compile until it has its column.
     default:
       return c satisfies never

@@ -51,6 +51,8 @@ export function MediaColumn(p: {
   cards: readonly CardRecord[]
   /** How many columns wide its card is drawn. */
   width: CardWidth
+  /** Its card's box (`ColumnContent`). */
+  ticked: boolean
   reader: Reader
   readOnly: ReadOnly | null
   seats: readonly SeatRecord[]
@@ -102,6 +104,7 @@ export function MediaColumn(p: {
         readOnly={p.readOnly}
         title={view.title}
         titled={view.titled}
+        ticked={p.ticked}
         width={p.width}
       />
       <div className="media-images" data-width={p.width}>

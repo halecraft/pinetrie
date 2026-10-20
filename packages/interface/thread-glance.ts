@@ -19,6 +19,7 @@ import {
   threadFirstMessage,
 } from "@pinetrie/core"
 import type { FocusRecord } from "@pinetrie/rules"
+import type { Status } from "./attention.ts"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
 /** A thread at a glance: what its slot and its folded strip draw. */
@@ -39,6 +40,8 @@ export interface ThreadGlance {
   readonly stopped: boolean
   /** How many cards wait in its queue, held until it is on a canvas. */
   readonly queued: number
+  /** Its status (`threadStatus`): what its dot draws; null for none. */
+  readonly status: Status | null
 }
 
 /** How long a glance's lines are kept. */
@@ -97,6 +100,8 @@ export function threadGlance(input: {
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly focuses: ReadonlyMap<ThreadId, FocusRecord>
   readonly iconFor: IconLookup
+  /** Each thread's status (`threadStatus`). */
+  readonly statuses: ReadonlyMap<ThreadId, Status>
 }): ThreadGlance {
   const { thread, index } = input
   const firstId = threadFirstMessage(index, thread)
@@ -117,6 +122,7 @@ export function threadGlance(input: {
     last: end === null || end === firstId ? null : line(end),
     stopped: prompt !== null && indexAsks(index).stoppedBy.has(prompt),
     queued: lane?.waiting ?? 0,
+    status: input.statuses.get(thread) ?? null,
   }
 }
 
@@ -131,6 +137,7 @@ export const bareThreadGlance = (thread: ThreadId): ThreadGlance => ({
   last: null,
   stopped: false,
   queued: 0,
+  status: null,
 })
 
 /** A glance's status in words: "stopped · 2 cards queued", or null for nothing to say. */

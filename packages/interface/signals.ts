@@ -30,20 +30,25 @@ import { type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
- * What a mark says, each named for it: unsent text of yours, needs you or worth
- * a read (`Level`, `attention.ts`), running (its agent works) and done (a run
- * you follow ended asking nothing). `SignalMark` draws every one, as
- * `.signal[data-signal]`.
+ * What a mark says, each named for it: unsent text of yours, a thread's
+ * status (`Level`, `attention.ts`), and done (a run you follow ended asking
+ * nothing). `SignalMark` draws every one, as `.signal[data-signal]`.
  */
-export type Signal = "unsent" | Level | "running" | "done"
+export type Signal = "unsent" | Level | "done"
 
 const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
   unsent: "you have an unsent message here",
-  "needs-you": "needs you",
-  "worth-a-read": "worth a read",
+  accepted: "accepted",
   running: "the agent is working",
+  "worth-a-read": "worth a read",
+  ready: "ready to accept",
+  conflicts: "conflicts with accepted work",
+  "needs-you": "needs you",
   done: "the agent has finished",
 }
+
+/** What a column's dot says with no status: a grey dot. */
+export const NO_STATUS_WORDS = "nothing here asks anything of you"
 
 /** What a signal says, its mark's name and title: the one place each is worded. */
 export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
@@ -53,16 +58,17 @@ export const elsewhereWords = (level: Level): string =>
   `a canvas not in the sidebar: ${signalWords(level)}`
 
 /**
- * The signal a thread's or a canvas's status draws: running while its agent
- * works, its level's when something is raised, done while a run you follow that
- * ended asking nothing still fades (`moving`), else none.
+ * The signal a thread's or a canvas's status draws: its level, done while a
+ * run you follow that ended asking nothing still fades (`moving`), else none.
+ * A status that is not raised draws its level quietly (`Status.raised`).
  */
 export const statusSignal = (
   status: Status | null,
   doneFading: boolean,
 ): Signal | null => {
-  if (status === null) return doneFading ? "done" : null
-  return status.kind === "working" ? "running" : status.kind
+  if (status === null || (!status.raised && doneFading))
+    return doneFading ? "done" : null
+  return status.level
 }
 
 /**

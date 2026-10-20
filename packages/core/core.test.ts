@@ -30,7 +30,6 @@ import {
   messageText,
   movesDocId,
   movesOfDocId,
-  NO_CONTENT,
   NOBODY,
   type NotesTarget,
   nonEmpty,
@@ -62,6 +61,7 @@ import {
   TRASH_PLACE,
   targetOfFields,
   threadIdFor,
+  UNTICKED,
   wireKeyFields,
   writerId,
   writerOfPrincipal,
@@ -612,7 +612,7 @@ describe("a card's place as flat fields", () => {
       owner: by,
       place: canvasPlace,
       placer: by,
-      content: NO_CONTENT,
+      content: UNTICKED,
     }
     const thread: CardRecord = {
       kind: "thread",
@@ -620,7 +620,7 @@ describe("a card's place as flat fields", () => {
       owner: by,
       place: canvasPlace,
       placer: by,
-      content: NO_CONTENT,
+      content: UNTICKED,
     }
     expect(placed(thread, held)?.place).toEqual(held)
     expect(placed(column, held)).toBeUndefined()

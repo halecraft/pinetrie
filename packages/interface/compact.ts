@@ -1,7 +1,8 @@
 // interface/compact — a card at its least detail, as a slot of your inventory
 // draws it: one value with one shape for every kind (a header row of its
-// kind's icon, a mark, a command and a badge, then a lead and a second line),
-// which one component draws. A kind fills it; no kind draws its own.
+// kind's icon, a mark, a thread's dot, a command and a badge, then a lead and
+// a second line), which one component draws. A kind fills it; no kind draws
+// its own.
 
 import {
   type CardCommand,
@@ -24,6 +25,7 @@ import {
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
 import { addressWords } from "./address-words.ts"
+import type { Status } from "./attention.ts"
 import type { CardTone } from "./card-frame.ts"
 import { COMMAND_VERB, hostCardLine } from "./card-words.ts"
 import { countWords } from "./count-words.ts"
@@ -54,7 +56,12 @@ export type DrawnKind = DrawnCard["kind"]
 /** Whose a compact is: a writer's circle, a thread's icon, or nobody's. */
 export type CompactMark =
   | { readonly kind: "writer"; readonly writer: WriterId }
-  | { readonly kind: "thread"; readonly icon: ThreadIcon | null }
+  | {
+      readonly kind: "thread"
+      readonly icon: ThreadIcon | null
+      /** Its thread's status (`ThreadGlance.status`): the dot its column draws. */
+      readonly status: Status | null
+    }
   | { readonly kind: "none" }
 
 /**
@@ -161,7 +168,7 @@ export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
       const status = glanceStatus(glance)
       return {
         ...base,
-        mark: { kind: "thread", icon: glance.icon },
+        mark: { kind: "thread", icon: glance.icon, status: glance.status },
         command: null,
         lead: text(glance.name ?? UNNAMED_THREAD),
         second:

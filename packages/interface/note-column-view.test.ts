@@ -2,9 +2,9 @@ import {
   type CardRecord,
   canvasIdFor,
   cardIdOfKind,
-  NO_CONTENT,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -39,7 +39,7 @@ const cardsFor = (...ids: (typeof A | typeof N1)[]): readonly CardOnCanvas[] =>
             owner: ADA,
             placer: ADA,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
         : {
             kind: "thread",
@@ -47,7 +47,7 @@ const cardsFor = (...ids: (typeof A | typeof N1)[]): readonly CardOnCanvas[] =>
             owner: ADA,
             placer: ADA,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
     }),
     CANVAS,

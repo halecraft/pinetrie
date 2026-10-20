@@ -126,6 +126,7 @@ import {
   rootSeed,
   type SearchState,
   SIDEBAR_WORDS,
+  STRIP_LEVEL,
   type Strip as StripView,
   searchCorpus,
   searchLine,
@@ -137,6 +138,7 @@ import {
   sidebarView,
   storedLayout,
   stripCards,
+  stripStates,
   type ThreadLink,
   TRASH_KEEP_MS,
   type TypedLast,
@@ -1088,10 +1090,23 @@ export function App({
       }),
     )
   }, [view.stage, columns, views, paths, search, matches, index, workFacts])
+  // Each lane's work strip state, from facts every lane has: the one read
+  // of it that a thread's status and the board's ready count share.
+  const strips = useMemo(
+    () => stripStates(workFacts.proposedByLane, workFacts.conflictAsks),
+    [workFacts.proposedByLane, workFacts.conflictAsks],
+  )
   const proposed = useMemo(
     () =>
-      openProposedByCanvas(view.openProposed, workFacts.names, canvasOfThread),
-    [view.openProposed, workFacts.names, canvasOfThread],
+      openProposedByCanvas(
+        view.openProposed.filter(o => {
+          const state = strips.get(o.lane)
+          return state !== undefined && STRIP_LEVEL[state] === "ready"
+        }),
+        workFacts.names,
+        canvasOfThread,
+      ),
+    [view.openProposed, strips, workFacts.names, canvasOfThread],
   )
 
   // Your inbox: the messages that mention you, and which you have seen.
@@ -1118,6 +1133,7 @@ export function App({
     directory,
     runEndReports,
     openProposed: view.openProposed,
+    strips,
     sshAsks: view.sshAsks,
     owner: workFacts.project?.owner ?? null,
     running,
@@ -1369,8 +1385,16 @@ export function App({
         names: workFacts.names,
         focuses: workFacts.focuses,
         iconFor,
+        statuses: attention.threads,
       }),
-    [index, lanes, workFacts.names, workFacts.focuses, iconFor],
+    [
+      index,
+      lanes,
+      workFacts.names,
+      workFacts.focuses,
+      iconFor,
+      attention.threads,
+    ],
   )
   // Each thread you hold, as its slot draws it.
   const threadGlances = useMemo(
@@ -1686,6 +1710,8 @@ export function App({
     live,
     attention: session.attention,
     runEnds: attention.runEnds,
+    statuses: attention.threads,
+    threadArrivals: attention.threadArrivals,
     spots,
     viewports,
     digests,

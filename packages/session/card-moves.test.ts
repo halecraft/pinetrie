@@ -4,10 +4,10 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   type TextCard,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -457,7 +457,7 @@ describe("drawnPlace", () => {
     owner: ME,
     placer: ME,
     place: { kind: "canvas", canvas, order: "0000000100", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const column = cardIdOfKind(
     "note-column",
@@ -469,7 +469,7 @@ describe("drawnPlace", () => {
     owner: ME,
     placer: ME,
     place: { kind: "canvas", canvas, order: "0000000200", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   test("a thread's nearest notes are drawn in the column the host would choose, or nowhere yet", () => {
     const to = { kind: "notes", near: "thread", thread: LANE } as const

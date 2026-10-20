@@ -143,9 +143,8 @@ export interface AssistantMessage {
 }
 
 /**
- * A tool's result, as pi wrote it, with what a host tool's says as a fact: an
- * `ask_about_conflict` the host took (`asked`), what a `catch_up` merged, a
- * `propose_branches` proposal.
+ * A tool's result, as pi wrote it, with what a host tool's says as a fact:
+ * what a `catch_up` merged, a `propose_branches` proposal.
  */
 export interface ToolResultMessage {
   readonly role: "toolResult"
@@ -153,7 +152,6 @@ export interface ToolResultMessage {
   /** The call it answers. */
   readonly toolCallId: string
   readonly isError: boolean
-  readonly asked?: true
   readonly merged?: readonly PointId[]
   readonly proposal?: Proposal
 }

@@ -14,7 +14,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createQueue, type LaneHistory } from "@pinetrie/lanes"
-import { readTreeIndex } from "@pinetrie/reads"
+import { readConflictAsks, readTreeIndex } from "@pinetrie/reads"
 import {
   ACCEPTED as ACCEPTED_RECORD,
   BASE,
@@ -30,6 +30,7 @@ import {
 import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import {
+  applyWrites,
   basics,
   putLane,
   putValue,
@@ -515,9 +516,10 @@ describe("askedAboutConflict", () => {
       piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>().port,
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
+      records: { writeValues: async writes => applyWrites(b, writes) },
       writeRevision: async () => {},
     })
-    return { updates, asked }
+    return { updates, asked, b }
   }
 
   test("taken while jj finds a conflict in the lane's copy, whatever started the run", async () => {
@@ -530,10 +532,21 @@ describe("askedAboutConflict", () => {
   })
 
   test("refused with no conflict, and for a lane that works directly, which jj is never asked about", async () => {
-    expect(await updatesWith([]).updates.askedAboutConflict(LANE)).toBe(false)
+    const none = updatesWith([])
+    expect(await none.updates.askedAboutConflict(LANE)).toBe(false)
+    expect(readConflictAsks(none.b.session).size).toBe(0)
     const direct = updatesWith(["a.txt"], false)
     expect(await direct.updates.askedAboutConflict(LANE)).toBe(false)
     expect(direct.asked).toEqual([])
+  })
+
+  test("a taken ask is recorded for its lane at the host's clock", async () => {
+    const { updates, b } = updatesWith(["a.txt"])
+    await updates.askedAboutConflict(LANE)
+    expect(readConflictAsks(b.session).get(LANE)).toEqual({
+      lane: LANE,
+      at: b.now(),
+    })
   })
 })
 
@@ -628,6 +641,7 @@ describe("getLatestInRun", () => {
       // Neither starts nor stops the lane: the port throws if asked.
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
+      records: record<Parameters<typeof createUpdates>[0]["records"]>().port,
       writeRevision: async () => {},
     })
     return { updates, asked }

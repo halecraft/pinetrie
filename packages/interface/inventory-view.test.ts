@@ -2,11 +2,11 @@ import {
   canvasIdFor,
   entryId,
   indexTree,
-  NO_CONTENT,
   type TextCard,
   type ThreadName,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -176,6 +176,7 @@ test("a thread's glance: its name, its first line, where it ended, and its statu
     ],
     names: new Map([[thread, "amber-fox" as ThreadName]]),
     focuses: new Map(),
+    statuses: new Map(),
     iconFor: () => null,
   })
   expect(glance).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
@@ -189,7 +190,7 @@ test("a thread's glance: its name, its first line, where it ended, and its statu
         owner: ADA,
         placer: ADA,
         place: { kind: "inventory", holder: ADA },
-        content: NO_CONTENT,
+        content: UNTICKED,
       },
     ],
     slots: {},
@@ -235,6 +236,7 @@ test("a thread's glance reads its first message, not the context entry its first
     lanes: [],
     names: new Map(),
     focuses: new Map(),
+    statuses: new Map(),
     iconFor: () => null,
   })
   expect([glance.first, glance.last]).toEqual(["an aside", "ok"])

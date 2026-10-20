@@ -10,7 +10,6 @@ import {
   type Gated,
   indexTree,
   type LaneView,
-  NO_CONTENT,
   pointId,
   type RevisionRecord,
   rootIdFor,
@@ -18,6 +17,7 @@ import {
   snapshotId,
   textCardId,
   threadIdFor,
+  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -245,7 +245,7 @@ describe("writesIn: the canvases a command writes in", () => {
       owner: BEA,
       placer: BEA,
       place: { kind: "canvas", canvas: OTHER_CANVAS, order: "z", width: 1 },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
   ]
   const canvases = indexCanvases(cards, new Map())

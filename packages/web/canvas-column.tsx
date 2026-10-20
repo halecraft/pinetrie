@@ -2,8 +2,9 @@
 // drawn before every card and outside the order, so nothing moves it. Its
 // title is renamed in place, its state changed from its Move to ▸, the same
 // intents the sidebar and the board send; who is here is the board's
-// readers. Folded, it is a `FoldedStrip` with its title, and no mark. What it
-// says is `canvasColumnView`'s.
+// readers. Its fold toggle comes first, folded or not, as a card column's
+// does. Folded, it is a `FoldedStrip` with its title, and no mark or box.
+// What it says is `canvasColumnView`'s.
 
 import type {
   CanvasId,
@@ -86,10 +87,20 @@ export function CanvasColumn(p: {
       >
         <FoldedStrip
           detail={pinnedCountWords(p.pins.length)}
+          dot={null}
           hint={null}
           mark={NO_MARK}
           name={view.label}
           onUnfold={() => fold(true)}
+          start={
+            <IconButton
+              label={UNFOLD_CANVAS.title}
+              className={UNFOLD_CANVAS.className}
+              onClick={() => fold(true)}
+            >
+              {UNFOLD_CANVAS.label}
+            </IconButton>
+          }
           unfold={UNFOLD_CANVAS}
         />
       </section>
@@ -97,6 +108,13 @@ export function CanvasColumn(p: {
   return (
     <section className="canvas-column" data-canvas={view.canvas}>
       <header className="canvas-column-head">
+        <IconButton
+          label={FOLD_CANVAS.title}
+          className={FOLD_CANVAS.className}
+          onClick={() => fold(false)}
+        >
+          {FOLD_CANVAS.label}
+        </IconButton>
         {renaming && !view.readOnly ? (
           <TitleField
             label="title for this canvas"
@@ -116,13 +134,6 @@ export function CanvasColumn(p: {
             <span data-fold-name="">{view.label}</span>
           </Button>
         )}
-        <IconButton
-          label={FOLD_CANVAS.title}
-          className={FOLD_CANVAS.className}
-          onClick={() => fold(false)}
-        >
-          {FOLD_CANVAS.label}
-        </IconButton>
       </header>
       <div className="canvas-column-body">
         <div className="canvas-state">

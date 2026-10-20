@@ -16,7 +16,6 @@ import {
   type Move,
   type MoveRefusal,
   makeCard,
-  NO_CONTENT,
   ownerCard,
   type Paste,
   type PlaceKey,
@@ -30,6 +29,7 @@ import {
   surfaceOwner,
   type ThreadId,
   TRASH_PLACE,
+  UNTICKED,
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
@@ -138,9 +138,9 @@ function madeAt(
       sender,
     )
   if (isNoteColumnId(card) && place.kind === "canvas")
-    return makeCard("note-column", card, place, NO_CONTENT, sender)
+    return makeCard("note-column", card, place, UNTICKED, sender)
   if (isMediaId(card) && place.kind === "canvas")
-    return makeCard("media", card, place, NO_CONTENT, sender)
+    return makeCard("media", card, place, UNTICKED, sender)
   return undefined
 }
 

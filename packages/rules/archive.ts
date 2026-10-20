@@ -257,8 +257,9 @@ export function writesIn(
     // A reorder stays in the place it names.
     case "reorder":
       return only(canvasLookup.place(intent.reorder.at))
-    // A width is drawn on the canvas it names.
+    // A width and a tick are drawn on the canvas they name.
     case "card-width":
+    case "card-tick":
       return only(intent.at.canvas)
     // A card's title writes in its card's canvas.
     case "mark":

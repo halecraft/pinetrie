@@ -1,10 +1,11 @@
 // web/list-column-head — a list column's header, a note column's or a media
-// column's: its kind's icon, its title (anyone who may write renames it),
-// how many it holds, its ⋯ and its fold. A drag handle, as a thread column's
-// header is.
+// column's: its fold and its box (`columnHead`), its kind's icon, its title
+// (anyone who may write renames it), how many it holds, and its ⋯. A drag
+// handle, as a thread column's header is.
 
 import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/core"
 import {
+  columnHead,
   countWords,
   type Intent,
   KIND_ICON,
@@ -14,7 +15,7 @@ import {
 import { dragProps } from "@pinetrie/web-core"
 import { useState } from "react"
 import { Button } from "./button.tsx"
-import { ColumnHeadEnd } from "./column-menu.tsx"
+import { ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"
 
 /** What each list column's header calls it. */
@@ -31,11 +32,21 @@ export function ListColumnHead(p: {
   titled: string | null
   count: number
   width: CardWidth
+  /** Its card's box (`ColumnContent`). */
+  ticked: boolean
   readOnly: ReadOnly | null
   onIntent: (intent: Intent) => void
 }) {
   const [renaming, setRenaming] = useState(false)
   const name = NAME[p.kind]
+  const head = columnHead({
+    card: p.card,
+    width: p.width,
+    writable: p.readOnly === null,
+    unstarted: false,
+    folded: false,
+    ticked: p.ticked,
+  })
   return (
     <header
       className="column-head"
@@ -43,6 +54,7 @@ export function ListColumnHead(p: {
       {...dragProps({ kind: "card", card: p.card })}
     >
       <div className="head-row">
+        <ColumnHeadStart head={head} onIntent={p.onIntent} />
         <span aria-hidden="true" className="note-column-mark">
           {KIND_ICON[p.kind]}
         </span>
@@ -72,13 +84,7 @@ export function ListColumnHead(p: {
           </Button>
         )}
         <span className="note-count">{countWords(p.kind, p.count)}</span>
-        <ColumnHeadEnd
-          card={p.card}
-          onIntent={p.onIntent}
-          unstarted={false}
-          width={p.width}
-          writable={p.readOnly === null}
-        />
+        <ColumnMenu onIntent={p.onIntent} sections={head.menu} />
       </div>
     </header>
   )

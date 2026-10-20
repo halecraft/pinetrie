@@ -4,11 +4,11 @@ import {
   entryId,
   type Gated,
   livePlace,
-  NO_CONTENT,
   rootIdFor,
   type SendAt,
   snapshotId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -112,7 +112,7 @@ describe("runsIn: what each command runs or writes a message in", () => {
         owner: BEA,
         placer: BEA,
         place: { kind: "inventory", holder: BEA },
-        content: NO_CONTENT,
+        content: UNTICKED,
       },
     ]
     const none = new Map()
@@ -196,7 +196,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one", 
     owner: BEA,
     placer: BEA,
     place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const held: CardRecord = { ...on, place: { kind: "inventory", holder: BEA } }
   expect(takenIn([on], [held])).toEqual([T])
@@ -211,7 +211,7 @@ test("a trashed thread is held by nobody, but trashing it stops its run and a co
     owner: BEA,
     placer: BEA,
     place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const trashed: CardRecord = {
     ...on,

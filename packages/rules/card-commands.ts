@@ -55,6 +55,7 @@ import { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 import {
   planReorder,
   planSetCommand,
+  planTick,
   planWidth,
   type ReorderStep,
 } from "./in-place.ts"
@@ -409,6 +410,21 @@ export function planCardWidth(
   },
 ): CardPlan {
   const step = planWidth(facts.cards, facts.change)
+  return step === null
+    ? { kind: "nothing" }
+    : carried(step, canvasHistory(facts.change.at.canvas))
+}
+
+/**
+ * A column's box ticked or cleared (`planTick`), in its canvas's history as
+ * a width is. The state it has already writes nothing.
+ */
+export function planCardTick(
+  facts: CardFacts & {
+    readonly change: Extract<Intent, { kind: "card-tick" }>
+  },
+): CardPlan {
+  const step = planTick(facts.cards, facts.change)
   return step === null
     ? { kind: "nothing" }
     : carried(step, canvasHistory(facts.change.at.canvas))

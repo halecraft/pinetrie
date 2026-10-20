@@ -3,12 +3,12 @@ import {
   canvasIdFor,
   entryId,
   makeCard,
-  NO_CONTENT,
   rootIdFor,
   type TextCard,
   type TextPlace,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -132,14 +132,14 @@ describe("planClose", () => {
         order: "a",
         width: 1,
       },
-      NO_CONTENT,
+      UNTICKED,
       ADA,
     )
     const taken = makeCard(
       "thread",
       LANE,
       { kind: "inventory", holder: ADA },
-      NO_CONTENT,
+      UNTICKED,
       ADA,
     )
     const step = [{ kind: "write", record: taken }] as const

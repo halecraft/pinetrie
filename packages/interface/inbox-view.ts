@@ -7,7 +7,7 @@
 // facts (where the agent works, which roots have work ready) are the board's,
 // not here.
 
-import type { Item } from "./attention.ts"
+import { type Item, needsYou } from "./attention.ts"
 import { count } from "./counts.ts"
 
 /** The inbox's groups, in the order they are drawn. */
@@ -23,9 +23,13 @@ const ORDER: readonly InboxSection[] = [
   "mentions",
 ]
 
-/** A run-end report goes under its level; proposed changes, under ready. */
+/** Proposed changes go under ready; anything else under worth a read or needs you. */
 const sectionOf = (item: Item): ThreadSection =>
-  item.raised.kind === "ready" ? "ready" : item.level
+  item.raised.kind === "proposed"
+    ? "ready"
+    : item.level === "worth-a-read"
+      ? "worth-a-read"
+      : "needs-you"
 
 /**
  * What needs you: the inbox's badge and the window's title (`pageTitle`).
@@ -33,7 +37,7 @@ const sectionOf = (item: Item): ThreadSection =>
  * once, and unseen mentions; never what is worth a read.
  */
 export const inboxCount = (items: readonly Item[], unseen: number): number =>
-  items.filter(i => i.level === "needs-you").length + unseen
+  items.filter(i => needsYou(i.level)).length + unseen
 
 export interface InboxView {
   /** `inboxCount`, as given. */

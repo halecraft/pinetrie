@@ -5,6 +5,9 @@
 - **Amends:**
   - ADR-0134: a column's header ends in ⋯ and ⇤, or ⋯ and × on a thread not
     yet started; Fold leaves ⋯, and Move to trash ends it.
+- **Amended by:**
+  - ADR-0198: the fold toggle is first in the header, not last; ⋯ ends it
+    alone; one value, `columnHead`, decides a header and its strip.
 
 **Context.**
 

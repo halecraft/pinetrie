@@ -495,11 +495,16 @@ test("not needed marks a run-end report by its ask, proposed changes by its sour
         kind: "not-needed",
         lane,
         raised: {
-          kind: "ready",
+          kind: "proposed",
+          state: "ready",
           source: cardIdFor("c1"),
         },
       },
-      { kind: "not-needed", lane, raised: { kind: "ready", source: null } },
+      {
+        kind: "not-needed",
+        lane,
+        raised: { kind: "proposed", state: "ready", source: null },
+      },
     ],
     p,
   )

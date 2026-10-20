@@ -513,14 +513,24 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   column you made.
 - **A column moves for everyone**: `move-column` is a reorder of its card
   on the canvas (`planColumnMove`), host-ordered and undone by the undo
-  key; its width is the card's too (`card-width`, `columnHeadEnd`).
-- **A card column's head ends in ⋯ and one button** (`columnHeadEnd`,
-  `column-menu.ts`, ADR-0161): ⇤, the `fold` intent, on a started thread
-  or a note column; a bin (ADR-0177) on a thread not yet started for a
-  reader who may write, and nothing for one who may not. The ⋯ ends in a
-  `trash` section, Move to trash, on every column for a reader who may
-  write; the bin and it ask one `trash` intent, built once.
-- **A thread column's ⋯ copies and takes it** (`columnHeadEnd`'s `thread`
+  key; its width is the card's too (`card-width`, `columnHead`), and so
+  is its box (`card-tick`, `ColumnContent`).
+- **A card column's head is one value, folded or not** (`columnHead`,
+  `column-menu.ts`, ADR-0161, ADR-0198), in its order: its toggle first, so
+  it stays where it is as the column folds (⇤ or ⇥ by `foldToggle`, the
+  `fold` intent, on a started thread or a list column; a bin, ADR-0177, on
+  a thread not yet started for a reader who may write, and nothing for one
+  who may not); its box (`HeadBox`: ticked, and a `card-tick` asking the
+  other state, null for a reader who may not change the canvas); and,
+  unfolded only, its ⋯. The ⋯ ends in a `trash` section, Move to trash, on
+  every column for a reader who may write; the bin and it ask one `trash`
+  intent, built once.
+- **A ticked column starts folded for whoever has not opened its canvas**
+  (ADR-0198): `defaultView` unfolds `firstUnticked`, and `resolveLayout`
+  keeps the canvas you are on's default view once its cards are drawn
+  (`keptOnceDrawn`), so a tick someone makes later folds nothing under you.
+  Before its cards arrive nothing is kept, or the view would unfold none.
+- **A thread column's ⋯ copies and takes it** (`columnHead`'s `thread`
   section, ADR-0127): `copy-thread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
   the source on its canvas (`canvasOfCard`) or into your inventory, and
@@ -790,34 +800,49 @@ pending.
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
-## What needs you (`attention.ts`, `column-status.ts`, `use-attention.ts`, ADR-0077, ADR-0166, ADR-0175)
+## What needs you (`attention.ts`, `column-status.ts`, `use-attention.ts`, ADR-0077, ADR-0166, ADR-0175, ADR-0198)
 
 - **`standingRunEnds` is the one rule for a run-end report**: each thread's
   report that asks something of you (`attentionLevel`), for its followers,
   while its lane is idle and its canvas not archived, and whether it is
   still `raised`. `attentionItems` keeps the raised ones; a column's status
   line (`columnStatus`, on `HeadIdentity`'s agent case) shows any, `quiet`
-  once read or dismissed. So the sidebar and the column cannot disagree.
+  once read or dismissed, and only in the open details once quiet. So the
+  sidebar and the column cannot disagree.
   The line's words are `columnStatusWords`: the level's signal words, then
   `attentionWords`' reason. Selector: `.head-status[data-level]`, with
   `data-quiet`.
 - **`attentionItems` decides what is raised**, pure: a thread's run-end report and its
   open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its canvas not archived.
+  Proposed changes are raised at their work strip's level
+  (`STRIP_LEVEL[stripStates(…)]`: ready, conflicts, or needs you for an
+  ask about a conflict), never as "ready" for being open: the strip and the
+  sidebar read one state (`workStripState`, `@pinetrie/rules`).
   A run-end report clears when your read mark passes its `end`, proposed changes when it
   goes; either with "Dismiss" (`dismissed`, `dismissedReady`). Nothing
   is raised before your attention document's `since` is set.
 - **`attentionLevel` turns a run-end report, a fact, into a level for you**: a stop is
-  done for whoever stopped it. `LEVELS` orders the levels once; `highest`
-  reads it.
-- **`threadStatus`** is each thread's mark: working while the agent works
-  there (`threadWork`, held by this tab or not) or its run-end report is pending,
-  else its highest item; **`canvasStatus`** is each canvas's, its threads'
-  together, working winning, through `canvasOfThread` (ADR-0116). `markLevel`
-  folds it over several canvases: `unlisted` (`layout.ts`) gives ▦'s, as it
-  gives `unsentSignals.elsewhere`.
+  done for whoever stopped it. `LEVELS` orders every level once, lowest
+  first: `accepted`, `running`, `worth-a-read`, `ready`, `conflicts`,
+  `needs-you`; `highest` reads it, and `needsYou` (ready or above) is
+  what the inbox's badge counts.
+- **`threadStatus` is each thread's one status** (`Status`: a level,
+  whether it is `raised` for you, and its item): the best of what holds
+  for it, a raised one before a quiet one, then the higher level. Running
+  while the agent works there (`threadWork`, held by this tab or not) or
+  its run-end report is pending, raised for everyone; each item raised for
+  you; a run-end report read or dismissed, quietly; its work strip's state
+  (`STRIP_LEVEL`), quietly; `accepted` is never raised. Every place reads
+  it and decides nothing: a column's dot, a strip's (`ThreadGlance.status`),
+  an inventory slot, the sidebar, the board, ▦ and the inboxes.
+  **`canvasStatus`** is each canvas's: the best raised status of its
+  threads, through `canvasOfThread` (ADR-0116), so a canvas's mark is never
+  a quiet one. `markLevel` folds it over several canvases, running aside:
+  `unlisted` (`layout.ts`) gives ▦'s, as it gives `unsentSignals.elsewhere`.
 - **Motion is a change you saw, never a state.** `arrivals` compares two
-  statuses, and `useArrivals` takes the first status after the session has
+  statuses, a canvas's or a thread's alike (generic over the key), and
+  `useArrivals` takes the first status after the session has
   settled and your `since` is known as the baseline, so a load moves
   nothing. It keeps *when* each mark arrived, never a timer: a mark is
   keyed by that time and moves only as it mounts within `ARRIVAL_MS`
@@ -830,8 +855,9 @@ pending.
 - **Words:** `attentionWords` words each item's reason; a level is a
   signal (`Signal` holds `Level`, *Signals*), named by `signalWords`, and an
   inbox row's class is its signal. Selectors: `.signal[data-signal]`
-  (`running`, `needs-you`, `worth-a-read`, `done`, with `data-arrived`),
-  `.here-thread.raised`, `.not-needed`.
+  (every `Level`, `done`, and a column's `none`; with `data-arrived`, and
+  `data-quiet` for a status not raised), `.here-thread.raised`,
+  `.not-needed`.
 
 ## The rail of a canvas (`canvasRail`, `app-view.ts`, ADR-0116, ADR-0117)
 
@@ -1743,17 +1769,18 @@ refusal or a failure as a rename's does.
 
 ## Signals (ADR-0126)
 
-What a mark says is one value, `Signal` (`signals.ts`): `unsent`,
-`needs-you`, `worth-a-read`, `running`, `done`. `signalWords` is the one
-place each is worded (its mark's name and title), and `packages/web` draws
-every one through `SignalMark`, `.signal[data-signal]`, the one selector
-the suites use. Attention keeps its `LEVELS` as what it decides
-(`attention.ts`), and each level is a signal by construction: `Signal`
-holds `Level`, spelled alike, so no function maps one to the other.
-`statusSignal` maps a thread's or a canvas's status to its mark
-(running while its agent works, ADR-0069, its level's when raised, done while a
-finished run fades). The plan's four signals are five: worth a read is a
-level of its own, with its own dim mark.
+What a mark says is one value, `Signal` (`signals.ts`): `unsent`, every
+`Level` (`accepted`, `running`, `worth-a-read`, `ready`, `conflicts`,
+`needs-you`, ADR-0198), and `done`. `signalWords` is the one place each is
+worded (its mark's name and title), and `packages/web` draws every one
+through `SignalMark`, `.signal[data-signal]`, the one selector the suites
+use. Attention keeps its `LEVELS` as what it decides (`attention.ts`), and
+each level is a signal by construction: `Signal` holds `Level`, spelled
+alike, so no function maps one to the other. `statusSignal` maps a
+thread's or a canvas's status to its mark: its level (running while its
+agent works, ADR-0069), drawn quiet when not raised, and done while a
+finished run fades over nothing raised. A column with no status draws a
+grey dot worded by `NO_STATUS_WORDS`.
 
 ### The unsent signal (ADR-0048, step 2)
 

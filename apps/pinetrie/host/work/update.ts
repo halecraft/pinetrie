@@ -58,6 +58,7 @@ import {
   type ParentNow,
   type PromptBudget,
   parentNow,
+  planConflictAsk,
   planGetLatestCall,
   planParentUpdate,
   planResolution,
@@ -72,6 +73,7 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import { failed, type LeaseBasics, notWritten } from "../basics.ts"
+import type { Records } from "../records.ts"
 import type { Containers } from "./containers.ts"
 import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
@@ -354,6 +356,7 @@ export function createUpdates(deps: {
   readonly registry: LaneRegistry
   readonly piSetup: Pick<PiSetup, "skill">
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
+  readonly records: Pick<Records, "writeValues">
   readonly writeRevision: Turns["writeRevision"]
 }): Updates {
   const { basics, setup, registry, containers, destination } = deps
@@ -529,7 +532,9 @@ export function createUpdates(deps: {
     async askedAboutConflict(lane) {
       if (!registry.isOwn(lane)) return false
       const conflicts = await registry.withHistory(lane, h => h.conflicts())
-      return conflicts.length > 0
+      const plan = planConflictAsk(lane, conflicts, basics.now())
+      await deps.records.writeValues(plan.writes)
+      return plan.asked
     },
 
     async getLatestInRun(lane, from) {

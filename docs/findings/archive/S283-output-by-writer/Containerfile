@@ -1,4 +1,4 @@
-# S280's guest: the driver (with attr.bpf.c in its skeleton), static, and an
+# S283's guest: the driver (with attr.bpf.c in its skeleton), static, and an
 # initramfs of busybox around it. vmlinux.btf is the lane VM kernel's BTF.
 FROM docker.io/library/alpine:3.23
 RUN apk add --no-cache clang llvm libbpf-dev bpftool elfutils-dev zlib-static zstd-static zstd-dev linux-headers build-base busybox-static liburing-dev cpio

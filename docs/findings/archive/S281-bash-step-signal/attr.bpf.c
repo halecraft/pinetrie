@@ -1,7 +1,7 @@
-// S281's kernel side: S280's attribution, with the tag set by bash itself. A
+// S281's kernel side: S283's attribution, with the tag set by bash itself. A
 // write to the marker file (the DEBUG trap's printf) retags the task that
 // made it with its own next signal; every task it starts inherits the tag.
-// Bytes in the watched pipe carry their writer's tag, as in S280.
+// Bytes in the watched pipe carry their writer's tag, as in S283.
 #include "vmlinux.h"
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>

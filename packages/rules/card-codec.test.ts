@@ -64,7 +64,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     "thread",
     lane,
     { kind: "canvas", canvas, order: "m", width: 1 },
-    NO_CONTENT,
+    { ticked: true },
     ada,
   ),
   canvas: makeCard(
@@ -78,7 +78,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     "note-column",
     cardIdOfKind("note-column", uuid("a3")),
     { kind: "canvas", canvas, order: "n", width: 1 },
-    NO_CONTENT,
+    { ticked: true },
     ada,
   ),
   fact: makeCard(
@@ -93,7 +93,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     "media",
     cardIdOfKind("media", uuid("a6")),
     { kind: "inventory", holder: ada },
-    NO_CONTENT,
+    { ticked: true },
     ada,
   ),
   image: makeCard(
@@ -133,6 +133,21 @@ describe("a card's content as stored (CARD_CODEC)", () => {
     const card = EACH[kind]
     const stored = JSON.parse(JSON.stringify(encodeCard(card)))
     expect(decodeCard(card.id, stored)).toEqual(card)
+  })
+
+  test("a column's row stored before ticks decodes unticked", () => {
+    for (const kind of ["thread", "note-column", "media"] as const) {
+      const { ticked: _, ...before } = encodeCard(EACH[kind])
+      expect(decodeCard(EACH[kind].id, before)?.content).toEqual({
+        ticked: false,
+      })
+    }
+  })
+
+  test("a tick that is neither 1 nor empty is refused", () => {
+    expect(
+      decodeCard(EACH.thread.id, { ...encodeCard(EACH.thread), ticked: "yes" }),
+    ).toBeUndefined()
   })
 
   test("an image with no versions, or one that is no blob's, is refused", () => {

@@ -134,7 +134,7 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
 
 /**
  * The proposed changes' state and buttons. `asked` is when the agent last asked
- * about a conflict on the thread's path (`conflictAskTime`); it asks for you
+ * about a conflict in its copy (`CONFLICT_ASK`); it asks for you
  * only when newer than the proposed changes. `base` is the lane's
  * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
  * `unfinishedAhead` come from accepted work's record. Jj proposed changes' acceptance
@@ -165,10 +165,7 @@ export function workStripView(input: {
   readonly parentRunning: boolean
 }): WorkStripView {
   const { proposed, asked } = input
-  const activity: WorkStripActivity =
-    input.activity === "idle" && input.queued.some(isGetLatest)
-      ? "get-latest"
-      : input.activity
+  const activity = workStripActivity(input.activity, input.queued)
   const notYetAccepted =
     proposed.kind === "open" || proposed.kind === "held"
       ? proposed.record
@@ -272,35 +269,99 @@ export function workStripView(input: {
       facts,
     }
   }
-  if (activity === "turn") return view("running", [], [])
-  if (activity !== "idle") return view("busy", [], [])
-  if (proposed.kind === "none") return view("nothing", [], ["update"])
-  if (proposed.kind === "accepted") return view("accepted", [], ["update"])
+  const state = workStripState({ proposed, activity, asked })
+  const [buttons, listed] = stateButtons(state, {
+    folder: open?.kind === "folder",
+    cause,
+    parentResolves,
+  })
+  return view(state, buttons, listed)
+}
+
+/** A work strip's state: one of `WorkStripView`'s. */
+export type WorkStripState = WorkStripView["state"]
+
+/**
+ * The work strip's state, from facts every lane has whether or not the tab
+ * holds its tree: what a thread's status reads (`threadStatus`,
+ * `@pinetrie/interface`) as the strip does, so the two cannot disagree.
+ * `activity` is `workStripActivity`'s.
+ */
+export function workStripState(input: {
+  readonly proposed: ProposedChangesStatus
+  readonly activity: WorkStripActivity
+  readonly asked: number | null
+}): WorkStripState {
+  const { proposed, activity, asked } = input
+  if (activity === "turn") return "running"
+  if (activity !== "idle") return "busy"
+  if (proposed.kind === "none") return "nothing"
+  if (proposed.kind === "accepted") return "accepted"
   const { record } = proposed
-  if (asked !== null && asked > record.at)
-    return view("needs-you", ["accept"], ["update"])
-  if (proposed.kind === "held") return view("nothing", [], ["update"])
-  if (record.kind === "jj" && record.edited)
-    return view("edited", ["accept", "refresh"], ["update"])
-  // A conflict that came with the lane's copy, which the parent has since
-  // resolved, is settled by catching up with the parent; any other by
-  // catching up with the base and resolving.
-  if (record.conflicts.length > 0)
-    return view(
-      "conflicts",
-      record.kind === "folder"
-        ? ["choose-versions", "update", "accept"]
-        : cause === "start" && parentResolves
-          ? ["get-latest-from-parent", "accept"]
-          : ["update", "accept"],
-      [],
-    )
+  if (asked !== null && asked > record.at) return "needs-you"
+  if (proposed.kind === "held") return "nothing"
+  if (record.kind === "jj" && record.edited) return "edited"
+  if (record.conflicts.length > 0) return "conflicts"
   // Folder proposed changes are its files: never split, never a stack.
-  if (record.kind === "folder")
-    return view("ready", ["accept"], ["describe", "update"])
-  if (record.size > 1)
-    return record.stale
-      ? view("stale", ["split", "accept"], ["update"])
-      : view("stack", ["accept", "squash"], ["update"])
-  return view("ready", ["accept", "split"], ["describe", "update"])
+  if (record.kind === "folder") return "ready"
+  if (record.size > 1) return record.stale ? "stale" : "stack"
+  return "ready"
+}
+
+/** What the lane runs, as its strip cares: a queued catch-up while it is idle is one. */
+export const workStripActivity = (
+  activity: Exclude<WorkStripActivity, "get-latest">,
+  queued: readonly CardCommand[],
+): WorkStripActivity =>
+  activity === "idle" && queued.some(isGetLatest) ? "get-latest" : activity
+
+/**
+ * The buttons beside the proposed changes in `state`, the first the primary
+ * one, and those in its menu, before the parent's catch-up, a gone WIP and
+ * the quiet ones are worked in (`workStripView`).
+ */
+function stateButtons(
+  state: WorkStripState,
+  open: {
+    /** Folder proposed changes: one change, never split. */
+    readonly folder: boolean
+    readonly cause: ConflictCause
+    readonly parentResolves: boolean
+  },
+): readonly [readonly WorkStripButton[], readonly WorkStripButton[]] {
+  switch (state) {
+    case "running":
+    case "busy":
+      return [[], []]
+    case "nothing":
+    case "accepted":
+      return [[], ["update"]]
+    case "needs-you":
+      return [["accept"], ["update"]]
+    case "edited":
+      return [["accept", "refresh"], ["update"]]
+    // A conflict that came with the lane's copy, which the parent has since
+    // resolved, is settled by catching up with the parent; any other by
+    // catching up with the base and resolving.
+    case "conflicts":
+      return [
+        open.folder
+          ? ["choose-versions", "update", "accept"]
+          : open.cause === "start" && open.parentResolves
+            ? ["get-latest-from-parent", "accept"]
+            : ["update", "accept"],
+        [],
+      ]
+    case "ready":
+      return open.folder
+        ? [["accept"], ["describe", "update"]]
+        : [
+            ["accept", "split"],
+            ["describe", "update"],
+          ]
+    case "stale":
+      return [["split", "accept"], ["update"]]
+    case "stack":
+      return [["accept", "squash"], ["update"]]
+  }
 }

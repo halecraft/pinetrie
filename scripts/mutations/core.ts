@@ -241,15 +241,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a host's fact and its base's news show as their one line",
   },
   {
-    name: "an ask ends at a compaction",
-    file: tree,
-    from: '    "pass",\n  )\n',
-    to: "    () => null,\n  )\n",
-    command: unit,
-    expect:
-      "an ask stays a fact past a compaction, and a result that did not ask is none",
-  },
-  {
     name: "a compaction never ends a walk",
     file: tree,
     from: '    if (entry.type === "compaction" && atCompaction !== "pass")',

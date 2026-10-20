@@ -3,9 +3,9 @@ import {
   canvasIdFor,
   cardIdOfKind,
   makeCard,
-  NO_CONTENT,
   type Sha256,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -32,9 +32,9 @@ const version = (c: string) => ({
   at: 1,
 })
 const cards: readonly CardRecord[] = [
-  makeCard("thread", T, on(K, "a"), NO_CONTENT, ADA),
-  makeCard("media", M, on(K, "b"), NO_CONTENT, ADA),
-  makeCard("note-column", N, on(K, "c"), NO_CONTENT, ADA),
+  makeCard("thread", T, on(K, "a"), UNTICKED, ADA),
+  makeCard("media", M, on(K, "b"), UNTICKED, ADA),
+  makeCard("note-column", N, on(K, "c"), UNTICKED, ADA),
   makeCard(
     "image",
     I,
@@ -88,7 +88,7 @@ describe("read_card", () => {
 
   test("a card on another canvas, a kind it does not read, or a thread on no canvas is refused", () => {
     const moved = cards.map(c =>
-      c.id === M ? makeCard("media", M, on(ELSEWHERE), NO_CONTENT, ADA) : c,
+      c.id === M ? makeCard("media", M, on(ELSEWHERE), UNTICKED, ADA) : c,
     )
     expect(read(I, null, moved).kind).toBe("refused")
     expect(read(T).kind).toBe("refused")

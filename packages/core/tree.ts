@@ -474,25 +474,6 @@ export const baseKnown = (
   )
 
 /**
- * When the agent last asked the person about a conflict on `tip`'s path (an
- * `ask_about_conflict` the host took), or null. An ask stays a fact after pi
- * summarises it, so a compaction does not end the walk.
- */
-export const conflictAskTime = (
-  index: TreeIndex,
-  tip: EntryId | null,
-): number | null =>
-  newestOnPath(
-    index,
-    tip,
-    e =>
-      e.message?.role === "toolResult" && e.message.asked === true
-        ? (e.timestamp ?? 0)
-        : undefined,
-    "pass",
-  )
-
-/**
  * The tool results among `ids`' entries, by the call each answers. A result
  * is its own entry but belongs to its call: counted as a message, it would
  * add a column row and a rail row per call.

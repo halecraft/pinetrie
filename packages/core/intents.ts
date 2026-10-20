@@ -541,6 +541,17 @@ export type Intent =
       readonly width: CardWidth
     }
   /**
+   * Tick a column's box, or clear it, for everyone, from where its sender
+   * saw it (`at`): a compare-and-set, as a width is, recorded in the
+   * canvas's history of the sender's moves.
+   */
+  | {
+      readonly kind: "card-tick"
+      readonly card: CardId
+      readonly at: CanvasKey
+      readonly ticked: boolean
+    }
+  /**
    * Undo or redo the sender's newest move in `canvas`, or, with none, in their
    * history outside any canvas.
    */

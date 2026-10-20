@@ -298,6 +298,12 @@ export type Intent =
       readonly card: CardId
       readonly width: CardWidth
     }
+  /** Tick a column's box, or clear it, for everyone. */
+  | {
+      readonly kind: "card-tick"
+      readonly card: CardId
+      readonly ticked: boolean
+    }
   /** Show a canvas, opening it in the sidebar, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
   /**
@@ -541,23 +547,20 @@ function planOf(
       return planAddColumn(intent.make, intent.at, state, minted)
     case "copy-thread":
       return planCopyThread(intent.source, intent.to, state, minted)
-    // From the canvas its sender sees it on: the host refuses it moved since.
-    case "card-width": {
-      const canvas = state.canvases.index.canvasOfCard.get(intent.card)
-      return canvas === undefined
-        ? []
-        : [
-            {
-              kind: "request",
-              intent: {
-                kind: "card-width",
-                card: intent.card,
-                at: { kind: "canvas", canvas },
-                width: intent.width,
-              },
-            },
-          ]
-    }
+    case "card-width":
+      return onItsCanvas(state, intent.card, at => ({
+        kind: "card-width",
+        card: intent.card,
+        at,
+        width: intent.width,
+      }))
+    case "card-tick":
+      return onItsCanvas(state, intent.card, at => ({
+        kind: "card-tick",
+        card: intent.card,
+        at,
+        ticked: intent.ticked,
+      }))
     case "show":
       return show(intent.here)
     case "new-canvas":
@@ -937,6 +940,25 @@ function planOpenIn(
   if (state.index.entries[entry] !== undefined)
     return planOpenEntry(entry, state)
   return [...showCanvas(canvas), { kind: "open-when-held", entry }]
+}
+
+/**
+ * A change to `card` asked of the host from the canvas its sender sees it
+ * on, which the host refuses if the card moved since; nothing for a card on
+ * no canvas.
+ */
+function onItsCanvas(
+  state: Pick<IntentState, "canvases">,
+  card: CardId,
+  request: (at: {
+    readonly kind: "canvas"
+    readonly canvas: CanvasId
+  }) => HostRequest,
+): readonly Effect[] {
+  const canvas = state.canvases.index.canvasOfCard.get(card)
+  return canvas === undefined
+    ? []
+    : [{ kind: "request", intent: request({ kind: "canvas", canvas }) }]
 }
 
 /**

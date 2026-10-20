@@ -1,8 +1,8 @@
 import {
   cardIdOfKind,
   makeCard,
-  NO_CONTENT,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
@@ -32,7 +32,7 @@ test("read_card hands the model an image's stored bytes, its words beside them",
         "media",
         column,
         { kind: "canvas", canvas: CANVAS_ID, order: "z", width: 1 },
-        NO_CONTENT,
+        UNTICKED,
         ada,
       ),
     },

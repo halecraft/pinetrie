@@ -1,26 +1,50 @@
 // interface/attention — what needs you, and where, decided. A run-end report clears by
 // reading past it, proposed changes by accepting or withdrawing it, and either
-// by "not needed".
+// by "not needed". Each thread's status is one level of one order
+// (`LEVELS`), from what needs you and the state of its work, so the sidebar,
+// the board and a column's dot cannot disagree.
 
 import type {
   AgentWork,
   CanvasId,
   EntryId,
+  ProposedChangesRecord,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
-import type {
-  RootRecord,
-  RunEndReport,
-  RunEndReportRecord,
+import {
+  type ConflictAskRecord,
+  proposedChangesStatus,
+  type RootRecord,
+  type RunEndReport,
+  type RunEndReportRecord,
+  type WorkStripState,
+  workStripState,
 } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
 import { sshAskWords } from "./access-view.ts"
 import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 
-/** Lowest first: `highest` and every comparison read this order. */
-export const LEVELS = ["worth-a-read", "needs-you"] as const
+/**
+ * A thread's status, lowest first: `highest` and every comparison read this
+ * order. None is null.
+ */
+export const LEVELS = [
+  "accepted",
+  "running",
+  "worth-a-read",
+  "ready",
+  "conflicts",
+  "needs-you",
+] as const
 export type Level = (typeof LEVELS)[number]
+
+/** What a run-end report can ask of you. */
+export type RunEndLevel = Extract<Level, "worth-a-read" | "needs-you">
+
+/** Whether `level` asks you to act: ready to accept, or above. The inbox's badge counts these. */
+export const needsYou = (level: Level): boolean =>
+  LEVELS.indexOf(level) >= LEVELS.indexOf("ready")
 
 /** The highest of `levels`, or null for none. */
 export const highest = (levels: Iterable<Level | null>): Level | null => {
@@ -50,7 +74,7 @@ export const follows = (me: WriterId, writers: readonly WriterId[]): boolean =>
 export function attentionLevel(
   report: RunEndReport,
   me: WriterId,
-): Level | null {
+): RunEndLevel | null {
   switch (report.kind) {
     case "pending":
       return null
@@ -83,8 +107,9 @@ export type Raised =
       readonly ask: EntryId
     }
   | {
-      /** Open proposed changes, ready to accept. */
-      readonly kind: "ready"
+      /** Open proposed changes: ready to accept, conflicted, or asked about. */
+      readonly kind: "proposed"
+      readonly state: WorkStripState
       /** Its `ledger.source`: what "not needed" dismisses; null, it cannot be. */
       readonly source: string | null
     }
@@ -105,7 +130,10 @@ export interface AttentionInput {
   /** Each thread's writers (`threadWriters`). */
   readonly writers: ReadonlyMap<ThreadId, readonly WriterId[]>
   readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
+  /** Open proposed changes: where each opens, and what dismisses it. */
   readonly openProposed: readonly OpenProposedChanges[]
+  /** Each lane's work strip state (`stripStates`). */
+  readonly strips: ReadonlyMap<ThreadId, WorkStripState>
   /** Lanes waiting for their owner's answer about ssh (`appView`'s `sshAsks`). */
   readonly sshAsks: readonly SshAsk[]
   /** Whom the host names its owner: the asks are theirs alone. */
@@ -129,7 +157,7 @@ const followed = (input: AttentionInput, lane: ThreadId): boolean =>
 /** A thread's last run-end report, while it asks something of you. */
 export interface StandingRunEnd {
   readonly record: RunEndReportRecord
-  readonly level: Level
+  readonly level: RunEndLevel
   /**
    * Not yet read past or dismissed: it raises an item. Read or dismissed, it
    * still stands, quietly, until the next run starts.
@@ -188,11 +216,14 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
     if (!isMine(o.lane)) continue
     if (o.source !== null && person.dismissedReady.get(o.lane) === o.source)
       continue
+    const state = input.strips.get(o.lane)
+    const level = state === undefined ? null : STRIP_LEVEL[state]
+    if (state === undefined || level === null || !needsYou(level)) continue
     items.push({
       lane: o.lane,
       end: o.end,
-      level: "needs-you",
-      raised: { kind: "ready", source: o.source },
+      level,
+      raised: { kind: "proposed", state, source: o.source },
     })
   }
   // An ask reaches its owner whether or not they follow the thread, and
@@ -209,15 +240,74 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
   return items
 }
 
-/** A thread's or a canvas's status: what its mark draws, in the sidebar and on the board. */
-export type Status =
-  | { readonly kind: "working" }
-  | { readonly kind: Level; readonly item: Item }
+/**
+ * The level a work strip's state is, for a thread's status; null for
+ * nothing to say. Over every state, so a new one does not compile until it
+ * says what it shows.
+ */
+export const STRIP_LEVEL: Readonly<Record<WorkStripState, Level | null>> = {
+  nothing: null,
+  running: "running",
+  busy: "running",
+  "needs-you": "needs-you",
+  conflicts: "conflicts",
+  ready: "ready",
+  stack: "ready",
+  stale: "ready",
+  edited: "ready",
+  accepted: "accepted",
+}
 
 /**
- * The highest level among `keys` (`highest`): what one mark says for them
- * all. The one rule for a canvas's item, a board column's dot and ▦'s, which
- * covers the canvases not in the sidebar. Working raises nothing.
+ * Each lane's work strip state, from its proposed changes and its conflict
+ * ask: facts every lane has, held tree or not. Read as idle: a lane that
+ * runs or has cards waiting is `running` before its strip is read
+ * (`threadStatus`).
+ */
+export const stripStates = (
+  proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>,
+  conflictAsks: ReadonlyMap<ThreadId, ConflictAskRecord>,
+): ReadonlyMap<ThreadId, WorkStripState> =>
+  new Map(
+    [...proposedByLane].map(([lane, record]) => [
+      lane,
+      workStripState({
+        proposed: proposedChangesStatus(record),
+        activity: "idle",
+        asked: conflictAsks.get(lane)?.at ?? null,
+      }),
+    ]),
+  )
+
+/**
+ * A thread's or a canvas's status: what its mark draws, in a column, the
+ * sidebar and on the board.
+ */
+export interface Status {
+  readonly level: Level
+  /**
+   * Raised for you: `running` for everyone, `accepted` never, any other
+   * while its item is (`attentionItems`). Only a raised status marks a
+   * canvas; a column draws one that is not in its quiet form.
+   */
+  readonly raised: boolean
+  /** Its item, raised or standing quietly; null for one no item names. */
+  readonly item: Item | null
+}
+
+/** A raised status before a quiet one, then the higher level. */
+const outranks = (a: Status, b: Status): boolean =>
+  a.raised !== b.raised
+    ? a.raised
+    : LEVELS.indexOf(a.level) > LEVELS.indexOf(b.level)
+
+const better = (now: Status | undefined, next: Status): Status =>
+  now === undefined || outranks(next, now) ? next : now
+
+/**
+ * The highest raised level among `keys` (`highest`): what one mark says for
+ * them all, running aside. The one rule for a board column's dot and ▦'s,
+ * which covers the canvases not in the sidebar.
  */
 export const markLevel = <K>(
   status: ReadonlyMap<K, Status>,
@@ -226,45 +316,65 @@ export const markLevel = <K>(
   highest(
     [...keys].map(k => {
       const s = status.get(k)
-      return s === undefined || s.kind === "working" ? null : s.kind
+      return s === undefined || !s.raised || s.level === "running"
+        ? null
+        : s.level
     }),
   )
 
-/** `now` and `item` together: working wins, else the higher level. */
-const withItem = (now: Status | undefined, next: Status): Status => {
-  if (now?.kind === "working" || next.kind === "working")
-    return { kind: "working" }
-  return now === undefined || highest([now.kind, next.kind]) !== now.kind
-    ? next
-    : now
-}
-
 /**
- * Each thread's status: working while its agent works, cards wait for it
- * to be free, or its run-end report is pending (the agent's side is not finished);
- * else its highest item. Cards behind a held queue are not work: they wait
- * for a person. A thread with none of these has none.
+ * Each thread's status: the best of what holds for it (`outranks`). Running
+ * while its agent works, cards wait for it to be free, or its run-end
+ * report is pending; each item raised for you; a run-end report read or
+ * dismissed, quietly, until the next run; its work strip's state, quietly.
+ * Cards behind a held queue are not work: they wait for a person.
  */
 export function threadStatus(input: {
+  /** What is raised for you (`attentionItems`). */
   readonly items: readonly Item[]
+  /** Run-end reports that ask something of you, read or not (`standingRunEnds`). */
+  readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
+  readonly strips: ReadonlyMap<ThreadId, WorkStripState>
   /** Threads whose agent works, held by this tab or not (`threadWork`). */
   readonly work: ReadonlyMap<ThreadId, AgentWork>
   readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
 }): ReadonlyMap<ThreadId, Status> {
   const out = new Map<ThreadId, Status>()
+  const add = (thread: ThreadId, status: Status) =>
+    out.set(thread, better(out.get(thread), status))
+  const running: Status = { level: "running", raised: true, item: null }
   for (const [thread, work] of input.work)
-    if (work !== "held") out.set(thread, { kind: "working" })
+    if (work !== "held") add(thread, running)
   for (const v of input.runEndReports.values())
-    if (v.report.kind === "pending") out.set(v.lane, { kind: "working" })
+    if (v.report.kind === "pending") add(v.lane, running)
   for (const item of input.items)
-    out.set(item.lane, withItem(out.get(item.lane), { kind: item.level, item }))
+    add(item.lane, { level: item.level, raised: true, item })
+  for (const [lane, standing] of input.runEnds)
+    if (!standing.raised)
+      add(lane, {
+        level: standing.level,
+        raised: false,
+        item: {
+          lane,
+          end: standing.record.end,
+          level: standing.level,
+          raised: {
+            kind: "run-end",
+            report: standing.record.report,
+            ask: standing.record.ask,
+          },
+        },
+      })
+  for (const [lane, state] of input.strips) {
+    const level = STRIP_LEVEL[state]
+    if (level !== null) add(lane, { level, raised: false, item: null })
+  }
   return out
 }
 
 /**
- * Each canvas's status: its threads' together, working when any
- * works, else the highest item among them. A thread in no canvas counts for
- * none.
+ * Each canvas's status: the best raised status among its threads. A thread
+ * in no canvas counts for none.
  */
 export function canvasStatus(
   threads: ReadonlyMap<ThreadId, Status>,
@@ -273,7 +383,8 @@ export function canvasStatus(
   const out = new Map<CanvasId, Status>()
   for (const [thread, status] of threads) {
     const canvas = canvasOfThread.get(thread)
-    if (canvas !== undefined) out.set(canvas, withItem(out.get(canvas), status))
+    if (canvas !== undefined && status.raised)
+      out.set(canvas, better(out.get(canvas), status))
   }
   return out
 }
@@ -291,12 +402,12 @@ export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
   return out
 }
 
-/** What each change of a canvas's status draws, seen live. */
-interface Arrivals {
-  /** Canvases whose status rose to needs you: their mark pulses, then stays. */
-  readonly arrived: ReadonlySet<CanvasId>
-  /** Canvases that stopped working with a run done: a ✓ fades. */
-  readonly done: ReadonlySet<CanvasId>
+/** What each change of a canvas's or a thread's status draws, seen live. */
+interface Arrivals<K> {
+  /** Those whose status rose to needing you: their mark pulses, then stays. */
+  readonly arrived: ReadonlySet<K>
+  /** Those that stopped running with a run done: a ✓ fades. */
+  readonly done: ReadonlySet<K>
 }
 
 /**
@@ -304,30 +415,35 @@ interface Arrivals {
  * (null), so a page that loads, or a tab shown again, draws every mark
  * still: motion marks a change you saw, never a state.
  */
-export function arrivals(
-  before: ReadonlyMap<CanvasId, Status> | null,
-  after: ReadonlyMap<CanvasId, Status>,
-  done: ReadonlySet<CanvasId>,
-): Arrivals {
-  const arrived = new Set<CanvasId>()
-  const ended = new Set<CanvasId>()
+export function arrivals<K>(
+  before: ReadonlyMap<K, Status> | null,
+  after: ReadonlyMap<K, Status>,
+  done: ReadonlySet<K>,
+): Arrivals<K> {
+  const arrived = new Set<K>()
+  const ended = new Set<K>()
   if (before === null) return { arrived, done: ended }
-  for (const [canvas, now] of after)
-    if (now.kind === "needs-you" && before.get(canvas)?.kind !== "needs-you")
-      arrived.add(canvas)
-  for (const [canvas, was] of before)
-    if (was.kind === "working" && !after.has(canvas) && done.has(canvas))
-      ended.add(canvas)
+  const asks = (s: Status | undefined): boolean =>
+    s?.raised === true && needsYou(s.level)
+  for (const [key, now] of after)
+    if (asks(now) && !asks(before.get(key))) arrived.add(key)
+  for (const [key, was] of before)
+    if (
+      was.level === "running" &&
+      after.get(key)?.raised !== true &&
+      done.has(key)
+    )
+      ended.add(key)
   return { arrived, done: ended }
 }
 
 /** How long an arrival's mark moves: the pulse's three beats, and the ✓'s fade (`index.html`). */
 const ARRIVAL_MS = 3_000
 
-/** When each canvas's mark last arrived, and its ✓ last showed (ms since the epoch). */
-export interface Moments {
-  readonly arrived: ReadonlyMap<CanvasId, number>
-  readonly done: ReadonlyMap<CanvasId, number>
+/** When each canvas's or thread's mark last arrived, and its ✓ last showed (ms since the epoch). */
+export interface Moments<K = CanvasId> {
+  readonly arrived: ReadonlyMap<K, number>
+  readonly done: ReadonlyMap<K, number>
 }
 
 /**
@@ -338,6 +454,20 @@ export interface Moments {
 export const moving = (at: number | null, now: number): boolean =>
   at !== null && now - at < ARRIVAL_MS
 
+/** Open proposed changes' reason, by its strip's state. */
+const PROPOSED_WORDS: Readonly<Record<WorkStripState, string>> = {
+  nothing: "nothing to accept",
+  running: "the agent is working",
+  busy: "the agent is working",
+  "needs-you": "the agent has a question about a conflict",
+  conflicts: "changes conflict with accepted work",
+  ready: "changes ready to accept",
+  stack: "changes ready to accept",
+  stale: "changes ready to accept",
+  edited: "your edited changes are ready to accept",
+  accepted: "accepted",
+}
+
 /** Why the agent's end could not be told, in words. */
 const UNCLASSIFIED_WORDS = "finished: have a look"
 
@@ -346,7 +476,7 @@ export function attentionWords(
   raised: Raised,
   nameOf: (writer: WriterId) => string,
 ): string {
-  if (raised.kind === "ready") return "changes ready to accept"
+  if (raised.kind === "proposed") return PROPOSED_WORDS[raised.state]
   if (raised.kind === "ssh") return sshAskWords("your ssh", raised.host)
   const v = raised.report
   switch (v.kind) {

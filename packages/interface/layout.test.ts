@@ -300,6 +300,34 @@ describe("layoutReducer", () => {
     expect(stored).toEqual(shown)
   })
 
+  test("the canvas you are on keeps its default view once its cards are drawn: a later tick folds nothing", () => {
+    const shown = resolve(at(initialLayout()))
+    expect(shown.canvases.get(TK("1-r1"))).toEqual(
+      defaultView(CANVASES.cardsOn.get(TK("1-r1"))?.[0]?.id ?? null),
+    )
+    const cards = CANVASES.cardsOn.get(TK("1-r1")) ?? []
+    const ticked = new Map([
+      [
+        TK("1-r1"),
+        cards.map(c => ({ ...c, content: { ticked: true } }) as typeof c),
+      ],
+    ])
+    expect(
+      drawnColumns(shown, TK("1-r1"), {
+        cardsOn: ticked,
+        unstarted: new Map(),
+        holders: new Map(),
+        index,
+        lanes: [],
+      }).map(c => c.folded),
+    ).toEqual(columnsOf(shown).map(([, folded]) => folded))
+    // Before its cards arrive, nothing is kept: it would unfold nothing.
+    expect(
+      resolve(at(initialLayout()), index, new Set(), [], [], new Map()).canvases
+        .size,
+    ).toBe(0)
+  })
+
   test("a column's anchor moves with its thread's end", () => {
     expect(
       drawnColumns(initialLayout(), TK("1-r1"), {

@@ -7,12 +7,12 @@ import {
   entryId,
   indexTree,
   type LaneRecord,
-  NO_CONTENT,
   rootIdFor,
   type Send,
   type SendAt,
   type ThreadId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -64,7 +64,7 @@ const inTrash: CardRecord = {
     kind: "trash",
     left: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
   },
-  content: NO_CONTENT,
+  content: UNTICKED,
 }
 
 /** One root, whose entry `e` is in T. */

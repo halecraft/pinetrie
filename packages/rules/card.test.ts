@@ -19,7 +19,6 @@ import {
   KINDS,
   type Move,
   movesDocId,
-  NO_CONTENT,
   type NoteColumnId,
   type Paste,
   PERSON_HISTORY,
@@ -40,6 +39,7 @@ import {
   type TreeIndex,
   textCardId,
   threadIdFor,
+  UNTICKED,
   type WorkflowStateId,
   type WriterId,
   workflowStateIdFor,
@@ -70,7 +70,13 @@ import { sourceWords } from "./card-words.ts"
 import type { Container, ContainerKind, MintContainer } from "./containers.ts"
 import { factLine } from "./fact.ts"
 import { landedThreadCard } from "./fixtures.ts"
-import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
+import {
+  planReorder,
+  planSetCommand,
+  planTick,
+  planWidth,
+  REORDERS,
+} from "./in-place.ts"
 import {
   crossesArchive,
   movesHistory,
@@ -497,7 +503,7 @@ describe("note columns", () => {
     owner: ADA,
     placer: ADA,
     place: { kind: "canvas", canvas: TEST_CANVAS, order, width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   })
   const nearest = (cards: readonly CardRecord[], t = LANE) =>
     nearestNoteColumn(cardsOnCanvas(cards, TEST_CANVAS), t)
@@ -643,7 +649,7 @@ describe("note columns", () => {
             kind: "canvas",
             canvas: TEST_CANVAS,
           }),
-          content: NO_CONTENT,
+          content: UNTICKED,
         },
       },
     ])
@@ -1970,7 +1976,7 @@ describe("a reorder on a canvas", () => {
     owner: ADA,
     placer: BEA,
     place: { kind: "canvas", canvas, order: key(n), width },
-    content: NO_CONTENT,
+    content: UNTICKED,
   })
   const [a, b, c] = [
     onCanvas("a", 100),
@@ -2045,6 +2051,24 @@ describe("a reorder on a canvas", () => {
       kind: "refused",
       code: "moved",
     })
+  })
+
+  test("planTick: a column's box ticked on its canvas, from where its sender saw it; its place and placer kept", () => {
+    expect(planTick([a, b], { card: a.id, at, ticked: true })).toEqual({
+      kind: "write",
+      record: { ...a, content: { ticked: true } },
+    })
+    // Unticked already: nothing to write.
+    expect(planTick([a], { card: a.id, at, ticked: false })).toBeNull()
+    expect(planTick([b], { card: a.id, at, ticked: true })).toEqual({
+      kind: "refused",
+      code: "gone",
+      now: null,
+    })
+    const elsewhere = onCanvas("a", 100, 1, canvasIdFor("k-other"))
+    expect(
+      planTick([elsewhere], { card: a.id, at, ticked: true }),
+    ).toMatchObject({ kind: "refused", code: "moved" })
   })
 
   test("every place a reorder moves among has its rule", () => {
@@ -2700,7 +2724,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
     owner: ADA,
     placer: ADA,
     place: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const trashed = (left: Parameters<typeof placeKey>[0], placer = ADA) =>
     card({

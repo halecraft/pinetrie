@@ -70,7 +70,9 @@ import {
   COMMANDS,
   COMMANDS_KEY,
   CONFLICT,
+  CONFLICT_ASK,
   type CommandSummary,
+  type ConflictAskRecord,
   contextInView,
   DIGEST,
   type DigestRecord,
@@ -703,6 +705,11 @@ export const readTraces = (
 export const readRunEndReports = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, RunEndReportRecord> => readRecords(doc, RUN_END_REPORT)
+
+/** Each lane's newest ask about a conflict (`pinetrie.conflict-ask`), by lane. */
+export const readConflictAsks = (
+  doc: SessionDocHandle,
+): ReadonlyMap<ThreadId, ConflictAskRecord> => readRecords(doc, CONFLICT_ASK)
 
 /** Each thread's focus (`pinetrie.focus`), by thread. */
 export const readFocuses = (

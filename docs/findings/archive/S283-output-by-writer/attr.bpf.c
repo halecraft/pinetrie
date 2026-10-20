@@ -1,4 +1,4 @@
-// S280's kernel side. Every event is sent while the watched pipe's mutex is
+// S283's kernel side. Every event is sent while the watched pipe's mutex is
 // held, so the ring's order is the order bytes entered the pipe.
 //
 // - A task's step is its parent's at birth (task_newtask), and the driver sets

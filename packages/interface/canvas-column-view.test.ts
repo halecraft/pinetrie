@@ -3,8 +3,8 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   threadIdFor,
+  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -166,7 +166,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
       owner: ADA,
       placer: ADA,
       place: { kind: "trash", left: left() },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
     {
       kind: "thread",
@@ -174,7 +174,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
       owner: ADA,
       placer: BEA,
       place: { kind: "trash", left: left() },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
     {
       kind: "note-column",
@@ -182,7 +182,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
       owner: ADA,
       placer: ADA,
       place: { kind: "trash", left: left(other) },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
     {
       kind: "thread",
@@ -190,7 +190,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
       owner: ADA,
       placer: ADA,
       place: left(),
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
   ]
   const event = (at: number) => ({
@@ -235,7 +235,7 @@ test("canvasTrash: a column whose deletion is close says when, by the keep it is
         kind: "trash",
         left: { kind: "canvas", canvas: K, order: "a", width: 1 },
       },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
   ]
   const histories = new Map([

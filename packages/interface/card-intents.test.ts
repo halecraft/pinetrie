@@ -12,7 +12,6 @@ import {
   KINDS,
   livePlace,
   makeCard,
-  NO_CONTENT,
   type PlacedKind,
   rootIdFor,
   type Sha256,
@@ -21,6 +20,7 @@ import {
   TRASH_PLACE,
   textCardId,
   threadIdFor,
+  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -1262,7 +1262,7 @@ describe("landing a copy", () => {
         order: "a",
         width: 1,
       },
-      content: NO_CONTENT,
+      content: UNTICKED,
     }
     const s = state({ cards: [thread] })
     const onto = planPut(

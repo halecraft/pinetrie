@@ -130,16 +130,19 @@ export const foldedMark = (glance: FoldedGlance): FoldedMark =>
       }
     : NO_MARK
 
-/** A folded column's own button, which unfolds it. */
-export const UNFOLD: ControlWords = {
-  label: "⇥",
-  title: "unfold this column: only you see your folds",
-  className: "unfold",
-}
-
-/** An unfolded column's own button, which folds it, for you alone. */
-export const FOLD: ControlWords = {
-  label: "⇤",
-  title: "fold this column to a strip: only you see your folds",
-  className: "fold",
-}
+/**
+ * A column's fold toggle, first in its header folded or not, so it stays
+ * under the pointer: ⇤ folds it to a strip, ⇥ unfolds it, for you alone.
+ */
+export const foldToggle = (folded: boolean): ControlWords =>
+  folded
+    ? {
+        label: "⇥",
+        title: "unfold this column: only you see your folds",
+        className: "unfold",
+      }
+    : {
+        label: "⇤",
+        title: "fold this column to a strip: only you see your folds",
+        className: "fold",
+      }

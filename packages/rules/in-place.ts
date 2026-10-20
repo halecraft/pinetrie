@@ -3,6 +3,7 @@
 
 import {
   type CanvasKey,
+  type CanvasPlace,
   type CardCommand,
   type CardId,
   type CardRecord,
@@ -217,11 +218,32 @@ export function planReorder(
 }
 
 /**
- * A card's width on its canvas: one column or two, from where its
- * sender saw it (`at`), a compare-and-set as a reorder is. Only its width
- * changes: its rank and its placer stay, so nobody's trace or history of
- * the card changes with it. Refused `gone` with no card, and `moved` once
- * it is not on the canvas its sender saw. Null when it has that width
+ * The card a change on a canvas names, where its sender saw it (`at`), a
+ * compare-and-set as a reorder is: refused `gone` with no card, and `moved`
+ * once it is not on the canvas its sender saw.
+ */
+function seenOnCanvas(
+  cards: readonly CardRecord[],
+  card: CardId,
+  at: CanvasKey,
+):
+  | {
+      readonly kind: "seen"
+      readonly now: CardRecord
+      readonly place: CanvasPlace
+    }
+  | Extract<MoveStep, { readonly kind: "refused" }> {
+  const now = cards.find(c => c.id === card)
+  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (now.place.kind !== "canvas" || !sameKey(placeKey(now.place), at))
+    return { kind: "refused", code: "moved", now }
+  return { kind: "seen", now, place: now.place }
+}
+
+/**
+ * A card's width on its canvas: one column or two (`seenOnCanvas`). Only
+ * its width changes: its rank and its placer stay, so nobody's trace or
+ * history of the card changes with it. Null when it has that width
  * already: nothing to write.
  */
 export function planWidth(
@@ -232,15 +254,43 @@ export function planWidth(
     readonly width: CardWidth
   },
 ): MoveStep | null {
-  const now = cards.find(c => c.id === change.card)
-  if (now === undefined) return { kind: "refused", code: "gone", now: null }
-  if (now.place.kind !== "canvas" || !sameKey(placeKey(now.place), change.at))
-    return { kind: "refused", code: "moved", now }
-  if (now.place.width === change.width) return null
-  const record = placed(now, { ...now.place, width: change.width })
+  const seen = seenOnCanvas(cards, change.card, change.at)
+  if (seen.kind !== "seen") return seen
+  const { now, place } = seen
+  if (place.width === change.width) return null
+  const record = placed(now, { ...place, width: change.width })
   return record === undefined
     ? { kind: "refused", code: "no-place", now }
     : { kind: "write", record }
+}
+
+/**
+ * A column's box on its canvas, ticked or not (`seenOnCanvas`): its place
+ * and placer stay. Refused `no-place` for a card that is no column. Null
+ * when it is so already: nothing to write.
+ */
+export function planTick(
+  cards: readonly CardRecord[],
+  change: {
+    readonly card: CardId
+    readonly at: CanvasKey
+    readonly ticked: boolean
+  },
+): MoveStep | null {
+  const seen = seenOnCanvas(cards, change.card, change.at)
+  if (seen.kind !== "seen") return seen
+  const { now } = seen
+  if (
+    now.kind !== "thread" &&
+    now.kind !== "note-column" &&
+    now.kind !== "media"
+  )
+    return { kind: "refused", code: "no-place", now }
+  if (now.content.ticked === change.ticked) return null
+  return {
+    kind: "write",
+    record: { ...now, content: { ticked: change.ticked } },
+  }
 }
 
 /**

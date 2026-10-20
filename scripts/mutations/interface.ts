@@ -263,11 +263,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a held queue rings its thread",
     file: "packages/interface/attention.ts",
-    from: '    if (work !== "held") out.set(thread, { kind: "working" })',
-    to: '    out.set(thread, { kind: "working" })',
+    from: '    if (work !== "held") add(thread, running)',
+    to: "    add(thread, running)",
     command: unit,
     expect:
-      "cards behind a held queue are not working: the thread shows what was raised there, or nothing",
+      "cards behind a held queue are not running: the thread shows what was raised there, or nothing",
   },
   {
     name: "the interface declares React",
@@ -2456,7 +2456,7 @@ export const mutations: readonly Mutation[] = [
     to: '  label: "×",\n  title: TRASH_COLUMN,',
     command: unit,
     expect:
-      "a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin",
+      "a column's head starts with its toggle: it folds a started thread or a note column, and trashes a thread not yet started with its bin",
   },
   {
     name: "a fact's compact has no lead",
@@ -2896,7 +2896,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inbox badge counts what is worth a read",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needs-you").length + unseen',
+    from: "  items.filter(i => needsYou(i.level)).length + unseen",
     to: "  items.length + unseen",
     command: unit,
     expect:
@@ -2905,8 +2905,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inbox badge leaves out unseen mentions",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needs-you").length + unseen',
-    to: '  items.filter(i => i.level === "needs-you").length',
+    from: "  items.filter(i => needsYou(i.level)).length + unseen",
+    to: "  items.filter(i => needsYou(i.level)).length",
     command: unit,
     expect:
       "counts what needs you, proposed changes of threads you follow and unseen mentions",
@@ -2914,8 +2914,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes go under its level, not ready",
     file: "packages/interface/inbox-view.ts",
-    from: '  item.raised.kind === "ready" ? "ready" : item.level',
-    to: "  item.level",
+    from: '  item.raised.kind === "proposed"\n    ? "ready"\n',
+    to: '  item.raised.kind === "proposed"\n    ? "needs-you"\n',
     command: unit,
     expect:
       "each run-end report under its level, each proposed changes under ready",
@@ -2963,7 +2963,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column counts every item as working",
     file: "packages/interface/board-view.ts",
-    from: '    working: canvases.filter(t => headOf(t).status?.kind === "working").length,',
+    from: '    working: canvases.filter(t => headOf(t).status?.level === "running").length,',
     to: "    working: canvases.length,",
     command: unit,
     expect:
@@ -3125,7 +3125,7 @@ export const mutations: readonly Mutation[] = [
     from: "      (top === null || LEVELS.indexOf(level) > LEVELS.indexOf(top))",
     to: "      top === null",
     command: unit,
-    expect: "highest: needs you over worth a read",
+    expect: "highest: one order, needs you over conflicts over ready",
   },
   {
     name: "a stop raises worth a read for whoever stopped it",
@@ -3138,8 +3138,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes are counted twice",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needs-you").length + unseen',
-    to: '  items.filter(i => i.level === "needs-you").length +\n  items.filter(i => i.raised.kind === "ready").length + unseen',
+    from: "  items.filter(i => needsYou(i.level)).length + unseen",
+    to: '  items.filter(i => needsYou(i.level)).length +\n  items.filter(i => i.raised.kind === "proposed").length + unseen',
     command: unit,
     expect:
       "counts what needs you, proposed changes of threads you follow and unseen mentions",
@@ -3147,10 +3147,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pending run-end report is no work",
     file: "packages/interface/attention.ts",
-    from: '    if (v.report.kind === "pending") out.set(v.lane, { kind: "working" })',
-    to: '    if (false) out.set(v.lane, { kind: "working" })',
+    from: '    if (v.report.kind === "pending") add(v.lane, running)',
+    to: "    if (false) add(v.lane, running)",
     command: unit,
-    expect: "working wins, and a pending run-end report is working",
+    expect:
+      "a raised item over running, and a pending run-end report is running",
   },
   {
     name: "a first render arrives at every mark",
@@ -3171,7 +3172,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's ⋯ offers no not needed",
     file: "packages/interface/sidebar-view.ts",
-    from: '    ...(status === null || status.kind === "working"',
+    from: "    ...(status === null || status.item === null",
     to: "    ...(true",
     command: unit,
     expect: "a root that raises something offers not needed first",
@@ -3310,10 +3311,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "markLevel counts a working root as raised",
     file: "packages/interface/attention.ts",
-    from: '      return s === undefined || s.kind === "working" ? null : s.kind',
-    to: '      return s === undefined ? null : s.kind === "working" ? "needs-you" : s.kind',
+    from: '      return s === undefined || !s.raised || s.level === "running"',
+    to: "      return s === undefined || !s.raised",
     command: unit,
-    expect: "markLevel: the highest level among the canvases it covers",
+    expect: "markLevel: the highest raised level among the canvases it covers",
   },
   {
     name: "a drop moves a canvas before itself",
@@ -3665,10 +3666,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a canvas's status is its last thread's",
     file: "packages/interface/attention.ts",
-    from: "    if (canvas !== undefined) out.set(canvas, withItem(out.get(canvas), status))",
-    to: "    if (canvas !== undefined) out.set(canvas, status)",
+    from: "      out.set(canvas, better(out.get(canvas), status))",
+    to: "      out.set(canvas, status)",
     command: unit,
-    expect: "a canvas's status is its threads' together",
+    expect: "a canvas's mark is the highest raised status of its threads",
   },
   {
     name: "a canvas's work is its last thread's",
@@ -4194,18 +4195,84 @@ export const mutations: readonly Mutation[] = [
     expect: "a canvas's card back on the board",
   },
   {
+    name: "a default view unfolds a ticked card",
+    file: "packages/interface/canvas-columns.ts",
+    from: "cards.find(c => !c.content.ticked)",
+    to: "cards.find(() => true)",
+    command: unit,
+    expect: "a canvas's default view unfolds its first unticked card",
+  },
+  {
+    name: "a default view is never kept once drawn",
+    file: "packages/interface/layout.ts",
+    from: "  return keptOnceDrawn(listed, facts.cardsOn)\n",
+    to: "  return listed\n",
+    command: unit,
+    expect:
+      "the canvas you are on keeps its default view once its cards are drawn",
+  },
+  {
+    name: "a default view is kept before its cards arrive",
+    file: "packages/interface/layout.ts",
+    from: "  return cards.length === 0\n",
+    to: "  return false\n",
+    command: unit,
+    expect:
+      "the canvas you are on keeps its default view once its cards are drawn",
+  },
+  {
+    name: "a tick is asked of the host from no canvas",
+    file: "packages/interface/intent.ts",
+    from: "        ticked: intent.ticked,\n",
+    to: "        ticked: !intent.ticked,\n",
+    command: unit,
+    expect: "a tick is asked of the host, from the canvas the card is on",
+  },
+  {
+    name: "conflicted proposed changes read as ready",
+    file: "packages/interface/attention.ts",
+    from: '  conflicts: "conflicts",\n  ready: "ready",',
+    to: '  conflicts: "ready",\n  ready: "ready",',
+    command: unit,
+    expect: "conflicted proposed changes are raised as conflicts, not ready",
+  },
+  {
+    name: "running outranks what needs you",
+    file: "packages/interface/attention.ts",
+    from: '  "accepted",\n  "running",\n  "worth-a-read",\n  "ready",\n  "conflicts",\n  "needs-you",\n]',
+    to: '  "accepted",\n  "worth-a-read",\n  "ready",\n  "conflicts",\n  "needs-you",\n  "running",\n]',
+    command: unit,
+    expect: "an ssh ask during a run is needs you",
+  },
+  {
+    name: "ready outranks conflicts",
+    file: "packages/interface/attention.ts",
+    from: '  "ready",\n  "conflicts",\n  "needs-you",\n]',
+    to: '  "conflicts",\n  "ready",\n  "needs-you",\n]',
+    command: unit,
+    expect: "highest: one order, needs you over conflicts over ready",
+  },
+  {
+    name: "a quiet status marks its canvas",
+    file: "packages/interface/attention.ts",
+    from: "    if (canvas !== undefined && status.raised)",
+    to: "    if (canvas !== undefined)",
+    command: unit,
+    expect: "accepted is never raised",
+  },
+  {
     name: "a working status signals done",
     file: "packages/interface/signals.ts",
-    from: '  return status.kind === "working" ? "running" : status.kind',
-    to: '  return status.kind === "working" ? "done" : status.kind',
+    from: "  return status.level\n",
+    to: '  return status.level === "running" ? "done" : status.level\n',
     command: unit,
     expect: "a status's signal",
   },
   {
     name: "a finished run signals nothing",
     file: "packages/interface/signals.ts",
-    from: '  if (status === null) return doneFading ? "done" : null',
-    to: "  if (status === null) return null",
+    from: '    return doneFading ? "done" : null',
+    to: "    return null",
     command: unit,
     expect: "a status's signal",
   },
@@ -4381,11 +4448,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread not yet started folds",
     file: "packages/interface/column-menu.ts",
-    from: "    button: !input.unstarted\n",
-    to: "    button: true\n",
+    from: "    toggle: !input.unstarted\n",
+    to: "    toggle: true\n",
     command: unit,
     expect:
-      "a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin",
+      "a column's head starts with its toggle: it folds a started thread or a note column, and trashes a thread not yet started with its bin",
   },
   {
     name: "a drop's kind of target is never round-tripped",

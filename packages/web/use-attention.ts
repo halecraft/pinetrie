@@ -1,7 +1,7 @@
 // web/use-attention — what needs you, and where: the shell over `attention.ts`.
 // It reads your attention document, decides each thread's status and so each
-// canvas's, and keeps what changed as you watched long enough for its mark to
-// move (`moving`). The decisions are `attention.ts`'s.
+// canvas's, and keeps what changed as you watched long enough for a mark to
+// move (`moving`), a canvas's and a thread's. The decisions are `attention.ts`'s.
 
 import {
   type AgentWork,
@@ -33,6 +33,7 @@ import {
   threadStatus,
   threadWriters,
   unlisted,
+  type WorkStripState,
 } from "@pinetrie/interface"
 import type { AttentionStore } from "@pinetrie/session"
 import {
@@ -50,12 +51,14 @@ interface AttentionView {
   readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
   /** Each canvas's (`canvasStatus`). */
   readonly status: ReadonlyMap<CanvasId, Status>
+  /** Each thread's (`threadStatus`): what its column's dot draws. */
+  readonly threads: ReadonlyMap<ThreadId, Status>
   /** ▦'s: the highest status of canvases not in the sidebar (`markLevel`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
+  /** When each thread's mark last arrived, and its ✓ last showed. */
+  readonly threadArrivals: Moments<ThreadId>
 }
-
-const NO_MOMENTS: Moments = { arrived: new Map(), done: new Map() }
 
 export function useAttention(input: {
   readonly me: WriterId
@@ -63,6 +66,8 @@ export function useAttention(input: {
   readonly directory: ReadonlyMap<RootId, RootRecord>
   readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
   readonly openProposed: readonly OpenProposedChanges[]
+  /** Each lane's work strip state (`stripStates`). */
+  readonly strips: ReadonlyMap<ThreadId, WorkStripState>
   /** Lanes waiting for their owner's answer about ssh. */
   readonly sshAsks: readonly SshAsk[]
   /** Whom the host names its owner. */
@@ -111,24 +116,27 @@ export function useAttention(input: {
       ),
     [input.canvasOfThread, input.archived],
   )
-  const { items, done, runEnds } = useMemo(() => {
+  const { items, done, doneThreadsNow, runEnds } = useMemo(() => {
     const facts = {
       me: input.me,
       writers,
       runEndReports: input.runEndReports,
       openProposed: input.openProposed,
+      strips: input.strips,
       sshAsks: input.sshAsks,
       owner: input.owner,
       person,
       busy,
       archived,
     }
+    const finished = doneThreads(facts)
     const ended = new Set(
-      [...doneThreads(facts)].flatMap(t => input.canvasOfThread.get(t) ?? []),
+      [...finished].flatMap(t => input.canvasOfThread.get(t) ?? []),
     )
     return {
       items: attentionItems(facts),
       done: ended,
+      doneThreadsNow: finished,
       runEnds: standingRunEnds(facts),
     }
   }, [
@@ -136,6 +144,7 @@ export function useAttention(input: {
     writers,
     input.runEndReports,
     input.openProposed,
+    input.strips,
     input.sshAsks,
     input.owner,
     person,
@@ -143,45 +152,54 @@ export function useAttention(input: {
     archived,
     input.canvasOfThread,
   ])
-  const status = useMemo(
+  const threads = useMemo(
     () =>
-      canvasStatus(
-        threadStatus({
-          items,
-          work: input.work,
-          runEndReports: input.runEndReports,
-        }),
-        input.canvasOfThread,
-      ),
-    [items, input.work, input.runEndReports, input.canvasOfThread],
+      threadStatus({
+        items,
+        runEnds,
+        strips: input.strips,
+        work: input.work,
+        runEndReports: input.runEndReports,
+      }),
+    [items, runEnds, input.strips, input.work, input.runEndReports],
+  )
+  const status = useMemo(
+    () => canvasStatus(threads, input.canvasOfThread),
+    [threads, input.canvasOfThread],
   )
   const elsewhere = useMemo(
     () =>
       markLevel(status, unlisted(input.layout, input.archived, status.keys())),
     [input.layout, input.archived, status],
   )
+  const ready = input.settled && person.since !== ""
   return {
     items,
     runEnds,
     status,
+    threads,
     elsewhere,
-    arrivals: useArrivals(status, done, input.settled && person.since !== ""),
+    arrivals: useArrivals(status, done, ready),
+    threadArrivals: useArrivals(threads, doneThreadsNow, ready),
   }
 }
 
 /**
- * When each canvas's mark last arrived, as you watched. Until `ready`, every
- * change is data arriving, so the first status after it is the baseline: a
- * page that loads draws every mark still. Nothing is dropped when a mark
- * stops moving (`moving`).
+ * When each canvas's or thread's mark last arrived, as you watched. Until
+ * `ready`, every change is data arriving, so the first status after it is
+ * the baseline: a page that loads draws every mark still. Nothing is dropped
+ * when a mark stops moving (`moving`).
  */
-function useArrivals(
-  status: ReadonlyMap<CanvasId, Status>,
-  done: ReadonlySet<CanvasId>,
+function useArrivals<K>(
+  status: ReadonlyMap<K, Status>,
+  done: ReadonlySet<K>,
   ready: boolean,
-): Moments {
-  const before = useRef<ReadonlyMap<CanvasId, Status> | null>(null)
-  const [kept, setKept] = useState<Moments>(NO_MOMENTS)
+): Moments<K> {
+  const before = useRef<ReadonlyMap<K, Status> | null>(null)
+  const [kept, setKept] = useState<Moments<K>>(() => ({
+    arrived: new Map(),
+    done: new Map(),
+  }))
   useEffect(() => {
     if (!ready) {
       before.current = null

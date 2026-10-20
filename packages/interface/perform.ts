@@ -218,7 +218,10 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "not-needed":
       if (effect.raised.kind === "run-end")
         ports.attention.dismiss(effect.lane, effect.raised.ask)
-      else if (effect.raised.kind === "ready" && effect.raised.source !== null)
+      else if (
+        effect.raised.kind === "proposed" &&
+        effect.raised.source !== null
+      )
         ports.attention.dismissReady(effect.lane, effect.raised.source)
       return
     case "send":

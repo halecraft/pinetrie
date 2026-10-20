@@ -134,6 +134,15 @@ export const cardCommand = (card: CardRecord): CardCommand | null =>
  *   the past never changes, so the quote is exact, and the reference draws
  *   without loading its referent's root.
  */
+/**
+ * What a card that is a canvas's column holds: a box anyone who may change
+ * the canvas ticks, for everyone. It means what they mean, and moves with
+ * the card.
+ */
+export interface ColumnContent {
+  readonly ticked: boolean
+}
+
 export interface ContentOf {
   readonly text: {
     readonly command: CardCommand | null
@@ -147,12 +156,12 @@ export interface ContentOf {
     /** Its quote's blob: the markdown of what it names, which never changes. */
     readonly quote: Sha256
   }
-  readonly thread: Readonly<Record<string, never>>
+  readonly thread: ColumnContent
   readonly canvas: Readonly<Record<string, never>>
-  readonly "note-column": Readonly<Record<string, never>>
+  readonly "note-column": ColumnContent
   readonly fact: { readonly fact: QueuedFact }
   readonly ask: { readonly relay: RelayDetails }
-  readonly media: Readonly<Record<string, never>>
+  readonly media: ColumnContent
   readonly image: { readonly versions: readonly ImageVersion[] }
 }
 
@@ -233,8 +242,11 @@ export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 export const isTextCard = (card: CardRecord): card is TextCard =>
   card.kind === "text"
 
-/** A thread card's content, a note column's and a media column's: nothing. */
+/** A canvas's card's content: nothing. */
 export const NO_CONTENT: Readonly<Record<string, never>> = {}
+
+/** A thread's, a note column's or a media column's card as it is made, a copy's too: its box not ticked. */
+export const UNTICKED: ColumnContent = { ticked: false }
 
 /**
  * Where a card's words are read (`KINDS`' `text`): its text document, the

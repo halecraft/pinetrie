@@ -9,8 +9,8 @@ import {
   cardIdOfKind,
   type MediaId,
   makeCard,
-  NO_CONTENT,
   type NoteColumnId,
+  UNTICKED,
   type WRAPS,
   type WrappedKind,
   type WriterId,
@@ -75,10 +75,10 @@ export function makeContainer<C extends Container>(
     container.kind === "note-column"
       ? planMake(
           cards,
-          makeCard("note-column", container.id, at, NO_CONTENT, by),
+          makeCard("note-column", container.id, at, UNTICKED, by),
           by,
         )
-      : planMake(cards, makeCard("media", container.id, at, NO_CONTENT, by), by)
+      : planMake(cards, makeCard("media", container.id, at, UNTICKED, by), by)
   if (made.kind !== "write") return null
   const place: FirstPlace =
     container.kind === "note-column"

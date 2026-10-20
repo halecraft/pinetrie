@@ -129,6 +129,7 @@ const COMMAND_PLACE = {
   "spin-off": "documents",
   reorder: "documents",
   "card-width": "documents",
+  "card-tick": "documents",
   "undo-move": "documents",
   "set-command": "documents",
   "traces-seen": "documents",
@@ -374,6 +375,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.reorder(writer, intent.reorder, canvases)
       case "card-width":
         return cardCommands.cardWidth(writer, intent, canvases)
+      case "card-tick":
+        return cardCommands.cardTick(writer, intent, canvases)
       case "unqueue-all":
         return cardCommands.unqueueAll(writer, intent.lane, canvases)
       case "queue-hold":

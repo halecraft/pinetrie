@@ -7,6 +7,9 @@
 - **Amends:**
   - ADR-0116: a folded strip shows its thread's mark, and its name at the
     header's size and colour, in its thread's colour.
+- **Amended by:**
+  - ADR-0198: the strip is the whole header turned on its side, in the
+    header's order; the fold toggle comes first and stays where it is.
 
 **Context.**
 

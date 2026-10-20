@@ -881,7 +881,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy with no conflict is asked about",
     file: "apps/pinetrie/host/work/update.ts",
-    from: "      return conflicts.length > 0\n",
+    from: "      return plan.asked\n",
     to: "      return true\n",
     command: unit,
     expect:
@@ -2243,6 +2243,15 @@ export const mutations: readonly Mutation[] = [
     expect: "planShutdown closes intake",
   },
   // ── the stored schemas, checked at start ──
+  {
+    name: "a places document stored before ticks is refused",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "[IMAGE_VERSIONS, CARD_TICKED]",
+    to: "[IMAGE_VERSIONS]",
+    command: unit,
+    expect:
+      "a places document stored before ticks opens through it, moving no data",
+  },
   {
     name: "a stored hash with no migration from it opens anyway",
     file: "apps/pinetrie/host/migrations/index.ts",

@@ -72,6 +72,10 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
   ]),
   runEndReports: new Map([[A, report(A, said("needs-you"))]]),
   openProposed: [],
+  strips: new Map([
+    [A, "ready"],
+    [B, "ready"],
+  ]),
   sshAsks: [],
   owner: null,
   person: person(),
@@ -90,9 +94,10 @@ const proposed = (
   source,
 })
 
-test("highest: needs you over worth a read, and null for none", () => {
+test("highest: one order, needs you over conflicts over ready, and null for none", () => {
   expect(highest(["worth-a-read", "needs-you", null])).toBe("needs-you")
-  expect(highest(["needs-you", "worth-a-read"])).toBe("needs-you")
+  expect(highest(["ready", "conflicts"])).toBe("conflicts")
+  expect(highest(["running", "worth-a-read", "accepted"])).toBe("worth-a-read")
   expect(highest([null])).toBeNull()
 })
 
@@ -213,7 +218,7 @@ describe("attentionItems", () => {
       }),
     )
     expect(items.map(i => [i.level, i.raised.kind])).toEqual([
-      ["needs-you", "ready"],
+      ["ready", "proposed"],
     ])
     const dismissed = person({
       dismissedReady: new Map([[A, cardIdFor("c1")]]),
@@ -236,6 +241,22 @@ describe("attentionItems", () => {
         }),
       ),
     ).toHaveLength(1)
+  })
+
+  test("conflicted proposed changes are raised as conflicts, not ready", () => {
+    const items = attentionItems(
+      input({
+        runEndReports: new Map(),
+        openProposed: [proposed(A, cardIdFor("c1"))],
+        strips: new Map([[A, "conflicts"]]),
+      }),
+    )
+    expect(items.map(i => [i.level, i.raised])).toEqual([
+      [
+        "conflicts",
+        { kind: "proposed", state: "conflicts", source: cardIdFor("c1") },
+      ],
+    ])
   })
 })
 
@@ -275,28 +296,54 @@ test("the sidebar and the column read one standing report", () => {
 })
 
 describe("threadStatus and canvasStatus", () => {
-  const facts = { work: new Map(), runEndReports: new Map() }
-  test("working wins, and a pending run-end report is working; else the highest item", () => {
+  const facts = {
+    items: [],
+    runEnds: new Map(),
+    strips: new Map(),
+    work: new Map(),
+    runEndReports: new Map(),
+  }
+  const running: Status = { level: "running", raised: true, item: null }
+
+  test("a raised item over running, and a pending run-end report is running", () => {
     const items = attentionItems(
       input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
     )
     const status = threadStatus({
       ...facts,
       items,
-      work: new Map([[B, "running"]]),
+      work: new Map([
+        [A, "running"],
+        [B, "running"],
+      ]),
     })
-    expect(status.get(A)?.kind).toBe("needs-you")
-    expect(status.get(B)).toEqual({ kind: "working" })
+    expect(status.get(A)?.level).toBe("needs-you")
+    expect(status.get(B)).toEqual(running)
     expect(
       threadStatus({
         ...facts,
-        items,
         runEndReports: new Map([[A, report(A, { kind: "pending" })]]),
       }).get(A),
-    ).toEqual({ kind: "working" })
+    ).toEqual(running)
   })
 
-  test("cards behind a held queue are not working: the thread shows what was raised there, or nothing", () => {
+  test("an ssh ask during a run is needs you", () => {
+    const C = threadIdFor("c")
+    const items = attentionItems(
+      input({
+        runEndReports: new Map(),
+        sshAsks: [{ lane: C, end: entryId("e-c"), host: null }],
+        owner: ADA,
+        busy: new Set([C]),
+      }),
+    )
+    expect(
+      threadStatus({ ...facts, items, work: new Map([[C, "running"]]) }).get(C)
+        ?.level,
+    ).toBe("needs-you")
+  })
+
+  test("cards behind a held queue are not running: the thread shows what was raised there, or nothing", () => {
     const items = attentionItems(
       input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
     )
@@ -305,23 +352,67 @@ describe("threadStatus and canvasStatus", () => {
       [B, "held"],
     ] as const)
     const status = threadStatus({ ...facts, items, work })
-    expect(status.get(A)?.kind).toBe("needs-you")
+    expect(status.get(A)?.level).toBe("needs-you")
     expect(status.has(B)).toBe(false)
   })
 
-  test("a thread with nothing raised and nothing working has no status", () => {
-    expect(threadStatus({ ...facts, items: [] }).size).toBe(0)
+  test("a thread you do not follow shows its work's state quietly, and raises nothing but running", () => {
+    const strips = new Map([[B, "conflicts"] as const])
+    const items = attentionItems(
+      input({
+        runEndReports: new Map(),
+        openProposed: [proposed(B, cardIdFor("c1"))],
+        strips,
+      }),
+    )
+    expect(items).toEqual([])
+    expect(threadStatus({ ...facts, items, strips }).get(B)).toEqual({
+      level: "conflicts",
+      raised: false,
+      item: null,
+    })
   })
 
-  test("a canvas's status is its threads' together: working wins, else the highest", () => {
+  test("accepted is never raised", () => {
+    const strips = new Map([[A, "accepted"] as const])
+    expect(threadStatus({ ...facts, strips }).get(A)).toEqual({
+      level: "accepted",
+      raised: false,
+      item: null,
+    })
+    expect(
+      canvasStatus(threadStatus({ ...facts, strips }), new Map([[A, K1]])).size,
+    ).toBe(0)
+  })
+
+  test("a run-end report read past stands quietly, with its item", () => {
+    const facts2 = input({
+      person: person({ read: new Map([[A, entryId("e-5")]]) }),
+    })
+    const status = threadStatus({
+      ...facts,
+      runEnds: standingRunEnds(facts2),
+    }).get(A)
+    expect(status?.level).toBe("needs-you")
+    expect(status?.raised).toBe(false)
+    expect(status?.item?.raised.kind).toBe("run-end")
+  })
+
+  test("a thread with nothing raised, nothing standing and nothing running has no status", () => {
+    expect(threadStatus(facts).size).toBe(0)
+  })
+
+  test("a canvas's mark is the highest raised status of its threads", () => {
     const [item] = attentionItems(input())
     if (item === undefined) throw new Error("no item")
     const C = threadIdFor("c")
+    const D = threadIdFor("d")
     // The higher first, so a later, lower thread cannot win by coming last.
     const threads = new Map<ThreadId, Status>([
-      [C, { kind: "working" }],
-      [B, { kind: "needs-you", item }],
-      [A, { kind: "worth-a-read", item }],
+      [D, { level: "conflicts", raised: false, item: null }],
+      [B, { level: "needs-you", raised: true, item }],
+      [C, running],
+      [A, { level: "worth-a-read", raised: true, item }],
     ])
     const of = (canvasOf: [ThreadId, CanvasId][]) =>
       canvasStatus(threads, new Map(canvasOf))
@@ -329,24 +420,27 @@ describe("threadStatus and canvasStatus", () => {
       of([
         [A, K1],
         [B, K1],
-      ]).get(K1)?.kind,
+        [C, K1],
+      ]).get(K1)?.level,
     ).toBe("needs-you")
     expect(
       of([
         [A, K1],
         [C, K1],
-      ]).get(K1),
-    ).toEqual({ kind: "working" })
-    expect([...of([[A, K1]]).keys()]).toEqual([K1])
+        [D, K1],
+      ]).get(K1)?.level,
+    ).toBe("worth-a-read")
+    expect(of([[D, K1]]).size).toBe(0)
   })
 })
 
 describe("arrivals", () => {
   const needs: Status = {
-    kind: "needs-you",
+    level: "needs-you",
+    raised: true,
     item: attentionItems(input())[0] as never,
   }
-  const working: Status = { kind: "working" }
+  const working: Status = { level: "running", raised: true, item: null }
   test("a first render arrives at nothing: a load draws every mark still", () => {
     expect(arrivals(null, new Map([[K1, needs]]), new Set([K1]))).toEqual({
       arrived: new Set(),
@@ -363,13 +457,25 @@ describe("arrivals", () => {
         .arrived,
     ).toEqual(new Set())
   })
-  test("working, then nothing, with a run you follow done: a ✓", () => {
+  test("ready to accept arrives as needing you", () => {
+    const ready: Status = { ...needs, level: "ready" }
+    expect(
+      arrivals(new Map([[K1, working]]), new Map([[K1, ready]]), new Set())
+        .arrived,
+    ).toEqual(new Set([K1]))
+  })
+  test("working, then nothing raised, with a run you follow done: a ✓", () => {
     expect(
       arrivals(new Map([[K1, working]]), new Map(), new Set([K1])).done,
     ).toEqual(new Set([K1]))
     expect(
       arrivals(new Map([[K1, working]]), new Map(), new Set()).done,
     ).toEqual(new Set())
+    const quiet: Status = { level: "ready", raised: false, item: null }
+    expect(
+      arrivals(new Map([[K1, working]]), new Map([[K1, quiet]]), new Set([K1]))
+        .done,
+    ).toEqual(new Set([K1]))
   })
 })
 
@@ -406,24 +512,31 @@ test("attentionWords: each reason, as a value worded once", () => {
     "the run failed: rate limited",
   )
   expect(of({ kind: "unclassified" })).toBe("finished: have a look")
-  expect(attentionWords({ kind: "ready", source: null }, nameOf)).toBe(
-    "changes ready to accept",
-  )
+  expect(
+    attentionWords({ kind: "proposed", state: "stack", source: null }, nameOf),
+  ).toBe("changes ready to accept")
+  expect(
+    attentionWords(
+      { kind: "proposed", state: "conflicts", source: null },
+      nameOf,
+    ),
+  ).toBe("changes conflict with accepted work")
 })
 
-test("markLevel: the highest level among the canvases it covers; working raises nothing", () => {
-  const item = (level: "needs-you" | "worth-a-read") => ({
-    lane: threadIdFor("m"),
-    end: entryId("e"),
-    level,
-    raised: { kind: "ready" as const, source: "c" },
-  })
-  const [a, b, c] = [canvasIdFor("a"), canvasIdFor("b"), canvasIdFor("c")]
+test("markLevel: the highest raised level among the canvases it covers; running raises nothing", () => {
+  const [a, b, c, d] = ["a", "b", "c", "d"].map(canvasIdFor) as [
+    CanvasId,
+    CanvasId,
+    CanvasId,
+    CanvasId,
+  ]
   const status = new Map<CanvasId, Status>([
-    [a, { kind: "working" }],
-    [b, { kind: "worth-a-read", item: item("worth-a-read") }],
-    [c, { kind: "needs-you", item: item("needs-you") }],
+    [a, { level: "running", raised: true, item: null }],
+    [b, { level: "worth-a-read", raised: true, item: null }],
+    [c, { level: "needs-you", raised: true, item: null }],
+    [d, { level: "conflicts", raised: false, item: null }],
   ])
+  expect(markLevel(status, [d])).toBeNull()
   expect(markLevel(status, [a])).toBeNull()
   expect(markLevel(status, [a, b])).toBe("worth-a-read")
   expect(markLevel(status, [b, c])).toBe("needs-you")

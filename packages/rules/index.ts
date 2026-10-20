@@ -228,6 +228,7 @@ export {
   planCardReorder,
   planCardSpend,
   planCardSpinOff,
+  planCardTick,
   planCardWidth,
   planImagesPut,
   planImageVersion,
@@ -285,6 +286,12 @@ export {
   resolveCommand,
 } from "./commands.ts"
 export { type ModelRef, modelRef } from "./config.ts"
+export {
+  CONFLICT_ASK,
+  type ConflictAskPlan,
+  type ConflictAskRecord,
+  planConflictAsk,
+} from "./conflict-ask.ts"
 export {
   type Container,
   type ContainerKind,
@@ -798,6 +805,9 @@ export {
 export {
   type WorkStripActivity,
   type WorkStripButton,
+  type WorkStripState,
   type WorkStripView,
+  workStripActivity,
+  workStripState,
   workStripView,
 } from "./work-strip.ts"

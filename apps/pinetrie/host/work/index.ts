@@ -247,6 +247,7 @@ export async function startLaneWork(input: {
     registry,
     piSetup: input.piSetup,
     containers,
+    records: input.records,
     writeRevision: turns.writeRevision,
   })
   const archive = createArchive({

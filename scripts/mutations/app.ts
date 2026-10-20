@@ -240,13 +240,41 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a take while the inventory is closed peeks, and a pointer over it keeps it open",
   },
-  // ⇤ and × are one button, its words and intent from `columnHeadEnd`:
+  // ⇤ and the bin are one toggle, its words and intent from `columnHead`:
   // each mutant skips its own intent.
+  {
+    name: "a column's ⇤ sits after the header's padding",
+    file: "packages/web/index.html",
+    from: "        width: var(--strip-width); margin-left: calc(-1 * var(--space-8)); margin-right: calc(-1 * var(--space-4));\n",
+    to: "        width: var(--strip-width); margin-right: calc(-1 * var(--space-4));\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "the fold toggle stays under the pointer: ⇥ where ⇤ was",
+  },
+  {
+    name: "a column's header draws its box unticked",
+    file: "packages/web/column.tsx",
+    from: "          ticked: p.ticked,\n",
+    to: "          ticked: false,\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "a column's box ticked on its strip is ticked on its header",
+  },
+  {
+    name: "a column's line never closes its details",
+    file: "packages/web/column.tsx",
+    from: "      onClick={() => onToggle(!open)}\n",
+    to: "      onClick={() => onToggle(true)}\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a press on a column's line opens its details, and a second closes them",
+  },
   {
     name: "a column's bin does nothing",
     file: "packages/web/column-menu.tsx",
-    from: "          onClick={() => p.onIntent(button.intent)}\n",
-    to: '          onClick={() => button.intent.kind === "trash" || p.onIntent(button.intent)}\n',
+    from: "          onClick={() => p.onIntent(toggle.intent)}\n",
+    to: '          onClick={() => toggle.intent.kind === "trash" || p.onIntent(toggle.intent)}\n',
     suite: "browser",
     scenario: "page",
     expect: "the bin on a branch's column takes it off the canvas",
@@ -254,8 +282,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's ⇤ does nothing",
     file: "packages/web/column-menu.tsx",
-    from: "          onClick={() => p.onIntent(button.intent)}\n",
-    to: '          onClick={() => button.intent.kind === "fold" || p.onIntent(button.intent)}\n',
+    from: "          onClick={() => p.onIntent(toggle.intent)}\n",
+    to: '          onClick={() => toggle.intent.kind === "fold" || p.onIntent(toggle.intent)}\n',
     suite: "browser",
     scenario: "page",
     expect: "a fold turns the column's name onto its strip's, in its colour",
@@ -1577,8 +1605,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's header draws no icon",
     file: "packages/web/column.tsx",
-    from: "        icon={identity.icon}\n",
-    to: "        icon={null}\n",
+    from: '            icon={identity.kind === "agent" ? identity.icon : null}\n',
+    to: "            icon={null}\n",
     suite: "browser",
     scenario: "banner",
     expect:

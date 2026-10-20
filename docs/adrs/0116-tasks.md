@@ -40,6 +40,8 @@
   - ADR-0183: "reading any card on demand waits for a tool of its own":
     `read_card` reads an image, a media column or a note column of the
     thread's canvas.
+  - ADR-0198: a canvas with no view kept opens with its first unticked card
+    unfolded, and that view is kept once its cards are drawn.
 
 **Context.**
 

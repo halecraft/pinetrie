@@ -15,6 +15,7 @@ import {
   type ConflictChoice,
   type EntryId,
   entryMargin,
+  isThreadId,
   type LaneView,
   type MediaId,
   nearestRevision,
@@ -51,6 +52,7 @@ import {
   type ColumnStatus,
   type ColumnView,
   type ComposerPlacesStore,
+  columnHead,
   columnProposals,
   columnView,
   composerPlace,
@@ -80,6 +82,7 @@ import {
   type LiveWork,
   leftLine,
   type MediaColumnView,
+  type Moments,
   marginCards,
   NEW_PIN,
   NEW_PIN_TITLE,
@@ -100,6 +103,7 @@ import {
   type SeatRecord,
   START_WORDS,
   type StandingRunEnd,
+  type Status,
   seenBatches,
   startedWords,
   type ThreadDetails,
@@ -147,7 +151,7 @@ import {
 } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { NewCardBox } from "./card-editor.tsx"
-import { ColumnHeadEnd } from "./column-menu.tsx"
+import { ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
@@ -168,6 +172,7 @@ import { Pane } from "./pane.tsx"
 import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
+import { ColumnDot } from "./root-signals.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadMark } from "./thread-mark.tsx"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -193,6 +198,8 @@ export interface ColumnProps {
   drawnAt: number
   /** How many columns wide its card is drawn; 1 with no card. */
   width: CardWidth
+  /** Its card's box (`ColumnContent`); false with no card. */
+  ticked: boolean
   /** A canvas's label: what a fork row names a source's canvas by. */
   labelOf: (canvas: CanvasId) => string
   view: ColumnView
@@ -265,6 +272,10 @@ export interface ColumnProps {
   attention: AttentionStore
   /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
   runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
+  /** Each thread's status (`threadStatus`): what its dot draws. */
+  statuses: ReadonlyMap<ThreadId, Status>
+  /** When each thread's mark last arrived, and its ✓ last showed. */
+  threadArrivals: Moments<ThreadId>
   /** Every mounted column's view, which the rail outlines. */
   viewports: ViewportStore
   /** Where columns were left, by message. */
@@ -337,6 +348,19 @@ export function Column(p: ColumnProps) {
       ? ROOT
       : atEntry(view.tipId)
   const writable = p.readOnly === null
+  // Open details stay open, through a reload too, as a density does.
+  const detailsOpen = p.column.details === true
+  const head =
+    card === null
+      ? null
+      : columnHead({
+          card,
+          width: p.width,
+          writable,
+          unstarted,
+          folded: false,
+          ticked: p.ticked,
+        })
   // What this column's reader asks, a message's acts among it: the one
   // handler every message shares, so none of them redraws when this column
   // does.
@@ -999,7 +1023,10 @@ export function Column(p: ColumnProps) {
             {...(card === null ? {} : dragProps({ kind: "card", card }))}
           >
             <div className="head-row">
-              <Identity
+              {head !== null && (
+                <ColumnHeadStart head={head} onIntent={p.onIntent} />
+              )}
+              <HeadLine
                 detailsId={detailsId}
                 identity={shows.identity}
                 onToggle={open => {
@@ -1009,9 +1036,18 @@ export function Column(p: ColumnProps) {
                   // keeps a column at its end there.
                   act({ kind: "details", open })
                 }}
+                open={detailsOpen}
                 running={running}
                 working={working}
               />
+              {card !== null && isThreadId(card) && (
+                <ColumnDot
+                  arrived={p.threadArrivals.arrived.get(card) ?? null}
+                  done={p.threadArrivals.done.get(card) ?? null}
+                  nameOf={p.nameOf}
+                  status={p.statuses.get(card) ?? null}
+                />
+              )}
               {p.matches !== null && (
                 <span className="match-count">{p.matches.count}</span>
               )}
@@ -1023,7 +1059,6 @@ export function Column(p: ColumnProps) {
                   {shows.behind.mark}
                 </span>
               )}
-              <span className="head-space" />
               {newPin === "header" && (
                 <Button
                   look="plain"
@@ -1054,35 +1089,58 @@ export function Column(p: ColumnProps) {
                   session={p.session}
                 />
               )}
-              {card !== null && (
-                <ColumnHeadEnd
-                  card={card}
-                  onIntent={p.onIntent}
-                  unstarted={unstarted}
-                  width={p.width}
-                  writable={writable}
-                />
+              {head !== null && (
+                <ColumnMenu onIntent={p.onIntent} sections={head.menu} />
               )}
             </div>
+            {/* Closed, the header shows only what asks something of you:
+            a raised run-end status, and an ssh ask for its owner. */}
             {shows.identity.kind === "agent" &&
-              shows.identity.focus !== null && (
-                <div
-                  className="head-focus"
-                  data-kind={shows.identity.focus.kind}
-                  title={focusTitle(shows.identity.focus)}
-                >
-                  {shows.identity.focus.text}
-                </div>
-              )}
-            {shows.identity.kind === "agent" &&
-              shows.identity.status !== null && (
+              shows.identity.status !== null &&
+              (detailsOpen || !shows.identity.status.quiet) && (
                 <StatusRow onOpen={openAt} status={shows.identity.status} />
               )}
-            <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />
-            {agentsLine !== null && (
-              // Other threads' agents in this thread, and what agents
-              // talking from it spent.
-              <div className="agents-row">{agentsWords(agentsLine)}</div>
+            {shows.access !== null && lane.kind === "lane" && (
+              <AccessRowView
+                acting={acting.access.get(lane.name) ?? null}
+                answer={answer =>
+                  void p.session.access(lane.name, answer).catch(() => {})
+                }
+                view={shows.access}
+              />
+            )}
+            {detailsOpen && (
+              <div className="head-details" id={detailsId}>
+                {shows.identity.kind === "agent" &&
+                  shows.identity.focus !== null && (
+                    <div
+                      className="head-focus"
+                      data-kind={shows.identity.focus.kind}
+                      title={focusTitle(shows.identity.focus)}
+                    >
+                      {shows.identity.focus.text}
+                    </div>
+                  )}
+                <Origin
+                  onLink={openLink}
+                  onOpen={openAt}
+                  origin={shows.origin}
+                />
+                {agentsLine !== null && (
+                  // Other threads' agents in this thread, and what agents
+                  // talking from it spent.
+                  <div className="agents-row">{agentsWords(agentsLine)}</div>
+                )}
+                <WorkStripView
+                  act={actOnProposedChanges}
+                  review={{
+                    id: paneId,
+                    open: pane?.kind === "strip",
+                    toggle: toggleReview,
+                  }}
+                  strip={shows.strip}
+                />
+              </div>
             )}
             {view.above.length > 0 && (
               <Button
@@ -1093,26 +1151,6 @@ export function Column(p: ColumnProps) {
               >
                 {earlierWords(view.above.length)}
               </Button>
-            )}
-            {/* The work strip, a row of the header. */}
-            <WorkStripView
-              act={actOnProposedChanges}
-              review={{
-                id: paneId,
-                open: pane?.kind === "strip",
-                toggle: toggleReview,
-              }}
-              strip={shows.strip}
-            />
-            {/* The access row: the lane's ssh identities, and the owner's answers. */}
-            {shows.access !== null && lane.kind === "lane" && (
-              <AccessRowView
-                acting={acting.access.get(lane.name) ?? null}
-                answer={answer =>
-                  void p.session.access(lane.name, answer).catch(() => {})
-                }
-                view={shows.access}
-              />
             )}
           </header>
           {/* Under a search, the thread stays as it is, covered and inert,
@@ -1126,7 +1164,7 @@ export function Column(p: ColumnProps) {
                   <ThreadDetailsPanel
                     details={shows.identity.details}
                     icon={shows.identity.icon}
-                    id={detailsId}
+                    id={`${detailsId}-thread`}
                     name={shows.identity.name}
                     onOpen={openAt}
                     running={running}
@@ -1423,13 +1461,16 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
 }
 
 /**
- * Who works in the column: its lane's name, which opens or closes the
- * thread's details; a lane about to start; or nothing, in a chat. Its mark pulses while the lane runs. The name's chevron is
- * CSS, so its text is the mark and the name alone.
+ * The header's line after its start: who works in the column (its lane's
+ * name, a lane about to start, or nothing, in a chat) and the free space
+ * after it, one button that opens or closes the details. Its mark pulses
+ * while the lane runs. The chevron is CSS, so its text is the mark and the
+ * name alone.
  */
-function Identity({
+function HeadLine({
   identity,
   detailsId,
+  open,
   onToggle,
   running,
   working,
@@ -1437,36 +1478,32 @@ function Identity({
   identity: HeadIdentity
   /** The details' element id, for `aria-controls`. */
   detailsId: string
+  open: boolean
   onToggle: (open: boolean) => void
   running: boolean
   working: string | undefined
 }) {
-  if (identity.kind === "none") return null
-  if (identity.kind === "pending")
-    return (
-      <span className="agent-name pending">
-        <ThreadMark folds icon={null} running={running} working={working} />{" "}
-        <span data-fold-name="">{identityWords(identity)}</span>
-      </span>
-    )
-  const { open } = identity.details
   return (
     <Button
       look="plain"
       aria-controls={open ? detailsId : undefined}
       aria-expanded={open}
-      className="agent-name"
-      data-thread={identity.name}
+      className={`head-line${identity.kind === "none" ? "" : " agent-name"}${identity.kind === "pending" ? " pending" : ""}`}
+      data-thread={identity.kind === "agent" ? identity.name : undefined}
       onClick={() => onToggle(!open)}
       title={detailsTitle(open)}
     >
-      <ThreadMark
-        folds
-        icon={identity.icon}
-        running={running}
-        working={working}
-      />{" "}
-      <span data-fold-name="">{identityWords(identity)}</span>
+      {identity.kind !== "none" && (
+        <>
+          <ThreadMark
+            folds
+            icon={identity.kind === "agent" ? identity.icon : null}
+            running={running}
+            working={working}
+          />{" "}
+          <span data-fold-name="">{identityWords(identity)}</span>
+        </>
+      )}
     </Button>
   )
 }

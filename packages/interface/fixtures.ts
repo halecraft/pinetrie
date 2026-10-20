@@ -11,7 +11,6 @@ import {
   type EntryId,
   type EntryLike,
   indexTree,
-  NO_CONTENT,
   rootIdFor,
   THE_AGENT,
   type ThreadCard,
@@ -21,6 +20,7 @@ import {
   textCardId,
   threadIdFor,
   treeRoot,
+  UNTICKED,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -167,7 +167,7 @@ export function canvasesFor(
       owner: TEST_WRITER,
       placer: TEST_WRITER,
       place: { kind: "canvas", canvas, order: `a${cards.length}`, width: 1 },
-      content: NO_CONTENT,
+      content: UNTICKED,
     })
     threads.set(thread, {
       thread,

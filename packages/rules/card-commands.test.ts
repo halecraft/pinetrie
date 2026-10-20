@@ -8,7 +8,6 @@ import {
   indexTree,
   isTextCardId,
   makeCard,
-  NO_CONTENT,
   PERSON_HISTORY,
   rootIdFor,
   type Sha256,
@@ -16,6 +15,7 @@ import {
   type ThreadRecord,
   TRASH_PLACE,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { canvasCard, fromParents, personMessage } from "@pinetrie/core/fixtures"
@@ -31,6 +31,7 @@ import {
   planCardReorder,
   planCardSpend,
   planCardSpinOff,
+  planCardTick,
   planCardWidth,
   planImagesPut,
   planImageVersion,
@@ -255,7 +256,7 @@ describe("planImageVersion", () => {
       "media",
       cardIdOfKind("media", uuid(50)),
       { kind: "canvas", canvas: CANVAS, order: "z", width: 1 },
-      NO_CONTENT,
+      UNTICKED,
       ADA,
     )
     const image = makeCard(
@@ -310,6 +311,26 @@ describe("planCardWidth", () => {
       planCardWidth({
         ...facts(),
         change: { kind: "card-width", card: T1, at, width: 1 },
+      }),
+    ).toEqual({ kind: "nothing" })
+  })
+})
+
+describe("planCardTick", () => {
+  test("a tick is one step of its canvas's history; the state it has writes nothing", () => {
+    const at = { kind: "canvas", canvas: CANVAS } as const
+    expect(
+      stepsOf(
+        planCardTick({
+          ...facts(),
+          change: { kind: "card-tick", card: T1, at, ticked: true },
+        }),
+      ).history,
+    ).toEqual(historyScope(CANVAS))
+    expect(
+      planCardTick({
+        ...facts(),
+        change: { kind: "card-tick", card: T1, at, ticked: false },
       }),
     ).toEqual({ kind: "nothing" })
   })

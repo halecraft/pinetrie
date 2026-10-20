@@ -619,16 +619,7 @@ export const mutations: readonly Mutation[] = [
     to: '              : "Asked. Stop here: the person will answer in this thread.",',
     command: unit,
     expect:
-      "with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask",
-  },
-  {
-    name: "ask_about_conflict's result does not say it asked",
-    file: "packages/pi/lanes.ts",
-    from: "        details: asked ? { asked: true } : undefined,",
-    to: "        details: undefined,",
-    command: unit,
-    expect:
-      "with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask",
+      "with a conflict in the copy, it asks; with none, there is nothing to ask",
   },
   {
     name: "a stopped run's last turn is never recorded",

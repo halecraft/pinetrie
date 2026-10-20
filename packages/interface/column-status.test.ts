@@ -43,6 +43,7 @@ const statusOf = (report: RunEndReport, over: Partial<AttentionInput> = {}) =>
       me: ADA,
       writers: new Map([[A, [ADA, BEA]]]),
       runEndReports: new Map([[A, record(report)]]),
+      strips: new Map(),
       openProposed: [],
       sshAsks: [],
       owner: null,

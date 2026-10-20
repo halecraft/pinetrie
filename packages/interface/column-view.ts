@@ -10,7 +10,6 @@ import {
   type CardRecord,
   type ConflictRecord,
   cardCommand,
-  conflictAskTime,
   type DiffSpan,
   type EntryId,
   entryThread,
@@ -45,6 +44,7 @@ import {
   type BaseRecord,
   baseMovedOn,
   type CommandSummary,
+  type ConflictAskRecord,
   displayName,
   type FocusRecord,
   type IconsRecord,
@@ -119,6 +119,8 @@ export interface WorkFacts {
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it. */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
+  /** Each lane's newest ask about a conflict (`pinetrie.conflict-ask`). */
+  readonly conflictAsks: ReadonlyMap<ThreadId, ConflictAskRecord>
   /** Each forked thread's fork, a branch's or a copy's (`CanvasIndex.forkOf`). */
   readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** Each lane of its own's fork: a copy's fork row says when its files were not kept. */
@@ -704,7 +706,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
   const view = workStripView({
     proposed,
     activity: laneActivity(f.index, lane),
-    asked: conflictAskTime(f.index, lane.tip),
+    asked: work.conflictAsks.get(lane.name)?.at ?? null,
     base,
     into:
       project.kind === "folder"

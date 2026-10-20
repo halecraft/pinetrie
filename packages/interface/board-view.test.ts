@@ -171,12 +171,16 @@ describe("boardView", () => {
       lane: threadIdFor("a"),
       end: entryId("e-1"),
       level: "needs-you" as const,
-      raised: { kind: "ready" as const, source: "c" },
+      raised: {
+        kind: "proposed" as const,
+        state: "ready" as const,
+        source: "c",
+      },
     }
     const status = new Map<CanvasId, Status>([
-      [E(1), { kind: "needs-you", item }],
-      [E(3), { kind: "working" }],
-      [E(4), { kind: "needs-you", item }],
+      [E(1), { level: "needs-you", raised: true, item }],
+      [E(3), { level: "running", raised: true, item: null }],
+      [E(4), { level: "needs-you", raised: true, item }],
     ])
     const view = boardView(input({ status }))
     expect(view.open.map(c => c.mark)).toEqual([null, "needs-you"])
@@ -185,9 +189,9 @@ describe("boardView", () => {
 
   test("a column counts its items working and ready, not threads; an item's ⇡ names its threads", () => {
     const status = new Map<CanvasId, Status>([
-      [E(1), { kind: "working" }],
-      [E(3), { kind: "working" }],
-      [E(4), { kind: "working" }],
+      [E(1), { level: "running", raised: true, item: null }],
+      [E(3), { level: "running", raised: true, item: null }],
+      [E(4), { level: "running", raised: true, item: null }],
     ])
     const ready = new Map([
       [E(1), ["amber-fox", "cozy-mallard"]],
@@ -326,17 +330,21 @@ describe("the board's search", () => {
   })
   test("a filtered head counts what it shows; its mark, Remove and the strip count every canvas", () => {
     const status = new Map<CanvasId, Status>([
-      [E(1), { kind: "working" }],
-      [E(2), { kind: "working" }],
+      [E(1), { level: "running", raised: true, item: null }],
+      [E(2), { level: "running", raised: true, item: null }],
     ])
     const ready = new Map([[E(2), ["amber-fox"]]])
     const item = {
       lane: threadIdFor("a"),
       end: entryId("e-2"),
       level: "needs-you" as const,
-      raised: { kind: "ready" as const, source: "c" },
+      raised: {
+        kind: "proposed" as const,
+        state: "ready" as const,
+        source: "c",
+      },
     }
-    status.set(E(2), { kind: "needs-you", item })
+    status.set(E(2), { level: "needs-you", raised: true, item })
     const view = boardView(input({ labels, status, ready, ...find("board") }))
     const doing = view.open[1]
     expect(view.shown).toEqual({

@@ -229,6 +229,13 @@ async function run(check: Checks["check"]): Promise<void> {
       const stillMsg = (scope: string) =>
         `${scope} .msg:has(> .text > p:only-child:has-text(${JSON.stringify(STILL)}))`
       const col = (n: number) => `.column[data-position="${n}"]`
+      /** Open a column's details, where its fork row is: its line opens them. */
+      const openDetails = (column: string) =>
+        page
+          .click(`${column} .head-line[aria-expanded="false"]`, {
+            timeout: 5_000,
+          })
+          .catch(() => {})
       // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
       // smallest element holding the text, which is that paragraph.
       const msg = (text: string) =>
@@ -558,6 +565,7 @@ async function run(check: Checks["check"]): Promise<void> {
             )
           })
         const hidden = !(await inView())
+        await openDetails(col(1))
         await page.click(`${col(1)} .column-head .origin`)
         const back = await waitFor(() => inView(), 5_000)
         if (size !== null) await page.setViewportSize(size)
@@ -617,12 +625,10 @@ async function run(check: Checks["check"]): Promise<void> {
       // `startText`'s, proven by their unit tests.
       await page
         .waitForFunction(
-          ([c, text]) =>
-            document
-              .querySelector(`${c} .origin`)
-              ?.textContent?.includes(text) === true &&
+          c =>
+            document.querySelector(`${c} .composer`) !== null &&
             document.querySelector(`${c} .msg`) === null,
-          [col(1), FOR_ADA] as const,
+          col(1),
           { timeout: 15_000 },
         )
         .catch(() => null)
@@ -731,6 +737,16 @@ async function run(check: Checks["check"]): Promise<void> {
             }),
           [col(0), card] as const,
         )
+        // Where ⇤ is: ⇥ must be in the same place once folded.
+        const toggleAt = async (sel: string) =>
+          page
+            .locator(sel)
+            .boundingBox()
+            .then(b =>
+              b === null ? null : [b.x + b.width / 2, b.y + b.height / 2],
+            )
+            .catch(() => null)
+        const foldAt = await toggleAt(`${col(0)} .fold`)
         await page.click(`${col(0)} .fold`)
         const t = await turn
         const off =
@@ -750,10 +766,90 @@ async function run(check: Checks["check"]): Promise<void> {
           JSON.stringify({ ...t, off }),
         )
         await page
+          .waitForFunction(
+            () => document.getAnimations().every(a => a.id !== "fold"),
+            undefined,
+            { timeout: 15_000 },
+          )
+          .catch(() => {})
+        const unfoldAt = await toggleAt(
+          `.folded-column[data-card="${card}"] .unfold`,
+        )
+        check(
+          "the fold toggle stays under the pointer: ⇥ where ⇤ was",
+          foldAt !== null &&
+            unfoldAt !== null &&
+            Math.abs((foldAt[0] ?? 0) - (unfoldAt[0] ?? 0)) <= 1 &&
+            Math.abs((foldAt[1] ?? 0) - (unfoldAt[1] ?? 0)) <= 1,
+          JSON.stringify({ foldAt, unfoldAt }),
+        )
+        // The box, ticked on the strip, is the card's: ticked unfolded too.
+        const box = (sel: string) =>
+          page
+            .locator(sel)
+            .isChecked({ timeout: 2_000 })
+            .catch(() => null)
+        await page
+          .click(`.folded-column[data-card="${card}"] .column-box`)
+          .catch(() => {})
+        await page
+          .waitForSelector(
+            `.folded-column[data-card="${card}"][data-ticked] .column-box:checked`,
+            { timeout: 10_000 },
+          )
+          .catch(() => {})
+        const tickedFolded = await box(
+          `.folded-column[data-card="${card}"] .column-box`,
+        )
+        await page
           .click(`.folded-column[data-card="${card}"] .folded-title`, {
             timeout: 15_000,
           })
           .catch(() => {})
+        const tickedOpen = await box(`.column[data-card="${card}"] .column-box`)
+        check(
+          "a column's box ticked on its strip is ticked on its header",
+          tickedFolded === true && tickedOpen === true,
+          JSON.stringify({ tickedFolded, tickedOpen }),
+        )
+        // Untick it, so the rest of the scenario sees the column as it was.
+        await page
+          .click(`.column[data-card="${card}"] .column-box`)
+          .catch(() => {})
+        await page
+          .waitForSelector(
+            `.column[data-card="${card}"] .column-box:not(:checked)`,
+            {
+              timeout: 10_000,
+            },
+          )
+          .catch(() => {})
+        // The line opens the details, and a second press closes them.
+        const line = `.column[data-card="${card}"] .head-line`
+        await page.click(line).catch(() => {})
+        const opened = await page
+          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
+            timeout: 5_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await page.click(line).catch(() => {})
+        const closed = await page
+          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
+            state: "detached",
+            timeout: 5_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a press on a column's line opens its details, and a second closes them",
+          opened && closed,
+          JSON.stringify({ opened, closed }),
+        )
         // Moved back, before the columns are dragged and measured.
         await page
           .waitForFunction(
@@ -774,7 +870,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const head = await page.locator(`${col(n)} .column-head`).boundingBox()
         const target = await page.locator(col(into)).boundingBox()
         if (head === null || target === null) return false
-        const y = head.y + head.height / 2
+        // The header's own padding, under its line: no button of its own, so
+        // the press is the header's, whatever the line starts with.
+        const y = head.y + head.height - 2
         await page.mouse.move(head.x + 40, y)
         await page.mouse.down()
         await page.mouse.move(target.x + dx, y, { steps: 12 })
@@ -805,7 +903,7 @@ async function run(check: Checks["check"]): Promise<void> {
           mid.dragging === "2" &&
           mid.shifted === "0,1" &&
           (await keys()).join() === unmoved.join(),
-        `${JSON.stringify(mid)}`,
+        `${JSON.stringify(mid)}}`,
       )
       await page.keyboard.press("Escape")
       await page.mouse.up()
@@ -4754,6 +4852,7 @@ async function run(check: Checks["check"]): Promise<void> {
             timeout: 15_000,
           })
           .catch(() => {})
+      await openDetails(`.column[data-card="${copy}"]`)
       const copiedRow = await page
         .waitForFunction(
           c =>

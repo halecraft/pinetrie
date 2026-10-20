@@ -557,8 +557,9 @@ which are swept.
   comparing with the codec's own columns, and a decoded card needs no
   cast (`kindedId` gives the id its kind's type). A text card holds its
   `command`, `unsent` and `origin`; a reference its `address` and `quote`;
-  a fact its `fact`; an ask its `relay` (ADR-0128); a thread's card and a
-  note column none. Where a card is goes through core's `placeFields`
+  a fact its `fact`; an ask its `relay` (ADR-0128); a thread's card, a
+  note column's and a media column's their box, `ticked` ("1" or "", one
+  `COLUMN_CODEC`, ADR-0198); a canvas's card none. Where a card is goes through core's `placeFields`
   and `placeOfFields` (`core/places.ts`), which the wire's key codec uses
   too, so the two cannot drift. Each stored kind's row has its fields in
   one table (`ROWS`): a row is written through it and read narrowed to its
@@ -1868,6 +1869,12 @@ commit-message request `request.ts` (`describeRequest`).
 
 ## What the page reads (`work-strip.ts`, `base.ts`)
 
+- **`workStripState` is the strip's state alone** (ADR-0198), from facts
+  every lane has whether or not the tab holds its tree: its proposed
+  changes, what it runs (`workStripActivity`) and its conflict ask. A
+  thread's status (`threadStatus`, `@pinetrie/interface`) reads it as the
+  strip does, so the two cannot disagree; the strip's buttons follow from
+  the state (`stateButtons`), never a second ladder.
 - **`workStripView`** is the work strip's states (ADR-0105) as a decision, from an
   `ProposedChangesStatus`: the proposed changes' state, its buttons, its menu, which of those
   are `quiet` (listed, but drawn disabled: changing nothing now, or not
@@ -2363,9 +2370,11 @@ Gotchas:
 - **A resolution has no record** (ADR-0080, S104): in progress, it is a
   running lane whose prompt is a land message; ended, it ended as any run
   does. What it left conflicted is the proposed changes', and whether the agent asked
-  for you is its newest `ask_about_conflict` in the tree
-  (`conflictAskTime`, core), which the strip reads as "needs you" while it
-  is newer than the proposed changes' record.
+  for you is its lane's `pinetrie.conflict-ask` record (`CONFLICT_ASK`,
+  written by `planConflictAsk` as the host takes an `ask_about_conflict`),
+  which the strip reads as "needs you" while it is newer than the proposed
+  changes' record (ADR-0198). A session record, so a lane whose tree the
+  tab does not hold is judged as one it does.
 
 # Agents talking (`relay.ts`, `allowance.ts`, `round.ts`, ADR-0128)
 

@@ -35,6 +35,10 @@
   - ADR-0175: a run-end report that asks something of you shows in its
     thread's column too, and reading past it or dismissing it quiets it there
     rather than clearing it.
+  - ADR-0198: a thread's status is one level of one order, decided by
+    `threadStatus`; a canvas's mark is the highest raised status of its
+    threads; "changes ready to accept" is raised from the work strip's state,
+    not from the proposed changes being open.
 
 Builds on ADR-0076.
 

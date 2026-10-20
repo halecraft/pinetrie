@@ -12,7 +12,6 @@ import {
   type JjProposedChangesRecord,
   type LaneRecord,
   type LaneView,
-  NO_CONTENT,
   type PinnedView,
   pointId,
   type RevisionRecord,
@@ -24,6 +23,7 @@ import {
   type TreeIndex,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -195,6 +195,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   bases: new Map(),
   forks: new Map(),
   laneForks: new Map(),
+  conflictAsks: new Map(),
   setup: null,
   allowances: new Map(),
   states: new Map(),
@@ -638,7 +639,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
                   owner: ADA,
                   placer: ADA,
                   place: { kind: "canvas", canvas: T, order: "a", width: 1 },
-                  content: NO_CONTENT,
+                  content: UNTICKED,
                 },
               ],
               ADA,

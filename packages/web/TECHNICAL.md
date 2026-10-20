@@ -512,13 +512,18 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   `.column`: a strip with `data-card` and `data-kind` (`thread` or
   `note-column`, as the wide `Column` and `NoteColumn` carry too), which a
   click unfolds. So `.column` counts whole thread columns, and the browser
-  suite counts with it. The folded canvas column is a
+  suite counts with it. The whole strip is the drag handle
+  (`data-column-head`), as an unfolded header is; `data-ticked` marks its
+  box ticked. The folded canvas column is a
   `.canvas-column.folded-column`. Both draw one `FoldedStrip`
-  (`folded-strip.tsx`): ⇥, the mark `foldedMark` decides, the name on its
-  side, the detail.
-- **A strip is its header turned on its side** (ADR-0137): a thread's
-  mark and its name at the header's size, in its thread's colour
-  (`threadTrackOf`, the `threadTrack` its column takes at the same end).
+  (`folded-strip.tsx`): its start (`.folded-start`: ⇥ and a card's box),
+  then one `.folded-title` button holding the mark `foldedMark` decides,
+  the name on its side, the detail and the dot.
+- **A strip is its header turned on its side** (ADR-0137, ADR-0198): in
+  the header's order, ⇥ where the header's ⇤ is (the same top border, its
+  row the header's height), a thread's mark and its name at the header's
+  size, in its thread's colour (`threadTrackOf`, the `threadTrack` its
+  column takes at the same end).
   Every row above the name has a fixed height, and their sums are the
   registered properties `--strip-mark-top` and `--strip-name-top` (with
   `--strip-width` and `--strip-name-max`), one rule per `data-kind` and one
@@ -531,7 +536,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 - **`data-position` is a column's index among whole thread columns**
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
   on the canvas, is what Alt+arrows move by.
-- **A column's ⋯** (`column-menu.tsx`, `columnHeadEnd`'s `menu`) is its
+- **A column's ⋯** (`column-menu.tsx`, `columnHead`'s `menu`) is its
   card's, for everyone: its width, one column or two (`card-width`); a
   thread's adds a section of Copy to this canvas, Copy to your inventory
   and Move to your inventory, and no canvas (ADR-0127); and, for a reader
@@ -558,15 +563,30 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   on the canvas you are on. A thread taken into an inventory stops, and its
   holder sees it there read only (ADR-0124): a mention of it opens nowhere
   while someone else holds it (`inbox-menu.tsx`).
-- **Every unfolded column's header ends in ⋯ and one button**
-  (`.column-menu`, then `.fold` or `.trash-column`, a bin, ADR-0161,
-  ADR-0177), a note column's
-  too, drawn by one component (`column-menu.tsx`) from one
-  `columnHeadEnd` value: ⇤ is the `fold` intent of its card, on a started
-  thread or a note column, and × the same `trash` intent as the ⋯'s
-  Move to trash, on a thread not yet started. On such a thread both are
-  there on purpose: ⋯ is everyone's and reads the same on every column.
-  The page draws whichever button it is given, never asking which. A note column's header is a
+- **Every column's header starts with its toggle and its box, and an
+  unfolded one ends in ⋯** (ADR-0161, ADR-0177, ADR-0198): `.fold`,
+  `.unfold` or `.trash-column` (a bin), then `.column-box`, a checkbox,
+  then, at the end, `.column-menu`. A note column's and a media column's
+  too, and a strip's, drawn by one component (`ColumnHeadStart`,
+  `ColumnMenu`, `column-menu.tsx`) from one `columnHead` value. The bin is
+  the same `trash` intent as the ⋯'s Move to trash, on a thread not yet
+  started: both there on purpose, since ⋯ is everyone's and reads the same
+  on every column. The page draws whichever toggle it is given, never
+  asking which. The toggle is centred in a strip's width from the column's
+  left edge (`.head-row > :first-child`), so a fold leaves it under the
+  pointer.
+- **The header is one line; a press on it opens the rest** (ADR-0198):
+  after its start, `HeadLine` (`.head-line.agent-name`) is the name and the
+  free space after it, one disclosure button over the column's `details`.
+  Closed, under the line are only what asks something of you: a raised
+  run-end status (`.head-status`) and an ssh ask (`AccessRowView`). Open,
+  `.head-details` holds the focus, the fork row, the agents line and the
+  work strip, and `ThreadDetailsPanel` shows under the header as before.
+- **A column's dot is its thread's status** (`ColumnDot`,
+  `root-signals.tsx`): a `SignalMark` of `statusSignal`, `data-quiet` when
+  not raised for you, or `.signal[data-signal="none"]` with nothing to
+  say. Folded or not, it is the same value (`threadStatus`, through
+  `ThreadGlance.status` for a strip). A note column's header is a
   `.column-head` with a thread's `.head-row`, so it takes the same button
   reset, row height and top border (its `--track` is grey), and its ▤ sits
   in the square a thread's mark takes: a rule written for `.note-column-*`
@@ -1058,9 +1078,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **A fact waiting for a run's end** is drawn above the line as a quiet row
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).
-- **"Needs you" comes from the tree** (ADR-0080): the strip's `needs-you`
-  is the thread's newest `ask_about_conflict` (`conflictAskTime`) when it is
-  newer than the proposed changes' record.
+- **"Needs you" comes from the host's record** (ADR-0080, ADR-0198): the
+  strip's `needs-you` is the lane's `pinetrie.conflict-ask` record when it
+  is newer than the proposed changes' record.
 - **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
@@ -1919,9 +1939,9 @@ What S151 measured, and these handlers rest on:
   selected item's fill covers: a descendant's background paints over an
   ancestor's inset shadow. The item reaches the list's right edge (the list
   has no right padding), so it meets the rail.
-- **A thread not yet started has × and no ⇤** (`columnHeadEnd`): only
-  it closes from its head (a branch not yet sent, a new tab's, a copy
-  before its first send), and every other card column folds by ⇤
+- **A thread not yet started has a bin and no ⇤** (`columnHead`): only
+  it trashes from its head's toggle (a branch not yet sent, a new tab's, a
+  copy before its first send), and every other card column folds by ⇤
   (`.fold`). A browser check that folds must fold a started column.
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half** (`placeBox`, web-core's `popover-place.ts`). A

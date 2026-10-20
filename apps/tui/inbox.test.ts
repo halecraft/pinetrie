@@ -21,6 +21,7 @@ describe("needsYouLines", () => {
     writers: new Map(),
     runEndReports: new Map(),
     openProposed: [],
+    strips: new Map(),
     sshAsks: [{ lane: LANE, end: END, host: null }],
     owner: ADA,
     person: {

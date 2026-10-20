@@ -29,7 +29,7 @@ export const CANVAS_TYPE = "pinetrie.canvas"
  * Constant, so the system prompt stays the same between runs.
  */
 export const CANVAS_RULE =
-  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given; `read_card` reads an image, a media column or a note column by the id the list gives."
+  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given; `read_card` reads an image, a media column or a note column by the id the list gives. A card marked \"box ticked\" has its box ticked by a person: their own mark, which may mean done, or handled for now."
 
 /** How many cards the list names; the rest are counted. */
 export const CANVAS_CAP = 50
@@ -142,10 +142,11 @@ const imagesLine = (images: readonly ImageGlance[]): string =>
 
 /**
  * One card's line. A thread is named by its two words, else by "a thread";
- * the reading thread says so, and no state, which is always its own run.
+ * the reading thread says so, and no state, which is always its own run. A
+ * ticked column says so last (`CANVAS_RULE` says what that means).
  */
 function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
-  const by = `put by ${f.nameOf(c.placer)}`
+  const by = `put by ${f.nameOf(c.placer)}${c.content.ticked ? ", box ticked" : ""}`
   switch (c.kind) {
     case "thread": {
       const name = f.names.get(c.id) ?? "a thread"

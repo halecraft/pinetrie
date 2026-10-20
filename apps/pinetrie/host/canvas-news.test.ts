@@ -2,9 +2,9 @@ import {
   type CardRecord,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   runId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
@@ -45,7 +45,7 @@ test("a card added to a canvas is told to its running threads, as a steer", asyn
     owner: BEA,
     placer: BEA,
     place: { kind: "canvas", canvas: CANVAS_ID, order: "zzzzzzzzzz", width: 1 },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   // It touched the column alone, which it made.
   const change = {

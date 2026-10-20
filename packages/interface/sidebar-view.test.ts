@@ -254,19 +254,22 @@ describe("sidebarView", () => {
     const item: Item = {
       lane: threadIdFor("a"),
       end: entryId("e"),
-      level: "needs-you",
-      raised: { kind: "ready", source: cardIdFor("c1") },
+      level: "ready",
+      raised: { kind: "proposed", state: "ready", source: cardIdFor("c1") },
     }
     const status = new Map<CanvasId, Status>([
-      [K("r1"), { kind: "working" }],
-      [K("r2"), { kind: "needs-you", item }],
+      [K("r1"), { level: "running", raised: true, item: null }],
+      [K("r2"), { level: "needs-you", raised: true, item }],
     ])
     const [r1, r2] = items({
       status,
       arrivals: { arrived: new Map([[K("r2"), 5]]), done: new Map() },
     })
-    expect(r1).toMatchObject({ status: { kind: "working" }, arrived: null })
-    expect(r2).toMatchObject({ status: { kind: "needs-you" }, arrived: 5 })
+    expect(r1).toMatchObject({
+      status: { level: "running", raised: true, item: null },
+      arrived: null,
+    })
+    expect(r2).toMatchObject({ status: { level: "needs-you" }, arrived: 5 })
   })
 
   test("a root that raises something offers not needed first in its ⋯; a working one does not", () => {
@@ -274,17 +277,21 @@ describe("sidebarView", () => {
       lane: threadIdFor("a"),
       end: entryId("e"),
       level: "worth-a-read",
-      raised: { kind: "ready", source: cardIdFor("c1") },
+      raised: { kind: "proposed", state: "ready", source: cardIdFor("c1") },
     }
     const [raised] = items({
-      status: new Map([[K("r1"), { kind: "worth-a-read", item }]]),
+      status: new Map([
+        [K("r1"), { level: "worth-a-read", raised: true, item }],
+      ]),
     })
     expect(raised?.kind === "canvas" && raised.menu[0]).toEqual({
       kind: "not-needed",
       intent: { kind: "not-needed", lane: item.lane, raised: item.raised },
     })
     const [working] = items({
-      status: new Map([[K("r1"), { kind: "working" }]]),
+      status: new Map([
+        [K("r1"), { level: "running", raised: true, item: null }],
+      ]),
     })
     expect(working?.kind === "canvas" && working.menu[0]).toEqual({
       kind: "rename",

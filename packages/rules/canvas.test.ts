@@ -3,11 +3,11 @@ import {
   cardIdOfKind,
   type ImageCard,
   makeCard,
-  NO_CONTENT,
   type Sha256,
   type ThreadId,
   type ThreadName,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -62,7 +62,7 @@ const cardsFor = (
             owner: ADA,
             placer,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
         : {
             kind: "thread",
@@ -70,7 +70,7 @@ const cardsFor = (
             owner: ADA,
             placer,
             place,
-            content: NO_CONTENT,
+            content: UNTICKED,
           }
     }),
     K,
@@ -112,6 +112,17 @@ describe("the canvas list", () => {
     expect(canvasList(facts({ reading: null })).lines[0]).toBe(
       "thread amber-fox, idle, put by Ada",
     )
+  })
+
+  test("a ticked column's line says its box is ticked, last", () => {
+    const onCanvas = cardsFor([A, N, B]).map(c =>
+      c.id === B || c.id === N ? { ...c, content: { ticked: true } } : c,
+    )
+    expect(canvasList(facts({ onCanvas })).lines).toEqual([
+      "thread amber-fox (this thread), put by Ada",
+      `note column "Decisions" (${N}), 4 notes, put by Bea, box ticked`,
+      "thread calm-owl, running, put by Bea, box ticked",
+    ])
   })
 
   test("at most CANVAS_CAP lines, the rest counted", () => {
@@ -375,7 +386,7 @@ describe("a media column on the canvas", () => {
     "media",
     M,
     { kind: "canvas", canvas: K, order: "0000000009", width: 1 },
-    NO_CONTENT,
+    UNTICKED,
     ADA,
   )
   const onCanvas = cardsOnCanvas([column], K)

@@ -535,6 +535,9 @@ reading the store once, planning once, then acting:
     `modelSaid` respelled `model-said` and its urgency `needs-you` or
     `worth-a-read` (`runEndReportNow`), read raw: the old shape no longer
     decodes.
+  - `0026-card-ticked` registers the places document's new hash: its card
+    record gains `ticked`, a column's box, which a stored record without it
+    reads as "", unticked (ADR-0198). It moves no data.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents

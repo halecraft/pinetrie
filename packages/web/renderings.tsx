@@ -50,6 +50,7 @@ import { BoundCardEditor } from "./card-editor.tsx"
 import { InventoryIcon } from "./icons.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Initial } from "./presence.tsx"
+import { ColumnDot } from "./root-signals.tsx"
 import { ThreadIconImage } from "./thread-icon-image.tsx"
 import { ThreadPreviewView } from "./thread-preview.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
@@ -166,6 +167,14 @@ export function CompactCard({ compact }: { compact: Compact }) {
         )}
         {mark.kind === "thread" && mark.icon !== null && (
           <ThreadIconImage className="compact-mark" icon={mark.icon} />
+        )}
+        {mark.kind === "thread" && mark.status !== null && (
+          <ColumnDot
+            arrived={null}
+            done={null}
+            nameOf={reader.nameOf}
+            status={mark.status}
+          />
         )}
         {words.command !== null && (
           <span className="card-chip">{words.command}</span>

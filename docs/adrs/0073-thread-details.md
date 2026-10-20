@@ -8,6 +8,9 @@ Numbered 0071 until 2026-10-04, when two files held that number.
     lane started is in them, offered only below the path's first message.
   - ADR-0053: the icon is also drawn magnified, in the thread's details, where
     it spins in as they are opened.
+- **Amended by:**
+  - ADR-0198: the header's line, the name and the free space after it, opens
+    the details, for every thread column.
 
 **Context.** A column's header names the agent working in it, `✦ amber-fox`,
 or its banner icon in the star's place (ADR-0040, ADR-0053). Clicking the

@@ -5,9 +5,9 @@ import {
   type ImageVersion,
   imageMargin,
   makeCard,
-  NO_CONTENT,
   type Sha256,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { canvasCard } from "@pinetrie/core/fixtures"
@@ -55,7 +55,7 @@ const column = (
     place.kind === "canvas" || place.kind === "trash"
       ? place
       : { kind: "canvas", canvas: CANVAS, order: "m", width: 1 },
-    NO_CONTENT,
+    UNTICKED,
     ADA,
   )
 
@@ -143,7 +143,7 @@ describe("putting images", () => {
       "media",
       OTHER,
       { kind: "canvas", canvas: CANVAS, order: "n", width: 1 },
-      NO_CONTENT,
+      UNTICKED,
       ADA,
     )
     const at = (n: number, column: typeof COLUMN, order: string) =>
@@ -287,7 +287,7 @@ describe("an agent's put_image ask", () => {
     "thread",
     thread,
     { kind: "canvas", canvas: CANVAS, order: "a", width: 1 },
-    NO_CONTENT,
+    UNTICKED,
     ADA,
   )
   const held = makeCard(

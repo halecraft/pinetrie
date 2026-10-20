@@ -3,11 +3,11 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   ROOT_ORIGIN,
   rootIdFor,
   type ThreadId,
   threadIdFor,
+  UNTICKED,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -54,7 +54,7 @@ const onCanvas = (
           owner: ADA,
           placer: ADA,
           place,
-          content: NO_CONTENT,
+          content: UNTICKED,
         }
       : {
           kind: "thread",
@@ -62,7 +62,7 @@ const onCanvas = (
           owner: ADA,
           placer: ADA,
           place,
-          content: NO_CONTENT,
+          content: UNTICKED,
         }
   })
 
@@ -102,7 +102,7 @@ describe("where a thread's card lands as it opens", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "canvas", canvas: K, width: 1 },
-      content: NO_CONTENT,
+      content: UNTICKED,
     })
     expect(ranked([...cards, ...start(cards, B).cards])).toEqual([A, N, B, NEW])
     expect(ranked([...cards, ...start(cards, null).cards])).toEqual([
@@ -211,7 +211,7 @@ describe("a trashed card is in the canvas its left place is in", () => {
       kind: "trash",
       left: { kind: "canvas", canvas: K, order: orderKey(2), width: 1 },
     },
-    content: NO_CONTENT,
+    content: UNTICKED,
   }
   const cards = [...onCanvas([A], [1]), trashedB]
   const threads = new Map([

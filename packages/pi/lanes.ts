@@ -351,8 +351,8 @@ export const NO_CONFLICTS =
 /**
  * The tool an agent leaves a conflict with: when its two sides meant
  * different things, the agent leaves it as it is and asks, and the thread
- * needs the person whatever the files say. Its result's `details` say it
- * asked, which is how the page reads it. Every lane has it, so a lane's tool
+ * needs the person whatever the files say. The host records an ask it
+ * takes (`askedAboutConflict`), which is how the page reads it. Every lane has it, so a lane's tool
  * list never changes between runs: a change drops the lane's earlier
  * thinking.
  */
@@ -388,7 +388,6 @@ export function conflictTool(
               : NO_CONFLICTS,
           },
         ],
-        details: asked ? { asked: true } : undefined,
       }
     },
   }

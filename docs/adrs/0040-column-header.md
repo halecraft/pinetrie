@@ -24,6 +24,8 @@
     task.
   - ADR-0134: a column's header ends in ⋯ and × on every column; ⇲, ⠿ and ⇤
     leave it, and the whole header drags.
+  - ADR-0198: the header's rows other than its first move into its details,
+    except a raised needs-you row and an ssh request.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

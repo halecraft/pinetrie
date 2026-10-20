@@ -834,8 +834,8 @@ item 18, and in `lanes.test.ts` against the harness.
   - **`ask_about_conflict`** (`conflictTool`, `lanes.ts`; renamed from
     `ask_for_guidance` by ADR-0080) is taken while jj finds a conflict in the
     lane's copy, in any run (`LaneHooks.askedAboutConflict`, async). Taken,
-    its result's `details` are `{ asked: true }`, which the page reads
-    (`renderableMessage`, `conflictAskTime`), never its text. Refused, it
+    the host records it (`pinetrie.conflict-ask`, `CONFLICT_ASK`), which is
+    what the page reads, never the result's text or `details`. Refused, it
     answers `NO_CONFLICTS`.
   - **The list is `TOOL_IDS`, the same in every run** (`agent.ts`), and set
     once where a lane is held (`existing()` in `thread-lanes.ts`). A new

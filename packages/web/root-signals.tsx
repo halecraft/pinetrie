@@ -15,6 +15,7 @@ import type {
 import {
   attentionWords,
   moving,
+  NO_STATUS_WORDS,
   type OpenMenus,
   peopleHere,
   peopleIn,
@@ -51,7 +52,7 @@ export function RootStatus({
 }) {
   const signal = statusSignal(status, moving(done, Date.now()))
   if (signal === null) return null
-  if (status === null || status.kind === "working")
+  if (status === null || status.item === null)
     return (
       <SignalMark arrived={status === null ? done : null} signal={signal} />
     )
@@ -60,6 +61,49 @@ export function RootStatus({
       arrived={arrived}
       signal={signal}
       title={`${signalWords(signal)}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
+    />
+  )
+}
+
+/**
+ * A column's dot, after its name, folded or not: its thread's status
+ * (`statusSignal`), quiet when not raised for you, or a grey dot with
+ * nothing to say, so the line keeps its shape.
+ */
+export function ColumnDot({
+  status,
+  arrived,
+  done,
+  nameOf,
+}: {
+  status: Status | null
+  arrived: number | null
+  done: number | null
+  nameOf: ReadonlyMap<WriterId, string>
+}) {
+  const signal = statusSignal(status, moving(done, Date.now()))
+  if (signal === null)
+    return (
+      <span
+        aria-label={NO_STATUS_WORDS}
+        className="signal"
+        data-signal="none"
+        role="img"
+        title={NO_STATUS_WORDS}
+      />
+    )
+  const why =
+    status === null || status.item === null
+      ? null
+      : attentionWords(status.item.raised, w => nameFor(nameOf, w))
+  return (
+    <SignalMark
+      arrived={status === null ? done : arrived}
+      quiet={status !== null && !status.raised}
+      signal={signal}
+      title={
+        why === null ? signalWords(signal) : `${signalWords(signal)}: ${why}`
+      }
     />
   )
 }

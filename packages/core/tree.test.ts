@@ -17,7 +17,6 @@ import {
   baseKnown,
   callSubject,
   canvasIdFor,
-  conflictAskTime,
   type EntryLike,
   entryId,
   entryMessage,
@@ -801,32 +800,6 @@ describe("pinned cards in the tree", () => {
       ]),
     )
     expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
-  })
-})
-
-describe("conflictAskTime", () => {
-  const asked = (id: string, parent: string | null, at: number) =>
-    entry(id, parent, toolResultMessage({ content: "Asked.", asked: true }), {
-      timestamp: at,
-    })
-  const list = [
-    entry("1-p", null, personMessage("p", { author: "A" })),
-    asked("2-a", "1-p", 20),
-    entry("3-c", "2-a", undefined, { type: "compaction" }),
-    entry("4-r", "3-c", toolResultMessage({ content: "No conflict." })),
-    asked("5-a", "4-r", 50),
-    entry("6-q", "5-a", personMessage("q", { author: "A" })),
-  ]
-  const index = indexTree(entriesById(list))
-
-  test("the newest ask on the path, by its time; none before the first", () => {
-    expect(conflictAskTime(index, entryId("6-q"))).toBe(50)
-    expect(conflictAskTime(index, entryId("1-p"))).toBeNull()
-    expect(conflictAskTime(index, null)).toBeNull()
-  })
-
-  test("an ask stays a fact past a compaction, and a result that did not ask is none", () => {
-    expect(conflictAskTime(index, entryId("4-r"))).toBe(20)
   })
 })
 

@@ -8,7 +8,6 @@ import path from "node:path"
 import {
   ancestry,
   commitId,
-  conflictAskTime,
   type EntryId,
   entryId,
   HOST_OPERATOR,
@@ -23,6 +22,7 @@ import { DEFAULT_REPO, laneBase, startOfProposed } from "@pinetrie/jj"
 import { type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import {
+  readConflictAsks,
   readNames,
   readPlaces,
   readProject,
@@ -791,7 +791,9 @@ async function mainSection(
       : undefined
     // A resolution ends as any run: no ask about a conflict.
     const askedAt =
-      two === undefined ? null : conflictAskTime(tree(), laneTip(two.name))
+      two === undefined
+        ? null
+        : (readConflictAsks(wh.session).get(two.name)?.at ?? null)
     check(
       "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the proposed changes come back clean",
       landMessage?.text.includes("1 file conflicts") === true &&

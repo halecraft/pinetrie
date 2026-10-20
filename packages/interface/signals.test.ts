@@ -5,13 +5,13 @@ import {
   canvasIdFor,
   cardIdOfKind,
   type EntryLike,
-  NO_CONTENT,
   rootIdFor,
   type TextCard,
   type ThreadId,
   type TreeIndex,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { landedThreadCard } from "@pinetrie/rules/fixtures"
@@ -33,9 +33,12 @@ import {
 /** Every signal: a key missing here, or one that is no signal, does not compile. */
 const EVERY_SIGNAL: Record<Signal, true> = {
   unsent: true,
-  "needs-you": true,
-  "worth-a-read": true,
+  accepted: true,
   running: true,
+  "worth-a-read": true,
+  ready: true,
+  conflicts: true,
+  "needs-you": true,
   done: true,
 }
 const SIGNALS = Object.keys(EVERY_SIGNAL) as Signal[]
@@ -120,7 +123,7 @@ const canvases = canvasesWith({
       owner: ADA,
       placer: ADA,
       place: { kind: "canvas", canvas: K("g1"), order: "z", width: 1 },
-      content: NO_CONTENT,
+      content: UNTICKED,
     },
   ],
   threads: new Map(),
@@ -154,12 +157,17 @@ describe("signals as one family", () => {
       "a canvas not in the sidebar: needs you",
     )
   })
-  test("a status's signal: running while its agent works, its level's when raised, done while a finished run fades, else none", () => {
-    const raised = (level: (typeof LEVELS)[number]): Status =>
-      ({ kind: level, item: {} }) as unknown as Status
-    expect(statusSignal({ kind: "working" }, true)).toBe("running")
-    expect(statusSignal(raised("needs-you"), true)).toBe("needs-you")
-    expect(statusSignal(raised("worth-a-read"), false)).toBe("worth-a-read")
+  test("a status's signal: its level, done while a finished run fades over nothing raised, else none", () => {
+    const status = (level: (typeof LEVELS)[number], raised = true): Status => ({
+      level,
+      raised,
+      item: null,
+    })
+    expect(statusSignal(status("running"), true)).toBe("running")
+    expect(statusSignal(status("needs-you"), true)).toBe("needs-you")
+    expect(statusSignal(status("worth-a-read"), false)).toBe("worth-a-read")
+    expect(statusSignal(status("ready", false), false)).toBe("ready")
+    expect(statusSignal(status("ready", false), true)).toBe("done")
     expect(statusSignal(null, true)).toBe("done")
     expect(statusSignal(null, false)).toBeNull()
   })

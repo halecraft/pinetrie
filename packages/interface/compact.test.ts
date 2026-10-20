@@ -3,12 +3,12 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   type NoteColumnCard,
   type RelayDetails,
   type Sha256,
   type TextCard,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, threadOfEntry } from "@pinetrie/core/fixtures"
@@ -64,7 +64,7 @@ const notes: NoteColumnCard = {
   owner: ADA,
   placer: ADA,
   place: { kind: "canvas", canvas: CANVAS, order: "a", width: 1 },
-  content: NO_CONTENT,
+  content: UNTICKED,
 }
 const threadGlanceOfT: ThreadGlance = threadGlance({
   thread: T,
@@ -72,6 +72,7 @@ const threadGlanceOfT: ThreadGlance = threadGlance({
   lanes: [],
   names: new Map([[T, "amber-fox" as never]]),
   focuses: new Map(),
+  statuses: new Map(),
   iconFor: () => null,
 })
 const M = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000e5")
@@ -117,7 +118,7 @@ const threadCard: DrawnCard = {
   owner: ADA,
   placer: ADA,
   place: { kind: "inventory", holder: ADA },
-  content: NO_CONTENT,
+  content: UNTICKED,
 }
 const relay: RelayDetails = {
   from: threadIdFor("here"),
@@ -141,7 +142,7 @@ const EVERY_KIND: Readonly<Record<DrawnKind, DrawnCard>> = {
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA },
-    content: NO_CONTENT,
+    content: UNTICKED,
   },
   image: {
     kind: "image",
@@ -263,7 +264,7 @@ describe("cardCompact", () => {
 describe("a folded column", () => {
   test("draws a note column's glance and a thread's, worded for its strip", () => {
     const folded = foldedView(
-      { kind: "notes", card: N, folded: true, width: 1 },
+      { kind: "notes", card: N, folded: true, width: 1, ticked: false },
       {
         threadGlanceOf: () => threadGlanceOfT,
         notes: facts.notes,
@@ -277,7 +278,14 @@ describe("a folded column", () => {
       count: 2,
     })
     const thread = foldedView(
-      { kind: "thread", card: T, column: {} as Column, folded: true, width: 1 },
+      {
+        kind: "thread",
+        card: T,
+        column: {} as Column,
+        folded: true,
+        width: 1,
+        ticked: false,
+      },
       {
         threadGlanceOf: () => threadGlanceOfT,
         notes: facts.notes,
@@ -306,6 +314,7 @@ test("a thread's glance carries its icon, a chat's with no lane included", () =>
     lanes: [],
     names,
     focuses: new Map(),
+    statuses: new Map(),
     iconFor: thread =>
       threadIcon({
         thread,
@@ -332,7 +341,7 @@ test("a media column's compact is its title and how many images it holds; an ima
     "2 of 2",
   ])
   const folded = foldedView(
-    { kind: "media", card: M, folded: true, width: 1 },
+    { kind: "media", card: M, folded: true, width: 1, ticked: false },
     {
       threadGlanceOf: () => threadGlanceOfT,
       notes: facts.notes,
@@ -359,7 +368,7 @@ describe("foldedMark", () => {
     })
     expect(foldedMark(threadGlanceOfT)).toEqual({ kind: "thread", icon: null })
     const folded = foldedView(
-      { kind: "notes", card: N, folded: true, width: 1 },
+      { kind: "notes", card: N, folded: true, width: 1, ticked: false },
       {
         threadGlanceOf: () => threadGlanceOfT,
         notes: facts.notes,

@@ -18,6 +18,7 @@ import { WORKFLOW } from "./board.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { CARD_TITLE } from "./card-title.ts"
 import { COMMANDS } from "./commands.ts"
+import { CONFLICT_ASK } from "./conflict-ask.ts"
 import { DIGEST } from "./digest.ts"
 import { FOCUS } from "./focus.ts"
 import { CONFLICT, FOLDER_WRITE_JOURNAL, STATE } from "./folder-records.ts"
@@ -74,6 +75,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   TRACE,
   RUN_END_REPORT,
   FOCUS,
+  CONFLICT_ASK,
   WORKFLOW,
 ]
 

@@ -17,6 +17,9 @@
     reaches pi.
   - ADR-0123: in story, a tool row with an intent leads with it, and its
     command is in its detail.
+- **Amended by:**
+  - ADR-0198: the focus row moves into the details; a strip's tooltip keeps
+    it.
 
 **Context.** Coming back to a column costs a reader too much. Nothing says
 what the thread is about: its header names its agent and where it forked.

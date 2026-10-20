@@ -1,6 +1,6 @@
-// S280's event: bytes that entered the watched pipe, by whom, in the pipe's order.
-#ifndef S280_ATTR_H
-#define S280_ATTR_H
+// S283's event: bytes that entered the watched pipe, by whom, in the pipe's order.
+#ifndef S283_ATTR_H
+#define S283_ATTR_H
 
 enum route {
   ROUTE_WRITE = 1,   // anon_pipe_write's copy (write, writev, io_uring write)

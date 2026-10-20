@@ -1,12 +1,12 @@
-// interface/column-menu — what a card column's head ends in, as values: its
-// ⋯, what changes the canvas everyone shares, ending in its trash; then one
-// button that is yours or loses nothing: ⇤, or the bin on a thread not yet
-// started.
+// interface/column-menu — a card column's head, folded or not, as values. It
+// starts with its toggle, ⇤ or ⇥, yours alone, or the bin on a thread not yet
+// started, and the card's box, everyone's; an unfolded head ends in its ⋯,
+// what changes the canvas everyone shares, ending in its trash.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
 import { moveWords } from "./card-frame.ts"
 import type { ControlWords } from "./card-words.ts"
-import { FOLD } from "./folded-column-view.ts"
+import { foldToggle } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
 
 export interface ColumnMenuItem {
@@ -28,10 +28,24 @@ export interface HeadButton {
   readonly intent: Intent
 }
 
-/** What a card column's head ends in, after its name: its ⋯, then one button or none. */
-interface HeadEnd {
+/** A column's box: whether it is ticked, what it says, and what a press asks; null intent for a reader who may not change it. */
+export interface HeadBox {
+  readonly ticked: boolean
+  readonly title: string
+  readonly intent: Intent | null
+}
+
+/**
+ * A card column's head, folded or not, in its order: the toggle first, so
+ * it stays where it is as the column folds; the box; then, unfolded, its ⋯
+ * at the end.
+ */
+export interface ColumnHead {
+  /** ⇤ or ⇥, or the bin on a thread not yet started; null for none. */
+  readonly toggle: HeadButton | null
+  readonly box: HeadBox
+  /** ⋯, unfolded only: a column is unfolded to act on it. */
   readonly menu: readonly ColumnMenuSection[]
-  readonly button: HeadButton | null
 }
 
 /** The title of the bin and of Move to trash: the card goes to the canvas's trash, for everyone. */
@@ -56,27 +70,47 @@ const trashIntent = (card: CardId): Intent => ({
   at: { kind: "column", key: card },
 })
 
+/** What a column's box says, by whether it is ticked and whether the reader may change it. */
+const boxTitle = (ticked: boolean, writable: boolean): string =>
+  !writable
+    ? ticked
+      ? "its box is ticked: only someone who may change this canvas changes it"
+      : "only someone who may change this canvas ticks its box"
+    : ticked
+      ? "clear this column's box, for everyone"
+      : "tick this column's box, for everyone: it means what you mean, done or set aside"
+
 /**
- * What a card column's head ends in, for its card `card`, now `width`
- * columns wide. ⋯ holds what is everyone's; the button is yours or loses
- * nothing, so a thread not yet started closes there and does not fold.
+ * A card column's head, for its card `card`, now `width` columns wide,
+ * folded or not. The toggle is yours or loses nothing, so a thread not yet
+ * started trashes there and does not fold; the box and ⋯ are everyone's.
  */
-export function columnHeadEnd(input: {
+export function columnHead(input: {
   readonly card: CardId
   readonly width: CardWidth
-  /** Whether the reader may trash it: no trash in ⋯, and no bin, otherwise. */
+  /** Whether the reader may change the canvas: no trash, no bin and no box to change, otherwise. */
   readonly writable: boolean
   /** A thread not yet started (`isNextSendBranch`); false for a note column. */
   readonly unstarted: boolean
-}): HeadEnd {
-  const { card } = input
+  readonly folded: boolean
+  readonly ticked: boolean
+}): ColumnHead {
+  const { card, folded, ticked, writable } = input
   return {
-    menu: columnMenu(input),
-    button: !input.unstarted
-      ? { words: FOLD, intent: { kind: "fold", card, unfolded: false } }
-      : input.writable
+    toggle: !input.unstarted
+      ? {
+          words: foldToggle(folded),
+          intent: { kind: "fold", card, unfolded: folded },
+        }
+      : writable
         ? { words: TRASH, intent: trashIntent(card) }
         : null,
+    box: {
+      ticked,
+      title: boxTitle(ticked, writable),
+      intent: writable ? { kind: "card-tick", card, ticked: !ticked } : null,
+    },
+    menu: folded ? [] : columnMenu(input),
   }
 }
 

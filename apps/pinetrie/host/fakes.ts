@@ -24,6 +24,7 @@ import {
   type Target,
   type ThreadId,
   threadIdFor,
+  UNTICKED,
   type ValueWrite,
   type WorkflowStateId,
   type WriterId,
@@ -446,7 +447,7 @@ export function putNoteColumn(
           order: orderAfter(cardsOnCanvas(readPlaces(b.places), canvas)),
           width: 1,
         },
-        content: NO_CONTENT,
+        content: UNTICKED,
       },
     },
   ])

@@ -1,5 +1,5 @@
 #!/bin/sh
-# S280's guest: PID 1 on the lane VM's kernel. Runs the driver three times and each control once, prints
+# S283's guest: PID 1 on the lane VM's kernel. Runs the driver three times and each control once, prints
 # what it measured between markers, and powers off.
 export PATH=/bin
 mount -t devtmpfs dev /dev

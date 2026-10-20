@@ -20,6 +20,7 @@ import {
   shownVersion,
   type ThreadId,
   textCardId,
+  UNTICKED,
   WRAPS,
   workflowStateIdFor,
   writerId,
@@ -81,13 +82,13 @@ describe("KINDS", () => {
   test("makeCard makes a card of its kind, at a place its kind is in, by its maker", () => {
     const thread = "t-1" as ThreadId
     const inventory = { kind: "inventory", holder: ADA } as const
-    expect(makeCard("thread", thread, inventory, NO_CONTENT, ADA)).toEqual({
+    expect(makeCard("thread", thread, inventory, UNTICKED, ADA)).toEqual({
       kind: "thread",
       id: thread,
       owner: ADA,
       placer: ADA,
       place: inventory,
-      content: {},
+      content: { ticked: false },
     })
     const queued = {
       kind: "queued",
@@ -97,7 +98,7 @@ describe("KINDS", () => {
       seen: "",
     } as const
     // @ts-expect-error: a thread's card is never queued
-    makeCard("thread", thread, queued, NO_CONTENT, ADA)
+    makeCard("thread", thread, queued, UNTICKED, ADA)
     const fact = "x-1" as FactCardId
     // @ts-expect-error: a fact is never in an inventory
     makeCard("fact", fact, inventory, { fact: null as never }, ADA)
@@ -115,7 +116,7 @@ test("a card's words are where its kind says (`KINDS`' text): cardTextSource agr
       { command: null, unsent: null, origin: null },
       ADA,
     ),
-    makeCard("thread", thread, place, NO_CONTENT, ADA),
+    makeCard("thread", thread, place, UNTICKED, ADA),
     makeCard(
       "canvas",
       `k-${UUID}` as CanvasId,
@@ -127,7 +128,7 @@ test("a card's words are where its kind says (`KINDS`' text): cardTextSource agr
       "note-column",
       `n-${UUID}` as NoteColumnId,
       { kind: "canvas", canvas: `k-${UUID}` as CanvasId, order: "a", width: 1 },
-      NO_CONTENT,
+      UNTICKED,
       ADA,
     ),
     makeCard(
@@ -151,7 +152,7 @@ test("a card's words are where its kind says (`KINDS`' text): cardTextSource agr
       { address: { kind: "thread", thread }, quote: "a".repeat(64) as Sha256 },
       ADA,
     ),
-    makeCard("media", cardIdOfKind("media", UUID), place, NO_CONTENT, ADA),
+    makeCard("media", cardIdOfKind("media", UUID), place, UNTICKED, ADA),
     makeCard(
       "image",
       cardIdOfKind("image", UUID),
@@ -226,7 +227,7 @@ test("a card's blobs are a reference's quote and every version of an image, none
   expect(shownVersion(image)?.sha256).toBe(v2)
   expect(
     cardBlobs(
-      makeCard("media", cardIdOfKind("media", UUID), place, NO_CONTENT, ADA),
+      makeCard("media", cardIdOfKind("media", UUID), place, UNTICKED, ADA),
     ),
   ).toEqual([])
 })

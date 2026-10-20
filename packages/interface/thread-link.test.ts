@@ -2,9 +2,9 @@ import {
   type CardRecord,
   canvasIdFor,
   entryId,
-  NO_CONTENT,
   type TranscriptMessage,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
@@ -28,7 +28,7 @@ const at = (place: CardRecord["place"]): CardRecord[] => [
     owner: ADA,
     placer: ADA,
     place,
-    content: NO_CONTENT,
+    content: UNTICKED,
   } as CardRecord,
 ]
 const E = entryId("e-1")

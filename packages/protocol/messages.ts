@@ -132,6 +132,7 @@ export const COMMAND_KINDS = [
   "queue-card",
   "reorder",
   "card-width",
+  "card-tick",
   "queue-hold",
   "unqueue-all",
   "spin-off",

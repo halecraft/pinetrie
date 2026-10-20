@@ -36,6 +36,7 @@ import {
   type CardView,
   canvasColumns,
   defaultView,
+  firstUnticked,
   keptTaskView,
   openColumns,
   type Strip,
@@ -315,7 +316,34 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
  */
 export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
   const open = drawnList(facts.list, facts.archived, stored.active)
-  return sameList(open, stored.open) ? stored : { ...stored, open }
+  const listed = sameList(open, stored.open) ? stored : { ...stored, open }
+  return keptOnceDrawn(listed, facts.cardsOn)
+}
+
+/**
+ * The canvas you are on with its default view kept (`defaultView`), once
+ * its cards are drawn: a tick someone makes later unfolds or folds nothing
+ * under you. A canvas whose cards have not arrived keeps none yet, or it
+ * would keep a view with nothing unfolded.
+ */
+function keptOnceDrawn(
+  layout: Layout,
+  cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>,
+): Layout {
+  const { active } = layout
+  if (active?.kind !== "canvas" || layout.canvases.has(active.canvas))
+    return layout
+  const cards = cardsOn.get(active.canvas) ?? []
+  return cards.length === 0
+    ? layout
+    : {
+        ...layout,
+        canvases: withView(
+          layout.canvases,
+          active.canvas,
+          defaultView(firstUnticked(cards)),
+        ),
+      }
 }
 
 /**

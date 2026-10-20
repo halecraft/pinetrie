@@ -1,50 +1,60 @@
-// web/column-menu — how a card column's head ends, a thread's and a note
-// column's alike, as `columnHeadEnd` decides: its ⋯, then one button, ⇤,
-// which folds it for you, or a bin on a thread not yet started, which trashes
-// it.
+// web/column-menu — a card column's head as `columnHead` decides, a thread's,
+// a note column's and a media column's alike, folded or not: its start, the
+// toggle (⇤ or ⇥, or a bin on a thread not yet started) and the card's box;
+// and, unfolded, its ⋯ at the end.
 
-import type { CardId, CardWidth } from "@pinetrie/core"
 import {
   COLUMN_MENU_LABEL,
+  type ColumnHead,
   type ColumnMenuSection,
-  columnHeadEnd,
   type Intent,
 } from "@pinetrie/interface"
 import { IconButton } from "./button.tsx"
 import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
-export function ColumnHeadEnd(p: {
-  card: CardId
-  width: CardWidth
-  /** Whether the reader may trash it: no trash in ⋯, and no bin, otherwise. */
-  writable: boolean
-  /** A thread not yet started: a bin in place of ⇤. */
-  unstarted: boolean
+/**
+ * A head's start: the toggle, then the box. The toggle comes first, so it
+ * is in the same place folded or not, and a second click lands on it.
+ */
+export function ColumnHeadStart(p: {
+  head: ColumnHead
   onIntent: (intent: Intent) => void
 }) {
-  const end = columnHeadEnd(p)
-  const { button } = end
+  const { toggle, box } = p.head
+  const { intent } = box
   return (
     <>
-      <ColumnMenu onIntent={p.onIntent} sections={end.menu} />
-      {button !== null && (
+      {toggle !== null && (
         <IconButton
-          label={button.words.title}
-          className={button.words.className}
-          onClick={() => p.onIntent(button.intent)}
+          label={toggle.words.title}
+          className={toggle.words.className}
+          onClick={() => p.onIntent(toggle.intent)}
         >
-          {button.intent.kind === "trash" ? <TrashIcon /> : button.words.label}
+          {toggle.intent.kind === "trash" ? <TrashIcon /> : toggle.words.label}
         </IconButton>
       )}
+      <input
+        aria-label={box.title}
+        checked={box.ticked}
+        className="column-box"
+        disabled={intent === null}
+        onChange={() => {
+          if (intent !== null) p.onIntent(intent)
+        }}
+        title={box.title}
+        type="checkbox"
+      />
     </>
   )
 }
 
-function ColumnMenu(p: {
+/** An unfolded head's ⋯: what changes the canvas everyone shares. */
+export function ColumnMenu(p: {
   sections: readonly ColumnMenuSection[]
   onIntent: (intent: Intent) => void
 }) {
+  if (p.sections.length === 0) return null
   return (
     <Menu
       className="column-more"

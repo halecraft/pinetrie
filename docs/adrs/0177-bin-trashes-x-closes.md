@@ -10,6 +10,8 @@
     not ×.
   - ADR-0171: the bench has a bar of put and trash, always drawn; a slot has
     no ×, and Delete on a selected slot trashes its card.
+- **Amended by:**
+  - ADR-0198: an unstarted thread's bin takes the fold toggle's place.
 
 **Context.**
 

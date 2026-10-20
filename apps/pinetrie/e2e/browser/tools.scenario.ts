@@ -1629,6 +1629,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("write two files")
         await toolIdle()
+        // The proposed changes are in the column's details: its line opens them.
+        await tp
+          .click(`${col(0)} .head-line[aria-expanded="false"]`, {
+            timeout: 2_000,
+          })
+          .catch(() => {})
         const acceptShown = await appears(
           `${col(0)} .work.work-strip[data-state="ready"] .work-accept`,
         )

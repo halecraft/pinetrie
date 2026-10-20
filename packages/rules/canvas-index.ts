@@ -30,6 +30,7 @@ import {
   type ThreadRecord,
   type TreeIndex,
   threadOfPlace,
+  UNTICKED,
   type ValueWrite,
   type WorkflowStateId,
   type WriterId,
@@ -385,7 +386,7 @@ export function planThreadOpen(input: {
   })()
   const made = planMake(
     cards,
-    makeCard("thread", thread, ranked.to, NO_CONTENT, by),
+    makeCard("thread", thread, ranked.to, UNTICKED, by),
     by,
   )
   if (made.kind === "refused") return made

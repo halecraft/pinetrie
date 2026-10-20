@@ -207,7 +207,7 @@ function menuOf(
 ): readonly ItemMenuItem[] {
   const { status } = head
   return [
-    ...(status === null || status.kind === "working"
+    ...(status === null || status.item === null
       ? []
       : [
           {

@@ -4,12 +4,18 @@ import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, json, Schema } from "@kyneta/schema"
-import { CONTROL_TOPIC, LIVE_DOC_ID } from "@pinetrie/protocol/messages"
+import {
+  CONTROL_TOPIC,
+  LIVE_DOC_ID,
+  PLACES_DOC_ID,
+} from "@pinetrie/protocol/messages"
 import { afterEach, describe, expect, test } from "vitest"
 import { lineDocPrefix } from "../lines.ts"
-import { SCHEMA_OF, type StoredKind } from "../policy.ts"
+import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { openStore } from "../store.ts"
+import { CARD_TICKED } from "./0026-card-ticked.ts"
 import {
+  MIGRATIONS,
   type Migration,
   migrate,
   migrationNameClash,
@@ -68,7 +74,7 @@ describe("the stored schemas", () => {
     expect(now).toEqual({
       session: "0223893f102c08dc9c7b6f976f712a842a",
       live: "028e3f891b8953894c3667be8ca55a5946",
-      places: "021c2551de2c5407d0256bc79fb580ee86",
+      places: "02d75eb7709972026cd9702fe1d99a668a",
       root: "02065b897f9f33229f2318be54d33c6e76",
       scratch: "0273580c3e061af065151eb6b6f081aeb0",
       text: "02cd0629243854b7d6f39abbc4ace6f345",
@@ -76,6 +82,24 @@ describe("the stored schemas", () => {
       attention: "024af7116f828237ae36a7acf7d388c385",
       open: "0234911a0091f81a8124b5fbfa5d339b44",
     })
+  })
+})
+
+describe("0026-card-ticked", () => {
+  test("a places document stored before ticks opens through it, moving no data", () => {
+    expect(
+      planOpen({
+        stored: new Map([[PLACES_DOC_ID, CARD_TICKED.from]]),
+        kindOf: storedKind,
+        hashOf: kind => SCHEMA_OF[kind].schemaHash,
+        migrations: MIGRATIONS,
+      }),
+    ).toEqual({
+      kind: "open",
+      run: [{ migration: CARD_TICKED, docIds: [PLACES_DOC_ID] }],
+      unknown: [],
+    })
+    expect(CARD_TICKED.run).toBeUndefined()
   })
 })
 

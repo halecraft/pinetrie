@@ -32,7 +32,7 @@ import {
 } from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"
-import { FOLD, UNFOLD, UNNAMED_THREAD } from "./folded-column-view.ts"
+import { foldToggle, UNNAMED_THREAD } from "./folded-column-view.ts"
 import { type CanvasSummary, NO_TEXT } from "./root-label.ts"
 import type { Reader } from "./send.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
@@ -227,13 +227,13 @@ export function canvasColumnView(input: {
 
 /** The canvas column's ⇤, which folds it to a strip: a card column's, titled for the canvas. */
 export const FOLD_CANVAS: ControlWords = {
-  ...FOLD,
+  ...foldToggle(false),
   title: "fold the canvas's column: only you see your folds",
 }
 
 /** The canvas column folded: its button, which unfolds it, a card column's strip's. */
 export const UNFOLD_CANVAS: ControlWords = {
-  ...UNFOLD,
+  ...foldToggle(true),
   title:
     "the canvas: its title, its state, who is here, its pins and what its agents are told",
 }

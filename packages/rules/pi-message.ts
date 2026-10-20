@@ -6,7 +6,6 @@
 
 import {
   type AgentMessageLike,
-  CONFLICT_TOOL,
   GET_LATEST_TOOL,
   type MessageContent,
   type MessagePart,
@@ -55,8 +54,6 @@ const ToolResultSchema = Type.Object({
   details: Type.Optional(Type.Unknown()),
 })
 
-const AskedSchema = Type.Object({ asked: Type.Literal(true) })
-
 const MergedSchema = Type.Object({
   merged: Type.Array(Type.String({ minLength: 1 })),
 })
@@ -88,20 +85,16 @@ const messageContent = (
 
 /**
  * What a tool result of the host's tools says as a fact, from its
- * `details`, never its text: an `ask_about_conflict` the host took, the
- * states a `catch_up` merged, or what `propose_branches` proposed. Empty for
- * any other result.
+ * `details`, never its text: the states a `catch_up` merged, or what
+ * `propose_branches` proposed. Empty for any other result.
  */
 function toolResultFacts(
   result: Static<typeof ToolResultSchema>,
 ):
-  | { readonly asked: true }
   | { readonly merged: readonly PointId[] }
   | { readonly proposal: Proposal }
   | Record<string, never> {
   const { toolName, details } = result
-  if (toolName === CONFLICT_TOOL && isWellFormed(AskedSchema, details))
-    return { asked: true }
   if (toolName === GET_LATEST_TOOL && isWellFormed(MergedSchema, details))
     return { merged: details.merged.map(pointId) }
   if (toolName === PROPOSE_TOOL) {

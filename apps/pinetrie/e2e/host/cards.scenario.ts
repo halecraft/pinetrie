@@ -539,6 +539,7 @@ async function run(check: Checks["check"]): Promise<void> {
         quote: "",
         origin: "",
         versions: "",
+        ticked: "",
       }),
     )
     check(

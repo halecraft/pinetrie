@@ -1,10 +1,10 @@
 import {
   cardIdOfKind,
   entryId,
-  NO_CONTENT,
   type TextCard,
   textCardId,
   threadIdFor,
+  UNTICKED,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -67,7 +67,7 @@ function setUp() {
           order: "zzzzzzzzzz",
           width: 1,
         },
-        content: NO_CONTENT,
+        content: UNTICKED,
       },
     },
     { kind: "write", record: pin },

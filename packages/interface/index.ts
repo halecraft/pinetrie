@@ -68,9 +68,13 @@ export {
   type Moments,
   markLevel,
   moving,
+  needsYou,
+  type RunEndLevel,
+  STRIP_LEVEL,
   type StandingRunEnd,
   type Status,
   standingRunEnds,
+  stripStates,
   threadStatus,
   threadWriters,
 } from "./attention.ts"
@@ -125,6 +129,7 @@ export {
   type CardColumn,
   type CardView,
   defaultView,
+  firstUnticked,
   heldByOthers,
   openColumns,
   type Strip,
@@ -212,8 +217,10 @@ export {
 export type { Codec } from "./codec.ts"
 export {
   COLUMN_MENU_LABEL,
+  type ColumnHead,
   type ColumnMenuSection,
-  columnHeadEnd,
+  columnHead,
+  type HeadBox,
 } from "./column-menu.ts"
 export type { ColumnMotion } from "./column-motion.ts"
 export {
@@ -318,13 +325,13 @@ export {
   foldedMark,
   foldedView,
   foldedWords,
+  foldToggle,
   glanceCardId,
   type ListGlance,
   mediaColumnGlance,
   NO_MARK,
   noteColumnGlance,
   stripTitle,
-  UNFOLD,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
 export { jjWordsIn, wordsIn } from "./folder-words.ts"
@@ -698,6 +705,7 @@ export {
 export {
   elsewhereWords,
   holdsText,
+  NO_STATUS_WORDS,
   ownCards,
   type Signal,
   signalWords,

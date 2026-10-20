@@ -6,6 +6,9 @@
   - ADR-0077: a run-end report that asks something of you shows in its
     thread's column too, and reading past it or dismissing it quiets it there
     rather than clearing it.
+- **Amended by:**
+  - ADR-0198: the run-end status row shows under the header only while raised;
+    read or dismissed, it is in the details, and the dot carries its level.
 
 **Context.** A run's end leaves a run-end report (ADR-0077, ADR-0166):
 needs you, worth a read, or done, with a reason. Only the sidebar's dot on
