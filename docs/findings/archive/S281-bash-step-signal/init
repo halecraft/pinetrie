@@ -1,0 +1,22 @@
+#!/bin/sh
+# S281's guest: PID 1 on the lane VM's kernel. Runs bash under each trap's
+# prelude, prints what the driver printed between markers, and powers off.
+export PATH=/bin:/usr/bin
+mount -t devtmpfs dev /dev
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t tmpfs tmp /tmp
+ln -s /proc/self/fd /dev/fd
+echo 'echo S44' > /tmp/src.sh
+echo "=== smoke"
+timeout 20 bash -c 'echo bash ok' </dev/null 2>&1
+: > /tmp/marks
+BASH_ENV=/prelude-plain.sh timeout 20 bash -c 'echo trap ok; echo two' </dev/null 2>&1
+cat /tmp/marks
+BASH_ENV=/prelude-plain.sh timeout 60 bash -c "$(cat /cmd.sh)" </dev/null 2>&1 | tail -3
+for p in plain functrace; do
+  echo "=== run $p"
+  timeout 300 drive /prelude-$p.sh 2>&1
+done
+echo "=== end"
+poweroff -f

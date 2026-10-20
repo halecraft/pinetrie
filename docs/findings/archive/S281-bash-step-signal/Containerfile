@@ -1,0 +1,20 @@
+# S281's guest: the driver (with attr.bpf.c in its skeleton), static; Alpine's
+# bash and the libraries it loads; busybox; the command and the preludes
+# guest.py wrote. vmlinux.btf is the lane VM kernel's BTF.
+FROM docker.io/library/alpine:3.23
+RUN apk add --no-cache clang llvm libbpf-dev bpftool elfutils-dev zlib-static zstd-static zstd-dev linux-headers build-base busybox-static cpio bash
+COPY vmlinux.btf attr.h attr.bpf.c drive.c init cmd.sh prelude-plain.sh prelude-functrace.sh /src/
+WORKDIR /src
+RUN bpftool btf dump file vmlinux.btf format c > vmlinux.h \
+ && clang -O2 -g -Wall -target bpf -D__TARGET_ARCH_arm64 -I. -c attr.bpf.c -o attr.bpf.o \
+ && bpftool gen skeleton attr.bpf.o name attr_bpf > attr.skel.h \
+ && cc -O2 -Wall -static -I. -o drive drive.c -lbpf -lelf -lz -lzstd -lpthread
+RUN mkdir -p /guest/bin /guest/usr/lib /guest/lib /guest/proc /guest/sys /guest/dev /guest/tmp \
+ && cp /bin/busybox.static /guest/bin/busybox \
+ && for a in $(/bin/busybox.static --list); do ln -sf busybox /guest/bin/$a; done \
+ && cp /bin/bash /guest/bin/bash \
+ && cp /lib/ld-musl-aarch64.so.1 /guest/lib/ \
+ && cp /usr/lib/libreadline.so.8 /usr/lib/libncursesw.so.6 /guest/usr/lib/ \
+ && cp drive /guest/bin/ && cp cmd.sh prelude-plain.sh prelude-functrace.sh /guest/ \
+ && cp init /guest/init && chmod 755 /guest/init \
+ && (cd /guest && find . | cpio -o -H newc --quiet | gzip -1) > /initramfs.cpio.gz
