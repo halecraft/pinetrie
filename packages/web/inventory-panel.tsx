@@ -58,6 +58,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { CardGrid } from "./card-grid.tsx"
 import { CopyIcon, InventoryIcon, TrashIcon } from "./icons.tsx"
 import { DrawCard, PutButton, RenderingProvider } from "./renderings.tsx"
@@ -281,15 +282,14 @@ export function InventoryPanel(p: {
             onSave={() => onIntent({ kind: "save" })}
           />
         )}
-        <button
-          aria-label={CLOSE_INVENTORY.title}
+        <IconButton
+          label={CLOSE_INVENTORY.title}
           className="inventory-close"
           onClick={() => act({ kind: "close" })}
           title={CLOSE_INVENTORY.title}
-          type="button"
         >
           {CLOSE_INVENTORY.label}
-        </button>
+        </IconButton>
       </header>
       <RenderingProvider context={context}>
         <div className="inventory-body">
@@ -315,7 +315,8 @@ export function InventoryPanel(p: {
             bench keeps its height. */}
             <div className="bench-bar">
               <PutButton card={benchCard} />
-              <button
+              <Button
+                look="outline"
                 aria-label={TRASH_SELECTED.title}
                 className="trash-selected"
                 disabled={!trashable}
@@ -323,10 +324,9 @@ export function InventoryPanel(p: {
                   if (benchCard !== null && trashable) trash(benchCard)
                 }}
                 title={TRASH_SELECTED.title}
-                type="button"
               >
                 <TrashIcon /> {TRASH_SELECTED.label}
-              </button>
+              </Button>
             </div>
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: Enter opens it from its slot */}
             {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on it opens its card, as Enter does */}
@@ -385,15 +385,15 @@ function ClipboardChip(p: { cell: ClipboardCellView; onSave: () => void }) {
       <CopyIcon />
       <span className="clipboard-cell-what">{cell.summary.words}</span>
       <span className="clipboard-cell-line">{cell.summary.line}</span>
-      <button
+      <Button
+        look="primary"
         className="save"
         disabled={!cell.save}
         onClick={p.onSave}
         title={SAVE_TITLE}
-        type="button"
       >
         <InventoryIcon way="take" /> {SAVE}
-      </button>
+      </Button>
     </section>
   )
 }

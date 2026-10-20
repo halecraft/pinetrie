@@ -12,6 +12,7 @@ import {
 } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { useContext, useRef, useState } from "react"
+import { Button } from "./button.tsx"
 import { pastedImages } from "./clipboard.ts"
 import { fileDropProps } from "./file-drop.ts"
 import { PictureCrop } from "./picture-crop.tsx"
@@ -73,21 +74,21 @@ export function PictureField({
             writer={writer}
           />
           <div className="picture-actions">
-            <button
+            <Button
+              look="outline"
               className="picture-upload"
               onClick={() => file.current?.click()}
-              type="button"
             >
               {has ? pictureWords.replace : pictureWords.upload}
-            </button>
+            </Button>
             {has && (
-              <button
+              <Button
+                look="outline"
                 className="picture-remove"
                 onClick={() => void send(null)}
-                type="button"
               >
                 {pictureWords.remove}
-              </button>
+              </Button>
             )}
           </div>
           <input

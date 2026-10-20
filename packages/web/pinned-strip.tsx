@@ -21,6 +21,7 @@ import {
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import type { ReactElement } from "react"
+import { Button } from "./button.tsx"
 import { PinnedCardEditor } from "./card-editor.tsx"
 
 export function PinnedStrip(p: {
@@ -74,14 +75,14 @@ export function PinnedStrip(p: {
       ))}
       {p.box}
       {p.onNewPin !== null && (
-        <button
+        <Button
+          look="primary"
           className="new-pin"
           onClick={p.onNewPin}
           title={NEW_PIN_TITLE}
-          type="button"
         >
           {NEW_PIN}
-        </button>
+        </Button>
       )}
     </div>
   )

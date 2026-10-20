@@ -87,6 +87,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { Button } from "./button.tsx"
 import { bindText, useCardBox } from "./card-box.ts"
 import { CardFrame } from "./card-frame.tsx"
 import { eventPastedFiles } from "./clipboard.ts"
@@ -365,16 +366,16 @@ export function CardEditor(p: {
               <div className="read-only">
                 <span className="read-only-label">{readOnly.label}</span>
                 {readOnly.action !== null && (
-                  <button
+                  <Button
+                    look="primary"
                     className="read-only-action"
                     onClick={() => {
                       if (readOnly.action !== null)
                         p.onIntent(readOnly.action.intent)
                     }}
-                    type="button"
                   >
                     {readOnly.action.title}
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (
@@ -387,15 +388,15 @@ export function CardEditor(p: {
                     forkConflicts={p.where.forkConflicts}
                   />
                 )}
-                <button
+                <Button
+                  look="primary"
                   className="send primary"
                   disabled={button.disabled}
                   onClick={() => void submit()}
                   title={button.title ?? undefined}
-                  type="button"
                 >
                   {button.label}
-                </button>
+                </Button>
                 {button.setup && (
                   <a className="composer-setup" href="#setup">
                     {SEE_SETUP}
@@ -422,17 +423,18 @@ export function CardEditor(p: {
       {conflict !== null && (
         <div className="conflict">
           <span className="conflict-text">{conflict.line}</span>{" "}
-          <button
+          <Button
+            look="primary"
             className="queue-after"
             onClick={() =>
               void send(conflict.text, "queue", shownBy(current.current))
             }
             title={queue.title ?? undefined}
-            type="button"
           >
             {queue.label}
-          </button>{" "}
-          <button
+          </Button>{" "}
+          <Button
+            look="primary"
             className="branch-instead"
             onClick={() => {
               setConflict(null)
@@ -442,10 +444,9 @@ export function CardEditor(p: {
                 ...(from === null ? {} : { card: from }),
               })
             }}
-            type="button"
           >
             branch here
-          </button>
+          </Button>
         </div>
       )}
       {options.length > 0 && p.readOnly === null && (

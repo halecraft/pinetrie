@@ -4,6 +4,7 @@
 // sidebar is folded, the account menu toggles it instead (`account-menu.tsx`).
 
 import { dropProps, inventoryWords } from "@pinetrie/interface"
+import { IconButton } from "./button.tsx"
 import { InventoryIcon } from "./icons.tsx"
 
 /** Your inventory's toggle: whether its panel is open, and its cards. */
@@ -20,14 +21,13 @@ export function InventoryToggle({
 }: InventoryToggleProps) {
   const words = inventoryWords(count)
   return (
-    <button
-      aria-label={words.label}
+    <IconButton
+      label={words.label}
       aria-pressed={open}
       className="inventory-toggle"
       {...dropProps({ kind: "inventory", slot: null })}
       onClick={onToggle}
       title={words.label}
-      type="button"
     >
       <InventoryIcon />
       {count > 0 && (
@@ -35,6 +35,6 @@ export function InventoryToggle({
           {count}
         </span>
       )}
-    </button>
+    </IconButton>
   )
 }

@@ -39,6 +39,7 @@ import {
   useState,
 } from "react"
 import { AddButton } from "./add-button.tsx"
+import { Button, IconButton } from "./button.tsx"
 import { slotColor } from "./colors.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
@@ -169,7 +170,8 @@ export function Sidebar({
               {...rootDropProps({ kind: "list", before: canvas })}
               {...dropProps({ kind: "sidebar", before: canvas })}
             >
-              <button
+              <Button
+                look="plain"
                 aria-current={item.selected || undefined}
                 className={["open-root", item.archived ? "archived" : ""]
                   .filter(c => c !== "")
@@ -178,7 +180,6 @@ export function Sidebar({
                 {...dragProps({ kind: "canvas", drag: dragOf(canvas) })}
                 onClick={() => onIntent(item.show)}
                 title={item.hover}
-                type="button"
               >
                 <ThreadHead
                   arrived={item.arrived}
@@ -189,7 +190,7 @@ export function Sidebar({
                   pip={pip}
                 />
                 <Readers {...readers} canvases={[item.canvas]} />
-              </button>
+              </Button>
               {item.menu.length > 0 && (
                 <Menu
                   className="open-more"
@@ -206,15 +207,14 @@ export function Sidebar({
                   triggerClassName="open-menu"
                 />
               )}
-              <button
-                aria-label={SIDEBAR_WORDS.close}
+              <IconButton
+                label={SIDEBAR_WORDS.close}
                 className="open-close"
                 onClick={() => onIntent(item.close)}
                 title={SIDEBAR_WORDS.closeTitle}
-                type="button"
               >
                 ×
-              </button>
+              </IconButton>
             </span>
           )
         })}
@@ -244,15 +244,14 @@ function FoldControl({
 }) {
   const words = listFoldWords(width)
   return (
-    <button
-      aria-label={words.label}
+    <IconButton
+      label={words.label}
       className="list-fold"
       onClick={() => onIntent({ kind: "fold-list" })}
       title={words.title}
-      type="button"
     >
       {words.glyph}
-    </button>
+    </IconButton>
   )
 }
 

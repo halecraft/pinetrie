@@ -9,6 +9,7 @@ import { PRODUCT_NAME } from "@pinetrie/core"
 import { type Identity, parseIdentity } from "@pinetrie/interface"
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
+import { Button } from "./button.tsx"
 import { NAME_PROBLEM, NameInput } from "./name-input.tsx"
 
 const EMAIL_PROBLEM = "an email address, like ada@example.com"
@@ -52,7 +53,9 @@ function IdentityForm({ onDone }: { onDone: (identity: Identity) => void }) {
         }
         value={name}
       />
-      <button type="submit">join</button>
+      <Button look="primary" type="submit">
+        join
+      </Button>
     </form>
   )
 }

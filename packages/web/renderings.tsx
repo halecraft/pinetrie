@@ -47,6 +47,7 @@ import {
 } from "@pinetrie/rules"
 import { AT_INVENTORY, newCardId, type SessionClient } from "@pinetrie/session"
 import { createContext, type ReactNode, useContext } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { BoundCardEditor } from "./card-editor.tsx"
 import { InventoryIcon } from "./icons.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -112,7 +113,8 @@ export function PutButton(p: { card: CardRecord | null }) {
   const { column, onIntent } = useRendering()
   const { card } = p
   return (
-    <button
+    <Button
+      look="primary"
       className="put primary"
       disabled={column === null || card === null}
       onClick={() => {
@@ -125,10 +127,9 @@ export function PutButton(p: { card: CardRecord | null }) {
           })
       }}
       title={card?.kind === "thread" ? PUT_THREAD_TITLE : PUT_TITLE}
-      type="button"
     >
       <InventoryIcon way="put" /> {PUT}
-    </button>
+    </Button>
   )
 }
 
@@ -223,15 +224,14 @@ function NormalFrame(p: {
           {KIND_ICON[p.kind]}
         </span>
         {p.onClose != null && (
-          <button
-            aria-label={CLOSE_CARD.title}
+          <IconButton
+            label={CLOSE_CARD.title}
             className="close-card"
             onClick={p.onClose}
             title={CLOSE_CARD.title}
-            type="button"
           >
             {CLOSE_CARD.label}
-          </button>
+          </IconButton>
         )}
       </header>
       <div className="card-normal-body">{p.children}</div>
@@ -385,7 +385,8 @@ function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
       <blockquote className="reference-quote">
         <MessageText mode="committed" text={quote ?? ""} />
       </blockquote>
-      <button
+      <Button
+        look="primary"
         className="edit-as-text"
         disabled={quote === null}
         onClick={() => {
@@ -398,10 +399,9 @@ function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
             })
         }}
         title={EDIT_AS_TEXT.title}
-        type="button"
       >
         {EDIT_AS_TEXT.label}
-      </button>
+      </Button>
     </NormalFrame>
   )
 }

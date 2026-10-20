@@ -23,7 +23,7 @@ import { Pictures } from "./pictures-context.ts"
  * or more saturated than any track. A ring also has a dark gap between it and
  * the dot (`Rail`), so it reads against a track of any colour.
  */
-const FIRST = ["#ff4fd8", "#ffffff", "#ffe030"]
+export const FIRST_COLORS = ["#ff4fd8", "#ffffff", "#ffe030"]
 
 /** A colour from a writer's id, at a saturation the tracks don't use. */
 const hashed = (writer: WriterId): string =>
@@ -47,14 +47,14 @@ export function writerOrder(
   return [...wrote, ...rest]
 }
 
-/** Each writer's colour: one of `FIRST` by `order`, else from their id. */
+/** Each writer's colour: one of `FIRST_COLORS` by `order`, else from their id. */
 export function presenceColors(
   order: readonly WriterId[],
 ): (writer: WriterId) => string {
   const slot = new Map(order.map((w, i) => [w, i]))
   return writer => {
     const i = slot.get(writer)
-    return (i === undefined ? undefined : FIRST[i]) ?? hashed(writer)
+    return (i === undefined ? undefined : FIRST_COLORS[i]) ?? hashed(writer)
   }
 }
 

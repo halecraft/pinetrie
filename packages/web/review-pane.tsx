@@ -19,6 +19,7 @@ import {
 } from "@pinetrie/interface"
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
 import { memo, useContext, useEffect, useRef, useState } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewMedia } from "./review-media.tsx"
 import { ReviewPrefsContext } from "./review-prefs.ts"
@@ -111,18 +112,17 @@ function ReviewPaneView(p: ReviewPaneProps) {
   const toggle = (pref: ReviewPref) => {
     const words = reviewPrefWords(pref, prefs[pref])
     return (
-      <button
-        aria-label={words.label}
+      <IconButton
+        label={words.label}
         aria-pressed={prefs[pref]}
         className="review-pref"
         data-pref={pref}
         key={pref}
         onClick={() => setPrefs({ ...prefs, [pref]: !prefs[pref] })}
         title={words.label}
-        type="button"
       >
         {words.glyph}
-      </button>
+      </IconButton>
     )
   }
 
@@ -161,7 +161,8 @@ function ReviewPaneView(p: ReviewPaneProps) {
                       </div>
                     )}
                     {r.state.value.files.map(f => (
-                      <button
+                      <Button
+                        look="plain"
                         aria-current={
                           current === f.key ? "location" : undefined
                         }
@@ -171,11 +172,10 @@ function ReviewPaneView(p: ReviewPaneProps) {
                         key={f.key}
                         onClick={() => jump(f.key)}
                         title={f.shown}
-                        type="button"
                       >
                         <span className="review-letter">{f.letter}</span>{" "}
                         <span className="review-path">{f.shown}</span>
-                      </button>
+                      </Button>
                     ))}
                   </>
                 )}
@@ -267,14 +267,14 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
       ref={self}
     >
       <div className="review-file-head">
-        <button
+        <Button
+          look="plain"
           aria-expanded={open}
           className="review-toggle"
           onClick={() => setToggled(t => !t)}
-          type="button"
         >
           {open ? "▾" : "▸"}
-        </button>
+        </Button>
         <span className="review-letter">{row.letter}</span>
         <span className="review-path">{row.shown}</span>
         {row.lines !== "" && <span className="review-lines">{row.lines}</span>}
@@ -287,13 +287,13 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
         <div className="review-note">{MOVED_UNCHANGED}</div>
       ) : state === "collapsed" ? (
         row.startsCollapsed && (
-          <button
+          <Button
+            look="outline"
             className="review-show"
             onClick={() => setToggled(t => !t)}
-            type="button"
           >
             show {row.changed} changed lines
-          </button>
+          </Button>
         )
       ) : state === "waiting" || state === "loading" ? (
         <div

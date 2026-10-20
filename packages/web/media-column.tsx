@@ -35,6 +35,7 @@ import {
 import { marginCards, type SeatRecord } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useRef, useState } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { fileDropAtProps, fileDropProps } from "./file-drop.ts"
 import { TrashIcon } from "./icons.tsx"
 import { uploadImages } from "./image-upload.ts"
@@ -250,41 +251,39 @@ function MediaImage(p: {
               stored={image.titled}
             />
           ) : (
-            <button
+            <Button
+              look="plain"
               className="media-image-title"
               disabled={!writable}
               onClick={() => setRenaming(true)}
               title="rename this image"
-              type="button"
             >
               {image.title}
-            </button>
+            </Button>
           )}
           {image.versions.length > 1 && (
             <span className="media-versions">
-              <button
-                aria-label="an older version"
+              <IconButton
+                label="an older version"
                 disabled={at === 0}
                 onClick={() => setStep(at - 1)}
-                type="button"
               >
                 ‹
-              </button>
+              </IconButton>
               {versionWords(at, image.versions.length)}
-              <button
-                aria-label="a newer version"
+              <IconButton
+                label="a newer version"
                 disabled={at === newest}
                 onClick={() => setStep(at + 1 === newest ? null : at + 1)}
-                type="button"
               >
                 ›
-              </button>
+              </IconButton>
             </span>
           )}
           {writable && (
             <span className="media-moves">
-              <button
-                aria-label="move it before the one before it"
+              <IconButton
+                label="move it before the one before it"
                 onClick={() =>
                   p.act({
                     kind: "reorder",
@@ -293,12 +292,11 @@ function MediaImage(p: {
                     step: -1,
                   })
                 }
-                type="button"
               >
                 ◀
-              </button>
-              <button
-                aria-label="move it after the one after it"
+              </IconButton>
+              <IconButton
+                label="move it after the one after it"
                 onClick={() =>
                   p.act({
                     kind: "reorder",
@@ -307,19 +305,17 @@ function MediaImage(p: {
                     step: 1,
                   })
                 }
-                type="button"
               >
                 ▶
-              </button>
-              <button
-                aria-label="trash this image"
+              </IconButton>
+              <IconButton
+                label="trash this image"
                 className="trash-card"
                 onClick={() => p.act({ kind: "trash", card: image.image })}
                 title="trash this image · ⌘Z brings it back"
-                type="button"
               >
                 <TrashIcon />
-              </button>
+              </IconButton>
             </span>
           )}
           {open ? null : (

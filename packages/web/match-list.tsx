@@ -6,6 +6,7 @@
 import type { EntryId } from "@pinetrie/core"
 import type { ColumnMatches } from "@pinetrie/interface"
 import { memo } from "react"
+import { Button } from "./button.tsx"
 
 function MatchListView({
   matches,
@@ -24,7 +25,8 @@ function MatchListView({
             {row.words}
           </div>
         ) : (
-          <button
+          <Button
+            look="outline"
             className="match-row"
             data-entry={row.id}
             key={row.id}
@@ -32,7 +34,6 @@ function MatchListView({
             title={
               row.at === null ? undefined : new Date(row.at).toLocaleString()
             }
-            type="button"
           >
             <span className="match-head">
               <span className="match-who">{row.who}</span>
@@ -51,7 +52,7 @@ function MatchListView({
                 ),
               )}
             </span>
-          </button>
+          </Button>
         ),
       )}
     </div>

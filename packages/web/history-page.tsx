@@ -12,6 +12,7 @@ import {
 } from "@pinetrie/interface"
 import { decodeRevisionReview, reviewUrl } from "@pinetrie/rules"
 import { useState } from "react"
+import { Button } from "./button.tsx"
 import { ReviewPane } from "./review-pane.tsx"
 import { useFetched } from "./use-fetched.ts"
 
@@ -62,18 +63,18 @@ function Preview({
       )}
       <div className="history-actions">
         {!empty && (
-          <button
+          <Button
+            look="primary"
             className="history-restore-confirm"
             disabled={waiting || files?.kind !== "ready"}
             onClick={restore}
-            type="button"
           >
             {restoreWords.confirm}
-          </button>
+          </Button>
         )}
-        <button className="history-cancel" onClick={cancel} type="button">
+        <Button look="primary" className="history-cancel" onClick={cancel}>
           {restoreWords.cancel}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -107,24 +108,24 @@ function Entry({
           {entry.who === null ? entry.when : `${entry.who} · ${entry.when}`}
         </span>
         {entry.review !== null && (
-          <button
+          <Button
+            look="primary"
             aria-expanded={open}
             className="history-review"
             onClick={() => setOpened(open ? null : entry.id)}
-            type="button"
           >
             {restoreWords.review}
-          </button>
+          </Button>
         )}
         {entry.restore !== null && (
-          <button
+          <Button
+            look="primary"
             className="history-restore"
             disabled={p.acting.waiting}
             onClick={() => setPreviewing(entry.id)}
-            type="button"
           >
             {restoreWords.offer}
-          </button>
+          </Button>
         )}
       </div>
       {open && entry.review !== null && (

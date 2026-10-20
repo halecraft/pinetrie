@@ -39,6 +39,7 @@ import {
 import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { PinnedCardEditor } from "./card-editor.tsx"
 import { FoldedStrip } from "./folded-strip.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"
@@ -105,25 +106,24 @@ export function CanvasColumn(p: {
             stored={view.titled}
           />
         ) : (
-          <button
+          <Button
+            look="plain"
             className="canvas-column-title"
             disabled={view.readOnly}
             onClick={() => setRenaming(true)}
             title={RENAME_CANVAS_TITLE}
-            type="button"
           >
             <span data-fold-name="">{view.label}</span>
-          </button>
+          </Button>
         )}
-        <button
-          aria-label={FOLD_CANVAS.title}
+        <IconButton
+          label={FOLD_CANVAS.title}
           className={FOLD_CANVAS.className}
           onClick={() => fold(false)}
           title={FOLD_CANVAS.title}
-          type="button"
         >
           {FOLD_CANVAS.label}
-        </button>
+        </IconButton>
       </header>
       <div className="canvas-column-body">
         <div className="canvas-state">
@@ -213,7 +213,8 @@ export function CanvasColumn(p: {
                 key={row.card}
               >
                 <span className="trash-title">{row.title}</span>
-                <button
+                <Button
+                  look="plain"
                   className="trash-restore"
                   disabled={view.readOnly}
                   onClick={() =>
@@ -224,10 +225,9 @@ export function CanvasColumn(p: {
                     })
                   }
                   title={RESTORE_WORDS.title}
-                  type="button"
                 >
                   {RESTORE_WORDS.label}
-                </button>
+                </Button>
                 <span className="trash-why">{trashWords(row, p.reader)}</span>
               </div>
             ))}

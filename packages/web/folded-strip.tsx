@@ -9,6 +9,7 @@ import {
   type FoldedMark,
   stripTitle,
 } from "@pinetrie/interface"
+import { Button } from "./button.tsx"
 import { ThreadMark } from "./thread-mark.tsx"
 
 export function FoldedStrip(p: {
@@ -21,12 +22,12 @@ export function FoldedStrip(p: {
   onUnfold: () => void
 }) {
   return (
-    <button
+    <Button
+      look="plain"
       aria-label={`${p.unfold.title}: ${p.name}`}
       className="folded-title"
       onClick={p.onUnfold}
       title={stripTitle(p.unfold, p.hint)}
-      type="button"
     >
       <span aria-hidden="true" className={p.unfold.className}>
         {p.unfold.label}
@@ -43,6 +44,6 @@ export function FoldedStrip(p: {
         {p.name}
       </span>
       {p.detail !== null && <span className="folded-detail">{p.detail}</span>}
-    </button>
+    </Button>
   )
 }

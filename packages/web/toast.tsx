@@ -1,6 +1,8 @@
 // web/toast — a note fixed above the footer until you dismiss it: what a setup
 // or publish command refused or failed says, with no menu open to say it.
 
+import { Button, IconButton } from "./button.tsx"
+
 export function Toast({
   text,
   action,
@@ -15,25 +17,20 @@ export function Toast({
     <div className="toast" role="alert">
       <span className="toast-text">{text}</span>
       {action !== null && (
-        <button
+        <Button
           className="toast-action"
+          look="outline"
           onClick={() => {
             action.onChoose()
             onDismiss()
           }}
-          type="button"
         >
           {action.label}
-        </button>
+        </Button>
       )}
-      <button
-        aria-label="dismiss"
-        className="toast-dismiss"
-        onClick={onDismiss}
-        type="button"
-      >
+      <IconButton className="toast-dismiss" label="dismiss" onClick={onDismiss}>
         ×
-      </button>
+      </IconButton>
     </div>
   )
 }

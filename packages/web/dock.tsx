@@ -37,6 +37,7 @@ import { readTypingIn } from "@pinetrie/reads"
 import type { QueuedCard } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import type { ReactNode } from "react"
+import { Button } from "./button.tsx"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { CardFrame } from "./card-frame.tsx"
 import { Menu } from "./menu.tsx"
@@ -220,14 +221,14 @@ export function Dock(p: {
         </div>
       )}
       {head !== null && p.queueAt !== null && (
-        <button
+        <Button
+          look="plain"
           className={ADD_TO_QUEUE.className}
           onClick={addToQueue}
           title={ADD_TO_QUEUE.title}
-          type="button"
         >
           {ADD_TO_QUEUE.label}
-        </button>
+        </Button>
       )}
       {head !== null && <hr className="the-line" />}
       {p.notices}
@@ -256,14 +257,14 @@ function HeadButton(p: {
     }
   }
   return (
-    <button
+    <Button
+      look="outline"
       className={`next-button ${words.className}`}
       onClick={press}
       title={words.title}
-      type="button"
     >
       {words.label}
-    </button>
+    </Button>
   )
 }
 

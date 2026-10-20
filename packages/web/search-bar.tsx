@@ -12,6 +12,7 @@ import {
   SEARCH_OPEN_TITLE,
 } from "@pinetrie/interface"
 import { type RefObject, useLayoutEffect } from "react"
+import { Button, IconButton } from "./button.tsx"
 
 /** The 🔍: it opens the bar, and, pressed while the bar is open, closes it. */
 export function SearchToggle({
@@ -25,9 +26,10 @@ export function SearchToggle({
 }) {
   const title = open ? SEARCH_CLOSE_TITLE : SEARCH_OPEN_TITLE
   return (
-    <button
+    <IconButton
+      look="outline"
       aria-keyshortcuts={open ? "Escape" : "/"}
-      aria-label={title}
+      label={title}
       aria-pressed={open}
       className="search-toggle"
       onClick={() =>
@@ -35,10 +37,9 @@ export function SearchToggle({
       }
       ref={toggle}
       title={title}
-      type="button"
     >
       🔍
-    </button>
+    </IconButton>
   )
 }
 
@@ -81,31 +82,30 @@ export function SearchBar({
           value={query}
         />
         {query !== "" && (
-          <button
-            aria-label={SEARCH_CLEAR}
+          <IconButton
+            label={SEARCH_CLEAR}
             className="search-clear"
             onClick={() => {
               onIntent({ kind: "search", act: { kind: "clear" } })
               field.current?.focus()
             }}
             title={SEARCH_CLEAR}
-            type="button"
           >
             ⌫
-          </button>
+          </IconButton>
         )}
       </div>
       <span aria-live="polite" className="search-line">
         {line}
       </span>
-      <button
+      <Button
+        look="outline"
         className="search-done"
         onClick={() => onIntent({ kind: "search", act: { kind: "close" } })}
         title={SEARCH_DONE_TITLE}
-        type="button"
       >
         {SEARCH_DONE}
-      </button>
+      </Button>
     </search>
   )
 }

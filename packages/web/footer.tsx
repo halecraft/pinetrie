@@ -21,6 +21,7 @@ import type { AcceptedRecord } from "@pinetrie/rules"
 import type { AcceptedActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
+import { Button } from "./button.tsx"
 import { InboxMenu, type InboxMenuProps } from "./inbox-menu.tsx"
 import {
   InventoryToggle,
@@ -137,16 +138,16 @@ function PublishButton({
   return (
     <>
       {words.kind === "publish" ? (
-        <button
+        <Button
+          look="outline"
           className="publish-button"
           data-refused={words.refused || undefined}
           disabled={waiting}
           onClick={() => void session.actOnAccepted("publish")}
           title={`${words.title}\n\nin jj: ${words.jj.join("; ")}`}
-          type="button"
         >
           {words.label}
-        </button>
+        </Button>
       ) : (
         <Menu
           className="publish-setup"

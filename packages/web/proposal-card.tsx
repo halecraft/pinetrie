@@ -14,6 +14,7 @@ import {
   type ScreenMemory,
 } from "@pinetrie/interface"
 import { useCallback, useRef, useState } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { nameFor } from "./presence.tsx"
 
 export function ProposalCard(p: {
@@ -37,14 +38,14 @@ export function ProposalCard(p: {
   }
   const button = (b: ProposalButton | null, className: string) =>
     b === null ? null : (
-      <button
+      <Button
+        look="primary"
         className={className}
         disabled={b.press === null}
         onClick={() => press(b)}
-        type="button"
       >
         {b.label}
-      </button>
+      </Button>
     )
   return (
     <div className="proposal" data-proposal={view.proposal}>
@@ -55,16 +56,16 @@ export function ProposalCard(p: {
             data-dropped={r.dropped ? "" : undefined}
             key={r.row}
           >
-            <button
+            <Button
+              look="plain"
               aria-expanded={r.open}
               className="proposal-title"
               onClick={() =>
                 change(m => ({ ...m, open: toggled(m.open, r.row) }))
               }
-              type="button"
             >
               {r.title}
-            </button>
+            </Button>
             {r.open && view.editable && !r.dropped ? (
               <textarea
                 className="proposal-brief"
@@ -83,16 +84,16 @@ export function ProposalCard(p: {
               </span>
             )}
             {view.editable && (
-              <button
-                aria-label={r.dropped ? "keep" : "drop"}
+              <IconButton
+                look="primary"
+                label={r.dropped ? "keep" : "drop"}
                 className="proposal-drop"
                 onClick={() =>
                   change(m => ({ ...m, dropped: toggled(m.dropped, r.row) }))
                 }
-                type="button"
               >
                 {r.dropped ? "↺" : "×"}
-              </button>
+              </IconButton>
             )}
           </li>
         ))}

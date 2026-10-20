@@ -9,6 +9,7 @@ import type { Sha256, WriterId } from "@pinetrie/core"
 import { planRename, profileWords, renameProblem } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { useState } from "react"
+import { Button } from "./button.tsx"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"
 import { PictureField } from "./picture-field.tsx"
 import { nameFor } from "./presence.tsx"
@@ -76,9 +77,9 @@ export function ProfilePage({
               {profileWords.saved}
             </span>
           )}
-          <button className="profile-save" type="submit">
+          <Button look="primary" className="profile-save" type="submit">
             {profileWords.save}
-          </button>
+          </Button>
         </div>
       </form>
       <p className="profile-email">{email}</p>

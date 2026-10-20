@@ -141,6 +141,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { NewCardBox } from "./card-editor.tsx"
 import { ColumnHeadEnd } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
@@ -1020,14 +1021,14 @@ export function Column(p: ColumnProps) {
               )}
               <span className="head-space" />
               {newPin === "header" && (
-                <button
+                <Button
+                  look="plain"
                   className="new-pin"
                   onClick={openPin}
                   title={NEW_PIN_TITLE}
-                  type="button"
                 >
                   {NEW_PIN}
-                </button>
+                </Button>
               )}
               {view.nodes.length > 0 && (
                 <DensityControl
@@ -1080,14 +1081,14 @@ export function Column(p: ColumnProps) {
               <div className="agents-row">{agentsWords(agentsLine)}</div>
             )}
             {view.above.length > 0 && (
-              <button
+              <Button
+                look="plain"
                 className="earlier"
                 onClick={() => setAboveOpen(true)}
                 title="show the path above this thread"
-                type="button"
               >
                 {earlierWords(view.above.length)}
-              </button>
+              </Button>
             )}
             {/* The work strip, a row of the header. */}
             <WorkStripView
@@ -1162,7 +1163,8 @@ export function Column(p: ColumnProps) {
               <div className="column-body" ref={body}>
                 {atTop !== null && (
                   <div className="ask-bar-slot">
-                    <button
+                    <Button
+                      look="plain"
                       className="ask-bar"
                       data-ask={atTop.ask}
                       data-where={atTop.kind}
@@ -1173,11 +1175,10 @@ export function Column(p: ColumnProps) {
                           ?.scrollIntoView({ block: "start" })
                       }}
                       title="the message this work answers"
-                      type="button"
                     >
                       {atTop.kind === "elsewhere" && "↰ answering "}
                       {askLineOf(atTop.ask)}
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {/* `useFollow` watches its height. Keep it unpositioned: it would
@@ -1264,13 +1265,13 @@ export function Column(p: ColumnProps) {
                 <div className="column-floor" ref={floor} />
                 {end.unseen && (
                   <div className="jump-slot">
-                    <button
+                    <Button
+                      look="outline"
                       className="jump-latest"
                       onClick={end.follow}
-                      type="button"
                     >
                       ↓ new below
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1280,7 +1281,8 @@ export function Column(p: ColumnProps) {
                     const last = g.traces.at(-1)
                     return (
                       last !== undefined && (
-                        <button
+                        <Button
+                          look="plain"
                           className="trace"
                           data-trace={g.traces.map(t => t.id).join(" ")}
                           key={last.id}
@@ -1288,10 +1290,9 @@ export function Column(p: ColumnProps) {
                             p.onIntent({ kind: "open-trace", trace: last })
                           }
                           title="show where it is now"
-                          type="button"
                         >
                           {traceWords(g, reader)}
-                        </button>
+                        </Button>
                       )
                     )
                   })}
@@ -1446,14 +1447,14 @@ function Identity({
     )
   const { open } = identity.details
   return (
-    <button
+    <Button
+      look="plain"
       aria-controls={open ? detailsId : undefined}
       aria-expanded={open}
       className="agent-name"
       data-thread={identity.name}
       onClick={() => onToggle(!open)}
       title={detailsTitle(open)}
-      type="button"
     >
       <ThreadMark
         folds
@@ -1462,7 +1463,7 @@ function Identity({
         working={working}
       />{" "}
       <span data-fold-name="">{identityWords(identity)}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -1500,17 +1501,16 @@ function ThreadDetailsPanel({
   const { started, behind, start } = details
   return (
     <section aria-label={name} className="thread-details" id={id}>
-      <button
-        aria-label="spin"
+      <IconButton
+        label="spin"
         className="thread-details-icon"
         // Each spin changes the animation's name, which restarts it without
         // drawing the mark again: a new icon would fade in again.
         data-spin={spins === 0 ? undefined : spins % 2 === 1 ? "odd" : "even"}
         onClick={() => setSpins(n => n + 1)}
-        type="button"
       >
         <ThreadMark icon={icon} running={running} working={working} />
-      </button>
+      </IconButton>
       <div className="thread-details-facts">
         <div className="thread-details-name">{name}</div>
         {started !== null && (
@@ -1525,13 +1525,13 @@ function ThreadDetailsPanel({
           <div className="thread-details-behind">{behind}</div>
         )}
         {start !== null && (
-          <button
+          <Button
+            look="plain"
             className="thread-details-start"
             onClick={() => onOpen(start)}
-            type="button"
           >
             {START_WORDS}
-          </button>
+          </Button>
         )}
       </div>
     </section>
@@ -1555,16 +1555,16 @@ function StatusRow({
   onOpen: (id: EntryId) => void
 }) {
   return (
-    <button
+    <Button
+      look="plain"
       className="head-status"
       data-level={status.level}
       data-quiet={status.quiet || undefined}
       onClick={() => onOpen(status.end)}
       title={status.words}
-      type="button"
     >
       {status.words}
-    </button>
+    </Button>
   )
 }
 
@@ -1580,7 +1580,8 @@ function Origin({
   if (origin.kind === "none") return null
   if (origin.kind === "source")
     return (
-      <button
+      <Button
+        look="plain"
         className="origin"
         data-copied={origin.copied || undefined}
         disabled={!opens(origin.link)}
@@ -1590,20 +1591,19 @@ function Origin({
             ? "show the thread it was copied from"
             : "show where it branched"
         }
-        type="button"
       >
         <span className="origin-dot" />↰ {origin.words}
-      </button>
+      </Button>
     )
   return (
-    <button
+    <Button
+      look="plain"
       className="origin"
       onClick={() => onOpen(origin.at)}
       title="show where this branch starts"
-      type="button"
     >
       <span className="origin-dot" />↰ {origin.speaker}: “{origin.text}”
-    </button>
+    </Button>
   )
 }
 
@@ -1614,14 +1614,14 @@ function Origin({
 function Bookmark({ name }: { name: string }) {
   const { copied, copy } = useCopy()
   return (
-    <button
+    <Button
+      look="plain"
       className="work-bookmark"
       onClick={e => copy(name, [e.currentTarget])}
       title={copied ? COPIED : "copy the bookmark, to find it in jj"}
-      type="button"
     >
       {name}
-    </button>
+    </Button>
   )
 }
 
@@ -1649,15 +1649,15 @@ function AccessRowView({
       {words.note !== null && <span className="access-note">{words.note}</span>}
       <span className="work-space" />
       {words.answers.map(({ answer: a, label }) => (
-        <button
+        <Button
+          look="outline"
           className={`access-${a}`}
           disabled={words.waiting}
           key={a}
           onClick={() => answer(a)}
-          type="button"
         >
           {label}
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -1691,16 +1691,16 @@ function WorkStripView({
           {words.line}
         </span>
       ) : (
-        <button
+        <Button
+          look="plain"
           aria-controls={review.id}
           aria-expanded={review.open}
           className="work-line"
           onClick={review.toggle}
           title={reviewToggleTitle(review.open)}
-          type="button"
         >
           {words.line}
-        </button>
+        </Button>
       )}
       {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
       {words.note !== null && (
@@ -1714,16 +1714,16 @@ function WorkStripView({
       )}
       <span className="work-space" />
       {words.buttons.map(({ button, label, title, disabled }) => (
-        <button
+        <Button
+          look="outline"
           className={`work-${button}`}
           disabled={strip.waiting || disabled === true}
           key={button}
           onClick={() => act(button)}
           title={title}
-          type="button"
         >
           {label}
-        </button>
+        </Button>
       ))}
       {words.menu.length > 0 && (
         <Menu
@@ -1767,17 +1767,17 @@ function DensityControl({
       {DENSITIES.map(d => {
         const words = densityWords(d)
         return (
-          <button
+          <Button
+            look="plain"
             aria-pressed={d === density}
             className="density-choice"
             data-density={d}
             key={d}
             onClick={() => onChoose(d)}
             title={words.title}
-            type="button"
           >
             {words.label}
-          </button>
+          </Button>
         )
       })}
     </span>

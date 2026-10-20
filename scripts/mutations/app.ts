@@ -833,8 +833,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the strip's working count pulses",
     file: "packages/web/index.html",
-    from: "      .state-working, .state-ready { font-size: .75rem; color: #8b93a1; }",
-    to: "      .state-working, .state-ready { font-size: .75rem; color: #8b93a1; animation: pulse 1s ease-in-out infinite; }",
+    from: "      .state-working, .state-ready { font-size: var(--font-sm); color: var(--text-faint); }",
+    to: "      .state-working, .state-ready { font-size: var(--font-sm); color: var(--text-faint); animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
     scenario: "page",
     expect:
@@ -914,8 +914,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's mark pulses while its agent works",
     file: "packages/web/index.html",
-    from: '      .signal[data-signal="running"] { border: 1.5px solid #9ecbff; }',
-    to: '      .signal[data-signal="running"] { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }',
+    from: '      .signal[data-signal="running"] { border: 1.5px solid var(--agent); }',
+    to: '      .signal[data-signal="running"] { border: 1.5px solid var(--agent); animation: pulse 1s ease-in-out infinite; }',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1115,8 +1115,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "→ sits a line below the other tools",
     file: "packages/web/index.html",
-    from: "      .tools .branch { color: #9ecbff; }",
-    to: "      .tools .branch { color: #9ecbff; position: relative; top: 1.1rem; }",
+    from: "      .tools .branch { color: var(--agent); }",
+    to: "      .tools .branch { color: var(--agent); position: relative; top: 1.1rem; }",
     suite: "browser",
     scenario: "page",
     expect: "a message's tools are one row: copy, comment, edit, →",
@@ -1431,8 +1431,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool row stops short of the right gutter",
     file: "packages/web/index.html",
-    from: "      .tool { margin: .3rem -1rem .3rem 0;",
-    to: "      .tool { margin: .3rem 0;",
+    from: "      .tool { margin: var(--space-4) calc(-1 * var(--space-9)) var(--space-4) 0;",
+    to: "      .tool { margin: var(--space-4) 0;",
     suite: "browser",
     scenario: "tools",
     expect:

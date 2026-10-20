@@ -50,6 +50,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import { nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
@@ -61,7 +62,7 @@ const PAD = 8
 /** A dot's radius. */
 const DOT = 4
 /** The panel behind the rail: a ring's gap, and a capsule's unfilled part. */
-const PANEL = "#14161a"
+const PANEL = "var(--page)"
 const x = (across: number) => PAD + across * GAP
 const y = (slot: number) => PAD + slot * ROW
 
@@ -154,8 +155,8 @@ export function Rail({
                 d={d}
                 fill="none"
                 key={`e-${it.ids[0]}`}
-                stroke={colors.color(it.track)}
                 strokeWidth={2}
+                style={{ stroke: colors.color(it.track) }}
               />
             )
           })}
@@ -202,7 +203,8 @@ export function Rail({
           const from = itemOf.get(stub.from)
           if (from === undefined) return null
           return (
-            <button
+            <Button
+              look="outline"
               className="rail-stub"
               data-thread={stub.thread}
               disabled={onLink === undefined || !opens(stub.link)}
@@ -213,10 +215,9 @@ export function Rail({
                 top: y(from.slot) + ROW / 2,
               }}
               title={title}
-              type="button"
             >
               {label}
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -464,8 +465,8 @@ function Dot(p: {
       ? undefined
       : `here: ${p.people.map(person => person.name).join(", ")}`
   return (
-    <button
-      aria-label="open this message's thread"
+    <IconButton
+      label="open this message's thread"
       className={["rail-dot", p.pulse ? "pulse" : ""]
         .filter(c => c !== "")
         .join(" ")}
@@ -498,13 +499,12 @@ function Dot(p: {
           .filter(t => t !== undefined)
           .join(" · ") || undefined
       }
-      type="button"
     >
       {p.people.length > 1 && (
         <span className="here-count">{p.people.length}</span>
       )}
       {p.mine !== null && <SignalMark color={p.mine} signal="unsent" />}
-    </button>
+    </IconButton>
   )
 }
 
@@ -539,8 +539,8 @@ function Capsule(p: {
   const color = useTrackColors().color(stretch.track)
   const fill = stretchFill(stretch.stats)
   return (
-    <button
-      aria-label={label}
+    <IconButton
+      label={label}
       className="rail-stretch"
       data-ask={stretch.ask ?? undefined}
       data-count={stretch.ids.length}
@@ -564,7 +564,6 @@ function Capsule(p: {
         background: FILL[fill](color),
       }}
       title={label}
-      type="button"
     />
   )
 }

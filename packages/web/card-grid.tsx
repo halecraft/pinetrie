@@ -17,6 +17,7 @@ import {
   type PutTarget,
 } from "@pinetrie/interface"
 import { useRef } from "react"
+import { Button } from "./button.tsx"
 import { CompactCard } from "./renderings.tsx"
 import { isTextBox } from "./text-box.ts"
 
@@ -88,7 +89,8 @@ export function CardGrid(p: {
     >
       {view.cells.map(cell => (
         <div className="card-grid-cell" key={cell.index}>
-          <button
+          <Button
+            look="outline"
             aria-pressed={cell.selected}
             className={cell.card === null ? `${names.cell} empty` : names.cell}
             data-card={cell.card?.id}
@@ -104,10 +106,9 @@ export function CardGrid(p: {
               select(cell.index)
               if (again) p.onOpen()
             }}
-            type="button"
           >
             {cell.compact !== null && <CompactCard compact={cell.compact} />}
-          </button>
+          </Button>
         </div>
       ))}
     </div>

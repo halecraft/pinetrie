@@ -15,6 +15,7 @@ import {
 } from "@pinetrie/interface"
 import type { MarginCard, SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
+import { Button } from "./button.tsx"
 import { NoteCardEditor } from "./card-editor.tsx"
 import { RENDERINGS } from "./renderings.tsx"
 
@@ -26,15 +27,15 @@ export function MarginCount(p: {
 }) {
   const words = marginCountWords(p.count, p.beside)
   return (
-    <button
+    <Button
+      look="plain"
       aria-label={words.title}
       className="margin-count"
       onClick={p.onOpen}
       title={words.title}
-      type="button"
     >
       {words.label}
-    </button>
+    </Button>
   )
 }
 
@@ -81,23 +82,23 @@ export function Margin(p: {
       ))}
       <div className="margin-foot">
         {p.readOnly === null && (
-          <button
+          <Button
+            look="plain"
             className="add-comment"
             onClick={p.onComment}
             title={add.title}
-            type="button"
           >
             {add.label}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          look="plain"
           className="shut-margin"
           onClick={p.onShut}
           title={shut.title}
-          type="button"
         >
           {shut.label}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,17 +1,31 @@
 import { readFileSync } from "node:fs"
 import { SLOTS } from "@pinetrie/interface"
 import { describe, expect, test } from "vitest"
-import { PALETTE, PENDING_COLOR, slotColor } from "./colors.ts"
+import { slotColor } from "./colors.ts"
+import { FIRST_COLORS } from "./presence.tsx"
 
 const html = readFileSync(new URL("./index.html", import.meta.url), "utf8")
 const seeds = Array.from({ length: SLOTS }, (_, i) => i)
 
-test("the page has a colour for every slot", () => {
-  expect(PALETTE.length).toBe(SLOTS)
+/** The colour the stylesheet names `--<name>`, as a six-digit hex; "" for none. */
+const named = (name: string): string =>
+  new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(html)?.[1] ?? ""
+const PALETTE = seeds.map(i => named(`slot-${i}`))
+
+test("the stylesheet has a colour for every slot, and no more", () => {
+  expect(PALETTE).not.toContain("")
+  expect(html).not.toContain(`--slot-${SLOTS}:`)
+})
+
+test("a slot's colour is the stylesheet's for it", () => {
+  expect(slotColor(3)).toBe("var(--slot-3)")
+  expect(slotColor("pending")).toBe("var(--slot-pending)")
 })
 
 test("a fresh branch is grey", () => {
-  expect(slotColor("pending")).toBe(PENDING_COLOR)
+  const [, r, g, b] = /--slot-pending: #(\w)(\w)(\w);/.exec(html) ?? []
+  expect(r).toBeDefined()
+  expect(new Set([r, g, b]).size).toBe(1)
 })
 
 // sRGB to OKLab, for the palette's bounds.
@@ -45,16 +59,14 @@ const contrast = (a: string, b: string) => {
   return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05)
 }
 
-describe("PALETTE", () => {
-  const page = /--page: (#[0-9a-f]{6})/.exec(html)?.[1] ?? ""
+describe("the slot colours", () => {
+  const page = named("page")
   /** People's first colours, the attention amber, the review's lines. */
   const reserved = [
-    "#ff4fd8",
-    "#ffffff",
-    "#ffe030",
-    "#e0c080",
-    "#a8d8a8",
-    "#e89a9a",
+    ...FIRST_COLORS,
+    named("attention"),
+    named("ok-soft"),
+    named("danger-soft"),
   ]
 
   test.each(PALETTE)("%s is 4.5:1 or more on --page", color => {
@@ -71,6 +83,7 @@ describe("PALETTE", () => {
   test.each(PALETTE)(
     "%s is apart from the colours that already mean something",
     color => {
+      expect(reserved).not.toContain("")
       for (const r of reserved)
         expect(distance(color, r)).toBeGreaterThanOrEqual(0.08)
     },

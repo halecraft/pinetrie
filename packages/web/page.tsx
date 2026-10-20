@@ -5,6 +5,7 @@
 
 import { type PageName, pageWords } from "@pinetrie/interface"
 import { type ReactNode, useLayoutEffect, useRef } from "react"
+import { Button } from "./button.tsx"
 
 export function Page({
   page,
@@ -22,9 +23,9 @@ export function Page({
   return (
     <section aria-labelledby={`page-${page}`} className="page" data-page={page}>
       <header className="page-head">
-        <button className="page-back" onClick={onBack} type="button">
+        <Button look="outline" className="page-back" onClick={onBack}>
           {words.back}
-        </button>
+        </Button>
         <h1 id={`page-${page}`} ref={heading} tabIndex={-1}>
           {words.title}
         </h1>

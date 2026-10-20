@@ -61,6 +61,7 @@ import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { AddButton } from "./add-button.tsx"
+import { Button, IconButton } from "./button.tsx"
 import { useFocusClaim } from "./focus-claim.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { ReaderMenus, Readers, type ReadersProps } from "./root-signals.tsx"
@@ -116,7 +117,8 @@ export function BoardStrip({
     )
   return (
     <div className="board-strip">
-      <button
+      <Button
+        look="plain"
         aria-expanded={open}
         className="board-toggle"
         data-messages={count.total}
@@ -126,7 +128,6 @@ export function BoardStrip({
             ? `${messageCountTitle(count)} · ${filterTitle(filter)}`
             : messageCountTitle(count)
         }
-        type="button"
       >
         <span aria-hidden className="glyph">
           ▦
@@ -145,7 +146,7 @@ export function BoardStrip({
           </span>
         )}
         {pip}
-      </button>
+      </Button>
       {open ? (
         <StripSearch
           filtered={filter !== null}
@@ -211,17 +212,16 @@ function StripSearch({
           value={query}
         />
         {query !== "" && (
-          <button
-            aria-label="clear the search"
+          <IconButton
+            label="clear the search"
             className="board-search-clear"
             onClick={() => {
               onQuery("")
               searchRef.current?.focus()
             }}
-            type="button"
           >
             ×
-          </button>
+          </IconButton>
         )}
       </span>
       <label className="board-mine">
@@ -246,12 +246,12 @@ function StripStateButton({
   readers: ReadersProps
 }) {
   return (
-    <button
+    <Button
+      look="plain"
       className="strip-state"
       data-archive={state.archive || undefined}
       data-state={state.id}
       onClick={onOpen}
-      type="button"
       // A card dropped on an open state becomes a thread there.
       {...(state.archive ? {} : dropProps({ kind: "state", state: state.id }))}
     >
@@ -262,7 +262,7 @@ function StripStateButton({
         readers={readers}
         signals={state.signals}
       />
-    </button>
+    </Button>
   )
 }
 
@@ -535,13 +535,13 @@ export function Board({
         // foot holds still as a filter shrinks it.
         <div className="board-filter" role="status">
           <span className="board-filter-words">{filterWords(view.shown)}</span>
-          <button
+          <Button
+            look="outline"
             className="board-filter-clear"
             onClick={onClearFilter}
-            type="button"
           >
             {CLEAR_FILTER}
-          </button>
+          </Button>
         </div>
       )}
     </section>
@@ -591,7 +591,8 @@ function ItemCard({
 }) {
   return (
     <div className="thread-card" data-canvas={item.canvas} {...drop}>
-      <button
+      <Button
+        look="plain"
         className="board-open"
         {...dragProps({
           kind: "canvas",
@@ -599,7 +600,6 @@ function ItemCard({
         })}
         onClick={() => onIntent(item.show)}
         title={item.label}
-        type="button"
       >
         <ThreadHead
           head={item.head}
@@ -607,7 +607,7 @@ function ItemCard({
           nameOf={readers.nameOf}
           pip={pip}
         />
-      </button>
+      </Button>
       {item.body !== null && <span className="board-body">{item.body}</span>}
       <span className="board-meta">
         <Writers nameOf={readers.nameOf} writers={item.writers} />
@@ -712,7 +712,8 @@ function StateName({
   const done = useRef(false)
   if (!editing)
     return (
-      <button
+      <Button
+        look="plain"
         className="state-name"
         onClick={() => {
           done.current = false
@@ -720,10 +721,9 @@ function StateName({
           setEditing(true)
         }}
         title="rename this state, for everyone"
-        type="button"
       >
         {name}
-      </button>
+      </Button>
     )
   const finish = (save: boolean) => {
     if (done.current) return

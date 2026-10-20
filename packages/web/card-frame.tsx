@@ -30,6 +30,7 @@ import {
   TRASH_CARD_TITLE,
 } from "@pinetrie/interface"
 import { type ReactNode, useRef, useState } from "react"
+import { Button, IconButton } from "./button.tsx"
 import { CardHistory, MovedBack } from "./card-history.tsx"
 import { fileDropProps } from "./file-drop.ts"
 import { InventoryIcon, TrashIcon } from "./icons.tsx"
@@ -172,15 +173,14 @@ export function CardFrame(p: {
             />
           )}
           {p.onClose !== undefined ? (
-            <button
-              aria-label={CLOSE_CARD.title}
+            <IconButton
+              label={CLOSE_CARD.title}
               className="close-card"
               onClick={p.onClose}
               title={CLOSE_CARD.title}
-              type="button"
             >
               {CLOSE_CARD.label}
-            </button>
+            </IconButton>
           ) : (
             view.trashes && <TrashButton onTrash={p.onTrash} />
           )}
@@ -193,15 +193,14 @@ export function CardFrame(p: {
           <span className="card-chip" title={words.command.title}>
             {words.command.label}
             {p.onClearCommand !== null && (
-              <button
-                aria-label={CLEAR_COMMAND}
+              <IconButton
+                label={CLEAR_COMMAND}
                 className="card-command-clear"
                 onClick={p.onClearCommand}
                 title={CLEAR_COMMAND}
-                type="button"
               >
                 ×
-              </button>
+              </IconButton>
             )}
           </span>
         )}
@@ -217,7 +216,9 @@ export function CardFrame(p: {
               const w = words.tools[i]
               return (
                 w !== undefined && (
-                  <button
+                  <IconButton
+                    look="primary"
+                    label={w.title}
                     className={w.className}
                     disabled={t.act === null}
                     key={t.step}
@@ -225,10 +226,9 @@ export function CardFrame(p: {
                       if (t.act !== null) p.onAct(t.act)
                     }}
                     title={w.title}
-                    type="button"
                   >
                     {w.label}
-                  </button>
+                  </IconButton>
                 )
               )
             })}
@@ -251,13 +251,13 @@ function ShareFileButton(p: {
   const input = useRef<HTMLInputElement>(null)
   return (
     <span className="card-share">
-      <button
+      <Button
+        look="primary"
         className="share-file"
         onClick={() => input.current?.click()}
-        type="button"
       >
         {SHARE_FILE}
-      </button>
+      </Button>
       <input
         className="share-file-input"
         hidden
@@ -278,14 +278,13 @@ function ShareFileButton(p: {
 /** A card's bin: trashes it, and the undo key outside a box brings it back. */
 function TrashButton(p: { onTrash: () => void }) {
   return (
-    <button
-      aria-label={TRASH_CARD_TITLE}
+    <IconButton
+      label={TRASH_CARD_TITLE}
       className="trash-card"
       onClick={p.onTrash}
       title={TRASH_CARD_TITLE}
-      type="button"
     >
       <TrashIcon />
-    </button>
+    </IconButton>
   )
 }

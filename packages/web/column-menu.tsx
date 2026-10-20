@@ -10,6 +10,7 @@ import {
   columnHeadEnd,
   type Intent,
 } from "@pinetrie/interface"
+import { IconButton } from "./button.tsx"
 import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
@@ -28,15 +29,14 @@ export function ColumnHeadEnd(p: {
     <>
       <ColumnMenu onIntent={p.onIntent} sections={end.menu} />
       {button !== null && (
-        <button
-          aria-label={button.words.title}
+        <IconButton
+          label={button.words.title}
           className={button.words.className}
           onClick={() => p.onIntent(button.intent)}
           title={button.words.title}
-          type="button"
         >
           {button.intent.kind === "trash" ? <TrashIcon /> : button.words.label}
-        </button>
+        </IconButton>
       )}
     </>
   )

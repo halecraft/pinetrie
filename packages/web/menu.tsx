@@ -2,6 +2,7 @@
 // and closing are `Popover`'s (`popover.tsx`).
 
 import { type ReactNode, useId, useLayoutEffect, useRef } from "react"
+import { Button } from "./button.tsx"
 import { Popover, type TriggerProps } from "./popover.tsx"
 
 /** A menu's items that can take focus, in order. */
@@ -218,16 +219,21 @@ function Item({
   }
   if (item.checked === undefined)
     return (
-      <button {...shared} role="menuitem">
+      <Button look="plain" {...shared} role="menuitem">
         {item.label}
-      </button>
+      </Button>
     )
   return (
-    <button {...shared} aria-checked={item.checked} role="menuitemradio">
+    <Button
+      look="plain"
+      {...shared}
+      aria-checked={item.checked}
+      role="menuitemradio"
+    >
       <span aria-hidden className="menu-check">
         {item.checked ? "✓" : ""}
       </span>
       {item.label}
-    </button>
+    </Button>
   )
 }

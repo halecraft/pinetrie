@@ -45,6 +45,7 @@ import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import { newCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
+import { Button, IconButton } from "./button.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { CopyIcon } from "./icons.tsx"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -130,7 +131,8 @@ function MessageView(p: MessageProps) {
         {p.crossCanvasLink !== undefined && (
           // Another canvas's thread it came from, opened as a fork row's link is;
           // held elsewhere, it opens nothing.
-          <button
+          <Button
+            look="plain"
             className="cross-canvas-link"
             disabled={!opens(p.crossCanvasLink.link)}
             onClick={() =>
@@ -138,10 +140,9 @@ function MessageView(p: MessageProps) {
               p.onLink(p.crossCanvasLink.link, node.id)
             }
             title="show that thread"
-            type="button"
           >
             · {p.crossCanvasLink.words}
-          </button>
+          </Button>
         )}
         {person?.command !== undefined && (
           <span
@@ -152,8 +153,8 @@ function MessageView(p: MessageProps) {
           </span>
         )}
         {p.forkTracks.map(t => (
-          <button
-            aria-label="show the branch that forks here"
+          <IconButton
+            label="show the branch that forks here"
             className="fork-dot"
             data-color={colors.slot(t)}
             data-track={t}
@@ -165,7 +166,6 @@ function MessageView(p: MessageProps) {
                 ?.scrollIntoView({ block: "nearest", inline: "nearest" })
             }
             style={colors.style(t)}
-            type="button"
           />
         ))}
         {showsText(node) && (
@@ -190,14 +190,14 @@ function MessageView(p: MessageProps) {
         {p.closedBranches.length > 0 && (
           <div className="actions">
             {p.closedBranches.map(b => (
-              <button
+              <Button
+                look="outline"
                 className="open-branch"
                 key={b.rootId}
                 onClick={() => p.onAct({ kind: "open-at", entry: b.rootId })}
-                type="button"
               >
                 ⑂ {plural(b.messageCount, "message")}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -235,7 +235,8 @@ function Tools({
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
       {tools.comment && (
-        <button
+        <Button
+          look="outline"
           aria-label={COMMENT.title}
           className="comment"
           onClick={() =>
@@ -247,41 +248,40 @@ function Tools({
             })
           }
           title={COMMENT.title}
-          type="button"
         >
           {COMMENT.label}
-        </button>
+        </Button>
       )}
       {edit?.kind === "branch" && (
-        <button
+        <Button
+          look="outline"
           className="edit"
           onClick={() => onAct(edit)}
           title="edit and send again, in a branch beside this one"
-          type="button"
         >
           edit
-        </button>
+        </Button>
       )}
       {edit?.kind === "new-canvas" && (
-        <button
+        <Button
+          look="outline"
           className="edit-new-canvas"
           onClick={() => onAct(edit)}
           title="a new canvas starting with this message's text"
-          type="button"
         >
           new canvas
-        </button>
+        </Button>
       )}
       {branch !== undefined && (
-        <button
-          aria-label="open a branch here"
+        <IconButton
+          look="outline"
+          label="open a branch here"
           className="branch"
           onClick={() => onAct(branch)}
           title="open a branch here"
-          type="button"
         >
           →
-        </button>
+        </IconButton>
       )}
     </div>
   )
@@ -294,8 +294,9 @@ function Tools({
 function CopyButton({ node }: { node: TranscriptMessage }) {
   const { copied, copy } = useCopy()
   return (
-    <button
-      aria-label={COPY_MESSAGE}
+    <IconButton
+      look="outline"
+      label={COPY_MESSAGE}
       className="copy"
       onClick={e =>
         copy(copyText(node), [
@@ -305,10 +306,9 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
         ])
       }
       title={copied ? COPIED : COPY_MESSAGE}
-      type="button"
     >
       {copied ? "✓" : <CopyIcon />}
-    </button>
+    </IconButton>
   )
 }
 
@@ -408,14 +408,14 @@ function ToolRow({
         body.text !== "" && <pre className="tool-output">{body.text}</pre>
       )}
       {view.more !== undefined && (
-        <button
+        <Button
+          look="plain"
           aria-expanded={open}
           className="tool-more"
           onClick={() => setMemory(m => ({ ...m, open: !m.open }))}
-          type="button"
         >
           {view.more}
-        </button>
+        </Button>
       )}
     </div>
   )

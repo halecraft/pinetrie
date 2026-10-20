@@ -4,6 +4,7 @@
 // board column, and past a canvas's last column.
 
 import type { Intent, StartButton } from "@pinetrie/interface"
+import { Button } from "./button.tsx"
 import { Menu } from "./menu.tsx"
 
 export function AddButton({
@@ -19,15 +20,15 @@ export function AddButton({
   const { main, more } = add
   return (
     <span className={folded ? "add-root folded" : "add-root"}>
-      <button
+      <Button
+        look="outline"
         aria-label={folded ? main.name : undefined}
         className={`add-${main.key}`}
         onClick={() => onIntent(main.intent)}
         title={main.title}
-        type="button"
       >
         {folded ? "＋" : `＋ ${main.label}`}
-      </button>
+      </Button>
       {more !== null && (
         <Menu
           className="add-more"

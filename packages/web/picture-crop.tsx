@@ -14,6 +14,7 @@ import {
   zoomCrop,
 } from "@pinetrie/interface"
 import { useLayoutEffect, useRef, useState } from "react"
+import { Button } from "./button.tsx"
 
 /** The preview's side, in CSS pixels. */
 const VIEW = 200
@@ -92,25 +93,25 @@ export function PictureCrop({
         />
       </label>
       <div className="picture-actions">
-        <button
+        <Button
+          look="outline"
           className="picture-cancel"
           disabled={busy}
           onClick={onCancel}
-          type="button"
         >
           {pictureWords.cancel}
-        </button>
-        <button
+        </Button>
+        <Button
+          look="primary"
           className="picture-use"
           disabled={busy}
           onClick={async () => {
             const picture = await render(image, crop)
             if (picture !== null) onUse(picture)
           }}
-          type="button"
         >
           {busy ? pictureWords.saving : pictureWords.use}
-        </button>
+        </Button>
       </div>
     </div>
   )

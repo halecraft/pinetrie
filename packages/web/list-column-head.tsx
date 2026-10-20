@@ -13,6 +13,7 @@ import {
   type ReadOnly,
 } from "@pinetrie/interface"
 import { useState } from "react"
+import { Button } from "./button.tsx"
 import { ColumnHeadEnd } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"
 
@@ -60,15 +61,15 @@ export function ListColumnHead(p: {
             stored={p.titled}
           />
         ) : (
-          <button
+          <Button
+            look="plain"
             className="note-column-title"
             disabled={p.readOnly !== null}
             onClick={() => setRenaming(true)}
             title={`rename this ${name}`}
-            type="button"
           >
             <span data-fold-name="">{p.title}</span>
-          </button>
+          </Button>
         )}
         <span className="note-count">{countWords(p.kind, p.count)}</span>
         <ColumnHeadEnd

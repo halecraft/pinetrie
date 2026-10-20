@@ -11,6 +11,7 @@ import {
   reviewView,
 } from "@pinetrie/interface"
 import { reviewUrl } from "@pinetrie/rules"
+import { Button } from "./button.tsx"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewFile, readReview, SHOWN_NOW } from "./review-pane.tsx"
 import { useFetched } from "./use-fetched.ts"
@@ -90,15 +91,15 @@ export function ConflictsPane({
             ))}
             <div className="conflict-choices">
               {c.choices.map(x => (
-                <button
+                <Button
+                  look="primary"
                   className="conflict-choice"
                   data-choose={x.choose}
                   key={x.choose}
                   onClick={() => choose(lane, c.path, x.choose)}
-                  type="button"
                 >
                   {x.label}
-                </button>
+                </Button>
               ))}
             </div>
           </section>

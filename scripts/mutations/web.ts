@@ -99,8 +99,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "everyone present has the first colour",
     file: "packages/web/presence.tsx",
-    from: "    return (i === undefined ? undefined : FIRST[i]) ?? hashed(writer)",
-    to: "    return (i === undefined ? undefined : FIRST[0]) ?? hashed(writer)",
+    from: "    return (i === undefined ? undefined : FIRST_COLORS[i]) ?? hashed(writer)",
+    to: "    return (i === undefined ? undefined : FIRST_COLORS[0]) ?? hashed(writer)",
     command: unit,
     expect: "each have their own colour",
   },
@@ -319,12 +319,38 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "index.html sizes the pane and the thread by pane.ts's numbers",
   },
+  // ── buttons ──
+  {
+    name: "a button is drawn raw",
+    file: "packages/web/toast.tsx",
+    from: '      <IconButton className="toast-dismiss" label="dismiss" onClick={onDismiss}>',
+    to: '      <button className="toast-dismiss" aria-label="dismiss" onClick={onDismiss}>',
+    command: unit,
+    expect: "every button the page draws is a Button or an IconButton",
+  },
+  // ── the page's named colours ──
+  {
+    name: "a rule writes its own colour",
+    file: "packages/web/index.html",
+    from: "      .sync-note { font-size: var(--font-sm); color: var(--text-quiet); }",
+    to: "      .sync-note { font-size: var(--font-sm); color: #6f7784; }",
+    command: unit,
+    expect: "only the rule that names the colours writes one",
+  },
+  {
+    name: "a rule reads a colour nobody named",
+    file: "packages/web/index.html",
+    from: "      .sync-note { font-size: var(--font-sm); color: var(--text-quiet); }",
+    to: "      .sync-note { font-size: var(--font-sm); color: var(--text-quieter); }",
+    command: unit,
+    expect: "every variable a rule reads without a fallback is defined",
+  },
   // ── track colours ──
   {
     name: "a track colour is the attention amber",
-    file: "packages/web/colors.ts",
-    from: '  "#c0a320",',
-    to: '  "#e0c080",',
+    file: "packages/web/index.html",
+    from: "--slot-2: #c0a320;",
+    to: "--slot-2: #e0c080;",
     command: unit,
     expect: "is apart from the colours that already mean something",
   },

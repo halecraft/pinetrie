@@ -22,6 +22,7 @@ import {
   useContext,
   useSyncExternalStore,
 } from "react"
+import { Button } from "./button.tsx"
 import { MessageText } from "./message-text.tsx"
 import { PaneReach } from "./pane-context.ts"
 
@@ -80,16 +81,16 @@ export function AskWork({
   const drawn: ReactNode[] = []
   if (draw.line !== null)
     drawn.push(
-      <button
+      <Button
+        look="plain"
         aria-expanded={open}
         className={view.running ? "ask-line running" : "ask-line"}
         key="line"
         onClick={toggle}
         title={title}
-        type="button"
       >
         <FoldLine parts={draw.line} />
-      </button>,
+      </Button>,
     )
   const { summary } = draw
   const summaryRow =
@@ -105,25 +106,25 @@ export function AskWork({
       case "fold":
         drawn.push(
           <div className="ask-fold-head" key={`fold-${row.ids[0]}`}>
-            <button
+            <Button
+              look="plain"
               aria-expanded={open}
               className="ask-fold"
               data-first={row.first || undefined}
               onClick={toggle}
               title={title}
-              type="button"
             >
               <FoldLine parts={row.parts} />
-            </button>
+            </Button>
             {row.files !== null && pane !== null && (
-              <button
+              <Button
+                look="outline"
                 className="ask-files"
                 onClick={() => pane.open({ kind: "ask", ask })}
                 title={ASK_FILES_TITLE}
-                type="button"
               >
                 {row.files}
-              </button>
+              </Button>
             )}
           </div>,
         )

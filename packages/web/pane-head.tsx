@@ -3,6 +3,7 @@
 // narrow screen goes back to the thread.
 
 import { type ReactNode, useLayoutEffect, useRef } from "react"
+import { IconButton } from "./button.tsx"
 import { paneCloseWords } from "./pane.ts"
 
 export function PaneHead({
@@ -30,15 +31,14 @@ export function PaneHead({
       {line !== undefined && <span className="pane-line">{line}</span>}
       {title !== undefined && <span className="pane-title">{title}</span>}
       {extra}
-      <button
-        aria-label={words.label}
+      <IconButton
+        label={words.label}
         className="pane-close"
         onClick={close}
         title={words.label}
-        type="button"
       >
         {words.glyph}
-      </button>
+      </IconButton>
     </div>
   )
 }

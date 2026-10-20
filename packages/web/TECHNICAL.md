@@ -305,19 +305,101 @@ bar, each column's matches, and the rail's marks.
 - **The bar slides in only.** It unmounts as it closes, which has no frame to
   slide out in.
 
-## The page's colours (`index.html`, ADR-0081)
+## The page's colours (`index.html`, ADR-0081, ADR-0195)
 
-`:root` names them: `--page` (the paper the columns and the root you are on
-are drawn on), `--chrome` (the sidebar and the footer), `--edge` (their lines
-and the selected item's sides), `--on` (the selected item's left edge) and
-`--side` (the sidebar's width, which the footer's own cell shares: 15rem,
-11.5rem under 56rem, 3rem under `:root[data-list="icons"]`, ADR-0088). No
-page-colour literal is left in the stylesheet. `--surface` is the colour
-behind a thing, set by context: `--page` by default, `--chrome` in
-`#sidebar` and `#bottom`, the hover fill on a hovered item, `--page` on
-the selected one and on a thread card. A ring that must read as a gap around
-a dot (`.signal[data-signal="needs-you"]`, `.signal[data-signal="unsent"]`) is drawn in `--surface`, so
-it matches whatever the dot sits on.
+The first `:root` rule in the stylesheet names every colour the page draws,
+and only that rule writes a colour literal. `stylesheet.test.ts` fails on a
+hex, a colour function or a colour's name anywhere else. It also fails on
+a `var()` with no fallback that names a variable nobody defines, which
+would draw nothing (S277).
+
+- **Neutrals are two ramps.**
+  - Surfaces, darkest first: `--chrome` (the sidebar and the footer),
+    `--sunk` (code, a tool's output, the board), `--page` (the paper the
+    columns and the root you are on are drawn on), `--panel`, `--raised`
+    (a menu, a hover fill, a field) and `--edge` (the lines between
+    regions, and the selected item's sides).
+  - Lines, from quiet to hovered: `--line`, `--line-strong`, `--line-hover`.
+  - Text, brightest first: `--text-bright`, `--text`, `--text-soft`,
+    `--text-dim` (the selected item's left edge too), `--text-muted`,
+    `--text-faint` and `--text-quiet`.
+- **A hue names its role:**
+  - `--accent`: what you act on (drops, filters, focus).
+  - `--agent`: the agent's own blue.
+  - `--queued` and `--pinned`: a card's place.
+  - `--action`: a primary button's fill.
+  - `--attention`: what needs you.
+  - `--caution`: a refusal or a conflict.
+  - `--inventory`: your inventory's amber when `--you` is not set.
+  - `--highlight`: a search's match.
+  - `--command`: a command's name.
+  - `--danger` and `--danger-soft`: a stop or a deletion.
+  - `--ok` and `--ok-soft`: a success or an addition.
+- **A tint is a mix, not a literal.** A blue band, an amber fill or a
+  hue's line is `color-mix(in srgb, var(--hue) p%, var(--page))`, so it
+  follows both the hue and the page. A colour that only fades is mixed
+  with `transparent`.
+- **Three colours are the same on any page:** `--white` (text on a filled
+  button, the light square of an image's checker), `--ink` (text on a bright
+  fill: a badge, an initial, a match) and `--shadow`.
+- **A light set would redefine this rule alone.** Each name is a role, not a
+  shade, so no rule outside it needs to change. People's colours are not
+  here: `presence.tsx` picks them in code.
+
+`--surface` is the colour behind a thing, set by context: `--page` by
+default, `--chrome` in `#sidebar` and `#bottom`, the hover fill on a
+hovered item, `--page` on the selected one and on a thread card. A ring that
+must read as a gap around a dot (`.signal[data-signal="needs-you"]`,
+`.signal[data-signal="unsent"]`) is drawn in `--surface`, so it matches
+whatever the dot sits on. `--side` is the sidebar's width, which the
+footer's own cell shares: 15rem, 11.5rem under 56rem, and 3rem under
+`:root[data-list="icons"]` (ADR-0088).
+
+## Sizes (`index.html`, ADR-0195)
+
+The second `:root` rule holds three scales. Every font size, radius,
+padding, margin and gap in the stylesheet is drawn from them:
+- `--font-2xs` … `--font-3xl`: .65rem to 1.1rem.
+- `--radius-xs` … `--radius-xl`: 2px to 8px, and `--radius-pill`.
+- `--space-1` … `--space-12`: .1rem to 2rem.
+
+A value left literal is held to another number, or is relative to its
+text:
+- the column's 1.75rem right gutter, which a message's → sits in;
+- the search field's room for its clear button, and an ask's for its files
+  button;
+- an initial's px size, set by its circle's, and a thread's large mark;
+- the rail's radii, half the width they round;
+- `50%` for a circle, and `.85em` for a chip in running text.
+
+A value tied to a padding is written from the same step. The board head's
+sticky `top`, a renamed title's negative margin and the diff's hanging
+indent are each a `calc()` of the padding they match. A menu's ✓ column is
+`--menu-check`, which also indents an item without one and a choice's
+detail.
+
+## Buttons (`button.tsx`, ADR-0195)
+
+Every button the page draws is a `Button` or an `IconButton`.
+`button.test.ts` fails on a `<button>` written anywhere else.
+
+- **A look is a value:** `primary` (filled in `--action`, `--white` text),
+  `outline` (a 1px `--line-strong` border, clear, the parent's text colour)
+  or `plain` (clear, the parent's text colour). The stylesheet draws it by
+  `data-look`. Its base gives every button the same padding, radius, font
+  and cursor.
+- **The looks lose to every other rule.** Their rules sit under `:where()`,
+  with no specificity, so a button's own class rule, or a context's
+  (`.tools button`, `.work button`), sets what it needs and wins. A rule
+  never undoes a look's fill: one that clears a background clears a
+  background some other rule of its own gives it (`.card-grid-cell >
+  button.empty`).
+- **`type` is `button` unless given,** so no button submits a form by
+  accident. A form's submit names `type="submit"`.
+- **`IconButton`** shows only a glyph or an icon. Its `label` is the name
+  read aloud in the glyph's place.
+- **Class names stay as they were.** The browser suite locates buttons by
+  them, and `data-look` adds an attribute without taking one away.
 
 ## Colour carries the link, not geometry
 
@@ -328,7 +410,8 @@ colour. There are no connector lines, so sibling branches never cross.
 - **A root seeds its colours** (`palette.ts`, ADR-0089, S110). Its
   `RootId`'s hash picks the slot its trunk takes, and track *n* takes
   `(seed + 7n) mod 12`. Which slot is the same in any client; the page's
-  colour for a slot is `colors.ts`'s (`slotColor`). The seed of the root you are on, or of the root a
+  colour for a slot is the stylesheet's `--slot-N`, which `slotColor`
+  (`colors.ts`) names as `var(--slot-N)`. The seed of the root you are on, or of the root a
   new canvas minted, is `TrackSeed`, a context `App` provides around the
   stage; `useTrackColors()` turns a track into its colour, slot and
   `--track` style. It changes only with the root, which remounts the

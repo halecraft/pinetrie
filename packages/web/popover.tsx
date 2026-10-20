@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { Button } from "./button.tsx"
 import { type Placement, placeBox } from "./popover-place.ts"
 
 interface PopoverApi {
@@ -197,7 +198,8 @@ export function Popover({
   )
   return (
     <span className={open ? `${className} open` : className} ref={wrapper}>
-      <button
+      <Button
+        look="plain"
         {...triggerProps}
         aria-controls={open ? boxId : undefined}
         aria-expanded={open}
@@ -229,10 +231,9 @@ export function Popover({
         }
         ref={button}
         title={title}
-        type="button"
       >
         {trigger}
-      </button>
+      </Button>
       {at !== null &&
         (role === "dialog" ? (
           <div

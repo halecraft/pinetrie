@@ -3,6 +3,7 @@
 // the bar's wrap carries its block.
 
 import { type ComponentProps, useContext } from "react"
+import { IconButton } from "./button.tsx"
 import { blockOfProperty } from "./markdown.ts"
 import { type PaneSubject, samePane, tableOpenWords } from "./pane.ts"
 import { MessageSource, PaneReach } from "./pane-context.ts"
@@ -48,8 +49,8 @@ export function MessageTable(
       data-shown={shown || undefined}
     >
       <div className="table-bar">
-        <button
-          aria-label={words.label}
+        <IconButton
+          label={words.label}
           aria-pressed={shown}
           className="table-open"
           disabled={mine === null}
@@ -57,10 +58,9 @@ export function MessageTable(
             if (mine !== null) reach.open(mine)
           }}
           title={words.title}
-          type="button"
         >
           ⤢
-        </button>
+        </IconButton>
       </div>
       <table {...props} />
     </div>
