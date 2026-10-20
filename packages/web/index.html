@@ -522,9 +522,15 @@
       @property --strip-mark-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
       @property --strip-name-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
       @property --strip-name-max { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-toggle-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-toggle-height { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-box-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-box { syntax: "<length>"; inherits: true; initial-value: 0px; }
       #strip { --strip-width: 2.2rem; --strip-border: 4px;
         --strip-head: calc(var(--strip-border) + 2 * var(--space-5) + 1.5rem); --strip-box: 1rem;
         --strip-pad: .5rem; --strip-gap: .4rem; --strip-mark: 1.5rem; --strip-name-max: 60vh;
+        --strip-toggle-top: var(--strip-border);
+        --strip-toggle-height: calc(var(--strip-head) - var(--strip-border)); --strip-box-top: var(--strip-head);
         --strip-mark-top: calc(var(--strip-head) + var(--strip-box) + var(--strip-pad));
         --strip-name-top: calc(var(--strip-mark-top) + var(--strip-mark) + var(--strip-gap)); }
       /* A list column's strip has no mark; the canvas column's (below), no box either. */
@@ -533,8 +539,8 @@
         flex-direction: column; box-shadow: inset -1px 0 0 var(--edge);
         border-top: var(--strip-border) solid var(--track, var(--slot-pending)); }
       .folded-start { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; }
-      .folded-start > :is(.fold, .unfold, .trash-column) { flex: 0 0 calc(var(--strip-head) - var(--strip-border));
-        height: calc(var(--strip-head) - var(--strip-border)); width: 100%; padding: 0; border-radius: 0;
+      .folded-start > :is(.fold, .unfold, .trash-column) { flex: 0 0 var(--strip-toggle-height);
+        height: var(--strip-toggle-height); width: 100%; padding: 0; border-radius: 0;
         font-size: var(--font-2xl); line-height: 1; color: var(--text-faint); }
       .folded-start > :is(.fold, .unfold, .trash-column):hover,
       .folded-start > :is(.fold, .unfold, .trash-column):focus-visible { color: var(--text); }

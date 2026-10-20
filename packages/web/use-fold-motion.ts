@@ -1,6 +1,7 @@
 // web/use-fold-motion — a column moves into its fold and out of it: its name
-// turns onto its strip's, its mark moves to the strip's, the rest of it
-// fades, and its right edge, which the columns after it follow, closes in.
+// turns onto its strip's, its mark and its box move to the strip's, its
+// toggle flips from ⇤ to ⇥ where it stands, the rest of it fades, and its
+// right edge, which the columns after it follow, closes in.
 // What moves where is `planFoldMotion`'s; this measures and plays it.
 //
 // A fold animates the live column, then lands, and lets go of the motion
@@ -59,22 +60,33 @@ function gather(
   column: HTMLElement,
   unfolding: boolean,
 ): FoldScene {
+  const of = (selector: string) => {
+    const el = column.querySelector(selector)
+    return el === null ? null : rect(el)
+  }
   const name = column.querySelector("[data-fold-name]")
-  const mark = column.querySelector("[data-fold-mark]")
   const style = getComputedStyle(column)
   return {
     unfolding,
     wide: {
       column: rect(column),
       name: name === null ? null : rect(name),
-      mark: mark === null ? null : rect(mark),
+      mark: of("[data-fold-mark]"),
+      toggle: of("[data-fold-toggle]"),
+      box: of("[data-fold-box]"),
     },
     stripMark: column.dataset.kind === "thread",
+    // A card column's strip has a box; the canvas column's has none.
+    stripBox: column.dataset.card !== undefined,
     geometry: {
       width: px(style, "--strip-width"),
       markTop: px(style, "--strip-mark-top"),
       nameTop: px(style, "--strip-name-top"),
       nameMax: px(style, "--strip-name-max"),
+      toggleTop: px(style, "--strip-toggle-top"),
+      toggleHeight: px(style, "--strip-toggle-height"),
+      boxTop: px(style, "--strip-box-top"),
+      boxHeight: px(style, "--strip-box"),
     },
     line:
       name === null
@@ -126,13 +138,17 @@ function around(
   return { elements, pseudos }
 }
 
-/** What in `el` turns or moves under `motion`, rather than fading: its name, its mark. */
+/** What in `el` turns, moves or flips under `motion`, rather than fading: its name, its mark, its toggle, its box. */
 function keptIn(el: Element, motion: FoldMotion): Element[] {
-  const name = el.querySelector("[data-fold-name]")
-  const mark = el.querySelector("[data-fold-mark]")
+  const kept = (selector: string, moves: unknown) => {
+    const found = el.querySelector(selector)
+    return moves === null || found === null ? [] : [found]
+  }
   return [
-    ...(motion.turn === null || name === null ? [] : [name]),
-    ...(motion.mark === null || mark === null ? [] : [mark]),
+    ...kept("[data-fold-name]", motion.turn),
+    ...kept("[data-fold-mark]", motion.mark),
+    ...kept("[data-fold-toggle]", motion.toggle),
+    ...kept("[data-fold-box]", motion.box),
   ]
 }
 
@@ -203,6 +219,32 @@ function play(
         frames.map(f => ({
           offset: f.offset,
           transform: `translate(${by.dx * f.fold}px, ${by.dy * f.fold}px)`,
+        })),
+        opts,
+      ),
+    )
+  const box = column.querySelector("[data-fold-box]")
+  const boxBy = motion.box
+  if (boxBy !== null && box !== null)
+    anims.push(
+      box.animate(
+        frames.map(f => ({
+          offset: f.offset,
+          transform: `translate(${boxBy.dx * f.fold}px, ${boxBy.dy * f.fold}px)`,
+        })),
+        opts,
+      ),
+    )
+  // ⇥ is ⇤ mirrored: turned half about its vertical axis, ⇤ ends as the
+  // strip's toggle, which takes its place unmoved.
+  const toggle = column.querySelector("[data-fold-toggle]")
+  const toggleBy = motion.toggle
+  if (toggleBy !== null && toggle !== null)
+    anims.push(
+      toggle.animate(
+        frames.map(f => ({
+          offset: f.offset,
+          transform: `translate(${toggleBy.dx * f.fold}px, ${toggleBy.dy * f.fold}px) perspective(8rem) rotateY(${180 * f.fold}deg)`,
         })),
         opts,
       ),

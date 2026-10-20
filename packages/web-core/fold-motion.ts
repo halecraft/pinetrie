@@ -21,19 +21,29 @@ export interface StripGeometry {
   readonly nameTop: number
   /** The longest name the strip shows. */
   readonly nameMax: number
+  /** From the strip's top to its toggle's row, and that row's height. */
+  readonly toggleTop: number
+  readonly toggleHeight: number
+  /** From the strip's top to its box's row, and that row's height. */
+  readonly boxTop: number
+  readonly boxHeight: number
 }
 
 /** What a fold or an unfold sees, measured where the column is wide. */
 export interface FoldScene {
   readonly unfolding: boolean
-  /** The wide column, its name's line box and its mark's box. */
+  /** The wide column, its name's line box, its mark's, its toggle's and its box's. */
   readonly wide: {
     readonly column: Rect
     readonly name: Rect | null
     readonly mark: Rect | null
+    readonly toggle: Rect | null
+    readonly box: Rect | null
   }
   /** Whether the strip draws a mark (a thread's does). */
   readonly stripMark: boolean
+  /** Whether the strip draws a box (a card column's does; the canvas column's does not). */
+  readonly stripBox: boolean
   readonly geometry: StripGeometry
   /** The name's line height. */
   readonly line: number
@@ -76,6 +86,14 @@ export interface FoldMotion {
   readonly turn: Shift | null
   /** The mark, folded: moved by this, unturned. Null when it fades instead. */
   readonly mark: Shift | null
+  /**
+   * The toggle, folded: moved by this and flipped about its vertical axis,
+   * so ⇤ ends as ⇥, the strip's toggle, which is its mirror. Null when it
+   * fades instead.
+   */
+  readonly toggle: Shift | null
+  /** The box, folded: moved by this. Null when it fades instead. */
+  readonly box: Shift | null
   /** The opacity of everything else in the column, by offset. */
   readonly fade: readonly {
     readonly offset: number
@@ -166,6 +184,18 @@ export function planFoldMotion(scene: FoldScene): FoldMotion | null {
           dy: top + geometry.markTop - wide.mark.top,
         }
       : null
+  // A toggle and a box land centred in their strip rows.
+  const centred = (el: Rect | null, rowTop: number, rowHeight: number) =>
+    el === null
+      ? null
+      : {
+          dx: left + geometry.width / 2 - (el.left + el.width / 2),
+          dy: top + rowTop + rowHeight / 2 - (el.top + el.height / 2),
+        }
+  const toggle = centred(wide.toggle, geometry.toggleTop, geometry.toggleHeight)
+  const box = scene.stripBox
+    ? centred(wide.box, geometry.boxTop, geometry.boxHeight)
+    : null
   const right = left + width
   const frames = Array.from({ length: SAMPLES + 1 }, (_, i): FoldFrame => {
     const offset = i / SAMPLES
@@ -203,5 +233,5 @@ export function planFoldMotion(scene: FoldScene): FoldMotion | null {
         { offset: 0.4, opacity: 0 },
         { offset: 1, opacity: 0 },
       ]
-  return { duration: FOLD_MS, frames, turn, mark, fade, clamp }
+  return { duration: FOLD_MS, frames, turn, mark, toggle, box, fade, clamp }
 }

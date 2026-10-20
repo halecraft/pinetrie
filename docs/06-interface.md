@@ -393,7 +393,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   ADR-0198), in the header's order: **⇥** where the header's ⇤ is, so a
   second click lands on it, the column's box, its mark, its name at the
   header's size, in its colour, and its dot. Folding turns the name 90°
-  into the strip, its mark moving with it, while the rest of the column
+  into the strip, its mark and its box moving with it and ⇤ flipping into
+  ⇥ where it stands, while the rest of the column
   fades and the columns after it close up; unfolding turns it back. Only a
   fold you ask for moves; under reduced motion, nothing does. The whole
   strip drags, as a header does.

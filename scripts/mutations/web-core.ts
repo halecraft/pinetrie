@@ -5,6 +5,30 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/web-core"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a fold's box lands at the toggle's row",
+    file: "packages/web-core/fold-motion.ts",
+    from: "    ? centred(wide.box, geometry.boxTop, geometry.boxHeight)\n",
+    to: "    ? centred(wide.box, geometry.toggleTop, geometry.toggleHeight)\n",
+    command: unit,
+    expect: "a fold moves the box into its strip row, under the toggle",
+  },
+  {
+    name: "a strip with no box moves one into it",
+    file: "packages/web-core/fold-motion.ts",
+    from: "  const box = scene.stripBox\n",
+    to: "  const box = true\n",
+    command: unit,
+    expect: "a fold moves the box into its strip row, under the toggle",
+  },
+  {
+    name: "a fold's box lands off the strip's centre",
+    file: "packages/web-core/fold-motion.ts",
+    from: "          dx: left + geometry.width / 2 - (el.left + el.width / 2),\n",
+    to: "          dx: left - el.left,\n",
+    command: unit,
+    expect: "a fold moves the box into its strip row, under the toggle",
+  },
+  {
     name: "the system's theme forces dark",
     file: "packages/web-core/theme.ts",
     from: '  theme === "system" ? null : theme',

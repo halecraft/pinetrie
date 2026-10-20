@@ -602,8 +602,9 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 ## Folding in motion (`use-fold-motion.ts`, `motion.ts`, ADR-0137, S164–S167)
 
 A fold you ask for moves (`layout` effect's `moves`, the `foldColumn`
-port): the name turns onto the strip's, the mark moves to the strip's, the
-rest fades, and one right edge closes in. What moves where is
+port): the name turns onto the strip's, the mark and the box move to the
+strip's, the toggle flips from ⇤ to ⇥ where it stands, the rest fades, and
+one right edge closes in. What moves where is
 `planFoldMotion`'s (`packages/web-core/TECHNICAL.md`, "A fold in
 motion"); `use-fold-motion.ts` measures and plays it.
 
@@ -622,7 +623,12 @@ motion"); `use-fold-motion.ts` measures and plays it.
 - **The names that turn are `[data-fold-name]` line boxes** at
   `line-height: 1.5`: `inline-block`, so their box is a line box, and a
   number, since `normal` reads back as no length. The header's mark and
-  the strip's are `[data-fold-mark]` (`ThreadMark`'s `folds`).
+  the strip's are `[data-fold-mark]` (`ThreadMark`'s `folds`); their
+  toggles `[data-fold-toggle]` and their boxes `[data-fold-box]`
+  (`ColumnHeadStart`, and the canvas column's toggle).
+- **The toggle flips rather than fades**: `rotateY` to half a turn, under a
+  `perspective`, as it moves, since ⇥ is ⇤ mirrored. Edge-on halfway, it
+  ends looking as the strip's ⇥ does, which the strip then draws unmoved.
 - **Everything beside the path from a kept element up to the column
   fades**, and the generated content of what is on it (the name's ▸). A
   column whose header draws no name at its first commit (a thread not yet

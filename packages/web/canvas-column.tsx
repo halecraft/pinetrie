@@ -96,6 +96,7 @@ export function CanvasColumn(p: {
             <IconButton
               label={UNFOLD_CANVAS.title}
               className={UNFOLD_CANVAS.className}
+              data-fold-toggle=""
               onClick={() => fold(true)}
             >
               {UNFOLD_CANVAS.label}
@@ -111,6 +112,7 @@ export function CanvasColumn(p: {
         <IconButton
           label={FOLD_CANVAS.title}
           className={FOLD_CANVAS.className}
+          data-fold-toggle=""
           onClick={() => fold(false)}
         >
           {FOLD_CANVAS.label}

@@ -42,7 +42,10 @@ column folds, and which way, is interface's `foldMotion`.
 
 - **The strip is predicted, both ways**: at the wide column's left and
   top, its name centred across `geometry.width` at `nameTop`, a line high
-  and the wide name long, its mark centred at `markTop`. An unfold's strip
+  and the wide name long, its mark centred at `markTop`, its toggle and its
+  box each centred in their rows (`toggleTop` and `toggleHeight`, `boxTop`
+  and `boxHeight`; a strip with no box, the canvas column's, fades it). An
+  unfold's strip
   lies where the column now starts, so it needs no measuring either. The
   browser suite's check of the turn proves the prediction is where the CSS
   draws the strip.

@@ -15,7 +15,9 @@ import { Menu } from "./menu.tsx"
 
 /**
  * A head's start: the toggle, then the box. The toggle comes first, so it
- * is in the same place folded or not, and a second click lands on it.
+ * is in the same place folded or not, and a second click lands on it. A fold
+ * moves the box and flips the toggle (`data-fold-box`, `data-fold-toggle`,
+ * `use-fold-motion.ts`) rather than fading them.
  */
 export function ColumnHeadStart(p: {
   head: ColumnHead
@@ -29,6 +31,7 @@ export function ColumnHeadStart(p: {
         <IconButton
           label={toggle.words.title}
           className={toggle.words.className}
+          data-fold-toggle=""
           onClick={() => p.onIntent(toggle.intent)}
         >
           {toggle.intent.kind === "trash" ? <TrashIcon /> : toggle.words.label}
@@ -38,6 +41,7 @@ export function ColumnHeadStart(p: {
         aria-label={box.title}
         checked={box.ticked}
         className="column-box"
+        data-fold-box=""
         disabled={intent === null}
         onChange={() => {
           if (intent !== null) p.onIntent(intent)

@@ -19,12 +19,27 @@ const stripName: Rect = {
   height: 80.11,
 }
 const stripMark: Rect = { left: 329.78, top: 62.39, width: 24, height: 24 }
+// The header's toggle, first, centred in the strip's width from the column's
+// left edge; its box after it.
+const toggle: Rect = { left: 324.19, top: 10.39, width: 35.2, height: 24 }
+const box: Rect = { left: 362.59, top: 15.59, width: 13.6, height: 13.6 }
+const wide = { column, name, mark, toggle, box }
 
 const scene = (over: Partial<FoldScene> = {}): FoldScene => ({
   unfolding: false,
-  wide: { column, name, mark },
+  wide,
   stripMark: true,
-  geometry: { width: 35.2, markTop: 62.4, nameTop: 92.8, nameMax: 480 },
+  stripBox: true,
+  geometry: {
+    width: 35.2,
+    markTop: 62.4,
+    nameTop: 92.8,
+    nameMax: 480,
+    toggleTop: 4,
+    toggleHeight: 36.8,
+    boxTop: 40.8,
+    boxHeight: 16,
+  },
   line: 21.06,
   view: { left: 0, top: 0, width: 1400, height: 800 },
   scroll: { left: 0, width: 1400, client: 1076 },
@@ -83,11 +98,40 @@ describe("planFoldMotion", () => {
     near({ ...mark, left: mark.left + by.dx, top: mark.top + by.dy }, stripMark)
   })
 
+  test("a fold moves the toggle onto its strip's, centre on centre, where it already stands", () => {
+    const { toggle: by } = plan()
+    if (by === null) throw new Error("no toggle")
+    // The strip's toggle row: from its top border to its head's foot.
+    expect(toggle.left + toggle.width / 2 + by.dx).toBeCloseTo(
+      column.left + 35.2 / 2,
+      5,
+    )
+    expect(toggle.top + toggle.height / 2 + by.dy).toBeCloseTo(4 + 36.8 / 2, 5)
+    // The header's toggle is where the strip's is, so it hardly moves.
+    expect(Math.abs(by.dx)).toBeLessThan(1)
+    expect(Math.abs(by.dy)).toBeLessThan(1)
+  })
+
+  test("a fold moves the box into its strip row, under the toggle; a strip with none fades it", () => {
+    const { box: by } = plan()
+    if (by === null) throw new Error("no box")
+    expect(box.left + box.width / 2 + by.dx).toBeCloseTo(
+      column.left + 35.2 / 2,
+      5,
+    )
+    expect(box.top + box.height / 2 + by.dy).toBeCloseTo(40.8 + 16 / 2, 5)
+    expect(plan({ stripBox: false }).box).toBeNull()
+    expect(plan({ wide: { ...wide, box: null } }).box).toBeNull()
+    expect(plan({ wide: { ...wide, toggle: null } }).toggle).toBeNull()
+  })
+
   test("an unfold starts where a fold ends, and ends wide", () => {
     const fold = plan()
     const unfold = plan({ unfolding: true })
     expect(unfold.turn).toEqual(fold.turn)
     expect(unfold.mark).toEqual(fold.mark)
+    expect(unfold.toggle).toEqual(fold.toggle)
+    expect(unfold.box).toEqual(fold.box)
     expect(unfold.frames[0]).toEqual({ offset: 0, fold: 1, inset: 449 - 35.2 })
     expect(fold.frames.at(-1)).toEqual({
       offset: 1,
@@ -101,7 +145,7 @@ describe("planFoldMotion", () => {
 
   test("the edge stays clear of a long name all the way through its turn", () => {
     const long = { ...name, width: 320 }
-    const motion = plan({ wide: { column, name: long, mark } })
+    const motion = plan({ wide: { ...wide, name: long } })
     const { turn } = motion
     if (turn === null) throw new Error("no turn")
     const edges = motion.frames.map(f => {
@@ -124,19 +168,19 @@ describe("planFoldMotion", () => {
     ).toBeNull()
     expect(
       planFoldMotion(
-        scene({ wide: { column: { ...column, width: 35.2 }, name, mark } }),
+        scene({ wide: { ...wide, column: { ...column, width: 35.2 } } }),
       ),
     ).toBeNull()
   })
 
   test("a name that wraps, outgrows the strip or is another size fades instead of turning", () => {
     const wraps = { ...name, height: 42.12 }
-    expect(plan({ wide: { column, name: wraps, mark } }).turn).toBeNull()
+    expect(plan({ wide: { ...wide, name: wraps } }).turn).toBeNull()
     expect(
       plan({ geometry: { ...scene().geometry, nameMax: 60 } }).turn,
     ).toBeNull()
     expect(plan({ line: 19.84 }).turn).toBeNull()
-    expect(plan({ wide: { column, name: null, mark } }).turn).toBeNull()
+    expect(plan({ wide: { ...wide, name: null } }).turn).toBeNull()
     expect(plan({ stripMark: false }).mark).toBeNull()
   })
 
