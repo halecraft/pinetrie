@@ -953,6 +953,12 @@ a notice gives a sign-in URL, a device code, information or progress.
 `planSignIn` reads `pnpm sign-in`'s arguments, pure; the script
 (`apps/pinetrie/scripts/sign-in.ts`) is only the terminal.
 
+- **pi's OAuth sign-in leaves a socket open.** Its loopback callback server
+  is closed with the server's `close()` alone, which leaves a connection
+  that never sent a request (a browser's speculative one) open, and the
+  process with it. So `pinetrie sign-in` exits itself once stdout drains
+  (`apps/pinetrie/bin.ts`); waiting for the event loop to empty would hang.
+
 ### pi's checkpoints, stored as text (`checkpoint.ts`)
 
 While a tool runs, pi writes its whole output view to `pi.pending.tool_output`

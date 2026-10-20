@@ -35,6 +35,11 @@ switch (planned.kind) {
           "in",
           ...args,
         ])
+        // pi's OAuth callback server closes without closing its connections,
+        // and a browser's speculative one, which never sends a request, would
+        // hold the process open. Exit once stdout drains, which on a macOS
+        // pipe is asynchronous.
+        process.stdout.write("", () => process.exit())
         break
       case "sign-out":
         process.exitCode = await (await import("./scripts/sign-in.ts")).main([
