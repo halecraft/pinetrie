@@ -122,6 +122,7 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
       status: f.status,
       pips: f.cardRoots,
       proposed: f.ready,
+      ready: f.ready,
       work: f.work,
     }),
   }

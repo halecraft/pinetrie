@@ -34,64 +34,26 @@ import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { useOthersReading, useReadingCanvases } from "./use-presence.ts"
 
-/**
- * A root's status, before its label: a still ring while its agent works, its
- * level's mark when something is raised, a ✓ that fades when a run you follow
- * ended with nothing to do (`statusSignal`).
- */
-export function RootStatus({
-  status,
-  arrived,
-  done,
-  nameOf,
-}: {
+interface StatusProps {
   status: Status | null
   arrived: number | null
   done: number | null
   nameOf: ReadonlyMap<WriterId, string>
-}) {
-  const signal = statusSignal(status, moving(done, Date.now()))
-  if (signal === null) return null
-  if (status === null || status.item === null)
-    return (
-      <SignalMark arrived={status === null ? done : null} signal={signal} />
-    )
-  return (
-    <SignalMark
-      arrived={arrived}
-      signal={signal}
-      title={`${signalWords(signal)}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
-    />
-  )
 }
 
+/** A root's status, before its label, in the sidebar and on the board (`statusMark`). */
+export const RootStatus = (p: StatusProps) => statusMark(p)
+
 /**
- * A column's dot, after its name, folded or not: its thread's status
- * (`statusSignal`), quiet when not raised for you, or a grey dot with
- * nothing to say, so the line keeps its shape.
+ * A status's mark: its level's (a still ring while its agent works, quiet
+ * when not raised for you), or a ✓ that fades when a run you follow ended
+ * with nothing to do (`statusSignal`); null with nothing to say. Its title
+ * says why, when an item raised it. A root's, before its label, and a
+ * column's dot draw it alike.
  */
-export function ColumnDot({
-  status,
-  arrived,
-  done,
-  nameOf,
-}: {
-  status: Status | null
-  arrived: number | null
-  done: number | null
-  nameOf: ReadonlyMap<WriterId, string>
-}) {
+function statusMark({ status, arrived, done, nameOf }: StatusProps) {
   const signal = statusSignal(status, moving(done, Date.now()))
-  if (signal === null)
-    return (
-      <span
-        aria-label={NO_STATUS_WORDS}
-        className="signal"
-        data-signal="none"
-        role="img"
-        title={NO_STATUS_WORDS}
-      />
-    )
+  if (signal === null) return null
   const why =
     status === null || status.item === null
       ? null
@@ -105,6 +67,25 @@ export function ColumnDot({
         why === null ? signalWords(signal) : `${signalWords(signal)}: ${why}`
       }
     />
+  )
+}
+
+/**
+ * A column's dot, after its name, folded or not: its thread's status
+ * (`statusMark`), or a grey dot with nothing to say, so the line keeps its
+ * shape.
+ */
+export function ColumnDot(p: StatusProps) {
+  return (
+    statusMark(p) ?? (
+      <span
+        aria-label={NO_STATUS_WORDS}
+        className="signal"
+        data-signal="none"
+        role="img"
+        title={NO_STATUS_WORDS}
+      />
+    )
   )
 }
 

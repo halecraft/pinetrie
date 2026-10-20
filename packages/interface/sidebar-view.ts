@@ -9,12 +9,13 @@ import {
   readableThreadName,
   type Workflow,
 } from "@pinetrie/rules"
-import type { Moments, Status } from "./attention.ts"
+import { type Moments, STRIP_LEVEL, type Status } from "./attention.ts"
 import {
   boardPlaceWords,
   type PlaceOnBoard,
   placeOnBoard,
 } from "./canvas-column-view.ts"
+import type { WorkStripState } from "./host-rules.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, sameHere, sidebarList } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
@@ -266,6 +267,20 @@ export function openProposedByCanvas(
   }
   return byCanvas
 }
+
+/**
+ * Of open proposed changes, those whose work strip reads ready to accept
+ * (`STRIP_LEVEL`), not conflicted or asked about: what ⇡ counts, for
+ * everyone, by the state the strip and a thread's status read.
+ */
+export const readyProposed = <O extends { readonly lane: ThreadId }>(
+  openProposed: readonly O[],
+  strips: ReadonlyMap<ThreadId, WorkStripState>,
+): readonly O[] =>
+  openProposed.filter(o => {
+    const state = strips.get(o.lane)
+    return state !== undefined && STRIP_LEVEL[state] === "ready"
+  })
 
 /** The sidebar's own words: its list, and each canvas item's buttons and ⋯. */
 export const SIDEBAR_WORDS = {

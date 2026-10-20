@@ -34,6 +34,7 @@ import {
   listKey,
   openProposedByCanvas,
   pageTitle,
+  readyProposed,
   type SidebarViewInput,
   sidebarView,
 } from "./sidebar-view.ts"
@@ -107,6 +108,7 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     archived: new Set(),
     work: new Map(),
     proposed: new Map(),
+    ready: new Map(),
     unsent: none,
     status: new Map(),
     arrivals: { arrived: new Map(), done: new Map() },
@@ -213,6 +215,21 @@ describe("sidebarView", () => {
       "unfinished changes will be dropped: amber-fox, cozy-mallard",
     )
     expect(dropsWords([])).toBe(null)
+  })
+
+  test("readyProposed keeps the open proposed changes whose strip reads ready, not conflicted or asked about", () => {
+    const lane = (n: string) => n as ThreadId
+    const open = ["l1", "l2", "l3", "l4"].map(n => ({ lane: lane(n) }))
+    expect(
+      readyProposed(
+        open,
+        new Map([
+          [lane("l1"), "stack"],
+          [lane("l2"), "conflicts"],
+          [lane("l3"), "needs-you"],
+        ]),
+      ),
+    ).toEqual([{ lane: lane("l1") }])
   })
 
   test("openProposedByCanvas: each open proposed changes' thread, under its canvas; one the host has not named yet by its id's end; one in no canvas left out", () => {

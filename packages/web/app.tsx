@@ -120,13 +120,13 @@ import {
   readParticipantPictures,
   readRoots,
   readSessionFacts,
+  readyProposed,
   reconcileName,
   resolveLayout,
   restoreStatus,
   rootSeed,
   type SearchState,
   SIDEBAR_WORDS,
-  STRIP_LEVEL,
   type Strip as StripView,
   searchCorpus,
   searchLine,
@@ -1098,11 +1098,13 @@ export function App({
   )
   const proposed = useMemo(
     () =>
+      openProposedByCanvas(view.openProposed, workFacts.names, canvasOfThread),
+    [view.openProposed, workFacts.names, canvasOfThread],
+  )
+  const ready = useMemo(
+    () =>
       openProposedByCanvas(
-        view.openProposed.filter(o => {
-          const state = strips.get(o.lane)
-          return state !== undefined && STRIP_LEVEL[state] === "ready"
-        }),
+        readyProposed(view.openProposed, strips),
         workFacts.names,
         canvasOfThread,
       ),
@@ -1172,6 +1174,7 @@ export function App({
         status: attention.status,
         pips: unsent.canvases,
         proposed,
+        ready,
         work: workOfCanvas,
       }),
     [
@@ -1183,6 +1186,7 @@ export function App({
       attention.status,
       unsent.canvases,
       proposed,
+      ready,
       workOfCanvas,
     ],
   )

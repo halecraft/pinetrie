@@ -457,8 +457,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a width is recorded in no history",
     file: "packages/rules/card-commands.ts",
-    from: '  const step = planWidth(facts.cards, facts.change)\n  return step === null\n    ? { kind: "nothing" }\n    : carried(step, canvasHistory(facts.change.at.canvas))\n',
-    to: '  const step = planWidth(facts.cards, facts.change)\n  return step === null\n    ? { kind: "nothing" }\n    : carried(step, null)\n',
+    from: ": carried(step, canvasHistory(canvas))\n",
+    to: ": carried(step, null)\n",
     command: unit,
     expect:
       "a width is one step of its canvas's history; the width it has writes nothing",
@@ -1693,14 +1693,6 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "a ticked column's line says its box is ticked, last",
-  },
-  {
-    name: "a tick is recorded in no history",
-    file: "packages/rules/card-commands.ts",
-    from: '  const step = planTick(facts.cards, facts.change)\n  return step === null\n    ? { kind: "nothing" }\n    : carried(step, canvasHistory(facts.change.at.canvas))\n',
-    to: '  const step = planTick(facts.cards, facts.change)\n  return step === null\n    ? { kind: "nothing" }\n    : carried(step, null)\n',
-    command: unit,
-    expect: "a tick is one step of its canvas's history",
   },
   {
     name: "the tick a card has is written again",

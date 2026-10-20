@@ -697,6 +697,7 @@ export {
   listKey,
   openProposedByCanvas,
   pageTitle,
+  readyProposed,
   renameIntent,
   SIDEBAR_WORDS,
   type SidebarView,

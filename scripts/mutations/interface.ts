@@ -2253,14 +2253,6 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a thread's details are open whatever the column keeps",
-    file: "packages/interface/column-view.ts",
-    from: "    open: f.detailsOpen,",
-    to: "    open: true,",
-    command: unit,
-    expect: "closed unless the column keeps them open",
-  },
-  {
     name: "the details offer to reveal a start at the path's first message",
     file: "packages/interface/column-view.ts",
     from: "    start: start === null || isFirst(index, start) ? null : start,",
@@ -2981,7 +2973,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread card never carries ⇡",
     file: "packages/interface/thread-card.ts",
-    from: "    ready: facts.proposed.get(canvas) ?? [],",
+    from: "    ready: facts.ready.get(canvas) ?? [],",
     to: "    ready: [],",
     command: unit,
     expect:
@@ -4227,6 +4219,23 @@ export const mutations: readonly Mutation[] = [
     to: "        ticked: !intent.ticked,\n",
     command: unit,
     expect: "a tick is asked of the host, from the canvas the card is on",
+  },
+  {
+    name: "⇡ counts conflicted proposed changes",
+    file: "packages/interface/sidebar-view.ts",
+    from: '    return state !== undefined && STRIP_LEVEL[state] === "ready"\n',
+    to: "    return state !== undefined && STRIP_LEVEL[state] !== null\n",
+    command: unit,
+    expect:
+      "readyProposed keeps the open proposed changes whose strip reads ready",
+  },
+  {
+    name: "archiving withdraws only the ready proposed changes",
+    file: "packages/interface/thread-card.ts",
+    from: "        drops: closes ? (facts.proposed.get(canvas) ?? []) : [],\n",
+    to: "        drops: closes ? (facts.ready.get(canvas) ?? []) : [],\n",
+    command: unit,
+    expect: "archiving withdraws every open one, a conflicted one too",
   },
   {
     name: "conflicted proposed changes read as ready",

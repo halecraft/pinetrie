@@ -705,7 +705,6 @@ export function Column(p: ColumnProps) {
     view,
     lane,
     createsLane,
-    detailsOpen: p.column.details === true,
     thread,
     writable,
     nameOf: p.nameOf,
@@ -1159,19 +1158,18 @@ export function Column(p: ColumnProps) {
           body's, so their offsets from the body hold. */}
           <div className="column-below">
             <div className="column-under" inert={p.matches !== null}>
-              {shows.identity.kind === "agent" &&
-                shows.identity.details.open && (
-                  <ThreadDetailsPanel
-                    details={shows.identity.details}
-                    icon={shows.identity.icon}
-                    id={`${detailsId}-thread`}
-                    name={shows.identity.name}
-                    onOpen={openAt}
-                    running={running}
-                    spinFirst={openedHere}
-                    working={working}
-                  />
-                )}
+              {shows.identity.kind === "agent" && detailsOpen && (
+                <ThreadDetailsPanel
+                  details={shows.identity.details}
+                  icon={shows.identity.icon}
+                  id={`${detailsId}-thread`}
+                  name={shows.identity.name}
+                  onOpen={openAt}
+                  running={running}
+                  spinFirst={openedHere}
+                  working={working}
+                />
+              )}
               {!unstarted && threadEnd !== null && (
                 <PinnedStrip
                   box={

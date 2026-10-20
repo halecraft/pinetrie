@@ -401,34 +401,27 @@ export function planCardReorder(
 }
 
 /**
- * A card drawn one column wide or two (`planWidth`), in its canvas's history
- * as a reorder is. The width it has already writes nothing.
+ * A change to a card in place on `canvas` (a width, a tick), in its canvas's
+ * history as a reorder is; null, a state it has already, writes nothing.
  */
-export function planCardWidth(
+const onCanvasStep = (step: MoveStep | null, canvas: CanvasId): CardPlan =>
+  step === null ? { kind: "nothing" } : carried(step, canvasHistory(canvas))
+
+/** A card drawn one column wide or two (`planWidth`, `onCanvasStep`). */
+export const planCardWidth = (
   facts: CardFacts & {
     readonly change: Extract<Intent, { kind: "card-width" }>
   },
-): CardPlan {
-  const step = planWidth(facts.cards, facts.change)
-  return step === null
-    ? { kind: "nothing" }
-    : carried(step, canvasHistory(facts.change.at.canvas))
-}
+): CardPlan =>
+  onCanvasStep(planWidth(facts.cards, facts.change), facts.change.at.canvas)
 
-/**
- * A column's box ticked or cleared (`planTick`), in its canvas's history as
- * a width is. The state it has already writes nothing.
- */
-export function planCardTick(
+/** A column's box ticked or cleared (`planTick`, `onCanvasStep`). */
+export const planCardTick = (
   facts: CardFacts & {
     readonly change: Extract<Intent, { kind: "card-tick" }>
   },
-): CardPlan {
-  const step = planTick(facts.cards, facts.change)
-  return step === null
-    ? { kind: "nothing" }
-    : carried(step, canvasHistory(facts.change.at.canvas))
-}
+): CardPlan =>
+  onCanvasStep(planTick(facts.cards, facts.change), facts.change.at.canvas)
 
 /** A card's command set or cleared (`planSetCommand`), in no history. */
 export function planCardCommandSet(

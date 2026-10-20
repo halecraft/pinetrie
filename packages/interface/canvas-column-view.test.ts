@@ -52,6 +52,7 @@ const head = threadCardHead(K, {
   status: new Map(),
   pips: new Set(),
   proposed: new Map(),
+  ready: new Map(),
   work: new Map(),
 })
 

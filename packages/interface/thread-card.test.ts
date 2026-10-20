@@ -39,6 +39,7 @@ const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   status: new Map(),
   pips: new Set([K1]),
   proposed: new Map([[K1, ["amber-fox"]]]),
+  ready: new Map([[K1, ["amber-fox"]]]),
   work: new Map([[K1, "running"]]),
   ...over,
 })
@@ -68,11 +69,31 @@ describe("threadCardHead", () => {
     })
   })
 
+  test("⇡ names the threads ready to accept; archiving withdraws every open one, a conflicted one too", () => {
+    const head = threadCardHead(
+      K1,
+      facts({
+        proposed: new Map([[K1, ["amber-fox", "cozy-mallard"]]]),
+        ready: new Map([[K1, ["amber-fox"]]]),
+      }),
+    )
+    expect(head.ready).toEqual(["amber-fox"])
+    expect(head.moves.find(m => m.closes)?.drops).toEqual([
+      "amber-fox",
+      "cozy-mallard",
+    ])
+  })
+
   test("a canvas with no signals of its threads has none; one with no place, no moves", () => {
     expect(
       threadCardHead(
         K1,
-        facts({ pips: new Set(), proposed: new Map(), work: new Map() }),
+        facts({
+          pips: new Set(),
+          proposed: new Map(),
+          ready: new Map(),
+          work: new Map(),
+        }),
       ),
     ).toMatchObject({ status: null, ready: [], pip: false })
     expect(threadCardHead(K1, facts({ stateOf: new Map() })).moves).toEqual([])

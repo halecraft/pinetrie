@@ -435,6 +435,10 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   root's header once in `App` (label, status, ⇡, your pip, its state and
   its Move to ▸ moves, with the busy reason and the proposed changes a close
   withdraws), and `boardView` and `sidebarView` both read it from `heads`.
+  ⇡ is `ThreadCardFacts.ready` (`readyProposed`: open changes whose strip
+  reads ready, ADR-0198); what a close withdraws is `proposed`, every open
+  one, a conflicted one included. Two lists, since the two answer different
+  questions.
   A board card spreads its head and keeps it whole as `head`, adding Move
   up and Move down, its writers, and its body (`bodyOf`: its first line
   under a title that says something else); a sidebar item keeps it as

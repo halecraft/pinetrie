@@ -218,7 +218,6 @@ export type HeadIdentity =
  * agent not yet named has nothing to show.
  */
 export interface ThreadDetails {
-  readonly open: boolean
   /** Who started its lane and when, from the lane's record; null before there is one. */
   readonly started: { readonly by: string; readonly at: number } | null
   /** `behindMark`'s title, in full: the header shows only its ↓. */
@@ -333,8 +332,6 @@ export interface ColumnFacts {
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
-  /** The reader has the thread's details open (`Column.details`). */
-  readonly detailsOpen: boolean
   /** The column's thread; null for a column not yet settled on one. */
   readonly thread: ThreadId | null
   /** The header's icon's URL as the column mounted (`threadIcon` of `headLane`'s), or null. */
@@ -563,7 +560,6 @@ function detailsOf(
   const last = stretches.at(-1)
   const start = last?.lane === head ? last.start : null
   return {
-    open: f.detailsOpen,
     started:
       record === undefined
         ? null

@@ -33,7 +33,7 @@ export interface ThreadCardHead {
   readonly label: string
   /** What its mark draws (`canvasStatus`), or null for none. */
   readonly status: Status | null
-  /** Its threads with changes ready to accept (`openProposedByCanvas`): ⇡, for everyone. */
+  /** Its threads with changes ready to accept (`ThreadCardFacts.ready`): ⇡, for everyone. */
   readonly ready: readonly string[]
   /** An unsent card of yours is in it (`UnsentSignals.canvases`): your pip. */
   readonly pip: boolean
@@ -55,8 +55,10 @@ export interface ThreadCardFacts {
   readonly status: ReadonlyMap<CanvasId, Status>
   /** Canvases holding an unsent card of yours (`UnsentSignals.canvases`). */
   readonly pips: ReadonlySet<CanvasId>
-  /** The threads with open proposed changes, by canvas (`openProposedByCanvas`). */
+  /** The threads with open proposed changes, by canvas (`openProposedByCanvas`): what archiving withdraws. */
   readonly proposed: ReadonlyMap<CanvasId, readonly string[]>
+  /** Of those, the threads whose changes are ready to accept (`readyProposed`): ⇡. */
+  readonly ready: ReadonlyMap<CanvasId, readonly string[]>
   /** The agent's work in each canvas, held or not (`canvasWork`). */
   readonly work: ReadonlyMap<CanvasId, AgentWork>
 }
@@ -70,7 +72,7 @@ export function threadCardHead(
     canvas,
     label: facts.labels.get(canvas) ?? NO_TEXT,
     status: facts.status.get(canvas) ?? null,
-    ready: facts.proposed.get(canvas) ?? [],
+    ready: facts.ready.get(canvas) ?? [],
     pip: facts.pips.has(canvas),
     state,
     moves: movesOf(canvas, state, facts),

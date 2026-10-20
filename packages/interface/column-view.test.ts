@@ -274,7 +274,6 @@ const facts = (
     view,
     lane: { kind: "none" },
     createsLane: false,
-    detailsOpen: false,
     thread: null,
     mountedIcon: null,
     writable: true,
@@ -394,7 +393,6 @@ describe("columnView: the header", () => {
       focus: null,
       status: null,
       details: {
-        open: false,
         started: null,
         behind: null,
         start: null,
@@ -667,10 +665,6 @@ describe("columnView: a thread's details", () => {
       work: work({ revisions: OWNERS, names: NAMES }),
       ...over,
     })
-  test("closed unless the column keeps them open", () => {
-    expect(detailsOf(columnView(onB()))?.open).toBe(false)
-    expect(detailsOf(columnView(onB({ detailsOpen: true })))?.open).toBe(true)
-  })
   test("who started the lane, from its record; no one before it has one", () => {
     const lanes = new Map([[B, record(B, true)]])
     const shown = detailsOf(
@@ -1331,7 +1325,6 @@ describe("identityWords", () => {
         status: null,
         icon: null,
         details: {
-          open: false,
           started: null,
           behind: null,
           start: null,
