@@ -5,15 +5,14 @@
 
 import {
   type BlobStore,
-  ERR,
   type Intent,
   isImageRef,
-  refused,
+  type Sha256,
   type StoredImage,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { PICTURE_MOST, pictureWrites, planPicture } from "@pinetrie/rules"
+import { planFittedPicture, planPicture } from "@pinetrie/rules"
 import type { Records } from "../records.ts"
 
 export interface PictureDeps {
@@ -40,29 +39,24 @@ export async function handlePicture(
   // A picture is an image: a quote's markdown is none.
   const ref = stored !== undefined && isImageRef(stored) ? stored : undefined
   // plan (pure)
-  const plan = planPicture(intent.sha256, ref)
-  // execute
-  switch (plan.kind) {
-    case "refuse":
-      return plan.refusal
-    case "clear":
-      await records.writeValues([pictureWrites(writer, null)])
-      return { kind: "pictured" }
-    case "set":
-      await records.writeValues([pictureWrites(writer, plan.sha256)])
-      return { kind: "pictured" }
-    case "fit": {
-      const bytes = blobs.get(plan.sha256)?.bytes
-      const fitted =
-        bytes === undefined ? null : await deps.fitImage(bytes, PICTURE_MOST)
-      if (fitted === null)
-        return refused(
-          ERR.PICTURE_UNREADABLE,
-          "that picture could not be read or made smaller: try another",
-        )
-      const copy = blobs.put(fitted)
-      await records.writeValues([pictureWrites(writer, copy.sha256)])
-      return { kind: "pictured" }
-    }
-  }
+  const plan = planPicture(writer, intent.sha256, ref)
+  // execute: a picture too large is fitted and kept first, then planned again
+  const done =
+    plan.kind === "fit"
+      ? planFittedPicture(writer, await fitted(deps, plan.sha256, plan.most))
+      : plan
+  if (done.kind === "refuse") return done.refusal
+  await records.writeValues(done.writes)
+  return { kind: "pictured" }
+}
+
+/** The blob `sha256` fitted within `most` and kept, by its copy's SHA-256; null when pi cannot. */
+async function fitted(
+  deps: Pick<PictureDeps, "blobs" | "fitImage">,
+  sha256: Sha256,
+  most: number,
+): Promise<Sha256 | null> {
+  const bytes = deps.blobs.get(sha256)?.bytes
+  const image = bytes === undefined ? null : await deps.fitImage(bytes, most)
+  return image === null ? null : deps.blobs.put(image).sha256
 }

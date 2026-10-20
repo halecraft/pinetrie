@@ -316,6 +316,13 @@ are the only code that builds or reads the shape.
   (ADR-0036), keeping the people it names. `planMessage` runs it on the host, and
   the composer's `planSend` (`packages/interface/send.ts`) runs it before a send,
   so the button's promise and the host's decision cannot drift apart.
+- **A send is planned in phases** (`send.ts`, ADR-0193): `planSendRoot`
+  (whether its root may be opened), `planSendReach` (its thread, by
+  `threadOfSend`, the command its first word names, the blobs it shares;
+  a `SendReach` only it makes), then `planSendMessage` (the shares, by
+  `planShares`; the base's news; `planMessage`; the thread a branch opens;
+  the quotes). Each refusal before anything is written is a
+  `SendRefusal`.
 - **`planMessage` decides what a message does** (ADR-0120), over the thread
   `threadOfSend` (core) gives for where it goes (`SendAt`), and names
   exactly where to write:
@@ -1203,7 +1210,8 @@ board is the team's: everyone in the session shares it.
 - **`stateTransition` says whether a move crosses the archive's edge**:
   `within`, `close` or `reopen`. The host gathers the canvas's roots'
   documents only to cross it (`apps/pinetrie/host/commands/board.ts`).
-- **`planWorkflowEdit`**: add (before a state, or after every open one),
+- **`planWorkflowEdit`** (through `planWorkflowChange`, which reads the
+  board from the cards and returns the workflow's write): add (before a state, or after every open one),
   rename (trimmed; names may repeat), move, remove. The archive is
   renamed only; a state holding a canvas is not removed, nor the only open
   state.
@@ -1240,7 +1248,8 @@ and made read-only, never removed.
   lanes of their own (`own`, each with its root's index) and the revision
   records, so no part decides anything when it runs.
 - **An archive settles its threads' pending run-end reports**
-  (`runEndReports`, `unclassifiedPending`, `run-end-report.ts`): the run's end that would write one
+  (`unclassifiedPending`, `run-end-report.ts`, returned as `planArchive`'s
+  `writes`): the run's end that would write one
   is a late write, which an archived canvas refuses, so the archive writes
   `unclassified` with its place, as a starting host does for a request it
   lost (`planStartup`).
@@ -1297,8 +1306,9 @@ or appended already: the first press is the one named. The run's end
 appends it first, whatever the hold, as a `pinetrie.fact` history message
 whose `content` the agent's next run reads ("Bea stopped this run.",
 `factContent`), and whose renderable form carries `stopped` (`{ prompt,
-by }`) for core. `planStop` also gives the hold the Stop leaves on the
-queue (`holdOnStop`, ADR-0048 step 7), written before the abort.
+by }`) for core. `planStop` also gives the write of the hold the Stop
+leaves on the queue (`holdOnStop`, ADR-0048 step 7), written before the
+abort, and reads the asks from the tree it is given.
 
 - **Who stopped a run is read from the asks**: `indexAsks` records each
   stopped run's stopper (`AskIndex.stoppedBy`) from its stop's fact, and
@@ -2438,6 +2448,7 @@ alone, so a rename never rewrites it, and contents that are not a SHA-256
 are malformed. `planPicture` decides a `picture` command from the blob
 store's reference, read without the bytes: `null` clears, a blob the store
 does not hold is refused (`IMAGE_MISSING`), one wider or taller than
-`PICTURE_MOST` (512) is fitted, and the rest is set. The size is never a
-refusal: the host fits any client's picture. `pictureWrites` is the one
-writer of the record.
+`PICTURE_MOST` (512) is fitted, and the rest is set, as its write. A
+fitted picture's copy is set by `planFittedPicture`, refused when it could
+not be read or made smaller. The size is never a refusal: the host fits
+any client's picture. `pictureWrites` is the one writer of the record.

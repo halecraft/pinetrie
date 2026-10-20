@@ -98,8 +98,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's thread is sent a command's files at their host paths",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "deps.piSetup.expand(source, typed.args, own)",
-    to: "deps.piSetup.expand(source, typed.args, false)",
+    from: "deps.piSetup.expand(reach.command.source, reach.command.args, own)",
+    to: "deps.piSetup.expand(reach.command.source, reach.command.args, false)",
     suite: "lanes",
     scenario: "commands",
     expect:
@@ -107,8 +107,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a person's path to the working copy is stored as written",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
+    file: "packages/rules/send.ts",
+    from: "    hostWorkingCopy: facts.own ? facts.projectRoot : null,",
     to: "    hostWorkingCopy: null,",
     suite: "lanes",
     scenario: "main",

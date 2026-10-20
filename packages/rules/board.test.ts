@@ -20,6 +20,7 @@ import {
   canvasRole,
   defaultWorkflow,
   planBoardMove,
+  planWorkflowChange,
   planWorkflowEdit,
   planWorkflowSeed,
   stateTransition,
@@ -380,4 +381,35 @@ test("planWorkflowSeed: a store with no workflow gets the default one, and one w
   n = 0
   expect(seed).toEqual([setRecord(WORKFLOW_SPEC, defaultWorkflow(newId))])
   expect(planWorkflowSeed(defaultWorkflow(newId), newId)).toEqual([])
+})
+
+describe("planWorkflowChange", () => {
+  test("refused before the host wrote a workflow; an edit is the workflow's write", () => {
+    const edit = {
+      action: "rename",
+      state: BACKLOG,
+      name: "Ideas",
+      before: null,
+    } as const
+    expect(
+      planWorkflowChange({ workflow: null, cards: [], edit, newId: () => "x" }),
+    ).toMatchObject({ code: ERR.UNKNOWN_STATE })
+    const planned = planWorkflowChange({
+      workflow: WORKFLOW,
+      cards: [],
+      edit,
+      newId: () => "x",
+    })
+    expect(planned).toEqual({
+      kind: "write",
+      writes: [
+        setRecord(WORKFLOW_SPEC, {
+          ...WORKFLOW,
+          open: WORKFLOW.open.map(s =>
+            s.id === BACKLOG ? { ...s, name: "Ideas" } : s,
+          ),
+        }),
+      ],
+    })
+  })
 })

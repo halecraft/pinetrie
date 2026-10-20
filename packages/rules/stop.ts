@@ -9,6 +9,7 @@ import {
   ERR,
   type ErrCode,
   type FactCardId,
+  indexAsks,
   isBusy,
   type LaneView,
   type Refusal,
@@ -16,14 +17,17 @@ import {
   runPrompt,
   type ThreadId,
   type TreeIndex,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { displayName } from "./participant.ts"
 import type { PlaceStep } from "./place-steps.ts"
 import { planFactCard, type QueuedCard, queuedOn } from "./queue.ts"
-import { holdOnStop, type QueueHold } from "./queue-hold.ts"
+import { holdOnStop, QUEUE_HOLD, type QueueHold } from "./queue-hold.ts"
+import { setRecord } from "./records.ts"
 
 /** What stopping a thread's lane does (`planStop`). */
 type StopPlan =
@@ -34,8 +38,8 @@ type StopPlan =
        * someone's stop is named already, or none of its ask is known.
        */
       readonly fact: readonly PlaceStep[]
-      /** The hold it leaves on the queue (`holdOnStop`); null for none. */
-      readonly hold: QueueHold | null
+      /** The hold it leaves on the queue (`holdOnStop`), as its write; none for none. */
+      readonly writes: readonly ValueWrite<"session">[]
     }
   | { readonly kind: "idle" }
 
@@ -69,7 +73,6 @@ export function planStop(
   lane: LaneView,
   facts: {
     readonly index: TreeIndex
-    readonly asks: AskIndex
     readonly cards: readonly CardRecord[]
     readonly holds: ReadonlyMap<ThreadId, QueueHold>
     readonly by: WriterId
@@ -82,10 +85,20 @@ export function planStop(
 ): StopPlan {
   if (!lane.running) return { kind: "idle" }
   const queue = queuedOn(facts.cards, lane.name)
+  const hold =
+    facts.budget === undefined
+      ? holdOnStop({
+          queue,
+          holds: facts.holds,
+          by: facts.by,
+          now: facts.now,
+          lane: lane.name,
+        })
+      : null
   const prompt = runPrompt(facts.index, lane.tip)
   const named =
     prompt === null ||
-    facts.asks.stoppedBy.has(prompt) ||
+    indexAsks(facts.index).stoppedBy.has(prompt) ||
     queuedStopper(queue, prompt) !== null
   return {
     kind: "abort",
@@ -103,16 +116,7 @@ export function planStop(
             ...(facts.budget === undefined ? {} : { budget: facts.budget }),
           },
         }) ?? []),
-    hold:
-      facts.budget === undefined
-        ? holdOnStop({
-            queue,
-            holds: facts.holds,
-            by: facts.by,
-            now: facts.now,
-            lane: lane.name,
-          })
-        : null,
+    writes: hold === null ? [] : [setRecord(QUEUE_HOLD, hold)],
   }
 }
 
@@ -232,16 +236,20 @@ export function planCarryOn(
   here: {
     readonly lane: LaneView
     readonly index: TreeIndex
-    readonly asks: AskIndex
   } | null,
   who: {
     readonly by: WriterId
-    readonly name: string
+    /** Each participant's display name as set; one unset is read from the writer. */
+    readonly names: ReadonlyMap<WriterId, string>
     readonly timestamp: number
   },
 ): { readonly kind: "start"; readonly message: CarryOnMessage } | Refusal {
   if (here === null) return refusedCarryOn(ERR.UNKNOWN_TARGET)
-  const state = carryOnState(here.lane, here)
+  const state = carryOnState(here.lane, {
+    ...here,
+    asks: indexAsks(here.index),
+  })
+  const name = displayName(who.by, who.names.get(who.by))
   if (state.kind === "refused") return refusedCarryOn(state.code)
   return {
     kind: "start",
@@ -249,10 +257,10 @@ export function planCarryOn(
       {
         lane: here.lane.name,
         by: who.by,
-        name: who.name,
+        name,
         reason: { kind: "stopped" },
       },
-      `${who.name} asked you to carry on from where you were stopped. ` +
+      `${name} asked you to carry on from where you were stopped. ` +
         "Anything you were writing when you were stopped was not kept.",
       who.timestamp,
     ),

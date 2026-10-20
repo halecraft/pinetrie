@@ -824,7 +824,8 @@ describe("sendMessage", () => {
       },
     })
     expect(out).toEqual({ kind: "busy" })
-    expect(pi.calls).toEqual([])
+    // The commands pi loaded are read; nothing is written.
+    expect(pi.calls.filter(c => c.method !== "commands")).toEqual([])
   })
 
   test("a message with no card names no one else", async () => {

@@ -16,7 +16,6 @@ import {
   type EntryId,
   ERR,
   type Intent,
-  placeKey,
   type RevisionRecord,
   refused,
   type WriterId,
@@ -37,11 +36,7 @@ import {
   type Crossing,
   planArchive,
   planBoardMove,
-  planWorkflowEdit,
-  RUN_END_REPORT,
-  setRecord,
-  taskBoard,
-  WORKFLOW,
+  planWorkflowChange,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
@@ -52,7 +47,12 @@ import type { Records } from "../records.ts"
 import type { StepDocs } from "../roots.ts"
 
 import type { LaneWork } from "../work/index.ts"
-import { type CardCommands, type Settled, settled } from "./cards.ts"
+import {
+  type CardCommands,
+  type Settled,
+  settled,
+  unmovedOutcome,
+} from "./cards.ts"
 
 export interface BoardDeps {
   readonly basics: Pick<Basics, "session" | "live" | "places" | "now" | "newId">
@@ -119,15 +119,7 @@ async function record(
   if (moved.kind === "refused")
     return {
       kind: "done",
-      outcome: settled(
-        {
-          kind: "unmoved",
-          code: moved.code,
-          place: moved.now === null ? null : placeKey(moved.now.place),
-          by: moved.now?.placer ?? null,
-        },
-        places.rev(),
-      ),
+      outcome: settled(unmovedOutcome(moved), places.rev()),
     }
   if (moved.kind === "unchanged") return done({ kind: "moved" })
   if (moved.transition === "within")
@@ -145,10 +137,7 @@ async function record(
   if (crossed.kind === "refused") return done(crossed)
   // execute
   const outcome = await deps.moves(roots).placeCanvas(writer, moved)
-  if (crossed.runEndReports.length > 0)
-    await deps.records.writeValues(
-      crossed.runEndReports.map(r => setRecord(RUN_END_REPORT, r)),
-    )
+  if (crossed.writes.length > 0) await deps.records.writeValues(crossed.writes)
   return {
     kind: "follow",
     outcome,
@@ -219,13 +208,13 @@ export async function handleWorkflow(
   intent: Extract<Intent, { kind: "workflow" }>,
 ): Promise<Outcome> {
   const { session, newId } = deps.basics
-  const workflow = readWorkflow(session)
-  if (workflow === null)
-    return refused(ERR.UNKNOWN_STATE, "the board has no states yet")
-  const board = taskBoard(workflow, readPlaces(deps.basics.places))
-  const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
+  const planned = planWorkflowChange({
+    workflow: readWorkflow(session),
+    cards: readPlaces(deps.basics.places),
+    edit: intent.edit,
+    newId,
+  })
   if (planned.kind === "refused") return planned
-  if (planned.kind === "write")
-    await deps.records.writeValues([setRecord(WORKFLOW, planned.workflow)])
+  if (planned.kind === "write") await deps.records.writeValues(planned.writes)
   return { kind: "workflow-changed" }
 }

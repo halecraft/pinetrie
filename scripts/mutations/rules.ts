@@ -5,6 +5,155 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a send planned in phases ──
+  {
+    name: "sendMessage leaves details' shares empty",
+    file: "packages/rules/send.ts",
+    from: "    shares,\n    hostWorkingCopy:",
+    to: "    shares: { images: [], shared: [] },\n    hostWorkingCopy:",
+    command: unit,
+    expect: "a sent message keeps the files its text shares",
+  },
+  {
+    name: "a person's paths are stored as typed in a thread with its own copy",
+    file: "packages/rules/send.ts",
+    from: "    hostWorkingCopy: facts.own ? facts.projectRoot : null,",
+    to: "    hostWorkingCopy: null,",
+    command: unit,
+    expect:
+      "in a thread with its own copy, your working copy's paths are stored as the lane sees them",
+  },
+  {
+    name: "a new canvas's first send is refused for its own canvas",
+    file: "packages/rules/send.ts",
+    from: '  if (send.at.at === null && known && !opened) return declined("canvas-in-use")',
+    to: '  if (send.at.at === null && known) return declined("canvas-in-use")',
+    command: unit,
+    expect:
+      "a thread at the root needs a new root, and a canvas no other root holds",
+  },
+  {
+    name: "a new root takes an id another holds",
+    file: "packages/rules/send.ts",
+    from: "  if (send.at.at === null && facts.roots.has(send.root))",
+    to: "  if (send.at.at === null && facts.roots.has(send.root) && false)",
+    command: unit,
+    expect:
+      "a thread at the root needs a new root, and a canvas no other root holds",
+  },
+  {
+    name: "a branch goes in a canvas the session lacks",
+    file: "packages/rules/send.ts",
+    from: '  if (send.at.at !== null && !known) return declined("no-canvas")\n',
+    to: "",
+    command: unit,
+    expect: "a branch elsewhere goes in a canvas the session holds",
+  },
+  {
+    name: "a branch names a copy anywhere",
+    file: "packages/rules/send.ts",
+    from: "    forkEntry(recorded.origin) !== send.at.at\n",
+    to: "    false\n",
+    command: unit,
+    expect:
+      "a recorded thread's first send is a branch where its record begins",
+  },
+  {
+    name: "a command pi lacks is sent as text",
+    file: "packages/rules/send.ts",
+    from: '          ? { kind: "unknown", name: typed.name }\n',
+    to: '          ? { kind: "none" }\n',
+    command: unit,
+    expect: "its first word names a command pi loaded, one it did not, or none",
+  },
+  {
+    name: "an unreadable command's file is sent as text",
+    file: "packages/rules/send.ts",
+    from: "          : (facts.expanded ?? { unreadable: command.source.name }),",
+    to: "          : facts.expanded,",
+    command: unit,
+    expect: "a command whose file could not be read is refused",
+  },
+  {
+    name: "a sender is their own contributor",
+    file: "packages/rules/send.ts",
+    from: "    contributors: facts.writers.filter(w => w !== writer),",
+    to: "    contributors: facts.writers,",
+    command: unit,
+    expect: "a message's contributors are its card's other writers",
+  },
+  {
+    name: "sendMessage quotes no share",
+    file: "packages/rules/send.ts",
+    from: "      ...shareQuotes(shares.shared, texts, facts.quoteBytes),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a text file shared is quoted to the model, and its words place no one",
+  },
+  {
+    name: "a copy's first send writes a second card",
+    file: "packages/rules/send.ts",
+    from: "    begun === null || begun.starts === null || reach.recorded !== undefined\n",
+    to: "    begun === null || begun.starts === null\n",
+    command: unit,
+    expect:
+      "a branch to a thread not yet opened opens it with its first message; a recorded one does not",
+  },
+  // ── the other commands' writes ──
+  {
+    name: "a carry-on names who resumed by their address",
+    file: "packages/rules/stop.ts",
+    from: "  const name = displayName(who.by, who.names.get(who.by))",
+    to: "  const name = displayName(who.by, undefined)",
+    command: unit,
+    expect:
+      "planCarryOn: a run whose prompt names who resumed, read back as its line",
+  },
+  {
+    name: "a gate's refusal names the archiver by their address",
+    file: "packages/rules/gate.ts",
+    from: "    displayName(writer, names.get(writer))",
+    to: "    displayName(writer, undefined)",
+    command: unit,
+    expect:
+      "gateRefusal: an archive names its archiver, a hold and a trash say what to do",
+  },
+  {
+    name: "a stop's hold is never written",
+    file: "packages/rules/stop.ts",
+    from: "    writes: hold === null ? [] : [setRecord(QUEUE_HOLD, hold)],",
+    to: "    writes: [],",
+    command: unit,
+    expect:
+      "with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first",
+  },
+  {
+    name: "an answer taken is not written",
+    file: "packages/rules/access.ts",
+    from: "  return { record: answered, writes: [setRecord(ACCESS, answered)] }",
+    to: "  return { record: answered, writes: [] }",
+    command: unit,
+    expect: "an answer taken is written as the lane's record",
+  },
+  {
+    name: "an edit to no workflow is planned",
+    file: "packages/rules/board.ts",
+    from: '  if (workflow === null)\n    return refused(ERR.UNKNOWN_STATE, "the board has no states yet")\n  const planned = planWorkflowEdit(',
+    to: '  if (workflow === null) return { kind: "unchanged" }\n  const planned = planWorkflowEdit(',
+    command: unit,
+    expect:
+      "refused before the host wrote a workflow; an edit is the workflow's write",
+  },
+  {
+    name: "a picture that could not be fitted is set",
+    file: "packages/rules/participant.ts",
+    from: "  return copy === null\n    ? {",
+    to: "  return false\n    ? {",
+    command: unit,
+    expect:
+      "a fitted picture's copy is set; one that could not be fitted is refused",
+  },
   // ── a card command planned whole ──
   {
     name: "a closed new canvas stays",
@@ -3239,8 +3388,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a second stop overwrites the first",
     file: "packages/rules/stop.ts",
-    from: "    prompt === null ||\n    facts.asks.stoppedBy.has(prompt) ||\n    queuedStopper(queue, prompt) !== null\n",
-    to: "    prompt === null || facts.asks.stoppedBy.has(prompt)\n",
+    from: "    prompt === null ||\n    indexAsks(facts.index).stoppedBy.has(prompt) ||\n    queuedStopper(queue, prompt) !== null\n",
+    to: "    prompt === null || indexAsks(facts.index).stoppedBy.has(prompt)\n",
     command: unit,
     expect:
       "the first press is named: a stop of the same ask queued, or one in the thread, queues no second",
@@ -4559,8 +4708,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive leaves its threads' run-end reports pending",
     file: archive,
-    from: '    runEndReports:\n      crossing === "archive"\n',
-    to: "    runEndReports:\n      false\n",
+    from: '    writes:\n      crossing === "archive"\n',
+    to: "    writes:\n      false\n",
     command: unit,
     expect:
       "archiving settles its threads' pending run-end reports as unclassified; another canvas's stay pending",

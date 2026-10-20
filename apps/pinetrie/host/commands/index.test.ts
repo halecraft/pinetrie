@@ -91,6 +91,7 @@ function setUp(
       CommandDeps["piSetup"]
   >({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
+    commands: () => [],
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
   // A step's records are the agent's record's too, so its writes show there.
@@ -288,7 +289,9 @@ test("the command's id is the send's id", async () => {
     id: cardIdFor("c2"),
     outcome: "appended",
   })
-  expect(pi.calls[0]?.args[0]).toMatchObject({
+  expect(
+    pi.calls.find(c => c.method === "appendToTree")?.args[0],
+  ).toMatchObject({
     details: { sendId: cardIdFor("c2") },
   })
 })

@@ -424,15 +424,6 @@ export const mutations: readonly Mutation[] = [
       "a thread opened before its lane makes its banner due once a column reserves its lane",
   },
   {
-    name: "a new canvas's first send is refused for its own canvas",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    if (send.at.at === null && known && !opened)\n",
-    to: "    if (send.at.at === null && known)\n",
-    command: unit,
-    expect:
-      "a new canvas's first send, its thread and canvas opened as it opened, writes its entry alone",
-  },
-  {
     name: "a refused spin-off keeps its thread's records",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: "        await deps.records.writeValues(plan.unwrite)\n",
@@ -662,15 +653,6 @@ export const mutations: readonly Mutation[] = [
     to: "    await deps.records.writeValues(setIfChanged(ROOT, record, undefined))",
     command: unit,
     expect: "a change the record does not show writes nothing",
-  },
-  {
-    name: "a new root takes an id another holds",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    if (send.at.at === null && readRoots(session).has(send.root))",
-    to: "    if (send.at.at === null && readRoots(session).has(send.root) && false)",
-    command: unit,
-    expect:
-      "a thread at the root under a root id in use is refused, and nothing is written",
   },
   {
     name: "a starting host opens no interrupted run's root",
@@ -1163,22 +1145,6 @@ export const mutations: readonly Mutation[] = [
     expect: "busy writes nothing and answers busy",
   },
   {
-    name: "sendMessage leaves details' shares empty",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    shares,\n",
-    to: "    shares: { images: [], shared: [] },\n",
-    command: unit,
-    expect: "a sent message keeps the files its text shares",
-  },
-  {
-    name: "sendMessage quotes no share",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    ...shareQuotes(shares.shared, held.texts, deps.quoteBytes),\n",
-    to: "",
-    command: unit,
-    expect: "the model reads a small text share quoted",
-  },
-  {
     name: "the blob sweep forgets fitted copies",
     file: "apps/pinetrie/host/housekeeping.ts",
     from: "      return fitted === undefined ? [sha] : [sha, fitted.sha256]",
@@ -1193,14 +1159,6 @@ export const mutations: readonly Mutation[] = [
     to: '    case "refused":\n    case "busy":\n      return planned\n    case "conflict":\n      return {\n        kind: "conflict",\n        by: planned.by === null ? null : (displayName(planned.by, undefined) as WriterId),\n      }',
     command: unit,
     expect: "a conflict names who holds the thread",
-  },
-  {
-    name: "a person's paths are stored as typed in a thread with its own copy",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
-    to: "    hostWorkingCopy: null,",
-    command: unit,
-    expect: "your working copy's paths are stored as the lane sees them",
   },
   {
     name: "a move into Done ignores the crossing's refusal",
@@ -1637,8 +1595,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused move names no placer",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "        by: refusal.now?.placer ?? null,",
-    to: "          by: null,",
+    from: "  by: refusal.now?.placer ?? null,",
+    to: "  by: null,",
     command: unit,
     expect: "a move someone else made first",
   },
@@ -2238,7 +2196,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop holds nothing",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "    if (planned.hold !== null)\n      await deps.records.writeValues([setRecord(QUEUE_HOLD, planned.hold)])\n",
+    from: "    if (planned.writes.length > 0)\n      await deps.records.writeValues(planned.writes)\n",
     to: "",
     command: unit,
     expect:
@@ -2475,8 +2433,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fitted picture records the original",
     file: "apps/pinetrie/host/commands/picture.ts",
-    from: "      await records.writeValues([pictureWrites(writer, copy.sha256)])",
-    to: "      await records.writeValues([pictureWrites(writer, plan.sha256)])",
+    from: "  return image === null ? null : deps.blobs.put(image).sha256",
+    to: "  return image === null ? null : (deps.blobs.put(image), sha256)",
     command: unit,
     expect:
       "an oversized picture is fitted within PICTURE_MOST, kept, and its copy set, not the original",
@@ -2555,24 +2513,6 @@ export const mutations: readonly Mutation[] = [
     expect: "planRebuild: a root a thread names",
   },
   {
-    name: "a copy's first send writes a second card",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    begun === null || begun.starts === null || copied !== undefined\n",
-    to: "    begun === null || begun.starts === null\n",
-    command: unit,
-    expect:
-      "a copy's first send is a branch at its fork, appended in the copy's thread",
-  },
-  {
-    name: "a branch names a copy anywhere",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    forkEntry(copied.origin) !== send.at.at\n",
-    to: "    true\n",
-    command: unit,
-    expect:
-      "a copy's first send is a branch at its fork, appended in the copy's thread",
-  },
-  {
     name: "the dispatcher lets a command run in a held thread",
     file: "apps/pinetrie/host/commands/gate.ts",
     from: "    cards: readPlaces(places),",
@@ -2636,9 +2576,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a board move refused says nowhere",
-    file: "apps/pinetrie/host/commands/board.ts",
-    from: "          place: moved.now === null ? null : placeKey(moved.now.place),",
-    to: "          place: null,",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "  place: refusal.now === null ? null : placeKey(refusal.now.place),",
+    to: "  place: null,",
     command: unit,
     expect: "refused `moved`, saying where it is",
   },
@@ -2935,8 +2875,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive leaves its pending run-end reports pending",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  if (crossed.runEndReports.length > 0)\n",
-    to: "  if (false)\n",
+    from: "  if (crossed.writes.length > 0) await deps.records.writeValues(crossed.writes)\n",
+    to: "",
     command: unit,
     expect:
       "an idle canvas moved to Done with its last run's end report pending leaves it unclassified",

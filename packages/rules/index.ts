@@ -138,7 +138,7 @@ export {
   defaultWorkflow,
   isBoardCard,
   planBoardMove,
-  planWorkflowEdit,
+  planWorkflowChange,
   planWorkflowSeed,
   stateIn,
   stateTransition,
@@ -418,7 +418,6 @@ export {
   addressLink,
   addressLinks,
   type LinkedQuote,
-  linkedQuotes,
   pastMarkdown,
   withQuotes,
 } from "./links.ts"
@@ -450,7 +449,6 @@ export {
   type PersonMessage,
   type PromptMessage,
   planDelivery,
-  planMessage,
   promptAuthor,
   renderableMessage,
   settleRun,
@@ -505,6 +503,7 @@ export {
   PICTURE_MOST,
   participants,
   pictureWrites,
+  planFittedPicture,
   planPicture,
 } from "./participant.ts"
 export {
@@ -684,6 +683,13 @@ export {
   writersOfClients,
 } from "./seat.ts"
 export {
+  planSendMessage,
+  planSendReach,
+  planSendRoot,
+  type SendRefusal,
+  type SharedBlob,
+} from "./send.ts"
+export {
   type ModelLine,
   type NoModel,
   SETUP,
@@ -712,19 +718,13 @@ export {
   DEFAULT_QUOTE_BYTES,
   fenceFor,
   fittedLine,
-  hasLocation,
   isUtf8Text,
   planSaveBlob,
-  planShares,
   type ReadableBlobs,
   readableBlobs,
   type SaveBlobPlan,
   type ShareQuote,
-  type StoredShare,
   shareMarkdown,
-  shareQuote,
-  shareQuoteMarkdown,
-  type TextBlob,
   textBlobs,
 } from "./shares.ts"
 export {

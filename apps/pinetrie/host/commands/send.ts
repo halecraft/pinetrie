@@ -4,23 +4,13 @@
 // dispatcher for a `chat` command, the drain for a popped queued card.
 
 import {
-  agentCandidates,
   type BlobStore,
-  baseKnown,
-  blobKind,
   ERR,
-  entryThread,
-  forkEntry,
-  messageText,
-  planMode,
-  ROOT_ORIGIN,
+  refused,
   type Send,
   type SentCard,
   type Sha256,
-  type Share,
   type ThreadId,
-  threadMembers,
-  threadOfSend,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
@@ -45,25 +35,16 @@ import {
 } from "@pinetrie/reads"
 import {
   type Cleared,
-  displayName,
   encodeMessage,
-  hasLocation,
   type LinkedQuote,
-  linkedQuotes,
   type MessageDecision,
   type MessageDetails,
-  parseCommand,
-  planBaseNews,
-  planMessage,
-  planShares,
-  planThreadOpen,
-  resolveCommand,
-  type StoredShare,
-  shareQuote,
-  shareQuoteMarkdown,
-  type TextBlob,
+  planSendMessage,
+  planSendReach,
+  planSendRoot,
+  type SendRefusal,
+  type SharedBlob,
   type ThreadOpen,
-  textBlobs,
 } from "@pinetrie/rules"
 import type { StepBasics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
@@ -105,63 +86,6 @@ export interface SendDeps {
   readonly relays: Pick<Relays, "relayMessage">
 }
 
-/**
- * What the store holds of each blob `named`: its ref, size and fitted copy,
- * whether an image's or an opaque file's bytes hold a location, and a text
- * file's text. A text file is not read for a location: its words may name
- * one without placing anyone.
- */
-function gatherShares(
-  blobs: SendDeps["blobs"],
-  named: readonly TextBlob[],
-): {
-  readonly stored: ReadonlyMap<Sha256, StoredShare>
-  readonly texts: ReadonlyMap<Sha256, string>
-} {
-  const stored = new Map<Sha256, StoredShare>()
-  const texts = new Map<Sha256, string>()
-  for (const { sha256 } of named) {
-    const ref = blobs.ref(sha256)
-    const size = blobs.size(sha256)
-    const bytes = blobs.get(sha256)?.bytes
-    if (ref === undefined || size === undefined || bytes === undefined) continue
-    const text = blobKind(ref) === "text"
-    if (text) texts.set(sha256, new TextDecoder().decode(bytes))
-    stored.set(sha256, {
-      ref,
-      size,
-      fitted: blobs.fitted(sha256),
-      hasLocation: !text && hasLocation(bytes),
-    })
-  }
-  return { stored, texts }
-}
-
-/** Each text or opaque share as the model reads it, under the message. */
-const shareQuotes = (
-  shared: readonly Share[],
-  texts: ReadonlyMap<Sha256, string>,
-  quoteBytes: number,
-): LinkedQuote[] =>
-  shared.flatMap(share =>
-    share.shown !== null
-      ? []
-      : [
-          {
-            kind: "share" as const,
-            label: share.name,
-            markdown: shareQuoteMarkdown(
-              share,
-              shareQuote(
-                share,
-                texts.get(share.original.sha256) ?? null,
-                quoteBytes,
-              ),
-            ),
-          },
-        ],
-  )
-
 /** What `executeSend` needs besides the decision: the facts the send was planned from. */
 interface SendContext {
   /** The root's documents the send was planned from. */
@@ -190,11 +114,14 @@ export const spendsCard = (sent: Outcome): boolean =>
   sent.kind === "appended" || sent.kind === "started"
 
 /**
- * Gather, `threadOfSend` and `planMessage`, then `executeSend`. A message sent from
- * a card carries its other writers as contributors ("Ada, with Bea"). It
- * spends nothing: whether the card goes is the caller's (`spendsCard`). It
- * takes only a send the gate cleared (`planGate`), so it checks no archive,
- * hold or lane kind of its own.
+ * A send, in phases: whether its root may be opened (`planSendRoot`); its
+ * root read, what it reaches (`planSendReach`: its thread, its command, the
+ * blobs it shares); the command expanded and the blobs read; the send planned
+ * whole (`planSendMessage`); then `executeSend`. A message sent from a card carries
+ * its other writers as contributors ("Ada, with Bea"). It spends nothing:
+ * whether the card goes is the caller's (`spendsCard`). It takes only a send
+ * the gate cleared (`planGate`), so it checks no archive, hold or lane kind
+ * of its own.
  */
 export async function sendMessage(
   deps: SendDeps,
@@ -205,35 +132,15 @@ export async function sendMessage(
   upToDate = false,
 ): Promise<Outcome> {
   const { work, blobs, cards } = deps
-  const { roots, session, live } = deps.basics
-
-  // A thread at the root starts a root, under the id its tab minted, in a new
-  // canvas: one the session already holds is another's, but for the canvas its
-  // thread was opened in, in that root. A branch elsewhere goes in a canvas the
-  // session holds.
-  if (send.at.kind === "branch") {
-    const known = readCanvases(deps.basics.places).has(send.at.canvas)
-    const opened = readThreads(session).get(send.at.thread)?.root === send.root
-    if (send.at.at === null && readRoots(session).has(send.root))
-      return {
-        kind: "refused",
-        code: ERR.ROOT_ID_IN_USE,
-        message: "that root's id is in use",
-      }
-    if (send.at.at === null && known && !opened)
-      return {
-        kind: "refused",
-        code: ERR.CANVAS_ID_IN_USE,
-        message: "that canvas's id is in use",
-      }
-    if (send.at.at !== null && !known)
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "no such canvas to start a thread in",
-      }
-  }
-  // gather
+  const { roots, session, live, places } = deps.basics
+  const threads = readThreads(session)
+  const opens = planSendRoot({
+    send,
+    threads,
+    roots: new Set(readRoots(session).keys()),
+    held: readCanvases(places),
+  })
+  if (opens.kind === "declined") return sendRefusal(opens.why)
   const view: RootView = {
     root: send.root,
     doc: await roots.root(send.root),
@@ -241,191 +148,93 @@ export async function sendMessage(
     live,
   }
   const index = readTreeIndex(view.doc)
-  const names = readParticipantNames(session)
-  const nameOf = (w: WriterId) => displayName(w, names.get(w))
-  const contributors =
-    send.card === null
-      ? []
-      : (await cards.writers(send.card.id)).filter(w => w !== writer)
-
-  const placed = readPlaces(deps.basics.places)
+  const placed = readPlaces(places)
   const blank = await cards.blankQueued(placed)
-
-  // plan (pure)
-  const thread = threadOfSend(
+  const reach = planSendReach({
+    send,
+    writer,
     index,
-    readLanes(view, index, placed, readQueueHolds(session), blank),
-    { at: send.at, me: writer },
-  )
-  // A thread or entry this document does not hold has nowhere to go: refused
-  // before anything is written, as pi would refuse a lane there.
-  if (thread.kind === "unknown") {
-    return {
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
-      message: "no such thread or entry to write at",
-    }
-  }
-  // A branch starts a new thread: one with an entry or a lane is another's.
-  if (thread.kind === "taken")
-    return {
-      kind: "refused",
-      code: ERR.THREAD_TAKEN,
-      message: "that thread has started already",
-    }
-  // A recorded thread's first send is a branch where its record says it begins:
-  // any other branch naming it is another's.
-  const copied = readThreads(session).get(send.at.thread)
-  if (
-    send.at.kind === "branch" &&
-    copied !== undefined &&
-    forkEntry(copied.origin) !== send.at.at
-  )
-    return {
-      kind: "refused",
-      code: ERR.THREAD_TAKEN,
-      message: "that thread has started already",
-    }
-  // A thread that works, or will work, in its own copy is sent paths as its
-  // lane sees them: your working copy's, and a command's files.
-  const own = worksOwn(view.session, {
-    lane: thread.lane,
-    mode: planMode(send.at),
+    lanes: readLanes(view, index, placed, readQueueHolds(session), blank),
+    threads,
+    commands: deps.piSetup.commands(),
   })
-  // gather: the command its first word names, from its file as it is now
-  const typed = parseCommand(send.text)
-  const source =
-    typed === null ? null : resolveCommand(typed.name, deps.piSetup.commands())
-  const command =
-    typed === null
-      ? null
-      : source === null
-        ? { unknown: typed.name }
-        : ((await deps.piSetup.expand(source, typed.args, own)) ?? {
-            unreadable: typed.name,
-          })
-  // gather: what the store holds of each blob its text shares, and the
-  // bytes of each that is not an image, for its quote
-  const named = textBlobs(send.text)
-  const held = gatherShares(blobs, named)
-
-  // gather: the thread's base, for a lane with no work of its own to catch up
-  // quietly before it runs
-  const lane = thread.lane.kind === "lane" ? thread.lane.name : null
-  const bases = readBases(session)
-
-  // plan: a share no longer stored refuses the send before planMessage decides
-  // the rest
-  const shares = planShares(named, held.stored)
-  if (shares.kind === "refused") return shares
-  const news =
-    lane === null
-      ? "nothing"
-      : planBaseNews({
-          own: bases.has(lane),
-          base: bases.get(lane),
-          accepted: readAccepted(session),
-          proposed: readProposedByLane(session).get(lane),
-          known: baseKnown(
-            index,
-            thread.end.kind === "entry" ? thread.end.id : null,
-          ),
-          told: null,
-        }).kind
-  const planned = planMessage({
-    news,
-    upToDate,
-    command,
-    shares,
-    hostWorkingCopy: own ? (work.project?.root ?? null) : null,
-    author: writer,
-    authorName: nameOf(writer),
-    text: send.text,
-    at: send.at,
-    thread,
-    mentions: send.mentions,
-    participants: readParticipants(session, index),
-    agents: agentCandidates(
-      readReachableAgents({ places: deps.basics.places, session }),
-      send.at.thread,
-      threadMembers(index, thread.end.kind === "entry" ? thread.end.id : null),
-    ),
+  if (reach.kind === "declined") return sendRefusal(reach.why)
+  // gather: the command from its file as it is now, paths as the thread's
+  // lane sees them; each blob its text shares; who wrote in its card
+  const own = worksOwn(session, { lane: reach.thread.lane, mode: reach.mode })
+  const expanded =
+    reach.command.kind === "expand"
+      ? await deps.piSetup.expand(reach.command.source, reach.command.args, own)
+      : null
+  const shared = new Map<Sha256, SharedBlob>()
+  for (const { sha256 } of reach.named) {
+    const ref = blobs.ref(sha256)
+    const size = blobs.size(sha256)
+    const bytes = blobs.get(sha256)?.bytes
+    if (ref !== undefined && size !== undefined && bytes !== undefined)
+      shared.set(sha256, { ref, size, fitted: blobs.fitted(sha256), bytes })
+  }
+  const writers = send.card === null ? [] : await cards.writers(send.card.id)
+  const planned = planSendMessage({
+    reach,
+    send,
+    writer,
     sendId,
-    contributors,
-    state: send.state,
+    upToDate,
+    expanded,
+    blobs: shared,
+    quoteBytes: deps.quoteBytes,
+    own,
+    projectRoot: work.project?.root ?? null,
+    bases: readBases(session),
+    accepted: readAccepted(session),
+    proposed: readProposedByLane(session),
+    names: readParticipantNames(session),
+    participants: readParticipants(session, index),
+    reachable: readReachableAgents({ places, session }),
+    writers,
+    index,
+    // As they are now, after the gathering's awaits.
+    cards: readPlaces(places),
+    held: readCanvases(places),
+    workflow: readWorkflow(session),
+    now: deps.basics.now(),
   })
   if (planned.kind === "get-latest-first")
     return getLatestFirst(deps, writer, sendId, send, planned.thread)
-  const begun =
-    planned.kind === "append-to-tree" || planned.kind === "create-and-run"
-      ? planned
-      : null
-  // A thread opened as its column opened, or made by a copy or a
-  // spin-off, has its record and card already; a branch to one not yet
-  // opened opens it with its first message, as its column would have.
-  const opened =
-    begun === null || begun.starts === null || copied !== undefined
-      ? null
-      : planThreadOpen({
-          thread: begun.thread,
-          origin:
-            send.at.kind === "branch" && send.at.at !== null
-              ? { kind: "fork", at: send.at.at, how: "branch" }
-              : ROOT_ORIGIN,
-          root: send.root,
-          by: writer,
-          now: deps.basics.now(),
-          // A branch's card goes just after the thread it forks from.
-          placement: {
-            kind: "after",
-            canvas: begun.starts.canvas,
-            parent:
-              send.at.kind === "branch" && send.at.at !== null
-                ? entryThread(index, send.at.at)
-                : null,
-          },
-          opens: readCanvases(deps.basics.places).has(begun.starts.canvas)
-            ? null
-            : {
-                state: begun.starts.state,
-                workflow: readWorkflow(session),
-              },
-          // As they are now, after the gathering's awaits.
-          cards: readPlaces(deps.basics.places),
-        })
-  if (opened?.kind === "refused")
+  if (planned.openingRefused !== null)
     deps.basics.log(
-      `[host] a thread's card was refused as its first message opened it: ${opened.code}`,
+      `[host] a thread's card was refused as its first message opened it: ${planned.openingRefused}`,
     )
-  const start = opened?.kind === "open" ? opened : null
-
-  // gather: the past its text links to, from the root it is in; then each
-  // file it shares that the model reads as text
-  const quotes = [
-    ...linkedQuotes(send.text, address => {
-      const message = index.entries[address.entry]?.message
-      return message === undefined ? undefined : messageText(message)
-    }),
-    ...shareQuotes(shares.shared, held.texts, deps.quoteBytes),
-  ]
-  const sent = await executeSend(deps, planned, {
+  const sent = await executeSend(deps, planned.decision, {
     view,
     writer,
     base: send.base,
     pinned: send.pinned,
-    start,
-    quotes,
+    start: planned.opening,
+    quotes: planned.quotes,
   })
   // Other threads' agents it asks or invites are relayed to once the chat is
   // written, in a step of their own.
-  const details = "details" in planned ? planned.details : null
-  if (
-    details !== null &&
-    (sent.kind === "appended" || sent.kind === "started") &&
-    ((details.asks?.length ?? 0) > 0 || (details.invites?.length ?? 0) > 0)
-  )
+  if (planned.relays && (sent.kind === "appended" || sent.kind === "started"))
     void deps.relays.relayMessage(send.at.thread, sendId)
   return sent
+}
+
+/** Why a send was refused before anything was written, as its sender is answered. */
+function sendRefusal(why: SendRefusal): Outcome {
+  switch (why) {
+    case "root-in-use":
+      return refused(ERR.ROOT_ID_IN_USE, "that root's id is in use")
+    case "canvas-in-use":
+      return refused(ERR.CANVAS_ID_IN_USE, "that canvas's id is in use")
+    case "no-canvas":
+      return refused(ERR.UNKNOWN_TARGET, "no such canvas to start a thread in")
+    case "unknown":
+      return refused(ERR.UNKNOWN_TARGET, "no such thread or entry to write at")
+    case "taken":
+      return refused(ERR.THREAD_TAKEN, "that thread has started already")
+  }
 }
 
 /**
@@ -469,7 +278,7 @@ async function getLatestFirst(
  */
 export async function executeSend(
   deps: SendDeps,
-  planned: MessageDecision,
+  planned: Exclude<MessageDecision, { kind: "get-latest-first" }>,
   context: SendContext,
 ): Promise<Outcome> {
   const { agent, work } = deps
@@ -498,12 +307,6 @@ export async function executeSend(
     case "conflict":
     case "busy":
       return planned
-    case "get-latest-first":
-      // `sendMessage` carries it out before it comes here.
-      return {
-        kind: "failed",
-        message: "getting the latest was not carried out",
-      }
     case "append-to-tree":
     case "append-to-lane": {
       const appended =

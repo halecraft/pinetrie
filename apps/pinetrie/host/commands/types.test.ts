@@ -2,7 +2,12 @@
 // `pnpm run typecheck` if the line below it ever compiles.
 
 import { type CardId, type Send, threadIdFor, writerId } from "@pinetrie/core"
-import { type CardPlan, type PlaceStep, planUndoAnswer } from "@pinetrie/rules"
+import {
+  type CardPlan,
+  type PlaceStep,
+  planSendMessage,
+  planUndoAnswer,
+} from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { ROOT_ID } from "../fakes.ts"
 import { type SendDeps, sendMessage } from "./send.ts"
@@ -63,4 +68,21 @@ test("an undo's answer for a revert no plan let through does not compile", () =>
       [],
     )
   expect(answer).toBeTypeOf("function")
+})
+
+test("a send planned from a reach no plan made does not compile", () => {
+  const plan = (facts: Parameters<typeof planSendMessage>[0]) =>
+    planSendMessage({
+      ...facts,
+      // @ts-expect-error: only `planSendReach` makes the `SendReach` it takes
+      reach: {
+        kind: "reach",
+        thread: facts.reach.thread,
+        mode: facts.reach.mode,
+        recorded: facts.reach.recorded,
+        command: facts.reach.command,
+        named: facts.reach.named,
+      },
+    })
+  expect(plan).toBeTypeOf("function")
 })

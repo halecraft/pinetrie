@@ -23,13 +23,16 @@ import {
   type TreeIndex,
   threadEnd,
   threadsWork,
+  type ValueWrite,
 } from "@pinetrie/core"
 import {
   type CanvasIndex,
   canvasOfCard,
   canvasOfTarget,
 } from "./canvas-index.ts"
+import { setRecord } from "./records.ts"
 import {
+  RUN_END_REPORT,
   type RunEndReportRecord,
   unclassifiedPending,
 } from "./run-end-report.ts"
@@ -60,11 +63,12 @@ type ArchivePlan =
       /** Off the keeper, after the place is written. */
       readonly teardown: ArchiveTeardown
       /**
-       * With the place, on archiving: each of the canvas's threads' run-end reports
-       * still pending, `unclassified`. Its run's end, a late write, is
-       * refused from now on, and would have been the one to write it.
+       * With the place, on archiving: the write of each of the canvas's
+       * threads' run-end reports still pending, `unclassified`. Its run's
+       * end, a late write, is refused from now on, and would have been the
+       * one to write it.
        */
-      readonly runEndReports: readonly RunEndReportRecord[]
+      readonly writes: readonly ValueWrite<"session">[]
     }
 
 /** Why a canvas cannot be archived now, as the board and the host both say it. */
@@ -108,11 +112,11 @@ export function planArchive(input: {
   return {
     kind: "cross",
     teardown: planTeardown(crossing, input),
-    runEndReports:
+    writes:
       crossing === "archive"
         ? unclassifiedPending(input.runEndReports.values(), lane =>
             input.threads.includes(lane),
-          )
+          ).map(r => setRecord(RUN_END_REPORT, r))
         : [],
   }
 }

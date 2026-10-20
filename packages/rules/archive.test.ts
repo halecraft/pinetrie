@@ -26,6 +26,8 @@ import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, planLanesGone, writesIn } from "./archive.ts"
 import { indexCanvases } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"
+import { setRecord } from "./records.ts"
+import { RUN_END_REPORT } from "./run-end-report.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -87,7 +89,7 @@ describe("planArchive", () => {
     expect(plan()).toEqual({
       kind: "cross",
       teardown: { forget: [], refs: [], snapshots: [] },
-      runEndReports: [],
+      writes: [],
     })
   })
   test("archiving settles its threads' pending run-end reports as unclassified; another canvas's stay pending", () => {
@@ -104,10 +106,10 @@ describe("planArchive", () => {
       ]),
     )
     expect(plan({ runEndReports })).toMatchObject({
-      runEndReports: [report("mine", "unclassified")],
+      writes: [setRecord(RUN_END_REPORT, report("mine", "unclassified"))],
     })
     expect(plan({ runEndReports, crossing: "restore" })).toMatchObject({
-      runEndReports: [],
+      writes: [],
     })
   })
   test("refuses while an agent of its threads works, or cards wait there, held or not", () => {

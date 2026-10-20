@@ -558,13 +558,18 @@ reading the store once, planning once, then acting:
   `withQuotes`): `sendMessage` gathers each past referent its text links to
   from the root it is in, and the chat's content quotes it under the text,
   frozen as sent.
-- **A message's shares are gathered with it** (`gatherShares`, ADR-0151):
-  each blob its text names (`textBlobs`), its ref, size and fitted copy,
-  whether an image's or an opaque file's bytes hold a location
-  (`hasLocation`; a text file's words may name a place without being one),
-  and a text file's text, which is quoted under the message up to
-  `shares.quoteBytes` (`shareQuote`). `planShares` refuses a send that
+- **A message's shares are read with it** (ADR-0151): `sendMessage` reads
+  each blob its text names (`SendReach.named`) with its ref, size, fitted
+  copy and bytes; `planSendMessage` reads which hold a location and quotes a text
+  file under the message up to `shares.quoteBytes`, and refuses a send that
   names a blob no longer stored.
+- **A send is planned in phases** (`commands/send.ts`, ADR-0193): whether
+  its root may be opened (`planSendRoot`); its root read, what it reaches
+  (`planSendReach`: its thread, the command its first word names, the blobs
+  it shares); the command expanded by pi and the blobs read; then the send
+  whole (`planSendMessage`: the message, the thread it opens, its quotes, and
+  whether it relays), which `executeSend` carries out. A refusal before
+  anything is written is a `SendRefusal`, worded by `sendRefusal`.
 - **`save_blob`'s hook** (`save-blob.ts`) reads the lane's path to its root
   (`ancestry` from its tip), and gives the bytes of a blob some message
   there named (`readableBlobs`, `planSaveBlob`). It never writes: the tool
@@ -923,8 +928,8 @@ rejects `shutdown()`.
   column (ADR-0138). A branch naming a thread no column opened (a script's) is
   opened with its send (ADR-0116, ADR-0117): `planMessage`'s decision names
   the thread it writes in (`thread`), and for a branch what its card needs
-  (`starts`), and `sendMessage`, after its last await, plans its opening
-  (`planThreadOpen`): the thread's record, its card just after the thread
+  (`starts`), and `planSendMessage`, over the cards read after the send's last
+  await, plans its opening (`planThreadOpen`): the thread's record, its card just after the thread
   it forks from on its canvas, and for a new canvas its card on the
   board (ADR-0126), at the end of the state the chat names
   (`Command.state`, a board column's ＋), else of the first open state.
@@ -942,7 +947,8 @@ rejects `shutdown()`.
   teardown (`work/archive.ts`) reports a lane whose removal fails and goes
   on: one disk left behind is waste, while a teardown stopped there would
   leave every lane after it, its history and its snapshots. **A change to the states** (`handleWorkflow`) is one
-  keeper step, `planWorkflowEdit` over the workflow and the board.
+  keeper step, `planWorkflowChange` over the workflow and the cards, which
+  returns the workflow's write.
 - **A message sent from a card spends it** (ADR-0048): `sendMessage` names the
   card's other writers as contributors, through the card port, and spends
   nothing. The dispatcher's `send` case spends the card when the answer
@@ -1037,9 +1043,10 @@ rejects `shutdown()`.
   saw it go.
 - **`picture` sets the sender's picture** (`commands/picture.ts`,
   ADR-0098): `planPicture` over the blob's reference, read without its
-  bytes. A picture wider or taller than `PICTURE_MOST` is fitted by
-  `fitImage` (`prepareImage` with a 512 box, `@pinetrie/pi`), kept as a
-  blob of its own, and that copy is set; the original is left to the sweep,
+  bytes, returns its write. A picture wider or taller than `PICTURE_MOST`
+  is fitted by `fitImage` (`prepareImage` with the box the plan names,
+  `@pinetrie/pi`), kept as a blob of its own, and that copy is set
+  (`planFittedPicture`); the original is left to the sweep,
   which keeps only pictures that are set (`readReferencedBlobs`). The fit
   runs inside the command's keeper step: an upload is already fitted to
   2000×2000, so it takes milliseconds, and the browser's 256 picture is
@@ -1255,7 +1262,8 @@ rejects `shutdown()`.
   `handleStop` writes it (with its history, a host write), then asks pi to
   abort, in one step. So the fact is queued when the run ends, and the
   first press is the one named. With a message card queued it holds the
-  queue first (`holdOnStop`, ADR-0048 step 7); the run's end, a drain on
+  queue first (`holdOnStop`, ADR-0048 step 7, its write returned by
+  `planStop`); the run's end, a drain on
   the same keeper, appends the stop's fact, which goes before the cards,
   and pops nothing else. The run's end report names the stopper from the
   queued fact (`endedOutcome`).

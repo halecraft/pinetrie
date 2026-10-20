@@ -18,6 +18,7 @@ import {
   type CanvasId,
   type CardCommand,
   type CardId,
+  type CardRecord,
   type EntryId,
   ERR,
   type Intent,
@@ -228,17 +229,9 @@ export function createCardCommands(deps: CardCommandDeps) {
     word: (why: W) => Outcome,
   ): Promise<Settled> => carryPlan(plan, { kind: "move", by: writer }, word)
 
-  /** A refused move: where the card is now and who put it there. */
+  /** A refused move, with the places' `rev` it was refused at. */
   const unmoved = (refusal: CardRefusal): Settled =>
-    settled(
-      {
-        kind: "unmoved",
-        code: refusal.code,
-        place: refusal.now === null ? null : placeKey(refusal.now.place),
-        by: refusal.now?.placer ?? null,
-      },
-      places.rev(),
-    )
+    settled(unmovedOutcome(refusal), places.rev())
 
   /**
    * The thread of each entry whose margin a move sends a card to, from its
@@ -770,6 +763,17 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
   }
 }
+
+/** A refused move, as its sender is answered: where the card is now and who put it there. */
+export const unmovedOutcome = (refusal: {
+  readonly code: Extract<Outcome, { kind: "unmoved" }>["code"]
+  readonly now: CardRecord | null
+}): Outcome => ({
+  kind: "unmoved",
+  code: refusal.code,
+  place: refusal.now === null ? null : placeKey(refusal.now.place),
+  by: refusal.now?.placer ?? null,
+})
 
 /** Why a blob makes no image, as its sender is answered. */
 function imageRefusal(why: ImageRefusal): Outcome {

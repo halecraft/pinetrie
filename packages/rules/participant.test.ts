@@ -4,6 +4,7 @@ import {
   PICTURE,
   PICTURE_MOST,
   pictureWrites,
+  planFittedPicture,
   planPicture,
 } from "./participant.ts"
 import { deleteRecord, setRecord } from "./records.ts"
@@ -24,25 +25,42 @@ describe("a person's picture", () => {
       expect(PICTURE.decode(bad, ADA)).toBeUndefined()
   })
 
+  const write = (sha: typeof SHA | null) => ({
+    kind: "write",
+    writes: [pictureWrites(ADA, sha)],
+  })
   test.each([
-    ["no picture", null, undefined, { kind: "clear" }],
+    ["no picture", null, undefined, write(null)],
+    ["at the most", SHA, ref(PICTURE_MOST, PICTURE_MOST), write(SHA)],
+    ["small", SHA, ref(40, 30), write(SHA)],
     [
-      "at the most",
+      "too wide",
       SHA,
-      ref(PICTURE_MOST, PICTURE_MOST),
-      { kind: "set", sha256: SHA },
+      ref(PICTURE_MOST + 1, 10),
+      { kind: "fit", sha256: SHA, most: PICTURE_MOST },
     ],
-    ["small", SHA, ref(40, 30), { kind: "set", sha256: SHA }],
-    ["too wide", SHA, ref(PICTURE_MOST + 1, 10), { kind: "fit", sha256: SHA }],
-    ["too tall", SHA, ref(10, PICTURE_MOST + 1), { kind: "fit", sha256: SHA }],
+    [
+      "too tall",
+      SHA,
+      ref(10, PICTURE_MOST + 1),
+      { kind: "fit", sha256: SHA, most: PICTURE_MOST },
+    ],
   ] as const)("%s", (_, sha, given, plan) => {
-    expect(planPicture(sha, given)).toEqual(plan)
+    expect(planPicture(ADA, sha, given)).toEqual(plan)
   })
 
   test("a blob the store does not hold is refused", () => {
-    expect(planPicture(SHA, undefined)).toMatchObject({
+    expect(planPicture(ADA, SHA, undefined)).toMatchObject({
       kind: "refuse",
       refusal: { code: ERR.IMAGE_MISSING },
+    })
+  })
+
+  test("a fitted picture's copy is set; one that could not be fitted is refused", () => {
+    expect(planFittedPicture(ADA, SHA)).toEqual(write(SHA))
+    expect(planFittedPicture(ADA, null)).toMatchObject({
+      kind: "refuse",
+      refusal: { code: ERR.PICTURE_UNREADABLE },
     })
   })
 

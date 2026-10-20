@@ -11,7 +11,6 @@
 import {
   cardIdOfKind,
   type EntryId,
-  indexAsks,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
@@ -197,7 +196,6 @@ export function createAllowances(deps: {
     if (view === undefined) return
     const planned = planStop(view, {
       index,
-      asks: indexAsks(index),
       cards,
       holds: readQueueHolds(session),
       by: over.by,

@@ -8,7 +8,6 @@ import {
   ERR,
   type ErrCode,
   type Intent,
-  indexAsks,
   type LaneView,
   type RootId,
   type ThreadId,
@@ -31,14 +30,10 @@ import {
 import {
   ACCESS,
   decodeRelay,
-  displayName,
-  emptyAccess,
   planAccessAnswer,
   planCarryOn,
   planQueueHold,
   planStop,
-  QUEUE_HOLD,
-  setRecord,
 } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import { type Basics, failed, type StepBasics } from "../basics.ts"
@@ -138,7 +133,6 @@ export async function handleStop(
   const { places, session, newId } = deps.basics
   const planned = planStop(here.lane, {
     index,
-    asks: indexAsks(index),
     cards: readPlaces(places),
     holds: readQueueHolds(session),
     by,
@@ -146,8 +140,8 @@ export async function handleStop(
     id: cardIdOfKind("fact", newId()),
   })
   if (planned.kind === "abort") {
-    if (planned.hold !== null)
-      await deps.records.writeValues([setRecord(QUEUE_HOLD, planned.hold)])
+    if (planned.writes.length > 0)
+      await deps.records.writeValues(planned.writes)
     if (planned.fact.length > 0)
       await deps.placesWriter.change({ kind: "host" }, open =>
         open.apply(planned.fact),
@@ -223,14 +217,11 @@ export async function handleCarryOn(
 ): Promise<Outcome> {
   const { basics } = deps
   const here = await laneAt(deps, lane)
-  const planned = planCarryOn(
-    here === null ? null : { ...here, asks: indexAsks(here.index) },
-    {
-      by,
-      name: displayName(by, readParticipantNames(basics.session).get(by)),
-      timestamp: basics.now(),
-    },
-  )
+  const planned = planCarryOn(here, {
+    by,
+    names: readParticipantNames(basics.session),
+    timestamp: basics.now(),
+  })
   if (planned.kind === "refused") return planned
   return startRun(deps, basics.roots, lane, {
     kind: "prompt",
@@ -425,8 +416,8 @@ export async function handleSshAccess(
 ): Promise<Outcome> {
   const { session, now } = deps.basics
   const planned = planAccessAnswer({
-    record:
-      readRecords(session, ACCESS).get(intent.lane) ?? emptyAccess(intent.lane),
+    lane: intent.lane,
+    record: readRecords(session, ACCESS).get(intent.lane),
     answer: intent.answer,
     sender,
     owner: readProject(session)?.owner ?? null,
@@ -441,6 +432,6 @@ export async function handleSshAccess(
           ? "only this host's owner answers for their ssh identity"
           : `this lane's ssh takes no ${intent.answer} now`,
     }
-  await deps.records.writeValues([setRecord(ACCESS, planned.record)])
+  await deps.records.writeValues(planned.writes)
   return { kind: "answered" }
 }

@@ -91,10 +91,12 @@ export const PICTURE: RecordSpec<PictureRecord, WriterId, "session"> = {
 export const PICTURE_MOST = 512
 
 type PicturePlan =
-  | { readonly kind: "clear" }
-  | { readonly kind: "set"; readonly sha256: Sha256 }
-  /** Fit the blob within `PICTURE_MOST`, keep the copy, and set that. */
-  | { readonly kind: "fit"; readonly sha256: Sha256 }
+  | {
+      readonly kind: "write"
+      readonly writes: readonly ValueWrite<"session">[]
+    }
+  /** Fit the blob within `most`, keep the copy, and set that (`planFittedPicture`). */
+  | { readonly kind: "fit"; readonly sha256: Sha256; readonly most: number }
   | { readonly kind: "refuse"; readonly refusal: Refusal }
 
 /**
@@ -102,10 +104,12 @@ type PicturePlan =
  * for its SHA-256, read without the bytes.
  */
 export function planPicture(
+  writer: WriterId,
   sha256: Sha256 | null,
   ref: ImageRef | undefined,
 ): PicturePlan {
-  if (sha256 === null) return { kind: "clear" }
+  if (sha256 === null)
+    return { kind: "write", writes: [pictureWrites(writer, null)] }
   if (ref === undefined)
     return {
       kind: "refuse",
@@ -115,8 +119,27 @@ export function planPicture(
       ),
     }
   return ref.width > PICTURE_MOST || ref.height > PICTURE_MOST
-    ? { kind: "fit", sha256 }
-    : { kind: "set", sha256 }
+    ? { kind: "fit", sha256, most: PICTURE_MOST }
+    : { kind: "write", writes: [pictureWrites(writer, sha256)] }
+}
+
+/**
+ * A picture fitted (`planPicture`'s `fit`): the copy kept, by its SHA-256,
+ * set; refused when it could not be read or made smaller (`copy` null).
+ */
+export function planFittedPicture(
+  writer: WriterId,
+  copy: Sha256 | null,
+): Exclude<PicturePlan, { kind: "fit" }> {
+  return copy === null
+    ? {
+        kind: "refuse",
+        refusal: refused(
+          ERR.PICTURE_UNREADABLE,
+          "that picture could not be read or made smaller: try another",
+        ),
+      }
+    : { kind: "write", writes: [pictureWrites(writer, copy)] }
 }
 
 /** The one write of `writer`'s picture: set to `sha256`, or with null deleted. */

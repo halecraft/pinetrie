@@ -422,3 +422,34 @@ export function planWorkflowEdit(
 
 const sameState = (a: WorkflowState, b: WorkflowState | undefined): boolean =>
   b !== undefined && a.id === b.id && a.name === b.name
+
+/**
+ * A change to the board's states, from the workflow and the cards as they
+ * are: refused before the host wrote a workflow, else `planWorkflowEdit`
+ * over the board they make, as the write of the workflow it leaves.
+ */
+export function planWorkflowChange(input: {
+  readonly workflow: Workflow | null
+  readonly cards: readonly CardRecord[]
+  readonly edit: WorkflowEdit
+  readonly newId: () => string
+}):
+  | Refusal
+  | { readonly kind: "unchanged" }
+  | {
+      readonly kind: "write"
+      readonly writes: readonly ValueWrite<"session">[]
+    } {
+  const { workflow } = input
+  if (workflow === null)
+    return refused(ERR.UNKNOWN_STATE, "the board has no states yet")
+  const planned = planWorkflowEdit(
+    workflow,
+    taskBoard(workflow, input.cards),
+    input.edit,
+    input.newId,
+  )
+  return planned.kind === "write"
+    ? { kind: "write", writes: [setRecord(WORKFLOW, planned.workflow)] }
+    : planned
+}

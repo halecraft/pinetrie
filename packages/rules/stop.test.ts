@@ -24,6 +24,8 @@ import { encodeFact } from "./fact.ts"
 import { renderableMessage } from "./message.ts"
 import { orderAfter } from "./order.ts"
 import { type QueuedCard, queuedOn } from "./queue.ts"
+import { QUEUE_HOLD } from "./queue-hold.ts"
+import { setRecord } from "./records.ts"
 import {
   carryOnLine,
   carryOnState,
@@ -69,7 +71,6 @@ describe("planStop", () => {
     id = FACT,
   ) => ({
     index,
-    asks: indexAsks(index),
     cards,
     holds: new Map(),
     by,
@@ -115,14 +116,14 @@ describe("planStop", () => {
           },
         },
       ],
-      hold: null,
+      writes: [],
     })
   })
   test("with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first", () => {
     const planned = planStop(lane(true), facts([queued]))
     expect(planned).toMatchObject({
       kind: "abort",
-      hold: { lane: name, by: ada, at: 7 },
+      writes: [setRecord(QUEUE_HOLD, { lane: name, by: ada, at: 7 })],
     })
     const fact = planned.kind === "abort" ? planned.fact[0] : undefined
     expect(
@@ -137,7 +138,7 @@ describe("planStop", () => {
       ...facts([queued]),
       budget: entryId("m"),
     })
-    expect(planned).toMatchObject({ kind: "abort", hold: null })
+    expect(planned).toMatchObject({ kind: "abort", writes: [] })
     const fact = planned.kind === "abort" ? planned.fact[0] : undefined
     expect(fact?.kind === "write" && fact.record.content).toEqual({
       fact: { ...stopped(), budget: entryId("m") },
@@ -154,7 +155,7 @@ describe("planStop", () => {
         lane(true),
         facts(queuedStop === undefined ? [] : [queuedStop], i, ada, SECOND),
       ),
-    ).toEqual({ kind: "abort", fact: [], hold: null })
+    ).toEqual({ kind: "abort", fact: [], writes: [] })
     const appended: EntryLike = {
       id: entryId("3-f"),
       parentId: work.id,
@@ -172,7 +173,7 @@ describe("planStop", () => {
           SECOND,
         ),
       ),
-    ).toEqual({ kind: "abort", fact: [], hold: null })
+    ).toEqual({ kind: "abort", fact: [], writes: [] })
   })
   test("an idle lane is already stopped", () => {
     expect(planStop(lane(false), facts())).toEqual({ kind: "idle" })
@@ -287,7 +288,7 @@ describe("carrying on", () => {
       refusedWith(ERR.UNKNOWN_TARGET),
     )
     expect(
-      planCarryOn(null, { by: ada, name: "Ada", timestamp: 9 }),
+      planCarryOn(null, { by: ada, names: new Map(), timestamp: 9 }),
     ).toMatchObject(refusedWith(ERR.UNKNOWN_TARGET))
   })
   test("a running lane, or one with a card queued, is busy", () => {
@@ -321,10 +322,10 @@ describe("carrying on", () => {
   test("planCarryOn: a run whose prompt names who resumed, read back as its line", () => {
     const o = over([ask, aborted])
     const planned = planCarryOn(
-      { lane: o.view, ...o.facts },
+      { lane: o.view, index: o.facts.index },
       {
         by: ada,
-        name: "Ada",
+        names: new Map([[ada, "Ada"]]),
         timestamp: 9,
       },
     )
@@ -355,8 +356,8 @@ describe("carrying on", () => {
     const o = over([ask, aborted], { running: true })
     expect(
       planCarryOn(
-        { lane: o.view, ...o.facts },
-        { by: ada, name: "Ada", timestamp: 9 },
+        { lane: o.view, index: o.facts.index },
+        { by: ada, names: new Map(), timestamp: 9 },
       ),
     ).toEqual({
       kind: "refused",

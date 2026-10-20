@@ -35,6 +35,7 @@ import {
   runThreads,
   type ThreadHolding,
 } from "./held.ts"
+import { displayName } from "./participant.ts"
 
 declare const clearedBrand: unique symbol
 /**
@@ -131,8 +132,11 @@ export function planGate<C extends Gated>(
 /** A gate's refusal, as the host answers it; `nameOf` names the archiver. */
 export function gateRefusal(
   refusal: GateRefusal,
-  nameOf: (writer: WriterId) => string,
+  /** Each participant's display name as set; one unset is read from the writer. */
+  names: ReadonlyMap<WriterId, string>,
 ): Refusal {
+  const nameOf = (writer: WriterId): string =>
+    displayName(writer, names.get(writer))
   switch (refusal.kind) {
     case "archived":
       return refused(

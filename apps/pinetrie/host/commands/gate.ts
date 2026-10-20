@@ -14,7 +14,6 @@ import {
 import {
   type CanvasIndex,
   type Cleared,
-  displayName,
   type GateFacts,
   type GateRoot,
   gateRefusal,
@@ -76,8 +75,7 @@ export async function clear<C extends Gated>(
     case "read":
       throw new Error("the gate asked again for roots it was given")
     default: {
-      const names = readParticipantNames(session)
-      return gateRefusal(plan, w => displayName(w, names.get(w)))
+      return gateRefusal(plan, readParticipantNames(session))
     }
   }
 }

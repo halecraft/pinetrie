@@ -174,7 +174,7 @@ describe("planGate", () => {
 })
 
 test("gateRefusal: an archive names its archiver, a hold and a trash say what to do", () => {
-  const nameOf = (w: string) => (w === BEA ? "Bea" : "?")
+  const nameOf = new Map([[BEA, "Bea"]])
   expect(
     gateRefusal(
       { kind: "archived", canvas: { canvas: CANVAS, by: BEA, at: 1 } },

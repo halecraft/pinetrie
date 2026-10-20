@@ -8,11 +8,12 @@ import {
   type AccessAnswer,
   ERR,
   type ThreadId,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, threadKey, WriterIdSchema } from "./decode.ts"
-import type { RecordSpec } from "./records.ts"
+import { type RecordSpec, setRecord } from "./records.ts"
 
 const HostSchema = Type.Union([Type.String(), Type.Null()])
 
@@ -151,15 +152,25 @@ export const answersFor = (record: AccessRecord): readonly AccessAnswer[] =>
 /** Why an answer is refused: the host's own codes, which its reply carries unchanged. */
 export type AccessRefusal = typeof ERR.NOT_OWNER | typeof ERR.NOTHING_TO_ANSWER
 
-/** An answer, as the record it makes, or why it is refused. It keeps the host the lane asked for. */
+/**
+ * An answer, as the record it makes and its write, or why it is refused. It
+ * keeps the host the lane asked for. A lane with no record has asked nothing.
+ */
 export function planAccessAnswer(input: {
-  readonly record: AccessRecord
+  readonly lane: ThreadId
+  readonly record: AccessRecord | undefined
   readonly answer: AccessAnswer
   readonly sender: WriterId
   readonly owner: WriterId | null
   readonly now: number
-}): { readonly record: AccessRecord } | { readonly refused: AccessRefusal } {
-  const { record, answer, sender, now } = input
+}):
+  | {
+      readonly record: AccessRecord
+      readonly writes: readonly ValueWrite<"session">[]
+    }
+  | { readonly refused: AccessRefusal } {
+  const { answer, sender, now } = input
+  const record = input.record ?? emptyAccess(input.lane)
   if (input.owner === null || sender !== input.owner)
     return { refused: ERR.NOT_OWNER }
   if (record.personal === null || !answersFor(record).includes(answer))
@@ -175,7 +186,8 @@ export function planAccessAnswer(input: {
           at: now,
           takenBack: answer === "take-back",
         }
-  return { record: { ...record, personal } }
+  const answered = { ...record, personal }
+  return { record: answered, writes: [setRecord(ACCESS, answered)] }
 }
 
 /** A lane asks for its owner's identity: it waits, unless it asked or was answered already. */

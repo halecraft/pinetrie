@@ -1,6 +1,7 @@
 import { type AccessAnswer, ERR, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  ACCESS,
   ACCESS_ANSWERS,
   type AccessRecord,
   answersFor,
@@ -14,6 +15,7 @@ import {
   planAccessUse,
   planPersonalSign,
 } from "./access.ts"
+import { setRecord } from "./records.ts"
 
 const LANE = threadIdFor("t-1")
 const DUANE = writerId("duane@x.io")
@@ -29,7 +31,14 @@ const at = (personal: PersonalAccess | null): AccessRecord => ({
   personal,
 })
 const answer = (record: AccessRecord, a: AccessAnswer, sender = DUANE) =>
-  planAccessAnswer({ record, answer: a, sender, owner: DUANE, now: 2 })
+  planAccessAnswer({
+    lane: LANE,
+    record,
+    answer: a,
+    sender,
+    owner: DUANE,
+    now: 2,
+  })
 
 describe("planAccessAnswer", () => {
   test("only the owner answers", () => {
@@ -38,6 +47,7 @@ describe("planAccessAnswer", () => {
     })
     expect(
       planAccessAnswer({
+        lane: LANE,
         record: at(STATES.waiting),
         answer: "allow",
         sender: DUANE,
@@ -57,6 +67,12 @@ describe("planAccessAnswer", () => {
       }
   })
 
+  test("an answer taken is written as the lane's record", () => {
+    const result = answer(at(STATES.waiting), "allow")
+    if (!("record" in result)) throw new Error("taken")
+    expect(result.writes).toEqual([setRecord(ACCESS, result.record)])
+  })
+
   test("a lane that never asked has nothing to answer", () => {
     expect(answer(at(null), "allow")).toEqual({
       refused: ERR.NOTHING_TO_ANSWER,
@@ -65,7 +81,7 @@ describe("planAccessAnswer", () => {
   })
 
   test("taking back is a denial that says it was allowed first", () => {
-    expect(answer(at(STATES.allowed), "take-back")).toEqual({
+    expect(answer(at(STATES.allowed), "take-back")).toMatchObject({
       record: at({
         kind: "denied",
         host: "pop",

@@ -35,7 +35,6 @@ import {
   messageImageShas,
   participants,
   pendingRunEndReport,
-  planMessage,
   planResolution,
   planSshNews,
   planStack,
@@ -46,7 +45,7 @@ import {
   settleRun,
   withMessageImages,
 } from "./index.ts"
-import { detailsFromStored } from "./message.ts"
+import { detailsFromStored, planMessage } from "./message.ts"
 import { removalsText } from "./removals.ts"
 
 /** A resolution's floor with room to spare. */
