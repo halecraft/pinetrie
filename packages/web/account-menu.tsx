@@ -1,6 +1,7 @@
 // web/account-menu — you, at the footer's left: your avatar and name, opening a
-// menu headed by who you are, your email included. It offers your profile page
-// and signing in as someone else. While your list is folded, the corner holds
+// menu headed by who you are, your email included. It offers your profile page,
+// signing in as someone else, and under them the theme: light, dark or the
+// system's. While your list is folded, the corner holds
 // your avatar alone, carrying the inbox's badge, and the menu holds the inbox
 // and the inventory too: choosing the inbox shows its sections in the same box,
 // after a back item. What the menu holds is `accountView`'s.
@@ -13,6 +14,12 @@ import {
   BACK,
   type Intent,
 } from "@pinetrie/interface"
+import {
+  THEME_HEADING,
+  THEMES,
+  type Theme,
+  themeWords,
+} from "@pinetrie/web-core"
 import { useState } from "react"
 import { type InboxMenuProps, useInboxMenu } from "./inbox-menu.tsx"
 import type { InventoryToggleProps } from "./inventory-toggle.tsx"
@@ -34,6 +41,7 @@ export function AccountMenu({
   inbox,
   inventory,
   onIntent,
+  theme,
 }: Me & {
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly colorOf: (writer: WriterId) => string
@@ -42,6 +50,11 @@ export function AccountMenu({
   readonly inventory: InventoryToggleProps
   /** Where Profile and "sign in as someone else" go. */
   readonly onIntent: (intent: Intent) => void
+  /** The theme you chose, offered as a choice under the menu's items. */
+  readonly theme: {
+    readonly chosen: Theme
+    readonly onChoose: (theme: Theme) => void
+  }
 }) {
   const shown = nameFor(nameOf, writer)
   const [inInbox, setInInbox] = useState(false)
@@ -135,7 +148,22 @@ export function AccountMenu({
         },
         ...inboxMenu.sections.slice(1),
       ]
-    : [{ key: "account", items: view.items.map(item) }]
+    : [
+        { key: "account", items: view.items.map(item) },
+        {
+          key: "theme",
+          heading: THEME_HEADING,
+          items: THEMES.map(t => ({
+            key: `theme-${t}`,
+            className: "account-theme",
+            data: { choice: t },
+            label: themeWords(t),
+            checked: t === theme.chosen,
+            keepOpen: true,
+            onChoose: () => theme.onChoose(t),
+          })),
+        },
+      ]
   return (
     <Menu
       className="account"

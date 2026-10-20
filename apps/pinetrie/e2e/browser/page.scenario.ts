@@ -4486,6 +4486,30 @@ async function run(check: Checks["check"]): Promise<void> {
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
       const openKeys = await columnKeys(page)
 
+      // The theme: the suite's browser is set light, so Dark is a change of
+      // the page's own, which the device keeps through a reload.
+      const pageIsDark = () =>
+        page
+          .waitForFunction(
+            () =>
+              document.documentElement.dataset.theme === "dark" &&
+              getComputedStyle(document.body).backgroundColor ===
+                "rgb(20, 22, 26)",
+            undefined,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+      const choseDark = await chooseFromMenu(
+        page,
+        "#bottom .me-trigger",
+        '.account-theme[data-choice="dark"]',
+      )
+      const darkNow = choseDark && (await pageIsDark())
+      await page.keyboard.press("Escape")
+
       // A reload is the same person: the device keeps your email, so your name
       // stays and you are not shown to yourself as someone else.
       const myName = await shownName(page)
@@ -4508,6 +4532,18 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       // Another window's entries may not have expired yet; none may be mine.
       const ghosts = await page.locator(`.avatar[data-writer="${me}"]`).count()
+      const darkKept = await pageIsDark()
+      check(
+        "Dark in the account menu draws the page dark over a light system, and a reload keeps it",
+        darkNow && darkKept,
+        `chosen ${darkNow}, after a reload ${darkKept}`,
+      )
+      await chooseFromMenu(
+        page,
+        "#bottom .me-trigger",
+        '.account-theme[data-choice="system"]',
+      )
+      await page.keyboard.press("Escape")
       check(
         "a reload keeps who you are: your name",
         myName === "Ada Lovelace" && kept && ghosts === 0,

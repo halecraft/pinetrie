@@ -310,22 +310,36 @@ bar, each column's matches, and the rail's marks.
 - **The bar slides in only.** It unmounts as it closes, which has no frame to
   slide out in.
 
-## The page's colours (`index.html`, ADR-0081, ADR-0195)
+## The page's colours (`index.html`, ADR-0081, ADR-0195, ADR-0196)
 
 The first `:root` rule in the stylesheet names every colour the page draws,
 and only that rule writes a colour literal. `stylesheet.test.ts` fails on a
-hex, a colour function or a colour's name anywhere else. It also fails on
-a `var()` with no fallback that names a variable nobody defines, which
-would draw nothing (S277).
+hex, a colour function or a colour's name anywhere else. A relative colour
+built from a named one (`oklch(from var(--fill) …)`) is not a literal. The
+test also fails on a `var()` with no fallback that names a variable nobody
+defines, which would draw nothing (S277).
 
+- **Each colour has a light value and a dark one:**
+  `--page: light-dark(#fbfbfc, #14161a)`. The rule's `color-scheme: light
+  dark` follows the system, and `:root[data-theme="light"]` or `"dark"`
+  forces one. A name the same on both pages is written once (`--action`,
+  `--white`, `--checker`, `--slot-pending`), and `stylesheet.test.ts`
+  fails on any other name with a single value. The light set keeps each
+  dark value's role (S280):
+  - text keeps its contrast on the page;
+  - a hue keeps its OKLCH hue and chroma, at 4.5 to 6:1;
+  - the track colours sit between 4.5 and 6:1, spread so they stay as far
+    apart as in dark.
 - **Neutrals are two ramps.**
-  - Surfaces, darkest first: `--chrome` (the sidebar and the footer),
-    `--sunk` (code, a tool's output, the board), `--page` (the paper the
-    columns and the root you are on are drawn on), `--panel`, `--raised`
-    (a menu, a hover fill, a field) and `--edge` (the lines between
-    regions, and the selected item's sides).
+  - Surfaces, darkest first in dark: `--chrome` (the sidebar and the
+    footer), `--sunk` (code, a tool's output, the board), `--page` (the
+    paper the columns and the root you are on are drawn on), `--panel`,
+    `--raised` (a menu, a hover fill, a field) and `--edge` (the lines
+    between regions, and the selected item's sides). In light, `--raised`
+    is white and the rest step down from the page as they step up from it
+    in dark.
   - Lines, from quiet to hovered: `--line`, `--line-strong`, `--line-hover`.
-  - Text, brightest first: `--text-bright`, `--text`, `--text-soft`,
+  - Text, strongest first: `--text-bright`, `--text`, `--text-soft`,
     `--text-dim` (the selected item's left edge too), `--text-muted`,
     `--text-faint` and `--text-quiet`.
 - **A hue names its role:**
@@ -344,12 +358,33 @@ would draw nothing (S277).
   hue's line is `color-mix(in srgb, var(--hue) p%, var(--page))`, so it
   follows both the hue and the page. A colour that only fades is mixed
   with `transparent`.
-- **Three colours are the same on any page:** `--white` (text on a filled
-  button, the light square of an image's checker), `--ink` (text on a bright
-  fill: a badge, an initial, a match) and `--shadow`.
-- **A light set would redefine this rule alone.** Each name is a role, not a
-  shade, so no rule outside it needs to change. People's colours are not
-  here: `presence.tsx` picks them in code.
+- **Text on a fill picks itself.** The fills that carry text are bright in
+  dark and deep in light: a person's initial, the inbox's and the menu's
+  badges, a search's match, a card's main button and a waiting approve.
+  Each sets `--fill`, and one rule under `:where()` gives it ink on a fill
+  lighter than OKLCH 0.56 and white on a darker one (`--on-fill`). A rule
+  that must win over another colour names `var(--on-fill)` itself.
+- **A banner sits on `--banner-ground`.** It is drawn on black, which
+  `lighten` takes out only over something darker. The ground is
+  transparent in dark, so nothing changes there, and a dark tile in light,
+  under the mark and the sidebar's icon.
+- **People's colours are named too** (`presence.tsx`). The first three
+  people take `--person-1` to `--person-3`. A later person's hue comes from
+  their id, drawn as `hsl(from var(--person-tone) hue s l)`, so each theme
+  sets how every hashed colour reads without knowing the hues. The track
+  colours are `--slot-0` … `--slot-11` and `--slot-pending`, which
+  `slotColor` names.
+- **Both pages are held to the same rules.** `colors.test.ts` checks the
+  track colours' contrast, their separations and their distance from the
+  colours that already mean something, and the text's contrast, on the
+  light page and the dark one. It also fails on a hex or a colour function
+  without a `var()` in the page's code.
+- **The theme is chosen in the account menu:** light, dark or as your
+  system is set (web-core's `theme.ts`). It is kept per device under
+  `THEME_KEY`, and `App` sets the root's `data-theme` from it. The script
+  in `index.html`'s head applies a stored choice before the first paint, so
+  a page set against the system's scheme never flashes the system's.
+  `theme-script.test.ts` runs that script against each stored value.
 
 `--surface` is the colour behind a thing, set by context: `--page` by
 default, `--chrome` in `#sidebar` and `#bottom`, the hover fill on a

@@ -70,6 +70,14 @@ export {
   screenMemory,
 } from "./screen-memory.ts"
 export {
+  THEME_HEADING,
+  THEMES,
+  type Theme,
+  themeAttribute,
+  themeCodec,
+  themeWords,
+} from "./theme.ts"
+export {
   type Box,
   columnSpot,
   keepSpot,

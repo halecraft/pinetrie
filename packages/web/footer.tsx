@@ -19,7 +19,7 @@ import {
   publishWords,
 } from "@pinetrie/interface"
 import type { AcceptedActing, SessionClient } from "@pinetrie/session"
-import { hashOfPage } from "@pinetrie/web-core"
+import { hashOfPage, type Theme } from "@pinetrie/web-core"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
 import { Button } from "./button.tsx"
@@ -43,6 +43,7 @@ export function Footer({
   inventory,
   me,
   folded,
+  theme,
 }: {
   /** The document's status is "pending" (`useDocStatus`). */
   syncing: boolean
@@ -65,6 +66,8 @@ export function Footer({
    * avatar, and your inbox and inventory are in its menu.
    */
   folded: boolean
+  /** The theme you chose, and how a choice in the account menu is kept. */
+  theme: { readonly chosen: Theme; readonly onChoose: (theme: Theme) => void }
 }) {
   return (
     <footer id="bottom">
@@ -77,6 +80,7 @@ export function Footer({
           inventory={inventory}
           nameOf={nameOf}
           onIntent={onIntent}
+          theme={theme}
         />
         {!folded && (
           <div className="footer-tools">

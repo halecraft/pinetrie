@@ -12,13 +12,18 @@ import {
 } from "@pinetrie/interface"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import { connectSession } from "@pinetrie/session/connect"
-import { type Dock, dockCodec } from "@pinetrie/web-core"
+import {
+  type Dock,
+  dockCodec,
+  type Theme,
+  themeCodec,
+} from "@pinetrie/web-core"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App, type AppStores } from "./app.tsx"
 import { askIdentity } from "./identity-form.tsx"
 import { REVIEW_PREFS_KEY, reviewPrefsCodec } from "./review-prefs.ts"
-import { DOCK_KEY, IDENTITY_KEY, LIST_KEY } from "./storage-keys.ts"
+import { DOCK_KEY, IDENTITY_KEY, LIST_KEY, THEME_KEY } from "./storage-keys.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 
 const stores: AppStores = {
@@ -63,6 +68,13 @@ const stores: AppStores = {
     codec: listWidthCodec,
     tab: sessionStorage,
     device: localStorage,
+  }),
+  /** Light, dark or the system's: the device's. */
+  theme: deviceState<Theme>({
+    key: THEME_KEY,
+    codec: themeCodec,
+    device: localStorage,
+    events: window,
   }),
   /** How you read a review: wrapped, its file list folded. */
   review: deviceState({

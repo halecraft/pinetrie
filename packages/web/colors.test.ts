@@ -1,25 +1,51 @@
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { SLOTS } from "@pinetrie/interface"
 import { describe, expect, test } from "vitest"
 import { slotColor } from "./colors.ts"
-import { FIRST_COLORS } from "./presence.tsx"
 
 const html = readFileSync(new URL("./index.html", import.meta.url), "utf8")
 const seeds = Array.from({ length: SLOTS }, (_, i) => i)
 
-/** The colour the stylesheet names `--<name>`, as a six-digit hex; "" for none. */
-const named = (name: string): string =>
-  new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(html)?.[1] ?? ""
-const PALETTE = seeds.map(i => named(`slot-${i}`))
+type Scheme = "light" | "dark"
+const SCHEMES: readonly Scheme[] = ["light", "dark"]
 
-test("the stylesheet has a colour for every slot, and no more", () => {
-  expect(PALETTE).not.toContain("")
+/** A hex written short (`#fff`) or long, as six digits. */
+const long = (hex: string) =>
+  hex.length === 4 ? `#${[...hex.slice(1)].map(c => c + c).join("")}` : hex
+
+/**
+ * The colour the stylesheet names `--<name>` on a `scheme` page, as six-digit
+ * hex: its `light-dark()` value for that page, or its one value; "" for none.
+ */
+function named(name: string, scheme: Scheme): string {
+  const value = new RegExp(`--${name}: ([^;]+);`).exec(html)?.[1]?.trim() ?? ""
+  const pair = /^light-dark\((#[0-9a-f]+), (#[0-9a-f]+)\)$/.exec(value)
+  const hex = pair === null ? value : scheme === "light" ? pair[1] : pair[2]
+  return hex !== undefined && /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(hex)
+    ? long(hex)
+    : ""
+}
+const palette = (scheme: Scheme) => seeds.map(i => named(`slot-${i}`, scheme))
+
+test("the stylesheet has a colour for every slot on both pages, and no more", () => {
+  for (const scheme of SCHEMES) expect(palette(scheme)).not.toContain("")
   expect(html).not.toContain(`--slot-${SLOTS}:`)
 })
 
 test("a slot's colour is the stylesheet's for it", () => {
   expect(slotColor(3)).toBe("var(--slot-3)")
   expect(slotColor("pending")).toBe("var(--slot-pending)")
+})
+
+// A colour written in code would stay as it is on a page with other colours.
+test("the page's code writes no colour of its own, only the stylesheet's", () => {
+  const dir = new URL(".", import.meta.url)
+  const colour =
+    /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\((?![^)]*var\()/i
+  const written = readdirSync(dir)
+    .filter(f => /\.tsx?$/.test(f) && !f.endsWith(".test.ts"))
+    .filter(f => colour.test(readFileSync(new URL(f, dir), "utf8")))
+  expect(written).toEqual([])
 })
 
 test("a fresh branch is grey", () => {
@@ -59,15 +85,28 @@ const contrast = (a: string, b: string) => {
   return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05)
 }
 
-describe("the slot colours", () => {
-  const page = named("page")
+describe.each(SCHEMES)("on a %s page", scheme => {
+  const page = named("page", scheme)
+  const PALETTE = palette(scheme)
   /** People's first colours, the attention amber, the review's lines. */
   const reserved = [
-    ...FIRST_COLORS,
-    named("attention"),
-    named("ok-soft"),
-    named("danger-soft"),
-  ]
+    "person-1",
+    "person-2",
+    "person-3",
+    "attention",
+    "ok-soft",
+    "danger-soft",
+  ].map(n => named(n, scheme))
+
+  test("text reads on the page: faint at 4.5:1 or more, quiet at 3:1", () => {
+    expect(page).not.toBe("")
+    expect(contrast(named("text-faint", scheme), page)).toBeGreaterThanOrEqual(
+      4.5,
+    )
+    expect(contrast(named("text-quiet", scheme), page)).toBeGreaterThanOrEqual(
+      3,
+    )
+  })
 
   test.each(PALETTE)("%s is 4.5:1 or more on --page", color => {
     expect(page).not.toBe("")
@@ -88,7 +127,9 @@ describe("the slot colours", () => {
         expect(distance(color, r)).toBeGreaterThanOrEqual(0.08)
     },
   )
+})
 
+describe("the hover pairs", () => {
   test("index.html links a header and its fork dots on hover, for every slot", () => {
     for (const slot of [...seeds.map(String), "pending"]) {
       expect(html).toContain(

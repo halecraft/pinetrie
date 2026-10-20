@@ -4,34 +4,90 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>pine·trie</title>
+    <script>
+      // A theme chosen on this device, set before the first paint so the page
+      // never flashes the system's: `THEME_KEY` and `themeAttribute`
+      // (`storage-keys.ts`, web-core's `theme.ts`), which `App` keeps after.
+      try {
+        const theme = JSON.parse(localStorage.getItem("pinetrie-theme") ?? "null")
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      } catch {}
+    </script>
     <style>
-      /* The page's colours, by role. Only this rule holds a colour literal
-         (`stylesheet.test.ts`): a tint is a `color-mix()` of a hue and the
-         surface under it, so a second set of these would recolour the page.
-         Surfaces, darkest first; lines; text, brightest first. */
-      :root { color-scheme: dark;
-        --chrome: #0e1013; --sunk: #11141a; --page: #14161a; --panel: #181b20;
-        --raised: #1b1e24; --edge: #23272e;
-        --line: #2c313a; --line-strong: #3a3f48; --line-hover: #5a606b;
-        --text-bright: #fff; --text: #e6e6e6; --text-soft: #ddd; --text-dim: #c9d1d9;
-        --text-muted: #aab4c3; --text-faint: #8b93a1; --text-quiet: #6f7784;
+      /* The page's colours, by role, each light-dark(light, dark): the page
+         follows the system's scheme unless `data-theme` on the root names
+         one. Only this rule holds a colour literal (`stylesheet.test.ts`): a
+         tint is a `color-mix()` of a hue and the surface under it, so it
+         follows both. Surfaces, darkest first in dark; lines; text,
+         brightest first in dark. A light value keeps its dark value's
+         contrast on the page, and a hue its hue and chroma. */
+      :root { color-scheme: light dark;
+        --chrome: light-dark(#eceef1, #0e1013);
+        --sunk: light-dark(#f2f4f6, #11141a);
+        --page: light-dark(#fbfbfc, #14161a);
+        --panel: light-dark(#f4f5f7, #181b20);
+        --raised: light-dark(#ffffff, #1b1e24);
+        --edge: light-dark(#dde1e6, #23272e);
+        --line: light-dark(#d3d8de, #2c313a);
+        --line-strong: light-dark(#bcc2ca, #3a3f48);
+        --line-hover: light-dark(#8f96a1, #5a606b);
+        --text-bright: light-dark(#13161c, #fff);
+        --text: light-dark(#23272c, #e6e6e6);
+        --text-soft: light-dark(#2a2d33, #ddd);
+        --text-dim: light-dark(#30363d, #c9d1d9);
+        --text-muted: light-dark(#424a56, #aab4c3);
+        --text-faint: light-dark(#5b6370, #8b93a1);
+        --text-quiet: light-dark(#757d8a, #6f7784);
         /* What a hue means: blue is what you act on, the agent's own blue
            what it said, amber what needs you. */
-        --accent: #8ab4f8; --agent: #9ecbff; --queued: #58a6ff; --action: #2f6feb;
-        --attention: #e0c080; --caution: #d0a15f; --inventory: #e3b341;
-        --highlight: #f2c94c; --pinned: #b392f0; --command: #d2a8ff;
-        --danger: #f28b82; --danger-soft: #e89a9a; --ok: #7bd88f; --ok-soft: #a8d8a8;
-        /* The same on any page: text on a filled button, text on a bright
-           fill, and the shadow under what floats. */
-        --white: #fff; --ink: #111; --shadow: rgb(0 0 0 / .5);
-        /* A track's colour per palette slot (`palette.ts`): in hue order, at
-           OKLCH lightness 0.72 and chroma 0.14, each 4.5:1 or more on --page
-           and apart from its neighbours (`colors.test.ts`). A branch not yet
-           started is grey. */
-        --slot-0: #eb8656; --slot-1: #dc932e; --slot-2: #c0a320; --slot-3: #9ab140;
-        --slot-4: #67bb6b; --slot-5: #13c097; --slot-6: #03b4e9; --slot-7: #60a8fa;
-        --slot-8: #919afb; --slot-9: #b68dec; --slot-10: #d383d1; --slot-11: #e67dac;
-        --slot-pending: #777; }
+        --accent: light-dark(#456baa, #8ab4f8);
+        --agent: light-dark(#3a6392, #9ecbff);
+        --queued: light-dark(#2575ca, #58a6ff);
+        --attention: light-dark(#654a00, #e0c080);
+        --caution: light-dark(#966a26, #d0a15f);
+        --inventory: light-dark(#816000, #e3b341);
+        --highlight: light-dark(#765e00, #f2c94c);
+        --pinned: light-dark(#8463bd, #b392f0);
+        --command: light-dark(#7c53a3, #d2a8ff);
+        --danger: light-dark(#b75650, #f28b82);
+        --danger-soft: light-dark(#7d393c, #e89a9a);
+        --ok: light-dark(#037030, #7bd88f);
+        --ok-soft: light-dark(#2a552c, #a8d8a8);
+        /* The same on both pages: the action's fill and the white on it, an
+           image's checker, and a branch not yet started. */
+        --action: #2f6feb; --white: #fff; --checker: #eee; --slot-pending: #777;
+        /* The shadow under what floats, and the tile under a banner: drawn on
+           black for `lighten`, it needs a dark ground on a light page. */
+        --shadow: light-dark(rgb(0 0 0 / .18), rgb(0 0 0 / .5));
+        --banner-ground: light-dark(#14161a, transparent);
+        /* People's colours (`presence.tsx`), apart from the tracks so a ring
+           or an avatar never reads as one: the first three people's, far
+           apart and lighter or more saturated than any track, and the tone
+           whose saturation and lightness a later person's hue, from their id,
+           is drawn at. */
+        --person-1: light-dark(#fe5dd9, #ff4fd8);
+        --person-2: light-dark(#1f2328, #ffffff);
+        --person-3: light-dark(#b59d02, #ffe030);
+        --person-tone: light-dark(hsl(0 50% 38%), hsl(0 45% 62%));
+        /* A track's colour per palette slot (`palette.ts`), in hue order: in
+           dark at OKLCH lightness 0.72 and chroma 0.14, in light between 4.5
+           and 6:1 on the page. Each is 4.5:1 or more on --page and apart from
+           the others and from the colours that already mean something
+           (`colors.test.ts`). */
+        --slot-0: light-dark(#b84b01, #eb8656);
+        --slot-1: light-dark(#8d5801, #dc932e);
+        --slot-2: light-dark(#897203, #c0a320);
+        --slot-3: light-dark(#5d6d04, #9ab140);
+        --slot-4: light-dark(#037f20, #67bb6b);
+        --slot-5: light-dark(#077f63, #13c097);
+        --slot-6: light-dark(#057295, #03b4e9);
+        --slot-7: light-dark(#0471cf, #60a8fa);
+        --slot-8: light-dark(#5d5be2, #919afb);
+        --slot-9: light-dark(#8947ce, #b68dec);
+        --slot-10: light-dark(#a733a8, #d383d1);
+        --slot-11: light-dark(#c52d7f, #e67dac); }
+      :root[data-theme="light"] { color-scheme: light; }
+      :root[data-theme="dark"] { color-scheme: dark; }
       /* The scales every size is drawn from. A size left literal is held to
          another number: a gutter a button sits in, a circle's initial. */
       :root {
@@ -72,6 +128,15 @@
       :where(button[data-look="outline"]) { border: 1px solid var(--line-strong);
         background: none; color: inherit; }
       :where(button[data-look="plain"]) { background: none; color: inherit; }
+      /* Text on a fill (`--fill`) is ink on a light fill and white on a dark
+         one: switched at OKLCH lightness 0.56, near where the two contrasts
+         cross, so each page's fills read without a colour of their own.
+         `infinity` makes the switch a step: any finite factor leaves a grey
+         for a fill at the threshold. Under `:where`, so a rule that must win
+         over another colour names `var(--on-fill)` itself. */
+      :where(.initial, .inbox-badge, .menu-badge, .match-text mark, .card-frame .primary,
+        .access-approve) { --on-fill: oklch(from var(--fill) clamp(0.178, (0.56 - l) * infinity, 1) 0 0);
+        color: var(--on-fill); }
       .actions button, .tools button { color: var(--text-muted);
         padding: var(--space-1) var(--space-5); border-radius: var(--radius-sm); }
       /* The sidebar down the left, the stage beside it, and the footer under
@@ -200,6 +265,8 @@
          ground is transparent, and lighten would take out its dark outline. */
       .open-sprite { object-fit: contain; }
       .open-sprite[data-kind="banner"] { mix-blend-mode: lighten; }
+      .open-icon:has(> .open-sprite[data-kind="banner"]) { border-radius: var(--radius-lg);
+        background: var(--banner-ground); }
       .open-initials { display: flex; align-items: center; justify-content: center; color: var(--page);
         font-size: var(--font-2xs); font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .02em; }
       .open-root.archived .open-initials { opacity: .45; }
@@ -321,6 +388,10 @@
       .thread-mark .thread-icon { position: absolute; inset: 0; width: 100%; height: 100%;
         object-fit: contain; pointer-events: none; }
       .thread-mark .thread-icon[data-kind="banner"] { mix-blend-mode: lighten; }
+      /* On a light page the black is lighter than nothing under it, so a
+         banner sits on a dark ground there (--banner-ground; none in dark). */
+      .thread-mark:has(> .thread-icon[data-kind="banner"]) { border-radius: var(--radius-lg);
+        background: var(--banner-ground); }
       .thread-mark .thread-icon[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
       .thread-mark .thread-icon[data-fade][data-loaded] { opacity: 1; }
       /* A named thread's name opens and closes its details (ADR-0073). Its
@@ -499,7 +570,7 @@
          the browser suite counts. */
       .initial { position: relative; display: inline-block; width: 16px; height: 16px;
         overflow: hidden; border-radius: 50%; font-size: 10px; line-height: 16px;
-        text-align: center; color: var(--ink); font-weight: 600; }
+        text-align: center; background: var(--fill); font-weight: 600; }
       /* A person's picture (ADR-0098), over their initial, which shows while
          it loads. */
       .initial img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -539,7 +610,8 @@
          them, the amber of a needs-you signal, approve filled as the action. */
       .work.access[data-state="waiting"] { margin-top: var(--space-2); padding: var(--space-3) var(--space-5);
         border-left: 2px solid var(--attention); background: color-mix(in srgb, var(--attention) 13%, var(--page)); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-      .work.access[data-state="waiting"] .access-approve { background: color-mix(in srgb, var(--ok) 52%, var(--page)); color: var(--white); }
+      .work.access[data-state="waiting"] .access-approve { --fill: color-mix(in srgb, var(--ok) 52%, var(--page));
+        background: var(--fill); color: var(--on-fill); }
       .work.access[data-state="refused"] .access-line { color: var(--text-faint); }
       .work .access-note { font-size: var(--font-sm); color: var(--attention); }
       .work .access-approve { border-color: color-mix(in srgb, var(--ok) 52%, var(--page)); color: var(--ok-soft); }
@@ -611,7 +683,7 @@
       .review-media-side { margin: 0; min-width: 0; }
       .review-media-side figcaption { font-size: var(--font-sm); color: var(--text-faint); margin-bottom: var(--space-3); }
       .review-media-side img { max-width: 100%; max-height: 24rem; display: block;
-        background: repeating-conic-gradient(color-mix(in srgb, var(--white) 93%, var(--ink)) 0 25%, var(--white) 0 50%) 0 0 / 16px 16px; }
+        background: repeating-conic-gradient(var(--checker) 0 25%, var(--white) 0 50%) 0 0 / 16px 16px; }
       .review-media-missing { color: var(--text-faint); font-style: italic; }
       .review-diff { margin: 0; padding: var(--space-4) 0; overflow-x: auto; white-space: pre;
         font-family: ui-monospace, monospace; font-size: var(--font-sm); line-height: var(--diff-line); }
@@ -1038,7 +1110,7 @@
       .card-share { display: flex; align-items: center; gap: var(--space-4); }
       .card-share .share-file { padding: var(--space-1) var(--space-5); font-size: var(--font-xs); }
       .share-status { color: var(--text-faint); font-size: var(--font-xs); }
-      .card-frame .primary { background: var(--tone); border-color: var(--tone); color: var(--ink); }
+      .card-frame .primary { --fill: var(--tone); background: var(--fill); border-color: var(--tone); }
       .card-frame .primary:disabled { opacity: .5; }
       .read-only { display: flex; gap: var(--space-6); align-items: center; justify-content: flex-end;
         margin-top: var(--space-5); font-size: var(--font-md); color: var(--text-muted); }
@@ -1463,7 +1535,7 @@
          Beside its icon; folded, on your avatar's corner (ADR-0098), ringed in
          what it sits on so it reads as apart from the circle. */
       .inbox-badge { min-width: 1rem; height: 1rem; padding: 0 var(--space-3); line-height: 1rem;
-        border-radius: var(--radius-pill); background: var(--attention); color: var(--ink); font-size: var(--font-xs);
+        border-radius: var(--radius-pill); --fill: var(--attention); background: var(--fill); font-size: var(--font-xs);
         font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
       .inbox-trigger:has(.inbox-badge) { color: var(--text-soft); }
       .me-trigger .inbox-badge { position: absolute; top: -4px; right: -6px;
@@ -1539,7 +1611,7 @@
       .account-inbox, .account-inventory { display: flex; align-items: center; gap: var(--space-6); }
       .menu-badge, .menu-count { margin-left: auto; padding: 0 var(--space-4); border-radius: var(--radius-pill);
         font-size: var(--font-xs); font-weight: 600; }
-      .menu-badge { background: var(--attention); color: var(--ink); }
+      .menu-badge { --fill: var(--attention); background: var(--fill); }
       .menu-count { color: var(--text-faint); font-weight: 400; }
 
       /* A page over the stage (ADR-0098): in the stage's cell, after
@@ -1648,7 +1720,7 @@
       .match-who { color: var(--text-soft); font-weight: 600; }
       .match-ask { font-size: var(--font-sm); color: var(--text-faint); }
       .match-text { font-size: var(--font-lg); line-height: 1.4; overflow-wrap: anywhere; }
-      .match-text mark { padding: 0 1px; border-radius: var(--radius-xs); background: var(--highlight); color: var(--ink); }
+      .match-text mark { padding: 0 1px; border-radius: var(--radius-xs); --fill: var(--highlight); background: var(--fill); }
       .match-gap { padding: var(--space-2) 0; color: var(--text-quiet); font-size: var(--font-sm); text-align: center; }
       .match-none { margin: var(--space-3) 0; color: var(--text-quiet); }
       .match-count { color: var(--highlight); font-size: var(--font-sm); white-space: nowrap; }

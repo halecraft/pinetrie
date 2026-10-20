@@ -14,19 +14,19 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { displayName, stringHash } from "@pinetrie/interface"
-import { useContext, useState } from "react"
+import { type CSSProperties, useContext, useState } from "react"
 import { Pictures } from "./pictures-context.ts"
 
 /**
- * The first people's colours: magenta, white and yellow, far apart, and lighter
- * or more saturated than any track. A ring also has a dark gap between it and
- * the dot (`Rail`), so it reads against a track of any colour.
+ * The first people's colours, the stylesheet's `--person-1` to `--person-3`.
+ * A ring also has a gap in the page's colour between it and the dot (`Rail`),
+ * so it reads against a track of any colour.
  */
-export const FIRST_COLORS = ["#ff4fd8", "#ffffff", "#ffe030"]
+const FIRST_COLORS = [1, 2, 3].map(n => `var(--person-${n})`)
 
-/** A colour from a writer's id, at a saturation the tracks don't use. */
+/** A colour from a writer's id: its hue, at the saturation and lightness of the stylesheet's `--person-tone`. */
 const hashed = (writer: WriterId): string =>
-  `hsl(${stringHash(writer) % 360} 45% 62%)`
+  `hsl(from var(--person-tone) ${stringHash(writer) % 360} s l)`
 
 /**
  * Writers in the order they joined: by their first message in the session
@@ -90,7 +90,7 @@ export function Initial({
     <span
       className={`initial ${className}`}
       data-writer={writer}
-      style={{ background: colorOf(writer) }}
+      style={{ "--fill": colorOf(writer) } as CSSProperties}
     >
       {nameFor(nameOf, writer).slice(0, 1).toUpperCase()}
       {picture !== undefined && picture !== failed && (

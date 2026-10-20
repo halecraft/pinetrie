@@ -3,6 +3,9 @@
 - **Status:** Proposed
 - **Area:** `packages/web/TECHNICAL.md`
 - **Evidence:** S277, S278
+- **Amended by:**
+  - ADR-0196: each named colour holds a light value and a dark one, and the
+    fixed ink gives way to text a fill picks for itself.
 
 **Context.**
 
@@ -25,13 +28,18 @@
    - neutrals as two ramps (surfaces darkest first, then lines and text);
    - a hue per meaning (`--accent`, `--agent`, `--attention`, `--danger` …);
    - `--white`, `--ink` and `--shadow`, which are the same on any page;
-   - the track colours as `--slot-0` … `--slot-11` and `--slot-pending`.
+   - the track colours as `--slot-0` … `--slot-11` and `--slot-pending`;
+   - people's colours as `--person-1` to `--person-3`, with
+     `--person-saturation` and `--person-lightness` for a later person's
+     hue from their id.
 
    That is 33 names, plus the slots. A near-duplicate takes the name of
    its role. A tint is `color-mix()` of its hue and the surface under it,
    never a literal of its own. `stylesheet.test.ts` holds this.
-2. **Code names the stylesheet's colours.** `slotColor` returns
-   `var(--slot-N)`, and the rail draws its gaps in `var(--page)`.
+2. **Code names the stylesheet's colours, and writes none of its own.**
+   `slotColor` returns `var(--slot-N)`, `presenceColors` returns
+   `var(--person-N)` or an `hsl()` of a hue and the person variables, and the
+   rail draws its gaps in `var(--page)`. `colors.test.ts` holds this.
 3. **Sizes come from scales:** eight font sizes, six radii and twelve
    spacing steps. A value stays literal only where another number holds
    it, and a value tied to a padding is a `calc()` of the same step.

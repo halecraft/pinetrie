@@ -184,6 +184,8 @@ import {
   spotFor,
   spotScrollTop,
   spotStore,
+  type Theme,
+  themeAttribute,
   viewportStore,
 } from "@pinetrie/web-core"
 import {
@@ -245,6 +247,8 @@ export interface AppStores {
   readonly dock: DeviceState<Dock>
   /** How you read a review, on this device. */
   readonly review: DeviceState<ReviewPrefs>
+  /** Light, dark or the system's, on this device. */
+  readonly theme: DeviceState<Theme>
   /** The sidebar full or folded to icons, chosen in this tab. */
   readonly list: TabState<ListWidth>
 }
@@ -1429,6 +1433,21 @@ export function App({
   useEffect(() => {
     document.documentElement.dataset.list = listWidth
   }, [listWidth])
+  // Light, dark or the system's. `index.html` set the root's attribute from
+  // the stored choice before the first paint; this keeps it as you choose.
+  const [theme, setTheme] = useState<Theme>(
+    () => stores.theme.load() ?? "system",
+  )
+  useEffect(
+    () => stores.theme.subscribe(t => setTheme(t ?? "system")),
+    [stores],
+  )
+  useEffect(() => {
+    const attribute = themeAttribute(theme)
+    if (attribute === null) delete document.documentElement.dataset.theme
+    else document.documentElement.dataset.theme = attribute
+  }, [theme])
+  const chooseTheme = useStable((t: Theme) => setTheme(stores.theme.save(t)))
   const [reviewPrefs, setReviewPrefs] = useState<ReviewPrefs>(
     () => stores.review.load() ?? NO_PREFS,
   )
@@ -1935,6 +1954,7 @@ export function App({
           )}
           <Footer
             syncing={status === "pending"}
+            theme={{ chosen: theme, onChoose: chooseTheme }}
             strip={
               <BoardStrip
                 count={count}

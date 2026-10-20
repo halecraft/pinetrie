@@ -13,10 +13,14 @@ const named = /:root \{ color-scheme: [^}]*\}/.exec(css)?.[0] ?? ""
 /**
  * A colour written as a value: a hex, a colour function, or a colour's
  * name. `transparent`, `currentColor` and `inherit` are no colour of their
- * own, and neither `white-space` nor `var(--white)` writes one.
+ * own, neither `white-space` nor `var(--white)` writes one, and a relative
+ * colour (`oklch(from var(--fill) …)`) is built from a named one.
  */
 const COLOUR =
-  /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|(?<![\w-])(?:white|black|red|green|blue|gr[ae]y|silver|yellow|orange|purple|pink)(?![\w-])/gi
+  /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\((?!\s*from\s+var\()|(?<![\w-])(?:white|black|red|green|blue|gr[ae]y|silver|yellow|orange|purple|pink)(?![\w-])/gi
+
+/** The named colours that are the same on a light page and a dark one. */
+const ON_BOTH = ["--action", "--white", "--checker", "--slot-pending"]
 
 /** Variables the page's code sets inline, which no rule defines. */
 const SET_INLINE = ["--ratio"]
@@ -24,6 +28,19 @@ const SET_INLINE = ["--ratio"]
 test("only the rule that names the colours writes one", () => {
   expect(named).toContain("--page:")
   expect(css.replace(named, "").match(COLOUR) ?? []).toEqual([])
+})
+
+test("every named colour has a light value and a dark one, unless it is the same on both", () => {
+  const single = [...named.matchAll(/(--[\w-]+):\s*([^;]+);/g)]
+    .filter(
+      ([, , value]) =>
+        value !== undefined && new RegExp(COLOUR.source, "i").test(value),
+    )
+    .filter(([, , value]) => !value?.trimStart().startsWith("light-dark("))
+    .map(([, name]) => name)
+  expect(single.filter(n => n !== undefined && !ON_BOTH.includes(n))).toEqual(
+    [],
+  )
 })
 
 test("every variable a rule reads without a fallback is defined", () => {

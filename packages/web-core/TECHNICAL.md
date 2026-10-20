@@ -144,3 +144,8 @@ this host (the page's origin) and names the text pasted, `\r\n` taken as
   out; the page uploads (`image-upload.ts`).
 - **A component's memory of the screen** (`screen-memory.ts`): what it
   knew when it unmounted, kept for the page's life.
+- **The theme** (`theme.ts`, ADR-0196): light, dark or the system's,
+  kept per device (`themeCodec`). The system's sets no `data-theme` on the
+  root (`themeAttribute`), so the stylesheet's `color-scheme: light dark`
+  follows the browser. Its words, and the account menu's heading over
+  them, are `themeWords` and `THEME_HEADING`.

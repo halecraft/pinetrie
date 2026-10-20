@@ -6,6 +6,17 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the theme ──
+  {
+    name: "a chosen theme never reaches the page's root",
+    file: "packages/web/app.tsx",
+    from: "    else document.documentElement.dataset.theme = attribute\n",
+    to: "    else delete document.documentElement.dataset.theme\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Dark in the account menu draws the page dark over a light system, and a reload keeps it",
+  },
   {
     name: "an archive's teardown stops at a lane it cannot remove",
     file: "apps/pinetrie/host/work/archive.ts",

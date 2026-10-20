@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/web-core"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the system's theme forces dark",
+    file: "packages/web-core/theme.ts",
+    from: '  theme === "system" ? null : theme',
+    to: '  theme === "system" ? "dark" : theme',
+    command: unit,
+    expect: "the system's theme sets no attribute, a chosen one names itself",
+  },
+  {
     name: "the web client's following reads the window",
     file: "packages/web-core/follow.ts",
     from: "const end = (m: Metrics) => Math.max(0, m.scrollHeight - m.clientHeight)",
