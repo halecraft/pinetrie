@@ -16,8 +16,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "raw drops the command under its intent",
     file: "packages/interface/tool-row.ts",
-    from: "    command: open ? summary.whole : byIntent ? [] : head.runs,\n",
-    to: "    command: open ? summary.whole : summary.intent !== undefined ? [] : head.runs,\n",
+    from: "    command: linesOf(open ? summary.whole : byIntent ? [] : head.runs).map(\n",
+    to: "    command: linesOf(open ? summary.whole : summary.intent !== undefined ? [] : head.runs).map(\n",
     command: unit,
     expect: "raw shows the command, its intent a caption under it",
   },
@@ -1310,8 +1310,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row's detail is its summary",
     file: "packages/interface/tool-row.ts",
-    from: "    command: open ? summary.whole : byIntent ? [] : head.runs,",
-    to: "    command: byIntent ? [] : head.runs,",
+    from: "    command: linesOf(open ? summary.whole : byIntent ? [] : head.runs).map(",
+    to: "    command: linesOf(byIntent ? [] : head.runs).map(",
     command: unit,
     expect: "the detail both whole",
   },
@@ -1326,11 +1326,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a shell command is not laid out",
     file: "packages/interface/tool-row.ts",
-    from: "    return [...(laidOut ?? spans)]",
-    to: "    return [...spans]",
+    from: "    const shown = laidOut ?? source",
+    to: "    const shown = source",
     command: unit,
     expect:
       "a long chain is tagged ran, highlighted, and laid out a step a line",
+  },
+  {
+    name: "a row sets no line of its command apart",
+    file: "packages/interface/tool-row.ts",
+    from: "      (runs, i) => ({ runs, startsStatement: summary.starts.includes(i) }),",
+    to: "      (runs, _i) => ({ runs, startsStatement: false }),",
+    command: unit,
+    expect: "a line beginning a top-level statement is set apart",
   },
   {
     name: "the longest backtick run, found by spreading every run",

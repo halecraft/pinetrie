@@ -4,8 +4,57 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/shell"]
 const layout = "packages/shell/layout.ts"
 const spans = "packages/shell/spans.ts"
+const statements = "packages/shell/statements.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a statement sharing its line with the one before begins one",
+    file: statements,
+    from: '    if (before === undefined || lead.trim() !== "") return',
+    to: "    if (before === undefined) return",
+    command: unit,
+    expect: "statements sharing a line begin none between them",
+  },
+  {
+    name: "a statement's comment lines are left above its gap",
+    file: statements,
+    from: "    while (line - 1 > after && isComment(lines[line - 1])) line--\n",
+    to: "",
+    command: unit,
+    expect: "the comment lines above a statement begin it",
+  },
+  {
+    name: "the walk up passes the statement before's end",
+    file: statements,
+    from: "    while (line - 1 > after && isComment(lines[line - 1])) line--",
+    to: "    while (line - 1 > 0 && isComment(lines[line - 1])) line--",
+    command: unit,
+    expect: "a line of the statement before, though it looks like a comment",
+  },
+  {
+    name: "the walk up passes any line",
+    file: statements,
+    from: "    while (line - 1 > after && isComment(lines[line - 1])) line--",
+    to: "    while (line - 1 > after) line--",
+    command: unit,
+    expect: "a heredoc's body is its statement's",
+  },
+  {
+    name: "a statement after a blank line begins one too",
+    file: statements,
+    from: '    if ((lines[line - 1] ?? "").trim() === "") return\n',
+    to: "",
+    command: unit,
+    expect: "a statement after a blank line begins none",
+  },
+  {
+    name: "a layout's starts are its source's",
+    file: "packages/shell/read.ts",
+    from: "      layout === undefined ? undefined : shellText(layout.text, layout.parsed),",
+    to: "      layout === undefined\n        ? undefined\n        : { ...shellText(layout.text, layout.parsed), starts: statementLines(source, parsed) },",
+    command: unit,
+    expect: "a laid-out command's starts are its layout's lines",
+  },
   {
     name: "every node fits its line",
     file: layout,

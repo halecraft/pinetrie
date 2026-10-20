@@ -387,7 +387,16 @@ function ToolRow({
       {view.head !== null && <div className="tool-intent">{view.head}</div>}
       {view.command.length > 0 && (
         <div className="tool-command">
-          <Runs runs={view.command} />
+          {view.command.map((line, i) => (
+            <div
+              className="tool-line"
+              data-starts={line.startsStatement || undefined}
+              // biome-ignore lint/suspicious/noArrayIndexKey: a call's lines are fixed for its view, and never reordered
+              key={i}
+            >
+              <Runs runs={line.runs} />
+            </div>
+          ))}
         </div>
       )}
       {view.caption !== null && (

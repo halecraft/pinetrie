@@ -98,6 +98,8 @@ export interface RowSummary {
   readonly tag: string | undefined
   /** All of what the call touched: a shell command highlighted, and laid out when it is one long line. */
   readonly whole: readonly Run[]
+  /** The lines of `whole`, from 0, that begin a shell command's top-level statement other than its first. */
+  readonly starts: readonly number[]
   /** What the call is for, in the model's words; absent for a call that says none. */
   readonly intent: string | undefined
 }
@@ -124,11 +126,21 @@ export const rowLead = (summary: RowSummary, density: Density): RowLead =>
  */
 const LAYOUT_WIDTH = 55
 
+/** A subject as its row reads it. */
+type Subject = Pick<RowSummary, "whole" | "starts">
+
+/** A text read as itself. */
+const plainSubject = (text: string): Subject => ({
+  whole: [{ text, role: "plain" }],
+  starts: [],
+})
+
 /** The tools whose subject reads other than as plain text, by id; any other reads plain. */
-const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Run[]>>> = {
+const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Subject>>> = {
   [BASH_TOOL]: subject => {
-    const { spans, laidOut } = readShell(subject, LAYOUT_WIDTH)
-    return [...(laidOut ?? spans)]
+    const { source, laidOut } = readShell(subject, LAYOUT_WIDTH)
+    const shown = laidOut ?? source
+    return { whole: shown.spans, starts: shown.starts }
   },
 }
 
@@ -137,12 +149,12 @@ export function rowSummary(call: ToolCall): RowSummary {
   const word = toolWord(call.name)
   const { intent } = call
   if (call.subject === undefined)
-    return { tag: undefined, whole: [{ text: word, role: "plain" }], intent }
+    return { tag: undefined, ...plainSubject(word), intent }
   const id = knownToolId(call.name)
   const view = id === undefined ? undefined : VIEWS[id]
   return {
     tag: word,
-    whole: view?.(call.subject) ?? [{ text: call.subject, role: "plain" }],
+    ...(view ?? plainSubject)(call.subject),
     intent,
   }
 }
@@ -253,14 +265,21 @@ export type RowBody =
       readonly thumb: boolean
     }
 
+/** A line of a command as its row draws it. */
+export interface CommandLine {
+  readonly runs: readonly Run[]
+  /** It begins a top-level statement other than the command's first: the row sets it apart. */
+  readonly startsStatement: boolean
+}
+
 /** Everything a row draws but its tag and status. */
 export interface RowView {
   /** The intent it leads with, beside its tag (`rowLead`); null when it leads with its command. */
   readonly head: string | null
   /** Its intent, as a caption under its command, when it leads with the command; null for none. */
   readonly caption: string | null
-  /** What the call touched: its first lines, all of it in the detail, none in a summary led by its intent. */
-  readonly command: readonly Run[]
+  /** What the call touched, by line: its first lines, all of it in the detail, none in a summary led by its intent. */
+  readonly command: readonly CommandLine[]
   readonly body: RowBody
   /** The toggle's words; undefined when the summary hides nothing. */
   readonly more: string | undefined
@@ -332,7 +351,9 @@ export function rowView(
   return {
     head: byIntent ? lead.intent : null,
     caption: byIntent ? null : (summary.intent ?? null),
-    command: open ? summary.whole : byIntent ? [] : head.runs,
+    command: linesOf(open ? summary.whole : byIntent ? [] : head.runs).map(
+      (runs, i) => ({ runs, startsStatement: summary.starts.includes(i) }),
+    ),
     body:
       body.kind === "images"
         ? { ...body, thumb: !open && tall }

@@ -542,8 +542,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command's lines run together",
     file: "packages/web/index.html",
-    from: "        white-space: pre-wrap; overflow-wrap: anywhere; }\n      /* A command's runs by role",
-    to: "        overflow-wrap: anywhere; }\n      /* A command's runs by role",
+    from: "      .tool-line { padding-left: 2ch; text-indent: -2ch; }",
+    to: "      .tool-line { display: inline; padding-left: 2ch; text-indent: -2ch; }",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -666,8 +666,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a long tool label runs out of its column",
     file: "packages/web/index.html",
-    from: "        white-space: pre-wrap; overflow-wrap: anywhere; }\n      /* A command's runs by role",
-    to: "        white-space: pre; }\n      /* A command's runs by role",
+    from: "        white-space: pre-wrap; overflow-wrap: anywhere; }\n      .tool-line",
+    to: "        white-space: pre; }\n      .tool-line",
     suite: "browser",
     scenario: "tools",
     expect:

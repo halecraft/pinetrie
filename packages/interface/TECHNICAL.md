@@ -1106,6 +1106,11 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   result arrives (ADR-0123). Led by its command, a call with an intent shows
   it as a caption under the command (`RowView.caption`), so the command's
   first line keeps its place beside the tag.
+- **`rowView` gives a command by line** (`CommandLine`), each line saying
+  whether it begins a top-level statement other than the first
+  (`startsStatement`), from `RowSummary.starts`, which `@pinetrie/shell`
+  reads for a shell command and is empty for any other. The summary's
+  lines are the command's first, so a line keeps its index cut or whole.
 - **`callPurpose` says what a call is for in one line:** its intent, else
   `callLabel`'s cut words. Outline's live line and a turn's revision title
   use it; a message's copy keeps `callLabel`, since pasting wants the

@@ -818,9 +818,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     `.tool-images`, a result's images in its text's place.
   - `.tool-more`, the toggle, a `<button>` with `aria-expanded`.
 
-  The command is drawn in runs (`Runs`), a `<span class="sh-<role>">` each,
-  and a plain run as bare text: a command's names, options, strings,
-  variables, redirects, keywords and operators are coloured apart.
+  The command is drawn a line at a time, a `div.tool-line` each (`rowView`
+  gives `CommandLine`s), and each line in runs (`Runs`), a
+  `<span class="sh-<role>">` each, and a plain run as bare text: a
+  command's names, options, strings, variables, redirects, keywords and
+  operators are coloured apart.
+- **A line that begins a top-level statement is set apart**
+  (`CommandLine.startsStatement`, `data-starts`, `@pinetrie/shell`'s
+  `statementLines`): a margin above it, not a blank line, so it costs none
+  of the summary's 5 lines. A line too long for the row wraps with its
+  rest hanging 2ch in, so the rest never reads as a statement of its own;
+  an empty line keeps its height (`.tool-line:empty`).
 - **A row is its summary or its detail** (`RowMemory.open`, `data-open`).
   The summary shows the command's first 5 lines and the output's last 5
   (`headLines`, `tailLines`), as written: the command is cut after its

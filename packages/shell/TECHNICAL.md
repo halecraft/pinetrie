@@ -2,7 +2,8 @@
 
 Shell source as structure (ADR-0114, S138): a command's text in runs by role
 (command, option, string, variable, operator, redirect, keyword, comment,
-plain), and a one-line command laid out to a width. It knows nothing of
+plain), a one-line command laid out to a width, and the lines its
+top-level statements begin on. It knows nothing of
 tool calls: `@pinetrie/interface` decides which call reads as shell, and
 `@pinetrie/web` colours the roles. It declares only `unbash`, and only
 interface declares it (`workspace.test.ts`). No DOM and no Node:
@@ -12,8 +13,9 @@ only the globals `pure-globals.d.ts` declares.
 ## `readShell(source, width)`
 
 One entry point, so a caller parses once and never knows how a layout is
-checked. It returns the source's runs and, when the source is laid out, the
-layout's runs, from the parse the layout's check already made.
+checked. It returns the source as a `ShellText` (its runs, and the lines its
+statements begin on) and, when the source is laid out, the layout as one,
+from the parse the layout's check already made.
 
 - **Runs join to their text.** Every character of the source is in exactly
   one run (`spans.test.ts` checks a corpus). A source that does not parse is
@@ -31,6 +33,23 @@ layout's runs, from the parse the layout's check already made.
   was laid out by the agent, and a heredoc needs its lines as written. In a
   one-line command, a comment can only be the last thing on the line, so the
   layout keeps it after the last statement.
+
+## Where statements begin (`statements.ts`)
+
+A reader tells a call's commands apart by its top-level statements, so
+`statementLines` names the lines that begin one, past the first, in the
+source or the layout alike; `@pinetrie/web` sets them apart.
+
+- **Only a statement that starts its line begins one.** `a; b` stays one
+  line's worth; a chain's later parts are the same statement.
+- **The comment lines directly above a statement are its own**, so the gap
+  goes above them. The walk up stops at the statement before's last line,
+  which can start with `#` inside a string; a heredoc's body, past that
+  line, ends in its terminator, which no walk passes.
+- **A statement after a blank line begins none:** the agent already set it
+  apart.
+- **It never changes the text**, only names its lines: a command with lines
+  of its own is still shown as written.
 
 ## Roles (`spans.ts`)
 

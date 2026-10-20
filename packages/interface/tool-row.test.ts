@@ -7,6 +7,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  type CommandLine,
   callMark,
   callStatus,
   headLines,
@@ -26,6 +27,8 @@ import {
 
 const text = (runs: readonly Run[] | undefined) =>
   runs?.map(r => r.text).join("")
+const lineText = (lines: readonly CommandLine[]) =>
+  lines.map(l => text(l.runs)).join("\n")
 const plain = (t: string): Run[] => [{ text: t, role: "plain" }]
 const numbered = (n: number) =>
   Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n")
@@ -177,14 +180,14 @@ describe("rowView", () => {
     const summary = rowSummary(call(numbered(9)))
     const output = numbered(300)
     const closed = rowView(summary, COMMAND, output, TEXT, false)
-    expect(text(closed.command)).toBe(numbered(5))
+    expect(lineText(closed.command)).toBe(numbered(5))
     expect(closed.body).toEqual({
       kind: "text",
       text: "line 296\nline 297\nline 298\nline 299\nline 300",
     })
     expect(closed.more).toBe("+4 lines · +295 lines of output")
     const open = rowView(summary, COMMAND, output, TEXT, true)
-    expect(text(open.command)).toBe(numbered(9))
+    expect(lineText(open.command)).toBe(numbered(9))
     expect(open.body).toEqual({ kind: "text", text: output })
     expect(open.more).toBe("less")
   })
@@ -197,9 +200,31 @@ describe("rowView", () => {
       TEXT,
       false,
     )
-    expect(text(view.command)).toBe("echo hi")
+    expect(lineText(view.command)).toBe("echo hi")
     expect(view.body).toEqual({ kind: "text", text: "hi" })
     expect(view.more).toBeUndefined()
+  })
+
+  test("a line beginning a top-level statement is set apart, in the summary and the detail", () => {
+    const command = [
+      "cd /tmp/copy &&",
+      "  jj log -r x |",
+      "    head -2",
+      "ls packages",
+      "pnpm test > /tmp/log 2>&1",
+      'rg -n "FAIL" /tmp/log',
+    ].join("\n")
+    const summary = rowSummary(call(command))
+    const apart = (open: boolean) =>
+      rowView(summary, COMMAND, "", TEXT, open)
+        .command.filter(l => l.startsStatement)
+        .map(l => text(l.runs))
+    expect(apart(false)).toEqual(["ls packages", "pnpm test > /tmp/log 2>&1"])
+    expect(apart(true)).toEqual([
+      "ls packages",
+      "pnpm test > /tmp/log 2>&1",
+      'rg -n "FAIL" /tmp/log',
+    ])
   })
 
   test("a tall image is a thumbnail in the summary, with full size; a short one is drawn whole, with no toggle", () => {
@@ -249,6 +274,7 @@ describe("rowSummary", () => {
     expect(rowSummary(call("read", "a.ts"))).toEqual({
       tag: "read",
       whole: [{ text: "a.ts", role: "plain" }],
+      starts: [],
     })
   })
 
@@ -256,6 +282,7 @@ describe("rowSummary", () => {
     expect(rowSummary(call("split_proposed_changes"))).toEqual({
       tag: undefined,
       whole: [{ text: "split", role: "plain" }],
+      starts: [],
     })
     expect(rowSummary(call("mystery", "x")).tag).toBe("mystery")
   })
@@ -316,7 +343,7 @@ describe("rowLead", () => {
     const view = rowView(summary, COMMAND, "ok\n", TEXT, false)
     expect(view.head).toBeNull()
     expect(view.caption).toBe("Run the tests")
-    expect(text(view.command)).toBe("npx vitest run")
+    expect(lineText(view.command)).toBe("npx vitest run")
   })
   test("a call with no intent reads as before", () => {
     const summary = rowSummary(call("echo hi"))
@@ -337,7 +364,7 @@ describe("rowLead", () => {
       "command · +295 lines of output",
     )
     const open = rowView(summary, lead, "ok\n", TEXT, true)
-    expect(text(open.command)).toBe("npx vitest run")
+    expect(lineText(open.command)).toBe("npx vitest run")
     expect(open.more).toBe("less")
   })
 })

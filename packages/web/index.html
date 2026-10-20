@@ -740,9 +740,16 @@
       .tool-tag { font-size: var(--font-xs); line-height: 1.6; text-transform: uppercase;
         letter-spacing: .1em; color: var(--text-quiet); }
       /* Not a scroll container: a long line wraps, or it runs out of the column.
-         Its lines are as `rowView` cut them, so pre-wrap keeps them. */
+         Its lines are as `rowView` cut them, a block each, so pre-wrap keeps
+         their indents. A wrapped line's rest hangs 2ch in, so it never reads
+         as a line of its own; a blank line keeps its height. */
       .tool-command { font-family: ui-monospace, monospace; color: var(--text-muted);
         white-space: pre-wrap; overflow-wrap: anywhere; }
+      .tool-line { padding-left: 2ch; text-indent: -2ch; }
+      .tool-line:empty::before { content: " "; }
+      /* A line that begins a top-level statement, past the first: a gap, not
+         a blank line, so it costs none of the summary's lines. */
+      .tool-line[data-starts] { margin-top: var(--space-6); }
       /* A command's runs by role (`rowSummary`, @pinetrie/shell). */
       .sh-command { color: var(--agent); }
       .sh-option, .sh-redirect { color: var(--text-faint); }
