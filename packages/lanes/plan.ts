@@ -197,10 +197,14 @@ export const slotMounts = (input: {
  * that is, or holds, your home directory, `/` or one of pine·trie's own
  * directories (`own`: credentials, service keys, sessions) is refused. A
  * root inside one of those, such as a skill folder in pine·trie's config,
- * is not: it lies inside, and does not hold it.
+ * is not: it lies inside, and does not hold it. A root inside the project
+ * (`project`) is left out, neither mounted nor refused: each lane has its
+ * own copy of the project.
  */
 export function planHostMounts(input: {
   readonly roots: readonly string[]
+  /** The project's folder; null for none. */
+  readonly project: string | null
   readonly home: string
   readonly own: readonly string[]
 }): {
@@ -212,7 +216,11 @@ export function planHostMounts(input: {
 } {
   const refused: { path: string; reason: string }[] = []
   const allowed: string[] = []
-  for (const root of new Set(input.roots.map(r => path.resolve(r)))) {
+  const { project } = input
+  const outside = input.roots
+    .map(r => path.resolve(r))
+    .filter(r => project === null || !isWithin(r, project))
+  for (const root of new Set(outside)) {
     const reason =
       root === "/"
         ? "it is the file system's root"
@@ -1063,6 +1071,61 @@ export async function decideLaneStart(
         }
         break
     }
+  }
+}
+
+/** A lane's start decided whole (`decideContainerStart`): a disk's or a snapshot's with the steps it runs. */
+export type ContainerStart =
+  | Exclude<LaneStart, { readonly kind: "gather" | "disk" | "snapshot" }>
+  | (Extract<LaneStart, { readonly kind: "disk" }> & {
+      readonly steps: readonly Step[]
+    })
+  | (Extract<LaneStart, { readonly kind: "snapshot" }> & {
+      readonly steps: readonly Step[]
+    })
+
+/**
+ * A lane's start, decided whole: its container's plan, from the container
+ * as it is and the spec hash its shape wants (`planContainer`), then the
+ * start, each fact read as it asks (`decideLaneStart`); a start that makes
+ * the container carries the steps that make it: on its disk (`planStart`),
+ * or on one restored from a snapshot (`planDisk`).
+ */
+export async function decideContainerStart(
+  input: {
+    readonly spec: LaneSpec<LaneOwner>
+    readonly env: Readonly<Record<string, string | undefined>>
+    readonly runtime: Pick<LaneRuntime, "runSpec">
+    readonly facts: {
+      readonly state: "running" | "stopped" | "missing"
+      readonly label: string | null
+    }
+    readonly fork: "owed" | "begun"
+  },
+  read: LaneFactReader,
+): Promise<{
+  readonly container: ContainerPlan
+  readonly start: ContainerStart
+}> {
+  const { spec, env } = input
+  const container = planContainer({
+    facts: input.facts,
+    want: shapeSpecHash(input.runtime, planShape(spec, env)),
+  })
+  const decided = await decideLaneStart({ fork: input.fork, container }, read)
+  switch (decided.kind) {
+    case "disk":
+      return { container, start: { ...decided, steps: [planStart(spec, env)] } }
+    case "snapshot":
+      return {
+        container,
+        start: {
+          ...decided,
+          steps: planDisk({ spec, env, from: decided.from }),
+        },
+      }
+    default:
+      return { container, start: decided }
   }
 }
 

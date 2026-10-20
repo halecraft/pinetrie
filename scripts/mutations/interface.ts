@@ -5,6 +5,42 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a refused command's answer ──
+  {
+    name: "a taken thread is answered as an unknown target",
+    file: "packages/interface/answer-words.ts",
+    from: '        code: ERR.THREAD_TAKEN,\n        message: "that thread has started already",\n',
+    to: '        code: ERR.UNKNOWN_TARGET,\n        message: "that thread has started already",\n',
+    command: unit,
+    expect:
+      "a card command's refusals each say what was refused, an unknown target and a taken thread apart",
+  },
+  {
+    name: "a gate's refusal names the archiver by their address",
+    file: "packages/interface/answer-words.ts",
+    from: "    displayName(writer, names.get(writer))",
+    to: "    displayName(writer, undefined)",
+    command: unit,
+    expect:
+      "gateRefusal: an archive names its archiver, a hold and a trash say what to do",
+  },
+  {
+    name: "a reverted catch-up is worded as conflicts you have",
+    file: "packages/interface/answer-words.ts",
+    from: '  if (code !== ERR.WORKING_COPY_CONFLICT)\n    return acceptedRefusal("publish", code, after)\n',
+    to: '  return acceptedRefusal("publish", code, after)\n',
+    command: unit,
+    expect: "publishUndone",
+  },
+  {
+    name: "an archived refusal names nobody",
+    file: "packages/interface/answer-words.ts",
+    from: "nameOf(refusal.canvas.by)",
+    to: "String(refusal.canvas.by)",
+    command: unit,
+    expect:
+      "gateRefusal: an archive names its archiver, a hold and a trash say what to do",
+  },
   {
     name: "story leads with the command though its call has an intent",
     file: "packages/interface/tool-row.ts",

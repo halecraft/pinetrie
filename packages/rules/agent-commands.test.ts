@@ -3,26 +3,22 @@ import {
   commitId,
   type JjProposedChangesRecord,
   pointFromCommit,
-  rootIdFor,
   type ThreadName,
   textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { getLatestAnswer, planGetLatestCall } from "./agent-commands.ts"
 import {
   encodeUpdate,
-  type Floor,
-  getLatestAnswer,
   getLatestRefusal,
   type ParentNow,
-  planGetLatestCall,
-  planResolution,
   planSplitCall,
-  resolutionFloor,
   resolveAnswer,
   splitRefusal,
 } from "./index.ts"
+import { type Floor, planResolution, resolutionFloor } from "./land.ts"
 import { removalsText } from "./removals.ts"
 
 /** A resolution's floor with room to spare. */
@@ -174,7 +170,6 @@ test("resolveAnswer: a path closed, or why not, each worded", () => {
 })
 
 describe("planSplitCall", () => {
-  const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const open = {
     kind: "open",
     record: {} as JjProposedChangesRecord,

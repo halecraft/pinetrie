@@ -1,33 +1,10 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import {
-  type FolderStamp,
-  type PointId,
-  pointId,
-  type ReadInAnswer,
-  type StateRecord,
-} from "@pinetrie/core"
+import type { PointId, ReadInAnswer, StateRecord } from "@pinetrie/core"
 import { createQueue } from "@pinetrie/lanes"
 import { afterEach, describe, expect, test } from "vitest"
 import { createFolderLine } from "./line.ts"
-
-const _file = (size: number, ctimeNs = "1"): FolderStamp => ({
-  kind: "file",
-  size,
-  ctimeNs,
-  exec: false,
-})
-const _stamps = (entries: Record<string, FolderStamp>) =>
-  new Map(Object.entries(entries))
-const _read = (id: string, ...parents: PointId[]): StateRecord => ({
-  id: pointId(id),
-  parents,
-  made: { kind: "read" },
-  at: 1,
-  by: null,
-})
-const _NEXT = pointId("line-next")
 
 describe("createFolderLine", () => {
   let dir = ""

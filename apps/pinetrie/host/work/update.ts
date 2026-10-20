@@ -6,22 +6,14 @@
 // fires what the merge's adapter does after it (`MergeDone.follow`).
 
 import {
-  type BaseMerge,
-  type CopyRefusal,
   type EntryId,
-  ERR,
-  entryOfMessage,
   errorText,
-  firstLine,
   type GetLatestCommand,
   indexTree,
-  messageText,
-  messageToolCalls,
   type OwnLane,
   type PointId,
   snapshotId,
   type ThreadId,
-  type TreeIndex,
   turnEntry,
   type WriterId,
 } from "@pinetrie/core"
@@ -30,9 +22,7 @@ import {
   executeOrThrow,
   type Follow,
   type LaneHistory,
-  type Merged,
   planSnapshot,
-  type TouchedRevision,
 } from "@pinetrie/lanes"
 import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
 import {
@@ -45,31 +35,23 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  encodeUpdate,
-  type Floor,
-  getLatestAnswer,
   getLatestRefusal,
   type LandMessage,
-  type LandSkill,
-  latestNow,
-  latestSourceName,
-  latestWords,
-  mergedFrom,
+  type LatestInRunDone,
   type ParentNow,
-  type PromptBudget,
   parentNow,
   planConflictAsk,
-  planGetLatestCall,
+  planGetLatest,
+  planLatestInRun,
+  planLatestInRunAnswer,
   planParentUpdate,
-  planResolution,
+  planSettle,
   planUpdateFrom,
-  refusedAnswer,
-  removalsText,
-  resolutionFloor,
-  type StaleRemoval,
+  type Resolution,
+  type Settle,
+  type SettleFacts,
   type ToolAnswer,
-  type UpdateMessage,
-  type UpdateRefusal,
+  updateRefusal,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import { failed, type LeaseBasics, notWritten } from "../basics.ts"
@@ -81,73 +63,6 @@ import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
-/** Why an update was refused, worded once. */
-function updateRefusal(code: UpdateRefusal): string {
-  switch (code) {
-    case ERR.NOT_SET_UP:
-      return "set up accepted work first"
-    case ERR.BASE_GONE:
-      return "this thread's unfinished work is gone: continue it on accepted work"
-    case ERR.NO_PARENT:
-      return "this thread did not branch from another thread's copy"
-    case ERR.PARENT_RUNNING:
-      return "the thread this one branched from is working: get its latest when its run ends"
-  }
-}
-
-/**
- * Why a catch-up was refused before it merged: the smallest resolution prompt
- * for it would not fit what a run keeps when pi compacts.
- */
-function unfittableWords(tokens: number, budget: number): string {
-  return `a resolution's prompt would need ${tokens} tokens, over the ${budget} a run keeps: shorten the card's text or the resolve-conflicts skill`
-}
-
-/**
- * What a catch-up may do once its base is known: merge, with the floor its
- * resolution's prompt will fit, or refuse with the lane untouched, when even
- * the smallest prompt would not fit. Decided before the merge, since a merge
- * left without a prompt is one no later catch-up merges again.
- */
-export function planGetLatest(
-  from: BaseMerge,
-  resolution: {
-    readonly budget: PromptBudget
-    readonly skill: LandSkill | null
-    readonly intent: string
-  },
-):
-  | { readonly kind: "refused"; readonly reason: string }
-  | {
-      readonly kind: "merge"
-      readonly from: BaseMerge
-      readonly floor: Floor
-    } {
-  const found = resolutionFloor({
-    ...resolution,
-    latest: latestWords(mergedFrom(from)),
-  })
-  if (found.kind === "too-large")
-    return {
-      kind: "refused",
-      reason: unfittableWords(found.tokens, found.budget),
-    }
-  return { kind: "merge", from, floor: found.floor }
-}
-
-/**
- * Why one side changed a file: the message a revision's trailer names,
- * attributed, else the description's first line.
- */
-export function changeReason(index: TreeIndex, description: string): string {
-  const entry = entryOfMessage(description)
-  const message = entry === null ? undefined : index.entries[entry]?.message
-  if (message === undefined) return firstLine(description, 200)
-  const who =
-    message.role === "person" ? `${message.author ?? "someone"}: ` : "agent: "
-  return `${who}${firstLine(messageText(message), 400)}`
-}
-
 /**
  * What popping an update's card comes to: the update written in the thread, a
  * resolution run's prompt, nothing new, or why not.
@@ -158,7 +73,7 @@ export type Prepared =
   | { readonly kind: "nothing" }
   | { readonly kind: "refused"; readonly reason: string }
 
-const refused = (reason: string): Prepared => ({ kind: "refused", reason })
+const refused = (reason: string) => ({ kind: "refused", reason }) as const
 
 /**
  * What follows an update: a run whatever it comes to, as after a quiet catch-up
@@ -183,104 +98,6 @@ export async function withLaneStarted(
   })().catch((error: unknown) => refused(errorText(error)))
   if (follows === "send" && prepared.kind !== "conflicted") ports.runEnded()
   return prepared
-}
-
-/**
- * What a merge found, with what a resolution's prompt needs when it
- * conflicted, and what getting the latest removed from the disk after it.
- */
-type SettleFacts = (
-  | Exclude<Merged, { readonly kind: "conflicted" | "refused" }>
-  | (Extract<Merged, { readonly kind: "conflicted" }> & {
-      /** What the prompt must fit, settled before the merge (`planGetLatest`). */
-      readonly floor: Floor
-    })
-) & { readonly removed: readonly StaleRemoval[] }
-
-/** What the thread gets after a merge. */
-export type Settle =
-  | {
-      readonly kind: "clean"
-      readonly message: UpdateMessage
-      readonly merge: PointId
-    }
-  | { readonly kind: "nothing" }
-  | { readonly kind: "conflicted"; readonly message: LandMessage }
-
-const touching = (revisions: readonly TouchedRevision[], path: string) =>
-  revisions.filter(r => r.paths.includes(path)).map(r => r.description)
-
-/**
- * What a merge comes to. Clean: the update, written in the thread. Nothing:
- * nothing for the thread. Conflicted: the resolution's prompt, within the
- * floor's budget, each file with why each side changed it, and the card's
- * text after. Both messages say what was removed from the disk after the
- * merge. What the merge's adapter does after it is its own
- * (`MergeDone.follow`).
- */
-export function planSettle(
-  facts: SettleFacts,
-  ctx: {
-    readonly lane: ThreadId
-    readonly by: WriterId
-    readonly from: BaseMerge
-    readonly index: TreeIndex
-    readonly now: number
-  },
-): Settle {
-  const { lane, by, from } = ctx
-  const upToDate = mergedFrom(from)
-  const removals = removalsText(facts.removed)
-  switch (facts.kind) {
-    case "nothing":
-      return { kind: "nothing" }
-    case "clean":
-      return {
-        kind: "clean",
-        message: encodeUpdate(
-          {
-            lane,
-            from: upToDate,
-            merged: facts.from,
-            files: facts.files,
-            commits: facts.commits,
-            by,
-          },
-          ctx.now,
-          removals,
-        ),
-        merge: facts.merge,
-      }
-    case "conflicted":
-      return {
-        kind: "conflicted",
-        message: planResolution({
-          floor: facts.floor,
-          files: facts.contents.map(({ path, content }) => ({
-            path,
-            content,
-            ours: {
-              label: "ours",
-              who: "this thread",
-              reasons: touching(facts.ours, path).map(d =>
-                changeReason(ctx.index, d),
-              ),
-            },
-            theirs: {
-              label: "theirs",
-              who:
-                upToDate.kind === "parent"
-                  ? `the thread ${latestSourceName(upToDate)}`
-                  : latestSourceName(upToDate),
-              reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
-            },
-          })),
-          removals,
-          details: { lane, merged: [facts.from], by },
-          timestamp: ctx.now,
-        }),
-      }
-  }
 }
 
 /**
@@ -447,7 +264,7 @@ export function createUpdates(deps: {
   const updateOnQueue = (
     lane: ThreadId,
     command: GetLatestCommand,
-    resolution: Parameters<typeof planGetLatest>[1],
+    resolution: Resolution,
   ) =>
     registry.withHistory(
       lane,
@@ -456,18 +273,10 @@ export function createUpdates(deps: {
         handle,
         record,
       ): Promise<
-        | Prepared
-        | {
-            readonly kind: "merged"
-            readonly from: BaseMerge
-            readonly facts: SettleFacts
+        | Exclude<LatestInRunDone, { readonly kind: "merged" }>
+        | (Extract<LatestInRunDone, { readonly kind: "merged" }> & {
             readonly follow: Follow
-          }
-        | {
-            /** The copy cannot take a merge: each caller words it its own way. */
-            readonly kind: "copy"
-            readonly why: CopyRefusal
-          }
+          })
       > => {
         const ready = await h.readyToMerge()
         if (typeof ready === "string") return { kind: "copy", why: ready }
@@ -520,9 +329,7 @@ export function createUpdates(deps: {
   }
 
   /** What a resolution's prompt must fit, read before a merge. */
-  const resolutionOf = async (
-    intent: string,
-  ): Promise<Parameters<typeof planGetLatest>[1]> => ({
+  const resolutionOf = async (intent: string): Promise<Resolution> => ({
     budget: LAND_BUDGET,
     skill: await deps.piSetup.skill("pinetrie:skill:resolve-conflicts"),
     intent,
@@ -540,53 +347,33 @@ export function createUpdates(deps: {
     async getLatestInRun(lane, from) {
       await using held = basics.leases.lane(lane)
       const doc = held === null ? null : await held.ready
-      // Who the update is by: the person behind the run.
-      const by = doc === null ? null : readRunAuthor(doc, docs.session, lane)
-      if (!registry.isOwn(lane) || doc === null || by === null)
-        return refusedAnswer("no-copy")
-      // gather
-      const index = readTreeIndex(doc)
-      const tip = readLaneTip(doc, lane)
-      const parent = from === "parent" ? await parentOf(lane) : null
-      // plan
-      const call = planGetLatestCall({
+      const call = planLatestInRun({
+        lane,
         from,
-        own: true,
-        calls:
-          tip === null
-            ? 0
-            : messageToolCalls(index.entries[turnEntry(index, tip)]?.message)
-                .length,
-        base: latestNow(
-          readBases(docs.session).get(lane),
-          readAccepted(docs.session),
-        ),
-        parent: parent?.now ?? null,
-        parentRunning: parent?.running ?? false,
+        own: registry.isOwn(lane),
+        index: doc === null ? null : readTreeIndex(doc),
+        tip: doc === null ? null : readLaneTip(doc, lane),
+        by: doc === null ? null : readRunAuthor(doc, docs.session, lane),
+        base: readBases(docs.session).get(lane),
+        accepted: readAccepted(docs.session),
+        ...(from === "parent"
+          ? await parentOf(lane).then(p => ({
+              parent: p.now,
+              parentRunning: p.running,
+            }))
+          : { parent: null, parentRunning: false }),
       })
-      if (call.kind === "refused") return refusedAnswer(call.why)
-      // execute
+      if (call.kind === "answer") return call.answer
       const done = await updateOnQueue(
         lane,
         call.command,
         await resolutionOf(""),
       )
-      if (done.kind === "copy") return refusedAnswer(done.why)
-      if (done.kind === "refused") return refusedAnswer({ reason: done.reason })
-      if (done.kind !== "merged") return getLatestAnswer({ kind: "nothing" })
-      const settle = planSettle(done.facts, {
-        lane,
-        by,
-        from: done.from,
-        index: readTreeIndex(doc),
+      if (done.kind === "merged") done.follow?.()
+      return planLatestInRunAnswer(call, done, {
+        index: doc === null ? indexTree({}) : readTreeIndex(doc),
         now: basics.now(),
       })
-      done.follow?.()
-      return getLatestAnswer(
-        settle.kind === "clean"
-          ? { kind: "clean", message: settle.message, merged: settle.merge }
-          : settle,
-      )
     },
 
     async prepareUpdate(handle, by, intent, command, follows) {

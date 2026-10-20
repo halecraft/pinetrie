@@ -9,14 +9,13 @@ export {
   type AcceptedActionState,
   type AcceptedRecord,
   acceptedActionState,
-  acceptedRefusal,
   type FolderAcceptedRecord,
   nothingToPublish,
+  type PublishTicket,
   type PublishWork,
   planAcceptedAction,
   planAcceptedRecord,
   planPublishFinish,
-  publishUndone,
   publishWork,
 } from "./accepted.ts"
 export {
@@ -39,9 +38,7 @@ export {
 } from "./access.ts"
 export {
   type GetLatestRefusal,
-  getLatestAnswer,
   getLatestRefusal,
-  planGetLatestCall,
   planSplitCall,
   refusedAnswer,
   resolveAnswer,
@@ -103,6 +100,7 @@ export {
   planParentUpdate,
   planUpdateFrom,
   type UpdateRefusal,
+  updateRefusal,
 } from "./base.ts"
 export {
   type BaseNews,
@@ -312,6 +310,7 @@ export {
   byteWords,
   count,
   countOrNone,
+  namesAndMore,
   noteCountWords,
   plural,
   shortId,
@@ -344,8 +343,6 @@ export {
   writesToClass,
 } from "./disk.ts"
 export {
-  acceptedFact,
-  actionFact,
   decodeFact,
   decodeQueuedFact,
   encodeFact,
@@ -380,18 +377,26 @@ export {
 export {
   type Cleared,
   type GateFacts,
+  type GateRefusal,
   type GateRoot,
-  gateRefusal,
   planGate,
 } from "./gate.ts"
+export {
+  type LatestInRunDone,
+  planGetLatest,
+  planLatestInRun,
+  planLatestInRunAnswer,
+  planSettle,
+  type Resolution,
+  type Settle,
+  type SettleFacts,
+} from "./get-latest.ts"
 export {
   foreignIn,
   foreignLaneWords,
   foreignRefusal,
-  HELD_WORDS,
   type RunAt,
   type ThreadHolding,
-  TRASHED_WORDS,
   takenIn,
   threadCardHolding,
 } from "./held.ts"
@@ -399,19 +404,14 @@ export { planReorder } from "./in-place.ts"
 export {
   type ConflictShown,
   decodeLand,
-  type Floor,
   type FloorFound,
   LAND_TYPE,
   type LandMessage,
-  type LandSkill,
   type PromptBudget,
-  planResolution,
-  resolutionFloor,
 } from "./land.ts"
 export {
   baseMovedOn,
   latestSourceName,
-  latestWords,
   mergedFrom,
 } from "./latest-from.ts"
 export {
@@ -534,11 +534,8 @@ export {
   isAsShown,
   isNotYetAccepted,
   PROPOSED_CHANGES,
-  planAcceptance,
-  planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planRebuild,
   planRefresh,
   planStackEnded,
   planWorkingCopyEdits,
@@ -546,6 +543,7 @@ export {
   proposedChangesSeen,
   proposedChangesStatus,
 } from "./proposed.ts"
+export { type ProposedAct, planProposedAct } from "./proposed-act.ts"
 export {
   type ImageAskPlan,
   type PutImageAsk,
@@ -797,8 +795,11 @@ export {
   PROJECT,
   PROJECT_KEY,
   type ProjectRecord,
+  planForkEnd,
+  planForkRedo,
   planLaneRecords,
-  planTurnRecord,
+  planTurn,
+  planTurnRevision,
   REVISION,
   sourceHistory,
 } from "./work.ts"

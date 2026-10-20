@@ -747,7 +747,9 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   19). `laneRefSteps` (`@pinetrie/jj`) is the one writer of the ref besides
   the fetch: archiving deletes it, restoring writes it back. In the lane's
   own repo the bookmark stays a local `pinetrie/<lane>`; `laneTipIn`
-  (`@pinetrie/jj`) reads the one in yours, `readLaneBookmark` the lane's.
+  (`@pinetrie/jj`) reads the one in yours, `readLaneBookmark` the lane's;
+  a fetch reads the bookmark it bundles, the lane's or its split's stack
+  (`readFetchBookmark`).
 - **Every fetch into a colocated repo ends with
   `jj --ignore-working-copy git import`**, in your repo as the host
   (`planImport`). A jj command run with

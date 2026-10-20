@@ -1,9 +1,8 @@
-// host/jj/proposed/marks — which lanes' proposed changes a move the owner
-// observed refreshes, pure. It stays in the host: it picks from the document's
-// names and records.
+// marks — which lanes' proposed changes a move the owner observed refreshes,
+// from the names and records the host reads of the session.
 
 import type { ThreadId, ThreadName } from "@pinetrie/core"
-import type { Moved } from "@pinetrie/jj"
+import type { Moved } from "./observe.ts"
 
 /**
  * What a move the owner observed marks for a refresh: accepted work's record,

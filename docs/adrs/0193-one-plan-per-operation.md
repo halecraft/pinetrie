@@ -4,6 +4,9 @@
 - **Area:** `docs/01-architecture.md`, `packages/rules/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`
 - **Evidence:** S279
+- **Amended by:**
+  - ADR-0199: a refusal's words are not the shell's; the plan returns its
+    reason, and the owner of its reader words it.
 
 **Context.** pine·trie's shell gathers, plans and executes, command by
 command, but S279 found it often strings several pure functions together

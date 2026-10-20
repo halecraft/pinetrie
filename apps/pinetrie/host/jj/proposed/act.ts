@@ -20,14 +20,7 @@ import {
   type RepoOps,
 } from "@pinetrie/jj"
 import { readThreadName } from "@pinetrie/reads"
-import {
-  acceptedFact,
-  actionFact,
-  planAcceptance,
-  planDescribeAgain,
-  planRebuild,
-  shortId,
-} from "@pinetrie/rules"
+import { planProposedAct, shortId } from "@pinetrie/rules"
 import type { Describe } from "../../describe.ts"
 import { describe } from "./describe.ts"
 import { executeProposedChanges } from "./execute.ts"
@@ -60,77 +53,64 @@ export async function act(
 
   /**
    * The command, whether its proposed changes are described after it (forced,
-   * or if wanted), and its fact: null when it was refused.
+   * or if wanted), and its fact: null when it was refused. Gathered for its
+   * action, planned once (`planProposedAct`), carried out.
    */
   async function carry(ops: RepoOps): Promise<{
     readonly code: ErrCode | null
     readonly describe: boolean | null
     readonly fact: ProposedChangesFact | null
   }> {
-    const code = (c: ErrCode) => ({ code: c, describe: null, fact: null })
     // gather
     const gathered = await gatherProposedChanges(ops, docs.input(lane))
-    if (action === "describe") {
-      const refused = planDescribeAgain(gathered)
-      return refused === null
-        ? {
-            code: null,
-            describe: true,
-            fact: actionFact("describe", lane, by),
-          }
-        : code(refused)
-    }
-    if (action === "accept") {
-      const acceptance =
-        gathered === null
-          ? null
-          : await gatherAcceptance(ops, gathered, repoConfig)
-      const { editing } = await ops.shared()
-      // plan
-      const planned = planAcceptance({
-        lane,
-        gathered,
-        seen,
-        acceptance,
-        editing,
-        acceptedBookmark: repoConfig.acceptedBookmark,
-        to,
-        now: basics.now(),
-      })
-      if (planned.kind === "refused") return code(planned.code)
-      // execute: the lane's base record first, as the acceptance found it.
-      await executeProposedChanges(
-        refresh.ports(ops, lane, planned.name),
-        {
-          base: gathered?.base ?? null,
-          effects: acceptanceEffects(planned),
-        },
-        null,
-      )
-      basics.log(
-        `[host] ${readThreadName(basics.session, lane)}: proposed changes accepted by ${by} as ${shortId(planned.top)}`,
-      )
-      return {
-        code: null,
-        describe: null,
-        fact: acceptedFact({
-          lane,
-          by,
-          decision: planned,
-          acceptedBookmark: repoConfig.acceptedBookmark,
-        }),
-      }
-    }
-    // squash and refresh: the proposed changes rebuilt from the lane's tip, as
-    // one.
-    const name = gathered?.name
+    const base = { lane, by, gathered }
+    const rebuilds = action === "squash" || action === "refresh"
     const message =
-      name === undefined
+      !rebuilds || gathered?.name === undefined
         ? { entry: "", unfinished: "" }
-        : await docs.messageFacts(lane, name)
-    const planned = planRebuild(gathered, message.unfinished)
-    if (planned.kind === "refused") return code(planned.why)
-    await refresh.rebuild(ops, lane, planned, message.entry)
-    return { code: null, describe: false, fact: actionFact(action, lane, by) }
+        : await docs.messageFacts(lane, gathered.name)
+    // plan
+    const planned =
+      action === "accept"
+        ? planProposedAct({
+            ...base,
+            action,
+            seen,
+            acceptance:
+              gathered === null
+                ? null
+                : await gatherAcceptance(ops, gathered, repoConfig),
+            editing: (await ops.shared()).editing,
+            acceptedBookmark: repoConfig.acceptedBookmark,
+            to,
+            now: basics.now(),
+          })
+        : action === "describe"
+          ? planProposedAct({ ...base, action })
+          : planProposedAct({ ...base, action, unfinished: message.unfinished })
+    // execute
+    switch (planned.kind) {
+      case "refused":
+        return { code: planned.code, describe: null, fact: null }
+      case "describe":
+        return { code: null, describe: true, fact: planned.fact }
+      case "accept":
+        // The lane's base record first, as the acceptance found it.
+        await executeProposedChanges(
+          refresh.ports(ops, lane, planned.decision.name),
+          {
+            base: gathered?.base ?? null,
+            effects: acceptanceEffects(planned.decision),
+          },
+          null,
+        )
+        basics.log(
+          `[host] ${readThreadName(basics.session, lane)}: proposed changes accepted by ${by} as ${shortId(planned.decision.top)}`,
+        )
+        return { code: null, describe: null, fact: planned.fact }
+      case "rebuild":
+        await refresh.rebuild(ops, lane, planned.rebuild, message.entry)
+        return { code: null, describe: false, fact: planned.fact }
+    }
   }
 }

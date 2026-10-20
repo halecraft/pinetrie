@@ -2,6 +2,7 @@
 // cleared by the one gate (`planGate`) before it is carried out.
 
 import type { Gated, RootId } from "@pinetrie/core"
+import { gateRefusal } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
@@ -16,7 +17,6 @@ import {
   type Cleared,
   type GateFacts,
   type GateRoot,
-  gateRefusal,
   planGate,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"

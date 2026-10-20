@@ -39,10 +39,10 @@ import {
   type ForkBegin,
   foreignLaneWords,
   forkSource,
-  LANE_FORK,
   type LaneForkRecord,
+  planForkEnd,
+  planForkRedo,
   planLaneRecords,
-  setRecord,
   sourceHistory,
 } from "@pinetrie/rules"
 import type { Basics, LeaseBasics } from "../basics.ts"
@@ -163,24 +163,16 @@ export async function prepareLane(
 }
 
 /**
- * The one write that ends a fork: its history's start, then its record
- * begun. It takes what only a fork's steps (`Forked`) and its history
- * (`StartRecords`) make, so no record says begun for a fork that did not run.
+ * A fork's end written (`planForkEnd`): it takes a `Forked`, which only
+ * `executeFork` makes, so no record says begun for a fork whose steps did not
+ * run.
  */
 export const forkEnd = (input: {
   readonly fork: LaneForkRecord
   readonly lost: SnapshotId | null
   readonly forked: Forked
   readonly start: StartRecords
-}): ValueWrite<"session">[] => [
-  ...input.start.writes,
-  setRecord(LANE_FORK, {
-    lane: input.fork.lane,
-    base: input.fork.base,
-    state: "begun",
-    lost: input.lost,
-  }),
-]
+}): readonly ValueWrite<"session">[] => planForkEnd(input)
 
 /**
  * Where a lane's fork begins in its root: its thread's fork entry, else the
@@ -261,11 +253,9 @@ export function createNewLanes(deps: {
         setup: forkSetup,
         innerDockerDataRoot: dataRoot,
       })
-      // execute: a fork run again is owed until its end, like the first
-      if (fork.state === "begun")
-        await deps.records.writeValues([
-          setRecord(LANE_FORK, { lane, base: fork.base, state: "owed" }),
-        ])
+      // execute
+      const redo = planForkRedo(fork)
+      if (redo.length > 0) await deps.records.writeValues(redo)
       if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
         await setup.baseAtAccepted()
       const forked = await executeFork(steps, handle.runners)

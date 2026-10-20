@@ -9,12 +9,12 @@ import {
   type AcceptedActionState,
   type AcceptedRecord,
   acceptedActionState,
-  acceptedRefusal,
   nothingToPublish,
   type PublishWork,
   publishWork,
 } from "@pinetrie/rules"
 import type { AcceptedActing } from "@pinetrie/session"
+import { acceptedRefusal } from "./answer-words.ts"
 import { count } from "./counts.ts"
 import { actingSaid } from "./outcome-words.ts"
 import type { PageName } from "./page.ts"

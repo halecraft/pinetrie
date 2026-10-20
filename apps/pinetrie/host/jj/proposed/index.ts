@@ -29,6 +29,7 @@ import {
   fileDiff,
   jjFileBytes,
   laneRefSteps,
+  planMarks,
   type RepoOwner,
   revisionRead,
   sideRev,
@@ -55,7 +56,6 @@ import type { AcceptedWork } from "../accepted.ts"
 import { recordedJjLane } from "../proven.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
-import { planMarks } from "./marks.ts"
 import { createRefresh } from "./refresh.ts"
 import { stackEnded, stackSpan } from "./stack.ts"
 import { createProposedChangesDeps } from "./state.ts"

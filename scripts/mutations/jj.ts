@@ -39,6 +39,76 @@ const proposedRefresh = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  // ── a lane's fetch ──
+  {
+    name: "a stack's fetch bundles the lane's bookmark",
+    file: "packages/jj/lane/revisions.ts",
+    from: "  const name = stack ? stackBookmark(lane) : bookmarkName(lane)\n",
+    to: "  const name = bookmarkName(lane)\n",
+    command: unit,
+    expect:
+      "a fetch bundles the lane's bookmark, or with a stack its split's, when the lane's repo has it",
+  },
+  // ── what a move the owner observed marks ──
+  {
+    name: "your @ moving marks every lane",
+    file: "packages/jj/marks.ts",
+    from: "  const every = moved.all\n",
+    to: "  const every = moved.all || moved.workingCopy\n",
+    command: unit,
+    expect: "your @ alone marks no lane",
+  },
+  {
+    name: "a move of main refreshes nothing",
+    file: "packages/jj/marks.ts",
+    from: "    accepted: every || moved.published,",
+    to: "    accepted: every,",
+    command: unit,
+    expect: "the publish bookmark marks accepted work's record, and no lane",
+  },
+  {
+    name: "your @ moving rewrites nothing",
+    file: "packages/jj/marks.ts",
+    from: "    shared: !every && moved.workingCopy,",
+    to: "    shared: false,",
+    command: unit,
+    expect: "your @ alone marks no lane",
+  },
+  {
+    name: "a moved proposed bookmark marks no lane",
+    file: "packages/jj/marks.ts",
+    from: "      const lane = byName.get(name)",
+    to: "      const lane = undefined",
+    command: unit,
+    expect: "proposed bookmark marks the lane its thread names",
+  },
+  {
+    name: "everything moving marks only the open records",
+    file: "packages/jj/marks.ts",
+    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
+    to: "",
+    command: unit,
+    expect:
+      "everything moved marks accepted work, every named lane not archived and every open record",
+  },
+  {
+    name: "everything moving marks archived lanes",
+    file: "packages/jj/marks.ts",
+    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
+    to: "          ...input.names.keys(),\n",
+    command: unit,
+    expect:
+      "everything moved marks accepted work, every named lane not archived and every open record",
+  },
+  {
+    name: "an archived lane's proposed bookmark marks nothing",
+    file: "packages/jj/marks.ts",
+    from: "      return lane === undefined ? [] : [lane]",
+    to: "      return lane === undefined || input.archived.has(lane) ? [] : [lane]",
+    command: unit,
+    expect:
+      "an archived lane is still marked by its ref, its proposed bookmark or an open record",
+  },
   {
     name: "planJjReviewContent reads every side whole",
     file: "packages/jj/review-content.ts",

@@ -24,7 +24,6 @@ import { conflictCause } from "./work-strip.ts"
 const LANE = threadIdFor("1")
 const TIP = commitId("t1")
 const T2 = commitId("t2")
-const _COPY = commitId("k1")
 
 const proposed: JjProposedChangesRecord = {
   kind: "jj",

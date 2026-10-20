@@ -1,11 +1,23 @@
 // What the types make impossible to write. Each `@ts-expect-error` fails
 // `pnpm run typecheck` if the line below it ever compiles.
 
-import { type CardId, type Send, threadIdFor, writerId } from "@pinetrie/core"
+import {
+  type CardId,
+  entryId,
+  indexTree,
+  type Send,
+  snapshotId,
+  type ThreadId,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
 import {
   type CardPlan,
   type PlaceStep,
+  planLatestInRunAnswer,
+  planPublishFinish,
   planSendMessage,
+  planTurnRevision,
   planUndoAnswer,
 } from "@pinetrie/rules"
 import { expect, test } from "vitest"
@@ -68,6 +80,52 @@ test("an undo's answer for a revert no plan let through does not compile", () =>
       [],
     )
   expect(answer).toBeTypeOf("function")
+})
+
+test("a publish's second round for a decision no first round made does not compile", () => {
+  const finish = (after: Parameters<typeof planPublishFinish>[0]["after"]) =>
+    planPublishFinish({
+      // @ts-expect-error: only `planAcceptedAction` makes the `PublishTicket` it takes
+      decision: {
+        kind: "publish",
+        acceptedBookmark: "a",
+        publish: "main",
+        getLatest: false,
+        accept: false,
+      },
+      after,
+      op: null,
+    })
+  expect(finish).toBeTypeOf("function")
+})
+
+test("a catch_up answer for a merge no call let through does not compile", () => {
+  const answer = (lane: ThreadId) =>
+    planLatestInRunAnswer(
+      // @ts-expect-error: only `planLatestInRun` makes the `LatestInRun` it takes
+      { kind: "merge", lane, command: "get-latest", by: writerId("a@x.io") },
+      { kind: "nothing" },
+      { index: indexTree({}), now: 0 },
+    )
+  expect(answer).toBeTypeOf("function")
+})
+
+test("a turn's revision for a turn no plan read does not compile", () => {
+  const revision = (lane: ThreadId) =>
+    planTurnRevision(
+      // @ts-expect-error: only `planTurn` makes the `TurnToCommit` it takes
+      {
+        kind: "commit",
+        entry: entryId("e"),
+        lane,
+        isPrompt: true,
+        toolCalls: false,
+        merged: false,
+        snapshot: snapshotId(entryId("e")),
+      },
+      { committed: null, newest: null, paths: [], conflicts: [] },
+    )
+  expect(revision).toBeTypeOf("function")
 })
 
 test("a send planned from a reach no plan made does not compile", () => {

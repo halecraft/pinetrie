@@ -76,7 +76,7 @@ test("forkFacts asks whether the snapshot above is still there, and not of the b
   expect(asked).toEqual(["s-1"])
 })
 
-test("forkEnd: the history's start records, then the fork begun, its lost carried, in one write", async () => {
+test("forkEnd: a fork's end, written only with the proof its steps ran", async () => {
   const lane = threadIdFor("1")
   const forked = await executeFork(
     { lane, steps: [] } as unknown as ForkSteps,

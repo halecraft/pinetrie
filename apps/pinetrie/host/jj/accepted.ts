@@ -8,10 +8,10 @@
 import type {
   AcceptedAction,
   JjAcceptedRecord,
-  PublishDecision,
   RepoConfig,
   ValueWrite,
 } from "@pinetrie/core"
+import { acceptedRefusal, publishUndone } from "@pinetrie/interface"
 import {
   planGetLatestUndo,
   planPublishGetLatest,
@@ -24,11 +24,10 @@ import {
 import { readAccepted } from "@pinetrie/reads"
 import {
   ACCEPTED,
-  acceptedRefusal,
+  type PublishTicket,
   planAcceptedAction,
   planAcceptedRecord,
   planPublishFinish,
-  publishUndone,
   setIfChanged,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
@@ -72,12 +71,13 @@ export function createAcceptedWork(deps: {
 
   /**
    * A publish in two rounds: the catch-up, then, from accepted work read again,
-   * the move or the catch-up reverted (`planPublishFinish`). A move jj refuses
-   * after a catch-up reverts it too, so nothing is left half done.
+   * the move or the catch-up reverted (`planPublishFinish`, which takes the
+   * ticket only `planAcceptedAction` makes). A move jj refuses after a
+   * catch-up reverts it too, so nothing is left half done.
    */
   async function publish(
     ops: RepoOps,
-    decision: PublishDecision,
+    decision: PublishTicket,
   ): Promise<AcceptedAnswer> {
     let op: string | null = null
     if (decision.getLatest) {

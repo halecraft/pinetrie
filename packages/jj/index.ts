@@ -9,6 +9,7 @@
 export { beginFacts, readUnfinishedState } from "./accepted.ts"
 export { readRepoFile } from "./file-at.ts"
 export * from "./lane/index.ts"
+export { planMarks } from "./marks.ts"
 export type { Moved } from "./observe.ts"
 export {
   type RepoOps,

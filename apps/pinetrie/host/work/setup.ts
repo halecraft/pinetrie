@@ -7,7 +7,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 import { type ConfigPlaces, ownDirs, type StartLayers } from "@pinetrie/config"
-import { errorText, isThreadId, isWithin } from "@pinetrie/core"
+import { errorText, isThreadId } from "@pinetrie/core"
 import type { Install } from "@pinetrie/install"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
@@ -312,11 +312,8 @@ async function laySetup(input: {
   )
 
   const hostMounts = planHostMounts({
-    // A project's own skills are in each lane's copy: never mounted from here.
-    roots: input.setup
-      .commands()
-      .map(c => c.root)
-      .filter(r => !isWithin(r, root)),
+    roots: input.setup.commands().map(c => c.root),
+    project: root,
     home: homedir(),
     own: ownDirs(input.places),
   })

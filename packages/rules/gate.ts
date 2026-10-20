@@ -9,33 +9,26 @@ import {
   type CanvasId,
   type CardRecord,
   type EntryId,
-  ERR,
   entryThread,
   type ForeignLane,
   type Gated,
   type LaneRecord,
   nearestRevision,
   type ProjectKind,
-  type Refusal,
   type RevisionRecord,
   type RootId,
-  refused,
   type ThreadId,
   type TreeIndex,
-  type WriterId,
 } from "@pinetrie/core"
 import { archivedIn, writesIn } from "./archive.ts"
 import type { CanvasIndex } from "./canvas-index.ts"
 import {
   foreignIn,
-  foreignRefusal,
   heldIn,
-  holdingWords,
   runsIn,
   runThreads,
   type ThreadHolding,
 } from "./held.ts"
-import { displayName } from "./participant.ts"
 
 declare const clearedBrand: unique symbol
 /**
@@ -63,7 +56,7 @@ export interface GateFacts {
 }
 
 /** The gate's refusals, before they are worded (`gateRefusal`). */
-type GateRefusal =
+export type GateRefusal =
   | { readonly kind: "archived"; readonly canvas: ArchivedCanvas }
   | {
       readonly kind: "held"
@@ -127,25 +120,4 @@ export function planGate<C extends Gated>(
   })
   if (foreign !== null) return { kind: "foreign", lane: foreign }
   return { kind: "cleared", command: command as Cleared<C> }
-}
-
-/** A gate's refusal, as the host answers it; `nameOf` names the archiver. */
-export function gateRefusal(
-  refusal: GateRefusal,
-  /** Each participant's display name as set; one unset is read from the writer. */
-  names: ReadonlyMap<WriterId, string>,
-): Refusal {
-  const nameOf = (writer: WriterId): string =>
-    displayName(writer, names.get(writer))
-  switch (refusal.kind) {
-    case "archived":
-      return refused(
-        ERR.CANVAS_ARCHIVED,
-        `archived by ${nameOf(refusal.canvas.by)}: restore the canvas first`,
-      )
-    case "held":
-      return refused(ERR.REFUSED, holdingWords(refusal.holding))
-    case "foreign":
-      return foreignRefusal(refusal.lane)
-  }
 }

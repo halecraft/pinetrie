@@ -9,9 +9,8 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { acceptedFact, actionFact } from "./fact.ts"
 import {
-  acceptedFact,
-  actionFact,
   decodeFact,
   decodeQueuedFact,
   encodeFact,

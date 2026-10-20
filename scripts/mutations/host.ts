@@ -102,15 +102,6 @@ export const mutations: readonly Mutation[] = [
   },
   // ── a lane's fork ──
   {
-    name: "a fork's end leaves out its history's start",
-    file: "apps/pinetrie/host/work/create.ts",
-    from: "  ...input.start.writes,\n",
-    to: "",
-    command: unit,
-    expect:
-      "forkEnd: the history's start records, then the fork begun, its lost carried, in one write",
-  },
-  {
     name: "withHistory queues a lane with no fork record",
     file: "apps/pinetrie/host/work/registry.ts",
     from: "      if (!readLaneForks(input.session).has(lane))",
@@ -459,15 +450,6 @@ export const mutations: readonly Mutation[] = [
     expect: "your commits conflicted by the catch-up: it is reverted",
   },
   // ── a resolution's prompt fits ──
-  {
-    name: "an unfittable catch-up is merged anyway",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: '  if (found.kind === "too-large")',
-    to: "  if (false)",
-    command: unit,
-    expect:
-      "refused, before the merge, when even the smallest prompt would not fit",
-  },
   // ── card history and traces ──
   {
     name: "traces seen delete someone else's trace",
@@ -1292,14 +1274,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a turn's title is its message's first line",
   },
   {
-    name: "a reason is never attributed",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: "  const entry = entryOfMessage(description)",
-    to: "  const entry: string | null = null",
-    command: unit,
-    expect: "a revision's reason is its message",
-  },
-  {
     name: "names are planned concurrently",
     file: "apps/pinetrie/host/names.ts",
     from: "    ensure: () =>\n      keeper.run(async () => {",
@@ -1627,22 +1601,6 @@ export const mutations: readonly Mutation[] = [
       "with a run to follow, the lane is never stopped, whatever the update comes to",
   },
   {
-    name: "a file's reasons are every revision on its side",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: "  revisions.filter(r => r.paths.includes(path)).map(r => r.description)",
-    to: "  revisions.map(r => r.description)",
-    command: unit,
-    expect: "each file's reasons are the revisions that touched it",
-  },
-  {
-    name: "the land message leaves out the card's text",
-    file: "packages/rules/land.ts",
-    from: "  const floor = { ...input, intent, content } as Floor",
-    to: '  const floor = { ...input, intent: "", content } as Floor',
-    command: unit,
-    expect: "the land message ends with the card's text",
-  },
-  {
     name: "a split starts its lane before reading its skill",
     file: "apps/pinetrie/host/jj/split.ts",
     from: '      const skill = await deps.piSetup.skill(\n        "pinetrie:skill:proposed-changes-stack",\n      )\n      // Last: nothing between the lane\'s start and its run can fail.\n      deps.beforeRun(lane)',
@@ -1713,14 +1671,6 @@ export const mutations: readonly Mutation[] = [
     expect: "rootsOpenedWords: how many roots a starting host opened",
   },
   {
-    name: "your @ moving marks every lane",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "  const every = moved.all\n",
-    to: "  const every = moved.all || moved.workingCopy\n",
-    command: unit,
-    expect: "your @ alone marks no lane",
-  },
-  {
     name: "a starting host leaves records no spec declares",
     file: "apps/pinetrie/host/startup.ts",
     from: "    await roots.records.writeValues(undeclared)\n",
@@ -1728,57 +1678,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "recover deletes the records of a type no spec declares, in the session and each root opened",
-  },
-  {
-    name: "a move of main refreshes nothing",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "    accepted: every || moved.published,",
-    to: "    accepted: every,",
-    command: unit,
-    expect: "the publish bookmark marks accepted work's record, and no lane",
-  },
-  {
-    name: "your @ moving rewrites nothing",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "    shared: !every && moved.workingCopy,",
-    to: "    shared: false,",
-    command: unit,
-    expect: "your @ alone marks no lane",
-  },
-  {
-    name: "a moved proposed bookmark marks no lane",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "      const lane = byName.get(name)",
-    to: "      const lane = undefined",
-    command: unit,
-    expect: "proposed bookmark marks the lane its thread names",
-  },
-  {
-    name: "everything moving marks only the open records",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
-    to: "",
-    command: unit,
-    expect:
-      "everything moved marks accepted work, every named lane not archived and every open record",
-  },
-  {
-    name: "everything moving marks archived lanes",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
-    to: "          ...input.names.keys(),\n",
-    command: unit,
-    expect:
-      "everything moved marks accepted work, every named lane not archived and every open record",
-  },
-  {
-    name: "an archived lane's proposed bookmark marks nothing",
-    file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "      return lane === undefined ? [] : [lane]",
-    to: "      return lane === undefined || input.archived.has(lane) ? [] : [lane]",
-    command: unit,
-    expect:
-      "an archived lane is still marked by its ref, its proposed bookmark or an open record",
   },
   {
     name: "the lane's base record is never written",
@@ -3425,15 +3324,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "read_card hands the model an image's stored bytes, its words beside them",
-  },
-  {
-    name: "a settle drops its removals",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: "  const removals = removalsText(facts.removed)\n",
-    to: "  const removals = removalsText([])\n",
-    command: unit,
-    expect:
-      "a settle's message names what getting the latest removed, clean or conflicted",
   },
   {
     name: "every document a candidate is compacted, due or not",

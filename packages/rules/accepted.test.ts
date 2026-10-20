@@ -17,9 +17,9 @@ import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   acceptedActionState,
-  acceptedRefusal,
   baseMovedOn,
   nothingToPublish,
+  type PublishTicket,
   parentNow,
   planAcceptedAction,
   planAcceptedRecord,
@@ -27,7 +27,6 @@ import {
   planParentUpdate,
   planPublishFinish,
   planUpdateFrom,
-  publishUndone,
   publishWork,
 } from "./index.ts"
 
@@ -227,41 +226,6 @@ describe("accepted work", () => {
       ])
         expect(nothingToPublish(publishWork(r))).toBe(code(r) === ERR.REFUSED)
     })
-    test("lineRefusal words each refusal once, naming the bookmark, the counts and the files", () => {
-      const r = at({ commit: main, behind: 3, ahead: 2 })
-      expect(acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, r)).toBe(
-        "main has 2 commits accepted work doesn't: bring them into accepted work in jj first",
-      )
-      expect(acceptedRefusal("publish", ERR.NO_PUBLISH, r)).toBe(
-        "this repo has no main bookmark to publish to",
-      )
-      expect(acceptedRefusal("publish", ERR.REFUSED, r)).toBe(
-        "nothing to publish",
-      )
-      expect(
-        acceptedRefusal(
-          "publish",
-          ERR.WORKING_COPY_CONFLICT,
-          at(unpublished, {
-            workingCopy: workingCopyFacts({
-              conflicts: { commits: 1, files: ["a", "b", "c", "d", "e"] },
-            }),
-          }),
-        ),
-      ).toBe("the working copy has conflicts in a, b, c and 2 more")
-      expect(
-        acceptedRefusal(
-          "publish",
-          ERR.WORKING_COPY_CONFLICT,
-          at(unpublished, {
-            workingCopy: workingCopyFacts({
-              behind: 1,
-              getLatest: { ...preview, conflicts: ["x.ts"] },
-            }),
-          }),
-        ),
-      ).toBe("bringing the working copy the latest would conflict in x.ts")
-    })
 
     describe("planPublishFinish: the second round, from accepted work read after the catch-up", () => {
       const decision = {
@@ -333,29 +297,15 @@ describe("accepted work", () => {
           },
         ],
       ] as const)("%s", (_, input, finish) => {
-        expect(planPublishFinish(input)).toEqual(finish)
+        // A test stands in for the first round's decision.
+        const ticket = input.decision as PublishTicket
+        expect(planPublishFinish({ ...input, decision: ticket })).toEqual(
+          finish,
+        )
       })
     })
   })
 
-  test("publishUndone: a reverted catch-up names the conflicts it would have left; main moving is worded as a refusal", () => {
-    const after = record({
-      commit: commitId("c1"),
-      published: { commit: commitId("m1"), behind: 1, ahead: 1 },
-      workingCopy: {
-        behind: 0,
-        ahead: 2,
-        getLatest: null,
-        conflicts: { commits: 2, files: [] },
-      },
-    })
-    expect(publishUndone(ERR.WORKING_COPY_CONFLICT, after)).toBe(
-      "bringing the working copy the latest would leave 2 commits of yours with conflicts",
-    )
-    expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(
-      acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, after),
-    )
-  })
   test("movedOnLine names the base as latestSourceName does", () => {
     expect(baseMovedOn({ kind: "accepted" })).toBe("accepted work has moved on")
     expect(baseMovedOn({ kind: "unfinished", bookmark: "wip/search" })).toBe(

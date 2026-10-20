@@ -247,7 +247,11 @@ facts' type and its result's type, and keeps the planners and helpers the
 plan builds on out of its index; since a manifest exports only the index,
 the host cannot reach them to combine. The shell calls a second plan only
 across a phase, I/O the first plan's result asks for. Whether to write, and
-whether to refuse, is the plan's; the refusal's words are the shell's. A
+whether to refuse, is the plan's: it returns reasons, never sentences.
+Each sentence has one owner, chosen by who reads it (ADR-0199): rules for
+what the agent reads, even when people read it too; interface for what only
+people read (a command's answer, a button's title); the host for its log.
+The shell words nothing: it hands a reason to its reader's owner. A
 plan's facts are values read before it runs; minting ids is the one
 function a plan may call. Where a family of plans has one way to be
 carried out, it takes only lists the deciding module branded, so the

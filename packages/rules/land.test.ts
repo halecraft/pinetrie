@@ -1,12 +1,13 @@
 import { type DiskPath, pointId, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { planResolution, renderableMessage } from "./index.ts"
+import { renderableMessage } from "./index.ts"
 import {
   type ConflictFile,
   conflictSections,
   type Floor,
   LAND_TYPE,
   type PromptBudget,
+  planResolution,
   resolutionFloor,
 } from "./land.ts"
 import { REMOVALS_HEADING, REMOVALS_MOST, removalsText } from "./removals.ts"

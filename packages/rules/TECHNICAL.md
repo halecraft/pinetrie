@@ -92,6 +92,14 @@ exported only where another package decides with it on its own
   report and its pending one, what a run reads of its canvas and its pinned
   cards, and a queued card popped. Each reads its own asks and ends from the
   tree; the planners it builds on stay in their modules (ADR-0193).
+- `get-latest.ts`: getting the latest, decided: whether a merge may go
+  ahead and the floor its resolution's prompt must fit (`planGetLatest`),
+  what a merge comes to for the thread (`planSettle`), and the agent's
+  `catch_up` in two phases around the merge (`planLatestInRun`, then
+  `planLatestInRunAnswer`, which takes the `LatestInRun` only the first
+  makes).
+- `proposed-act.ts`: an action on proposed changes other than a split,
+  planned once with the fact the thread is told (`planProposedAct`).
 - `place-steps.ts`: a write to the places document (`PlaceStep`), the one
   rule every card is made by (`planMake`) and who may move into a place,
   which the planners of moves, queues, notes and canvases all build on.
@@ -853,10 +861,11 @@ which are swept.
   but a new list loses it, so the brand is on the lists, and
   `apps/pinetrie/host/commands/types.test.ts` proves both with
   `@ts-expect-error`.
-- **A refusal's reason is the plan's, its words the shell's.** A plan
-  refused for a reason of its own returns `declined` with a `why`
+- **A refusal's reason is the plan's, its words its reader's owner's.** A
+  plan refused for a reason of its own returns `declined` with a `why`
   (`ImageRefusal` for a blob that makes no image, the opening's, the
-  copy's, the press's); the shell words each in one function. A move
+  copy's, the press's); interface words each, since only a person reads a
+  command's answer (ADR-0199). A move
   refused says where the card is now (`CardRefusal`).
 - **The history's stack loads after the plan.** The plan names the history
   (`history`; `canvasHistory` gives none for a command on no canvas, since
@@ -1126,8 +1135,9 @@ trash, have no agent and no runner. Where its card leaves it is
   lane's kind), so its messages wait. A
   fact on top is popped there all the same: it starts no run, and putting one away's
   stop must be in the thread for its face to say so (ADR-0126). Refused
-  with `HELD_WORDS`, "put it on a canvas first", or for a trashed thread
-  `TRASHED_WORDS`, "restore it first" (`holdingWords`).
+  as held or trashed (`ThreadHolding`), which interface words for the
+  person answered (`HELD_WORDS`, "put it on a canvas first";
+  `TRASHED_WORDS`, "restore it first").
 - **Putting a thread away stops the run** (`takenIn(before, after)`): every thread card
   in an inventory or a trash after a change that was not there before. The host's
   provenance step reads it from every person's change to the places (a
@@ -1170,9 +1180,11 @@ not gated here: they ask `threadReach` (`reach.ts`).
   read (`runThreads` reads a missing tree as no thread); then a thread held
   or trashed (`runThreads`, `heldIn`); then a lane of another kind
   (`foreignIn`).
-- **Its words are its own** (`gateRefusal`): `canvas-archived` naming the
-  archiver through a `nameOf`, as `reachWords` takes one; `holdingWords`;
-  `foreignRefusal`. The host words none.
+- **Its words are interface's** (`gateRefusal`, `@pinetrie/interface`'s
+  `answer-words.ts`, ADR-0199): only the person whose command it refused
+  reads them; `canvas-archived` names the archiver through a `nameOf`. A
+  lane of another kind is refused in `foreignRefusal`'s words, which stay
+  here: the agent reads them too, in a relay's refusal.
 - **A pass proves the check ran, nothing more.** It does not say the facts
   it was planned from still hold: the host clears and sends in one keeper
   step. And a spread of a cleared value keeps the brand
@@ -1278,7 +1290,7 @@ and made read-only, never removed.
   "restore the canvas first"). `archivedIn` finds an archived one by its
   `CanvasId`. One rule, the gate's first (`planGate`), for every command and
   every send, a popped queued card's among them (its thread's canvas),
-  worded by `gateRefusal`.
+  worded by interface's `gateRefusal`.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
   canvas stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.
@@ -1531,7 +1543,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
-| a lane of its own's fork: the unfinished work it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`forkEnd`, the host's) |
+| a lane of its own's fork: the unfinished work it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`planForkEnd`, through the host's `forkEnd`, which takes a `Forked`) |
 | the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (a migration, since deleted, moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
@@ -1539,7 +1551,10 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   any entry names its lane, its state and its disk (`nearestRevision`, in
   core, finds the nearest state and the nearest snapshot independently,
   each with the lane that recorded it).
-  `planTurnRecord` is the rule:
+  `planTurnRecord` is the rule, in two phases around the commit: `planTurn`
+  reads the turn from the tree (its entry, whether it is a prompt, made
+  calls, or merged), and `planTurnRevision` takes the `TurnToCommit` only
+  `planTurn` makes, with what the commit made:
   - A lane of its own records every turn that made tool calls, with its
     snapshot, because ignored files change without a commit. The commit is
     there only when the turn has one: made by the host, or made by the agent
@@ -1981,16 +1996,17 @@ commit-message request `request.ts` (`describeRequest`).
   your commits move with accepted work (`accept`), both false with
   `publish.catchUp` off. `@pinetrie/jj` turns it into steps (`planSetup`,
   `planPublishGetLatest`, `planPublishMove`).
-- **`planPublishFinish` is a publish's second round** (ADR-0090): from the
+- **`planPublishFinish` is a publish's second round** (ADR-0090): it takes
+  the `PublishTicket` only `planAcceptedAction` makes, so it follows the
+  decision the first round carried out; from the
   record read again after getting the latest, the move, or getting the latest's
   operation reverted (`undo`, S111) when your commits came out conflicted
   (`workingCopy.conflicts.commits`, which the preview of `@` alone cannot show)
   or the publish bookmark moved meanwhile. `accept` is read from the
-  record after, not the decision. `publishUndone` words an undo from that
-  record: the conflicts getting the latest would have left, since the revert took
-  them away, so `acceptedRefusal`'s "your commits have conflicts" would be
-  untrue. It lives here, not beside the steps,
-  because `@pinetrie/jj` does not import this package.
+  record after, not the decision. Interface's `publishUndone` words an undo
+  from that record: the conflicts getting the latest would have left, since
+  the revert took them away, so `acceptedRefusal`'s "your commits have
+  conflicts" would be untrue.
 - **`effectiveBase`**, **`latestNow`** and **`parentNow`** are in `base.ts`,
   with the `pinetrie.base` record; **`latestSourceName`** (accepted work is
   "accepted work", ADR-0090) and **`baseMovedOn`** (a base that moved,
@@ -2005,9 +2021,9 @@ commit-message request `request.ts` (`describeRequest`).
   `working-copy-conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing
-  to do", which the page's hidden button reads too. `acceptedRefusal` words
-  each refusal once, naming files with `named`, for the host's answer and
-  the button's title.
+  to do", which the page's hidden button reads too. Interface's
+  `acceptedRefusal` words each refusal once, for the host's answer and the
+  button's title (ADR-0199).
 - **`pinetrie.proposed`, `pinetrie.accepted` and `pinetrie.base` are unions on
   the project's kind** (`kind`: `jj` or `folder`, ADR-0150), each decoded by
   its `kind`; one stored before records had a kind does not decode, and

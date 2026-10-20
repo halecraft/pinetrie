@@ -11,13 +11,18 @@ import {
   isRootId,
   isThreadId,
   type LaneRecord,
+  messageToolCalls,
   type OwnLane,
   type PointId,
   type ProjectKind,
   type RevisionRecord,
+  runPrompt,
   type SnapshotId,
   snapshotId,
   type ThreadId,
+  type TreeIndex,
+  turnEntry,
+  turnMerged,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
@@ -166,6 +171,95 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
   }
 
 // ── turns and forks ────────────────────────────────────────────────────────
+
+declare const turnBrand: unique symbol
+/**
+ * A turn of a lane of its own, to commit: its entry, what kind of turn it
+ * is, and its snapshot. Only `planTurn` makes one, so a revision is planned
+ * only for a turn it read from the tree.
+ */
+export interface TurnToCommit {
+  readonly kind: "commit"
+  readonly entry: EntryId
+  readonly lane: ThreadId
+  readonly isPrompt: boolean
+  readonly toolCalls: boolean
+  readonly merged: boolean
+  readonly snapshot: SnapshotId
+  readonly [turnBrand]: true
+}
+
+/**
+ * What a turn ending at `tip` comes to, read from its root's tree: for a
+ * lane with no copy of its own, its revision (a prompt's) or none; for one
+ * of its own, the turn to commit, whose revision `planTurnRevision` plans
+ * from what the commit made. A `catch_up` in the turn moved the lane: read
+ * from the tree (`turnMerged`), so a restart before the record changes
+ * nothing.
+ */
+export function planTurn(facts: {
+  readonly index: TreeIndex
+  readonly tip: EntryId
+  readonly lane: ThreadId
+  readonly own: boolean
+}):
+  | { readonly kind: "none" }
+  | { readonly kind: "record"; readonly revision: RevisionRecord }
+  | TurnToCommit {
+  const { index, lane } = facts
+  const entry = turnEntry(index, facts.tip)
+  const isPrompt = runPrompt(index, entry) === entry
+  const toolCalls = messageToolCalls(index.entries[entry]?.message).length > 0
+  if (!facts.own) {
+    const revision = planTurnRecord({
+      entry,
+      lane,
+      isPrompt,
+      toolCalls,
+      own: false,
+      committed: null,
+      newest: null,
+      snapshot: null,
+      paths: [],
+      conflicts: [],
+      merged: false,
+    })
+    return revision === null ? { kind: "none" } : { kind: "record", revision }
+  }
+  return {
+    kind: "commit",
+    entry,
+    lane,
+    isPrompt,
+    toolCalls,
+    merged: turnMerged(index, facts.tip),
+    snapshot: snapshotId(entry),
+  } as TurnToCommit
+}
+
+/**
+ * The revision a committed turn records (`planTurnRecord`), from what its
+ * commit made; null for one with nothing to record.
+ */
+export const planTurnRevision = (
+  turn: TurnToCommit,
+  made: {
+    readonly committed: PointId | null
+    readonly newest: PointId | null
+    readonly paths: readonly string[]
+    readonly conflicts: readonly string[]
+  },
+): RevisionRecord | null =>
+  planTurnRecord({
+    entry: turn.entry,
+    lane: turn.lane,
+    isPrompt: turn.isPrompt,
+    toolCalls: turn.toolCalls,
+    own: true,
+    snapshot: turn.snapshot,
+    merged: turn.merged,
+    ...made,
+  })
 
 /**
  * What a turn records. A lane of its own records every prompt and every turn
@@ -361,6 +455,41 @@ export const LANE_FORK: RecordSpec<LaneForkRecord, ThreadId, "session"> = {
           },
     ),
 }
+
+/**
+ * What a fork writes before it runs: a fork run again (its record `begun`)
+ * is owed until its end, like the first.
+ */
+export const planForkRedo = (
+  fork: LaneForkRecord,
+): readonly ValueWrite<"session">[] =>
+  fork.state === "begun"
+    ? [
+        setRecord(LANE_FORK, {
+          lane: fork.lane,
+          base: fork.base,
+          state: "owed",
+        }),
+      ]
+    : []
+
+/**
+ * What a fork writes at its end, in one write: the history's start records
+ * (an adapter's), then the fork begun, carrying the snapshot it lost.
+ */
+export const planForkEnd = (input: {
+  readonly fork: LaneForkRecord
+  readonly lost: SnapshotId | null
+  readonly start: { readonly writes: readonly ValueWrite<"session">[] }
+}): readonly ValueWrite<"session">[] => [
+  ...input.start.writes,
+  setRecord(LANE_FORK, {
+    lane: input.fork.lane,
+    base: input.fork.base,
+    state: "begun",
+    lost: input.lost,
+  }),
+]
 
 /**
  * The writes that record a new lane: its `LANE`, and for a lane of its own

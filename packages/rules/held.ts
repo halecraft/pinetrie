@@ -43,17 +43,6 @@ export function threadCardHolding(
   return card?.place.kind === "trash" ? TRASHED : FREE
 }
 
-/** Why a command in a thread in an inventory is refused. */
-export const HELD_WORDS = "put it on a canvas first"
-
-/** Why a command in a trashed thread is refused. */
-export const TRASHED_WORDS = "restore it first"
-
-/** Why a command in a thread held or trashed is refused, as the host says it. */
-export const holdingWords = (
-  holding: Exclude<ThreadHolding, { readonly kind: "free" }>,
-): string => (holding.kind === "held" ? HELD_WORDS : TRASHED_WORDS)
-
 /**
  * Why a lane of the other kind is refused, as the host says it: its work
  * was made when the project was another kind, and is kept as it was.

@@ -20,7 +20,6 @@ import {
   type CardId,
   type CardRecord,
   type EntryId,
-  ERR,
   type Intent,
   isTextCardId,
   type Move,
@@ -33,7 +32,6 @@ import {
   type QueueMove,
   type Reorder,
   type RootId,
-  refused,
   type Send,
   type SentCard,
   type Sha256,
@@ -42,6 +40,13 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
+import {
+  branchOutRefusal,
+  copyRefusal,
+  imageRefusal,
+  openRefusal,
+  spinOffRefusal,
+} from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
@@ -58,18 +63,14 @@ import {
 } from "@pinetrie/reads"
 import {
   type BoardMove,
-  type BranchOutRefusal,
   type CanvasIndex,
   type CardFacts,
   type CardPlan,
   type CardRefusal,
-  type CopyPlan,
   type CopyThread,
   type GatheredStart,
-  type ImageRefusal,
   mintContainer,
   NO_CANVAS_INDEX,
-  type OpenPlan,
   type OpenThread,
   planBusyQueue,
   planCanvasPlacement,
@@ -789,105 +790,3 @@ export const unmovedOutcome = (refusal: {
   place: refusal.now === null ? null : placeKey(refusal.now.place),
   by: refusal.now?.placer ?? null,
 })
-
-/** Why a blob makes no image, as its sender is answered. */
-function imageRefusal(why: ImageRefusal): Outcome {
-  switch (why.kind) {
-    case "missing":
-      return refused(ERR.IMAGE_MISSING, `no blob is stored as ${why.sha256}`)
-    case "not-an-image":
-      return refused(ERR.NOT_AN_IMAGE, "only images go in a media column")
-  }
-}
-
-/** Why a spin-off started no thread, as its sender is answered. */
-function spinOffRefusal(why: "blank" | "root-in-use"): Outcome {
-  switch (why) {
-    case "blank":
-      return refused(ERR.REFUSED, "nothing in the card to start a thread with")
-    case "root-in-use":
-      return refused(ERR.ROOT_ID_IN_USE, "that root's id is in use")
-  }
-}
-
-/** Why an opening was refused, as its sender is answered. */
-function openRefusal(
-  why: Extract<OpenPlan, { kind: "refused" }>["why"],
-): Outcome {
-  switch (why) {
-    case "unknown":
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "no such entry, or no such canvas, to branch in",
-      }
-    case "taken":
-      return {
-        kind: "refused",
-        code: ERR.THREAD_TAKEN,
-        message: "that thread has started already",
-      }
-    default:
-      return { kind: "unmoved", code: why, place: null, by: null }
-  }
-}
-
-/** Why a press on a proposal was refused, as its sender is answered. */
-function branchOutRefusal(why: BranchOutRefusal): Outcome {
-  switch (why) {
-    case "no-proposal":
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "no proposal at that entry",
-      }
-    case "running":
-      return {
-        kind: "refused",
-        code: ERR.REFUSED,
-        message: "the run that proposed these has not ended",
-      }
-    case "spent":
-      return {
-        kind: "refused",
-        code: ERR.REFUSED,
-        message: "someone has already opened these branches",
-      }
-    case "no-row":
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "the proposal has no such row",
-      }
-    default:
-      return openRefusal(why)
-  }
-}
-
-/** Why a copy was refused, as its sender is answered. */
-function copyRefusal(
-  why: Extract<CopyPlan, { kind: "refused" }>["why"],
-): Outcome {
-  switch (why) {
-    case "unknown":
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "no such thread, or no such end of it, to copy",
-      }
-    case "taken":
-      return {
-        kind: "refused",
-        code: ERR.THREAD_TAKEN,
-        message: "that copy's thread has started already",
-      }
-    case "held":
-      return {
-        kind: "refused",
-        code: ERR.REFUSED,
-        message: "someone else holds that thread",
-      }
-    default:
-      return { kind: "unmoved", code: why, place: null, by: null }
-  }
-}

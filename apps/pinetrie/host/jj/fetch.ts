@@ -7,15 +7,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { CommitId, ThreadId } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
-import {
-  bookmarkName,
-  bookmarkRevset,
-  laneJj,
-  planBundle,
-  readCommits,
-  readLaneBookmark,
-  stackBookmark,
-} from "@pinetrie/jj"
+import { laneJj, planBundle, readFetchBookmark } from "@pinetrie/jj"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow } from "@pinetrie/lanes"
 import { failed, type LeaseBasics } from "../basics.ts"
@@ -74,14 +66,12 @@ export function createFetches(deps: {
             .state !== "running"
         if (stopped) await deps.startContainer(record, h)
         try {
-          const jj = laneJj(handle.runners.lane)
-          const name = stack ? stackBookmark(lane) : bookmarkName(lane)
-          const bookmark = stack
-            ? await readCommits(jj, `present(${bookmarkRevset(name)})`).then(
-                c => c[0] ?? null,
-              )
-            : await readLaneBookmark(jj, lane)
-          if (bookmark === null) return null
+          const name = await readFetchBookmark(
+            laneJj(handle.runners.lane),
+            lane,
+            stack,
+          )
+          if (name === null) return null
           const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-bundle-"))
           const bundle = path.join(dir, "lane.bundle")
           await executeOrThrow(

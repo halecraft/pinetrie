@@ -7,6 +7,7 @@ import {
   BASE_LANE,
   configChangeNote,
   configWidenings,
+  decideContainerStart,
   decideLaneStart,
   effectiveLaneConfig,
   imageRefusal,
@@ -42,6 +43,7 @@ import {
   planShape,
   planShared,
   planSnapshot,
+  planStart,
   type Step,
   sessionFiles,
   shapeSpecHash,
@@ -157,10 +159,21 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
           "/Users/ada/ai/duane/skills/plan",
           "/opt/x",
         ],
+        project: null,
         home,
         own,
       }),
     ).toEqual({ mounts: ["/Users/ada/ai/duane", "/opt/x"], refused: [] })
+  })
+  test("a root inside the project is neither mounted nor refused: each lane has its own copy", () => {
+    expect(
+      planHostMounts({
+        roots: ["/work/app/.pi/skills", "/work/app", "/opt/x"],
+        project: "/work/app",
+        home,
+        own,
+      }),
+    ).toEqual({ mounts: ["/opt/x"], refused: [] })
   })
   test("never your home directory, / or pine·trie's own directories; a folder inside one is fine", () => {
     const planned = planHostMounts({
@@ -173,6 +186,7 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
         "/Users/ada/.config/pinetrie/skills/plan",
         "/x/a,b:c",
       ],
+      project: null,
       home,
       own,
     })
@@ -730,6 +744,35 @@ describe("the host: its root", () => {
         await decideLaneStart({ fork: "begun", container: "create" }, read),
       ).toEqual({ kind: "snapshot", from: e2, recreate: false })
       expect(reads).toEqual(["disk", "history", "e3", "e2"])
+    })
+
+    test("decideContainerStart: a missing container's start carries the steps that make it, on its disk or from a snapshot", async () => {
+      const runtime = { runSpec: () => ({}) }
+      const missing = { state: "missing", label: null } as const
+      const base = {
+        spec,
+        env: {},
+        runtime,
+        facts: missing,
+        fork: "begun",
+      } as const
+      const onDisk = await decideContainerStart(base, reader(true, []).read)
+      expect(onDisk.container).toBe("create")
+      expect(onDisk.start).toEqual({
+        kind: "disk",
+        recreate: false,
+        steps: [planStart(spec, {})],
+      })
+      const restored = await decideContainerStart(
+        base,
+        reader(false, [e2]).read,
+      )
+      expect(restored.start).toEqual({
+        kind: "snapshot",
+        from: e2,
+        recreate: false,
+        steps: planDisk({ spec, env: {}, from: e2 }),
+      })
     })
 
     test("decideLaneStart: a container there reads nothing", async () => {

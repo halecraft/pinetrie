@@ -203,8 +203,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a start reads every fork as begun",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "      { fork: fork.state, container: containerPlan },",
-    to: '      { fork: "begun" as const, container: containerPlan },',
+    from: "          fork: fork.state,\n",
+    to: '          fork: "begun" as const,\n',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -319,9 +319,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a catch-up's turn names no commit",
-    file: "apps/pinetrie/host/work/turns.ts",
-    from: "        const merged = turnMerged(index, tip)",
-    to: "        const merged = false && turnMerged(index, tip)",
+    file: "packages/rules/work.ts",
+    from: "    merged: turnMerged(index, facts.tip),",
+    to: "    merged: false && turnMerged(index, facts.tip),",
     suite: "lanes",
     scenario: "get-latest",
     expect:
@@ -3288,8 +3288,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a squash rebuilds nothing",
     file: "apps/pinetrie/host/jj/proposed/act.ts",
-    from: "    await refresh.rebuild(ops, lane, planned, message.entry)\n",
-    to: '    if (action !== "squash") await refresh.rebuild(ops, lane, planned, message.entry)\n',
+    from: "        await refresh.rebuild(ops, lane, planned.rebuild, message.entry)\n",
+    to: '        if (action !== "squash") await refresh.rebuild(ops, lane, planned.rebuild, message.entry)\n',
     suite: "lanes",
     scenario: "main",
     expect:

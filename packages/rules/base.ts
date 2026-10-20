@@ -320,6 +320,23 @@ export type UpdateRefusal =
   | typeof ERR.PARENT_RUNNING
 
 /**
+ * Why an update was refused, worded once: the agent reads it in
+ * `catch_up`'s answer, and a person on the card that asked for it.
+ */
+export function updateRefusal(code: UpdateRefusal): string {
+  switch (code) {
+    case ERR.NOT_SET_UP:
+      return "set up accepted work first"
+    case ERR.BASE_GONE:
+      return "this thread's unfinished work is gone: continue it on accepted work"
+    case ERR.NO_PARENT:
+      return "this thread did not branch from another thread's copy"
+    case ERR.PARENT_RUNNING:
+      return "the thread this one branched from is working: get its latest when its run ends"
+  }
+}
+
+/**
  * What bringing a thread up to date merges: the base the thread
  * follows (`effectiveBase`), so the button that names it names what is
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's

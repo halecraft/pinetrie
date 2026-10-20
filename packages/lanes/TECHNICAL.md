@@ -382,6 +382,10 @@ paths are its diff." would compare a function with itself.
     turn recorded, forks again, since its files are its fork's (S227);
     else it is retired: the files it recorded are gone, and a branch from
     it continues.
+- **The host decides a start whole** (`decideContainerStart`): the
+  container's plan from its facts and its shape's hash, then the start; one
+  that makes the container carries its steps (`planStart` on its disk,
+  `planDisk` from a snapshot).
 - **A start reads one fact at a time, each only when its plan asks**
   (`planLaneStart`'s `gather`, read by `decideLaneStart` through a
   `LaneFactReader`): whether its disk is there; only with it gone, its
@@ -545,7 +549,8 @@ paths are its diff." would compare a function with itself.
   none can shadow a directory of the image's (S46). Nested roots collapse. A
   root that is, or holds, your home directory, `/` or one of pine·trie's own
   directories (`own`: the config and data directories, which hold
-  credentials, service keys and sessions) is refused. A folder inside one,
+  credentials, service keys and sessions) is refused. A root inside the
+  project (`project`) is left out: each lane has its own copy of it. A folder inside one,
   such as a skill folder in the config directory, is allowed: it lies
   inside, and does not hold it. A project's own skills are not a host path:
   a lane reads them in its own copy.

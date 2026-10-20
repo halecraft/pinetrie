@@ -12,20 +12,21 @@ import {
   nearestRevision,
   type PointId,
   type RevisionRecord,
-  runPrompt,
   type SnapshotId,
-  snapshotId,
   type ThreadId,
   type TreeIndex,
-  turnEntry,
-  turnMerged,
 } from "@pinetrie/core"
 import { callPurpose } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow, type Follow, planSnapshot } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
-import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
+import {
+  planTurn,
+  planTurnRevision,
+  REVISION,
+  setRecord,
+} from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"
@@ -128,60 +129,24 @@ export function createTurns(deps: {
         await using held = basics.leases.root(record.root)
         const doc = await held.ready
         const index = readTreeIndex(doc)
-        const entry = turnEntry(index, tip)
-        const isPrompt = runPrompt(index, entry) === entry
-        const toolCalls =
-          messageToolCalls(index.entries[entry]?.message).length > 0
-        // A `catch_up` in the turn moved the bookmark: read from the tree, so a
-        // restart before this record changes nothing.
-        const merged = turnMerged(index, tip)
-        if (!registry.isOwn(lane)) {
-          const revision = planTurnRecord({
-            entry,
-            lane,
-            isPrompt,
-            toolCalls,
-            own: false,
-            committed: null,
-            newest: null,
-            snapshot: null,
-            paths: [],
-            conflicts: [],
-            merged: false,
-          })
-          if (revision !== null) await writeRevision(revision)
+        const turn = planTurn({ index, tip, lane, own: registry.isOwn(lane) })
+        if (turn.kind === "none") return
+        if (turn.kind === "record") {
+          await writeRevision(turn.revision)
           return
         }
+        const { entry } = turn
         const handle = registry.handleOf(lane)
         // The commit is queued, so it never overlaps the last turn's
         // snapshot, and awaited, so the next request sees it.
-        const {
-          committed,
-          newest,
-          paths: changed,
-          conflicts,
-          follow,
-        } = await registry.withHistory(lane, h =>
-          h.recordTurn({
-            title: revisionTitle(readTreeIndex(doc), entry),
-            entry,
-          }),
+        const { follow, ...made } = await registry.withHistory(lane, h =>
+          h.recordTurn({ title: revisionTitle(index, entry), entry }),
         )
-        const planned = planTurnRecord({
-          entry,
-          lane,
-          isPrompt,
-          toolCalls,
-          own: true,
-          committed,
-          newest,
-          snapshot: snapshotId(entry),
-          paths: changed,
-          conflicts,
-          merged,
-        })
+        const changed = made.paths
+        const { newest } = made
+        const planned = planTurnRevision(turn, made)
         if (planned === null) return
-        const previous = isPrompt
+        const previous = turn.isPrompt
           ? null
           : (last.get(lane) ?? nearestBefore(index, doc, entry))
         if (planned.snapshot !== null)
@@ -208,7 +173,7 @@ export function createTurns(deps: {
                   return null
                 })
                 await executeOrThrow(
-                  planSnapshot({ lane, snapshot: snapshotId(entry) }),
+                  planSnapshot({ lane, snapshot: turn.snapshot }),
                   handle.runners,
                 )
                 const disk =
@@ -222,7 +187,7 @@ export function createTurns(deps: {
                             ? null
                             : await handle.runners.runtime.diff(
                                 previous.snapshot,
-                                snapshotId(entry),
+                                turn.snapshot,
                               ),
                         shared,
                       }).catch(error => {

@@ -23,7 +23,13 @@ import {
   type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { readLaneBookmark, setBookmark } from "./bookmarks.ts"
-import { type RevsetQuery, revsetAliased } from "./names.ts"
+import {
+  bookmarkName,
+  bookmarkRevset,
+  type RevsetQuery,
+  revsetAliased,
+  stackBookmark,
+} from "./names.ts"
 import { type OldNamesOnDisk, planTurnCommit } from "./plan.ts"
 import { laneJj } from "./run.ts"
 /** The commit ids a revset, or a revset with its aliases, names, in jj's order. */
@@ -322,4 +328,19 @@ export async function fileText(
     `root:${JSON.stringify(path)}`,
   ])
   return shown.ok ? shown.stdout : null
+}
+
+/**
+ * The bookmark a fetch bundles, when the lane's repo has it: the lane's own
+ * (`bookmarkName`), or with `stack` its split's stack (`stackBookmark`).
+ * Null when it has none: nothing to fetch.
+ */
+export async function readFetchBookmark(
+  jj: Runner,
+  lane: ThreadId,
+  stack: boolean,
+): Promise<string | null> {
+  const name = stack ? stackBookmark(lane) : bookmarkName(lane)
+  const [commit] = await readCommits(jj, `present(${bookmarkRevset(name)})`)
+  return commit === undefined ? null : name
 }

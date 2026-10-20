@@ -1,6 +1,7 @@
 import {
   BASE_SNAPSHOT,
   entryId,
+  indexTree,
   NO_SHARED,
   pointId,
   type RevisionRecord,
@@ -9,6 +10,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { fromParents, personMessage } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   decodeRecords,
@@ -17,12 +19,19 @@ import {
   LANE as LANE_RECORD,
   PROJECT,
   planLaneRecords,
-  planTurnRecord,
   REVISION,
   setRecord,
   sourceHistory,
 } from "./index.ts"
-import { planRetention, showHostWorkingCopy } from "./work.ts"
+import {
+  planForkEnd,
+  planForkRedo,
+  planRetention,
+  planTurn,
+  planTurnRecord,
+  planTurnRevision,
+  showHostWorkingCopy,
+} from "./work.ts"
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada")
@@ -492,4 +501,79 @@ describe("showHostWorkingCopy: whole path prefixes only", () => {
   test("the file system's root is never a working copy's", () => {
     expect(showHostWorkingCopy("/etc/hosts", "/")).toBe("/etc/hosts")
   })
+})
+
+describe("a turn, around its commit", () => {
+  const TURN_LANE = threadIdFor("turns")
+  const tree = indexTree(
+    fromParents({ p: null, a: "p" }, id =>
+      id === "p"
+        ? personMessage("do it")
+        : {
+            role: "assistant",
+            content: [
+              { type: "toolCall", id: "c1", name: "bash", arguments: {} },
+            ],
+          },
+    ),
+  )
+
+  test("a lane with no copy of its own records its prompts alone, with no state", () => {
+    expect(
+      planTurn({ index: tree, tip: entryId("p"), lane: TURN_LANE, own: false }),
+    ).toMatchObject({
+      kind: "record",
+      revision: { entry: entryId("p"), point: null, snapshot: null },
+    })
+    expect(
+      planTurn({ index: tree, tip: entryId("a"), lane: TURN_LANE, own: false }),
+    ).toEqual({ kind: "none" })
+  })
+
+  test("a lane of its own commits the turn its tip ends, snapshotted under its entry, and records what the commit made", () => {
+    const turn = planTurn({
+      index: tree,
+      tip: entryId("a"),
+      lane: TURN_LANE,
+      own: true,
+    })
+    expect(turn).toMatchObject({
+      kind: "commit",
+      entry: entryId("a"),
+      isPrompt: false,
+      toolCalls: true,
+      snapshot: snapshotId(entryId("a")),
+    })
+    if (turn.kind !== "commit") throw new Error("committed")
+    expect(
+      planTurnRevision(turn, {
+        committed: pointId("1111"),
+        newest: pointId("0000"),
+        paths: ["a.txt"],
+        conflicts: [],
+      }),
+    ).toMatchObject({ point: pointId("1111"), paths: ["a.txt"] })
+  })
+})
+
+test("planForkEnd: the history's start records, then the fork begun, its lost carried, in one write", () => {
+  const lane = threadIdFor("1")
+  const start = setRecord(LANE_FORK, { lane, base: null, state: "owed" })
+  const writes = planForkEnd({
+    fork: { lane, base: "wip", state: "owed" },
+    lost: snapshotId("e1"),
+    start: { writes: [start] },
+  })
+  expect(writes.map(w => ("value" in w ? w.value : null))).toEqual([
+    start.value,
+    { base: "wip", state: "begun", lost: "e1" },
+  ])
+})
+
+test("planForkRedo: a fork run again is owed until its end; a first one writes nothing", () => {
+  const lane = threadIdFor("2")
+  expect(planForkRedo({ lane, base: "wip", state: "owed" })).toEqual([])
+  expect(
+    planForkRedo({ lane, base: "wip", state: "begun", lost: null }),
+  ).toEqual([setRecord(LANE_FORK, { lane, base: "wip", state: "owed" })])
 })

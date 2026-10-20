@@ -3,7 +3,6 @@ import {
   type CardRecord,
   canvasIdFor,
   type EntryLike,
-  ERR,
   entryId,
   indexTree,
   type LaneRecord,
@@ -18,8 +17,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"
-import { type GateFacts, type GateRoot, gateRefusal, planGate } from "./gate.ts"
-import { HELD_WORDS, TRASHED_WORDS } from "./held.ts"
+import { type GateFacts, type GateRoot, planGate } from "./gate.ts"
 
 const T = threadIdFor("t")
 const NEW = threadIdFor("new")
@@ -171,30 +169,4 @@ describe("planGate", () => {
     )
     expect(planGate(atEnd, facts({ lanes, kind: null })).kind).toBe("cleared")
   })
-})
-
-test("gateRefusal: an archive names its archiver, a hold and a trash say what to do", () => {
-  const nameOf = new Map([[BEA, "Bea"]])
-  expect(
-    gateRefusal(
-      { kind: "archived", canvas: { canvas: CANVAS, by: BEA, at: 1 } },
-      nameOf,
-    ),
-  ).toEqual({
-    kind: "refused",
-    code: ERR.CANVAS_ARCHIVED,
-    message: "archived by Bea: restore the canvas first",
-  })
-  expect(
-    gateRefusal(
-      { kind: "held", thread: T, holding: { kind: "held", by: BEA } },
-      nameOf,
-    ),
-  ).toEqual({ kind: "refused", code: ERR.REFUSED, message: HELD_WORDS })
-  expect(
-    gateRefusal(
-      { kind: "held", thread: T, holding: { kind: "trashed" } },
-      nameOf,
-    ).message,
-  ).toBe(TRASHED_WORDS)
 })

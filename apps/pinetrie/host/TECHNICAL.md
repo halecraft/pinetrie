@@ -7,7 +7,9 @@ does one thing and takes its dependencies as a parameter; `index.ts` alone
 wires them. An operation reads its facts once, calls one plan and carries
 out what it returns; it combines no helpers around the plan, and builds no
 record a plan did not return (ADR-0193, `docs/01-architecture.md`, One
-plan per operation). A `plan…` declared here decides what only the host
+plan per operation). It words nothing either: a refused command's answer
+is interface's words, a tool's answer rules', and only its log lines are
+its own (ADR-0199). A `plan…` declared here decides what only the host
 knows of.
 
 ## Where things are
@@ -928,8 +930,8 @@ rejects `shutdown()`.
   them (`read`), the roots a branch forks in, so a command the archive
   refuses opens none; then a thread someone holds or trashed, "put it on
   a canvas first"; then a run that would start on a lane of another kind
-  than the project's (`ERR.FOREIGN_LANE`). The refusal is worded in rules
-  (`gateRefusal`). The dispatcher clears each decoded command once and
+  than the project's (`ERR.FOREIGN_LANE`). The refusal is worded in
+  interface (`gateRefusal`), since only the person answered reads it. The dispatcher clears each decoded command once and
   carries out the `Cleared<Intent>`; a popped queued card and a spin-off's
   first message are cleared as `Send`s (`send`). `sendMessage` takes only a
   `Cleared<Send>`, so a send nobody cleared does not compile
@@ -1645,11 +1647,11 @@ adapter's.
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`); a whole directory's scan (`scanned`), whose missing files' lineages go once every version is older than the host's start (`planGoneLineages`); and a thread deleted from the trash, which leaves every lineage it read (`forgetReaders`, from `sweepTrash`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen, and what is gone. A listing that fails throws, so it never reads as every file gone; only a missing directory lists none. A delete event lets nothing go: the next scan does. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, no fork record, or a history the adapter does not keep; each lane's link registers it with `Ready`'s observer (`laneLinkOpener`), so no lane is observed before the observer is |
-| `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, then `decideLaneStart` from the lane's fork record, which reads, only when the container must be made, its disk, and with that gone its revision records' snapshots and `keptSnapshot`, then each snapshot newest first until one is there (`factsOf`); a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`decideContainerStart`, `@pinetrie/lanes`': the container's plan, then the start from the lane's fork record, which reads, only when the container must be made, its disk, and with that gone its revision records' snapshots and `keptSnapshot`, then each snapshot newest first until one is there (`factsOf`); a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its step ran. After a host's start there is no last run's lane until a run ends |
-| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |
-| `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd`) |
-| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`), whose message says what the merge's stale outputs removed; `getLatestInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
+| `turns.ts` | pi's `turnDone`, in two phases (`@pinetrie/rules`' `planTurn`, from the tree; then `planTurnRevision`, which takes the `TurnToCommit` only `planTurn` makes): the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |
+| `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd` over `@pinetrie/rules`' `planForkEnd`) |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `@pinetrie/rules`' `planGetLatest` and `planSettle`, then `applySettle`, which fires the merge's `follow` after `recordUpdate`), whose message says what the merge's stale outputs removed; `getLatestInRun`, the agent's `catch_up`, in two phases around the merge (`planLatestInRun`, then `planLatestInRunAnswer`, which takes the `LatestInRun` only the first makes); `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
@@ -2022,7 +2024,7 @@ adapter's.
   record `later("line")`. So a command waits for at most the one step
   running, however many refreshes are marked, and a lane marked many times
   before its refresh starts refreshes once.
-- **What marks a lane** (`planMarks`, `marks.ts`, pure, from the owner's `onMoved`): a
+- **What marks a lane** (`@pinetrie/jj`'s `planMarks`, pure, from the owner's `onMoved`): a
   move of accepted work or unfinished work, or the first observation (`all`), marks the
   line's record, every named lane whose root is not archived, and every
   open record; your `@` alone
@@ -2091,7 +2093,8 @@ adapter's.
   `describe.ts` gathers by a pinned read, asks the model outside the owner,
   one request per lane at a time (`describing`), and writes in an owner
   command; `act.ts` and `stack.ts` are the actions and a split's stack;
-  `marks.ts` is `planMarks`.
+  an action is planned once (`@pinetrie/rules`' `planProposedAct`, which
+  returns its fact).
 - **A root archived or restored moves its lanes' refs in an owner
   command** (`ProposedChanges.moveLanes`, called by `work/archive.ts`), then marks
   each lane: an archived thread's proposed changes are withdrawn, a restored one's built
@@ -2117,7 +2120,8 @@ adapter's.
   getting the latest (`planPublishGetLatest`, as you, only with `publish.catchUp` on
   and only when the working copy is behind), then the record read again, with
   the operation that got the latest from `SharedFacts.op`, decided by
-  `planPublishFinish` into the move (`planPublishMove`) or getting the latest's
+  `planPublishFinish`, which takes the `PublishTicket` only
+  `planAcceptedAction` makes, into the move (`planPublishMove`) or getting the latest's
   undo (`planGetLatestUndo`) and a worded refusal. A move jj refuses after a
   getting the latest runs the undo and rethrows: the one branch that is not a plan's
   value. The record's preview runs `git merge-tree` on your repo (the

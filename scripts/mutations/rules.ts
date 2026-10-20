@@ -5,6 +5,133 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── an action on proposed changes ──
+  {
+    name: "a describe with no proposed changes goes ahead",
+    file: "packages/rules/proposed-act.ts",
+    from: "      return refused === null\n",
+    to: "      return true\n",
+    command: unit,
+    expect:
+      "describe and squash are refused with no proposed changes; let through, each carries the fact the thread is told",
+  },
+  {
+    name: "a squash tells the thread it refreshed",
+    file: "packages/rules/proposed-act.ts",
+    from: "        fact: actionFact(input.action, lane, by),\n",
+    to: '        fact: actionFact("refresh", lane, by),\n',
+    command: unit,
+    expect:
+      "describe and squash are refused with no proposed changes; let through, each carries the fact the thread is told",
+  },
+  // ── a fork ──
+  {
+    name: "a fork's end leaves out its history's start",
+    file: "packages/rules/work.ts",
+    from: "  ...input.start.writes,\n",
+    to: "",
+    command: unit,
+    expect:
+      "planForkEnd: the history's start records, then the fork begun, its lost carried, in one write",
+  },
+  {
+    name: "a fork run again is not owed",
+    file: "packages/rules/work.ts",
+    from: '  fork.state === "begun"\n',
+    to: "  false\n",
+    command: unit,
+    expect:
+      "planForkRedo: a fork run again is owed until its end; a first one writes nothing",
+  },
+  // ── a turn, around its commit ──
+  {
+    name: "a lane with no copy of its own commits its turns",
+    file: "packages/rules/work.ts",
+    from: "  if (!facts.own) {\n",
+    to: "  if (false) {\n",
+    command: unit,
+    expect:
+      "a lane with no copy of its own records its prompts alone, with no state",
+  },
+  {
+    name: "every turn is a prompt",
+    file: "packages/rules/work.ts",
+    from: "  const isPrompt = runPrompt(index, entry) === entry\n",
+    to: "  const isPrompt = true\n",
+    command: unit,
+    expect:
+      "a lane of its own commits the turn its tip ends, snapshotted under its entry, and records what the commit made",
+  },
+  // ── getting the latest ──
+  {
+    name: "the land message leaves out the card's text",
+    file: "packages/rules/land.ts",
+    from: "  const floor = { ...input, intent, content } as Floor",
+    to: '  const floor = { ...input, intent: "", content } as Floor',
+    command: unit,
+    expect: "the land message ends with the card's text",
+  },
+  {
+    name: "an unfittable catch-up is merged anyway",
+    file: "packages/rules/get-latest.ts",
+    from: '  if (found.kind === "too-large")',
+    to: "  if (false)",
+    command: unit,
+    expect:
+      "refused, before the merge, when even the smallest prompt would not fit",
+  },
+  {
+    name: "a reason is never attributed",
+    file: "packages/rules/get-latest.ts",
+    from: "  const entry = entryOfMessage(description)",
+    to: "  const entry: string | null = null",
+    command: unit,
+    expect: "a revision's reason is its message",
+  },
+  {
+    name: "a file's reasons are every revision on its side",
+    file: "packages/rules/get-latest.ts",
+    from: "  revisions.filter(r => r.paths.includes(path)).map(r => r.description)",
+    to: "  revisions.map(r => r.description)",
+    command: unit,
+    expect: "each file's reasons are the revisions that touched it",
+  },
+  {
+    name: "a settle drops its removals",
+    file: "packages/rules/get-latest.ts",
+    from: "  const removals = removalsText(facts.removed)\n",
+    to: "  const removals = removalsText([])\n",
+    command: unit,
+    expect:
+      "a settle's message names what getting the latest removed, clean or conflicted",
+  },
+  {
+    name: "catch_up merges with no person behind its run",
+    file: "packages/rules/get-latest.ts",
+    from: "  if (!facts.own || index === null || by === null)\n",
+    to: "  if (!facts.own || index === null)\n",
+    command: unit,
+    expect:
+      "refused with no copy of its own, or no person behind its run; refused beside another call in its turn",
+  },
+  {
+    name: "catch_up counts one call in any turn",
+    file: "packages/rules/get-latest.ts",
+    from: "            .length,\n",
+    to: "            .length * 0 + 1,\n",
+    command: unit,
+    expect:
+      "refused with no copy of its own, or no person behind its run; refused beside another call in its turn",
+  },
+  {
+    name: "catch_up's answer forgets a copy it could not merge into",
+    file: "packages/rules/get-latest.ts",
+    from: '    case "copy":\n      return refusedAnswer(done.why)\n',
+    to: '    case "copy":\n      return refusedAnswer("nothing-new")\n',
+    command: unit,
+    expect:
+      "let through, it merges for the person behind the run, and its answer is planned from what the merge came to",
+  },
   // ── a run the last host left open ──
   {
     name: "a left-open lane's prompt does not resume first",
@@ -232,15 +359,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "planCarryOn: a run whose prompt names who resumed, read back as its line",
-  },
-  {
-    name: "a gate's refusal names the archiver by their address",
-    file: "packages/rules/gate.ts",
-    from: "    displayName(writer, names.get(writer))",
-    to: "    displayName(writer, undefined)",
-    command: unit,
-    expect:
-      "gateRefusal: an archive names its archiver, a hold and a trash say what to do",
   },
   {
     name: "a stop's hold is never written",
@@ -3401,14 +3519,6 @@ export const mutations: readonly Mutation[] = [
     expect: "your commits conflicted by the catch-up: reverted",
   },
   {
-    name: "a reverted catch-up is worded as conflicts you have",
-    file: "packages/rules/accepted.ts",
-    from: '  if (code !== ERR.WORKING_COPY_CONFLICT)\n    return acceptedRefusal("publish", code, after)\n',
-    to: '  return acceptedRefusal("publish", code, after)\n',
-    command: unit,
-    expect: "publishUndone",
-  },
-  {
     name: "a publish's second round accepts as decided",
     file: "packages/rules/accepted.ts",
     from: "  return { ...move, accept: after.workingCopy.ahead > 0 }",
@@ -4459,15 +4569,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a branch at an entry asks for its root's tree, then is decided by it",
-  },
-  {
-    name: "an archived refusal names nobody",
-    file: "packages/rules/gate.ts",
-    from: "nameOf(refusal.canvas.by)",
-    to: "String(refusal.canvas.by)",
-    command: unit,
-    expect:
-      "gateRefusal: an archive names its archiver, a hold and a trash say what to do",
   },
   {
     name: "a held thread is never found held",

@@ -31,21 +31,19 @@ import {
   addressMessage,
   decodeMessage,
   encodeMessage,
-  type Floor,
   messageImageShas,
   participants,
   pendingRunEndReport,
   planAfterStep,
-  planResolution,
   planRunSteps,
   planSshNews,
   planStack,
   planStartup,
   promptAuthor,
   renderableMessage,
-  resolutionFloor,
   withMessageImages,
 } from "./index.ts"
+import { type Floor, planResolution, resolutionFloor } from "./land.ts"
 import { detailsFromStored, planMessage } from "./message.ts"
 import { removalsText } from "./removals.ts"
 

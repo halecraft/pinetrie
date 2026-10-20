@@ -1,7 +1,7 @@
 import { type ThreadId, type ThreadName, threadIdFor } from "@pinetrie/core"
-import type { Moved } from "@pinetrie/jj"
 import { describe, expect, test } from "vitest"
 import { planMarks } from "./marks.ts"
+import type { Moved } from "./observe.ts"
 
 describe("planMarks: what a move the owner observed refreshes", () => {
   const A = threadIdFor("a")

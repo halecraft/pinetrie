@@ -7,6 +7,26 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── host mounts ──
+  {
+    name: "a project's own skills are mounted from the host",
+    file: "packages/lanes/plan.ts",
+    from: "    .filter(r => project === null || !isWithin(r, project))\n",
+    to: "",
+    command: unit,
+    expect:
+      "a root inside the project is neither mounted nor refused: each lane has its own copy",
+  },
+  // ── a lane's start, decided whole ──
+  {
+    name: "a disk's start makes no container",
+    file: "packages/lanes/plan.ts",
+    from: "      return { container, start: { ...decided, steps: [planStart(spec, env)] } }\n",
+    to: "      return { container, start: { ...decided, steps: [] } }\n",
+    command: unit,
+    expect:
+      "decideContainerStart: a missing container's start carries the steps that make it, on its disk or from a snapshot",
+  },
   // ── the images ──
   {
     name: "a Containerfile copies nothing in",

@@ -8,16 +8,11 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import { HELD_WORDS } from "@pinetrie/interface"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
-import {
-  foreignLaneWords,
-  HELD_WORDS,
-  LANE,
-  setRecord,
-  WORKFLOW,
-} from "@pinetrie/rules"
+import { foreignLaneWords, LANE, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {

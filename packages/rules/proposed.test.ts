@@ -23,17 +23,15 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { actionFact } from "./fact.ts"
 import {
   ACCEPTED,
   BASE as BASE_RECORD,
   decodeStack,
   encodeUpdate,
   PROPOSED_CHANGES,
-  planAcceptance,
-  planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planRebuild,
   planRefresh,
   planStack,
   planStackEnded,
@@ -48,7 +46,11 @@ import {
   acceptanceDestinations,
   isAsShown,
   isProposedMoved,
+  planAcceptance,
+  planDescribeAgain,
+  planRebuild,
 } from "./proposed.ts"
+import { planProposedAct } from "./proposed-act.ts"
 import { removalsText } from "./removals.ts"
 import { decodeUpdate } from "./update.ts"
 
@@ -1092,6 +1094,41 @@ describe("the proposed changes' policy over a gather", () => {
           "",
         ),
       ).toEqual({ kind: "refused", why: ERR.NO_PROPOSED_CHANGES })
+    })
+  })
+
+  describe("planProposedAct: an action on proposed changes, with its fact", () => {
+    test("describe and squash are refused with no proposed changes; let through, each carries the fact the thread is told", () => {
+      const act = { lane: LANE, by: ADA } as const
+      expect(
+        planProposedAct({ ...act, gathered: null, action: "describe" }),
+      ).toEqual({ kind: "refused", code: ERR.NO_PROPOSED_CHANGES })
+      expect(
+        planProposedAct({
+          ...act,
+          gathered: null,
+          action: "squash",
+          unfinished: "",
+        }),
+      ).toEqual({ kind: "refused", code: ERR.NO_PROPOSED_CHANGES })
+      expect(
+        planProposedAct({ ...act, gathered: gather(), action: "describe" }),
+      ).toEqual({
+        kind: "describe",
+        fact: actionFact("describe", LANE, ADA),
+      })
+      expect(
+        planProposedAct({
+          ...act,
+          gathered: gather(),
+          action: "squash",
+          unfinished: "WIP (amber-fox): x",
+        }),
+      ).toMatchObject({
+        kind: "rebuild",
+        rebuild: { name: NAME },
+        fact: actionFact("squash", LANE, ADA),
+      })
     })
   })
 

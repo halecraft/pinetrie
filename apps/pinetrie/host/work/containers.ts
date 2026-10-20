@@ -11,7 +11,7 @@ import {
 import { PINETRIE_MOUNT } from "@pinetrie/install"
 import type { Keeper } from "@pinetrie/keeper"
 import {
-  decideLaneStart,
+  decideContainerStart,
   executeOrThrow,
   innerDockerDataRootStep,
   KILL_SSH,
@@ -22,12 +22,7 @@ import {
   type LaneStartWithStoppedContainer,
   laneNote,
   nestedLaneDockerNote,
-  planContainer,
-  planDisk,
-  planShape,
-  planStart,
   RUNTIME_BIN,
-  shapeSpecHash,
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import {
@@ -88,7 +83,7 @@ export interface Containers {
   runEnded(lane: ThreadId): void
   /**
    * Start a lane's container, as `planLaneStart` decides from its fork's
-   * record and its container (`planContainer`): a fork owed runs; a container
+   * record and its container (`decideContainerStart`): a fork owed runs; a container
    * made from another spec (image, mounts, grants) is recreated on the same
    * volume; a missing one starts from its disk, else a snapshot, whose disk
    * then gets what its history needs (`LaneHistory.afterRestore`). Run from a
@@ -187,14 +182,17 @@ export function createContainers(deps: {
     const fork = readLaneForks(session).get(lane)
     if (fork === undefined)
       throw new Error(`${readThreadName(session, lane)} has no fork record`)
-    const containerPlan = planContainer({
-      facts: await runtime.containerFacts(container),
-      want: shapeSpecHash(runtime, planShape(spec, process.env)),
-    })
-    const decided = await decideLaneStart(
-      { fork: fork.state, container: containerPlan },
-      factsOf(lane, h),
-    )
+    const { container: containerPlan, start: decided } =
+      await decideContainerStart(
+        {
+          spec,
+          env: process.env,
+          runtime,
+          facts: await runtime.containerFacts(container),
+          fork: fork.state,
+        },
+        factsOf(lane, h),
+      )
     switch (decided.kind) {
       case "fork":
         // A fork stopped part way may have left its container running, its
@@ -218,15 +216,8 @@ export function createContainers(deps: {
           await runtime.remove(container)
         }
         await makeInnerDockerDataRoot(spec, decided, handle.runners)
-        if (decided.kind === "disk")
-          await executeOrThrow([planStart(spec, process.env)], handle.runners)
-        else {
-          await executeOrThrow(
-            planDisk({ spec, env: process.env, from: decided.from }),
-            handle.runners,
-          )
-          await h.afterRestore()
-        }
+        await executeOrThrow(decided.steps, handle.runners)
+        if (decided.kind === "snapshot") await h.afterRestore()
         // Made just now: running.
         await handle.start("running")
         break

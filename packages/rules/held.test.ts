@@ -15,10 +15,8 @@ import { describe, expect, test } from "vitest"
 import {
   foreignIn,
   heldIn,
-  holdingWords,
   runsIn,
   runThreads,
-  TRASHED_WORDS,
   takenIn,
   threadCardHolding,
 } from "./held.ts"
@@ -224,5 +222,4 @@ test("a trashed thread is held by nobody, but trashing it stops its run and a co
   expect(
     heldAt([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
   ).toEqual({ thread: T, holding: { kind: "trashed" } })
-  expect(holdingWords({ kind: "trashed" })).toBe(TRASHED_WORDS)
 })

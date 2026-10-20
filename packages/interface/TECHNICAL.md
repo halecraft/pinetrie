@@ -32,6 +32,12 @@ browser decides from them is web-core's. `apps/tui`, a terminal client
 declaring only this package, the session and core, proves it
 (`apps/tui/TECHNICAL.md`).
 
+- **Words a person reads are here, and only here** (ADR-0199): a sentence
+  only people read is worded once in this package, the host's answer to a
+  refused command among them (`answer-words.ts`: `gateRefusal`,
+  `acceptedRefusal`, the card commands' refusals), which the host imports to
+  answer with and the page reads for a title. A sentence the agent reads,
+  even one a person sees too, is rules'; the host's log is the host's.
 - **No DOM, no React, no I/O.** `tsconfig.pure.json` type-checks this
   package, with what it imports, against `lib: ["ESNext"]`, no ambient
   types and only the globals `pure-globals.d.ts` declares, run by `pnpm run
