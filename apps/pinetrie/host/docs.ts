@@ -22,7 +22,7 @@ export interface HostDocuments {
 
 /**
  * What a starting host says it opened: `opened` of the directory's `total`
- * roots, those a crash interrupted a run in (`planLoads`).
+ * roots, those the last host left a run open in (`planLoads`).
  */
 export const rootsOpenedWords = (counts: {
   readonly opened: number
@@ -32,13 +32,14 @@ export const rootsOpenedWords = (counts: {
   const of = `of ${total} ${total === 1 ? "root" : "roots"}`
   return opened === 0
     ? `opened none ${of}`
-    : `opened ${opened} ${of}: ${opened === 1 ? "the one" : "those"} a crash interrupted a run in`
+    : `opened ${opened} ${of}: ${opened === 1 ? "the one" : "those"} the last host left a run open in`
 }
 
 /**
  * The roots a starting host opens: those of the lanes `pinetrie:live` still
- * names as running, which a crash interrupted, read before `planClear`
- * empties it. Every other root loads when a step needs it. In order, by id.
+ * names as running, whose runs the last host left open, crashed or stopped,
+ * read before `planClear` empties it. Every other root loads when a step
+ * needs it. In order, by id.
  */
 export const planLoads = (
   running: readonly ThreadId[],

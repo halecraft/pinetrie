@@ -449,12 +449,19 @@ are the only code that builds or reads the shape.
 
 # Runs and startup (`message.ts`, `startup.ts`)
 
-- **`settleRun`** (`message.ts`): a compelled message pi refuses to run is kept,
-  appended with no reply, rather than lost; the author already heard
-  `started`.
-- **`planStartup`** (`startup.ts`): a starting host resumes every lane a
-  crash interrupted, before anything queued for it, since it holds its
-  operation open (S36); its run's end then drains it. It drains every other
+- **A run's course is planned as values** (`message.ts`, ADR-0197).
+  `planRunSteps` is what a run does, from its start's kind and whether pi
+  holds an operation open on the lane that another process left: a prompt
+  there resumes it first (`["resume", "prompt"]`), since pi refuses a run
+  on it as busy. `planAfterStep` is what follows each step: an `interrupted`
+  step ends the run (pi's harness closed under it, and the operation stays
+  open for the next process); a chat refused or stopped is kept, appended
+  with no reply, rather than lost, since the author already heard
+  `started`; a resume that ran goes on to the prompt.
+- **`planStartup`** (`startup.ts`): a starting host resumes every lane the
+  last host left running, crashed or stopped, before anything queued for
+  it, since pi holds its operation open (S36, S282); its run's end then
+  drains it. It drains every other
   lane with cards queued for it, since no run's end will. A run-end report
   left pending lost its request with the last host and is `unclassified`, unless
   its lane is resumed. What does not survive a process (runs and streams)

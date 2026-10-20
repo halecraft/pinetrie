@@ -58,6 +58,8 @@ export {
 export { KynetaStorage } from "./storage.ts"
 export type {
   BeforePrompt,
+  Interrupted,
+  ResumeOutcome,
   RunOutcome,
   ThreadLaneHandle,
   WriteOutcome,

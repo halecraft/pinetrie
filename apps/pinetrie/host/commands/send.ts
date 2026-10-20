@@ -317,6 +317,11 @@ export async function executeSend(
               planned.thread,
             )
           : await agent.lane(planned.thread).append(message(planned.details))
+      // pi refuses a lane another process left open as busy: the send is
+      // then busy as a running lane's is, and its card waits in the queue
+      // until the lane's next run, the resume's, ends.
+      if (appended.kind === "refused" && appended.code === ERR.BUSY)
+        return { kind: "busy" }
       if (appended.kind === "refused") {
         return {
           kind: "refused",

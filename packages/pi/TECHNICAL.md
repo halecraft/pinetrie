@@ -61,6 +61,11 @@ kept, so the next call asks again. That stays sound because the host runs
   never opened too. `Agent.close()` closes the harnesses alone
   (`closeBuilt`), which ends running runs; the host's shutdown closes the
   scribe after it.
+  - **`Agent.close()` closes no agent** (S282). A later call on a root
+    whose harness it closed builds a new harness over the session the old
+    one closed, and faults (`HarnessFault`) for `run`, `resume` and
+    `append` alike, opening nothing. A later call on a root it never built a
+    harness for builds one, and runs.
 - **Routing.** `createThreadLane(spot, lane)` acts in `spot.root`'s
   harness. `lane(name)` returns a handle whose every call finds the lane's
   root when it is made: a lane is created, then its record written, then it
@@ -257,8 +262,8 @@ the alternative a second host would need: read the thread's end inside
 `laneErrCode(tag)` maps pi's refusal tags for runs and lane creation, so none of
 pi's vocabulary passes the boundary (ADR-0003): `UnknownTarget` and `LaneBusy`
 have codes of their own; anything else is `refused`. The host never writes to
-a running lane, but after a crash pi holds the interrupted operation open, and
-the lane is `LaneBusy` until resumed (below).
+a running lane, but after a crash or a stop pi holds the interrupted
+operation open, and the lane is `LaneBusy` until resumed (below).
 
 ### Streaming, in pine·trie's words (ADR-0107)
 
@@ -733,12 +738,33 @@ item 18, and in `lanes.test.ts` against the harness.
   - `run` and `resume` call it once more after the run, for the last turn,
     however the run ends: a Stop, or a model that fails (S104).
   - A hook that throws is reported by pi, and the run goes on.
-- **Resume after a crash.** `Agent.interrupted()` lists lanes whose
+- **Resume after a crash or a stop.** `Agent.interrupted()` lists lanes whose
   `inspectExecution` shows an open operation; `ThreadLaneHandle.resume()`
   resumes one in its `Context`. pi records the interrupted tool call as
   interrupted, never running it again, and the rest of the run uses the
   directory in `resume`'s `Context`. `lanes.test.ts` reproduces the crash with
-  two agents over one document.
+  two agents over one document, and the stop with an agent closed under a
+  run held on the model (ADR-0197).
+  - **A drive cut off by a close is `interrupted`** (`thread-lanes.ts`).
+    pi's `close` seals each lane, and a call it lands during rejects with
+    `HarnessClosed`: a drive's operation stays open, as a crash's does
+    (S282). A close during a run's admission rejects the same way with
+    nothing committed; its lane is marked for nothing, and the next start
+    finds no operation and clears the mark. A close before the call is pi's
+    `Closed`, a refusal.
+    `turn` maps that rejection, from `lane.prompt` or `lane.resume` alone,
+    to `{ kind: "interrupted" }`, and records no turn: the process that
+    resumes it does. A `HarnessFault` is not interrupted: a faulted harness
+    may not run again in this process.
+  - **`isLeftOpen` and the busy append.** `ThreadLanes` tracks the lanes
+    with a run or resume of this process in flight (`driving`).
+    `isLeftOpen` is pi's open operation on a lane none of them drives; a
+    driven lane's open operation is its own run's, and it is not
+    inspected. An `append` on a lane left open is refused `busy`: pi would
+    queue it in the operation's inbox, which only a resume delivers, as a
+    follow-up turn no one asked for (S282). On a driven lane pi still
+    queues it into the run in flight, which an answer held for its asker
+    relies on.
 - **A lane's prefix never changes between its runs** (S85, ADR-0176, S244).
   Anthropic drops an earlier thinking block when anything before it in the
   request changed since it was written, and pi asks it to (`drop_block`): a

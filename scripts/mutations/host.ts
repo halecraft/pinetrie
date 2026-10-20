@@ -11,6 +11,43 @@ const command = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  // ── a run the last host left open ──
+  {
+    name: "an interrupted run clears its mark",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '      input.interrupted ? "left-running" : "end-run",\n',
+    to: '      "end-run",\n',
+    command: unit,
+    expect:
+      "an interrupted run leaves its lane running, and ended is still last",
+  },
+  {
+    name: "a Stop while resuming is cancelled as if pi had not started",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '      if (stopping.phase === "resuming") return false\n',
+    to: "",
+    command: unit,
+    expect:
+      "a Stop while a chat's run resumes it keeps the message, unrun, and leaves the abort to pi",
+  },
+  {
+    name: "a prompt on a left-open lane is not resumed first",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '            start.kind === "prompt" && (await handle.isLeftOpen())\n',
+    to: "            false\n",
+    command: unit,
+    expect:
+      "a prompt on it resumes the operation, then runs with what it is told gathered after",
+  },
+  {
+    name: "a busy append is refused to the sender",
+    file: "apps/pinetrie/host/commands/send.ts",
+    from: '      if (appended.kind === "refused" && appended.code === ERR.BUSY)\n        return { kind: "busy" }\n',
+    to: "",
+    command: unit,
+    expect:
+      "a plain chat whose append pi refuses busy is busy, so its card is queued",
+  },
   // ── the start's checklist ──
   {
     name: "an estimate forgets the build remembered",
@@ -526,8 +563,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's run is not told its base's news",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.incoming ?? null,\n            ...canvas,\n            pinned,\n",
+    from: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          ...canvas,\n          pinned,\n",
+    to: "        const before = [\n          prompt.incoming ?? null,\n          ...canvas,\n          pinned,\n",
     command: unit,
     expect: "a chat's run is told its base's news first",
   },
@@ -615,7 +652,7 @@ export const mutations: readonly Mutation[] = [
     from: "  [...new Set(lanes.flatMap(lane => rootOfLane(lane) ?? []))].sort()",
     to: "  [...new Set(lanes.flatMap(() => []))].sort()",
     command: unit,
-    expect: "planLoads: the roots of the lanes a crash interrupted a run in",
+    expect: "planLoads: the roots of the lanes the last host left running",
   },
   {
     name: "accepted work's preview runs no git",
@@ -853,8 +890,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane stops before its streams close",
     file: "apps/pinetrie/host/runs.ts",
-    from: '    "run-end-report-pending",\n    "end-run",\n    "lane-stopped",\n',
-    to: '    "run-end-report-pending",\n    "lane-stopped",\n    "end-run",\n',
+    from: '      input.interrupted ? "left-running" : "end-run",\n      "lane-stopped",\n',
+    to: '      "lane-stopped",\n      input.interrupted ? "left-running" : "end-run",\n',
     command: unit,
     expect: "end-run comes before lane-stopped",
   },
@@ -869,8 +906,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused run's message is lost",
     file: "apps/pinetrie/host/runs.ts",
-    from: "            await handle.append(personMessage)\n          }\n        } catch (error) {",
-    to: "          }\n        } catch (error) {",
+    from: '            if (next === "keep" && personMessage !== null) {\n',
+    to: "            if (false) {\n",
     command: unit,
     expect: "a compelled chat pi refuses to run is appended",
   },
@@ -1069,8 +1106,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split's stack is never checked",
     file: "apps/pinetrie/host/runs.ts",
-    from: '  const outcome: readonly RunEndStep[] = role === "stack" ? ["split-ended"] : []',
-    to: "  const outcome: readonly RunEndStep[] = []",
+    from: '    input.role === "stack" ? ["split-ended"] : []\n',
+    to: "    []\n",
     command: unit,
     expect:
       "a stack prompt adds split-ended before end-run; a land prompt ends as any run",
@@ -1882,24 +1919,24 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run reads no pinned cards",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n",
+    from: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          ...canvas,\n          pinned,\n",
+    to: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          ...canvas,\n",
     command: unit,
     expect: "a prompt's run reads its pinned cards",
   },
   {
     name: "a stop before pi starts is lost",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          if (personMessage !== null && stop.signal.aborted) {",
-    to: "          if (false) {",
+    from: '        leave()\n        if (stop.signal.aborted) return "stopped"\n',
+    to: "        leave()\n",
     command: unit,
     expect: "a stop while a chat's run waits for its pinned cards",
   },
   {
     name: "a land start can be cancelled",
     file: "apps/pinetrie/host/runs.ts",
-    from: "      if (personMessage !== null) waiting.set(lane, stop)",
-    to: "      waiting.set(lane, stop)",
+    from: '        personMessage === null ? null : { stop, phase: "pinned" }\n',
+    to: '        false ? null : { stop, phase: "pinned" }\n',
     command: unit,
     expect: "a land or stack start cannot be cancelled",
   },
@@ -1980,8 +2017,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the run-end report is pending only after the run has stopped",
     file: "apps/pinetrie/host/runs.ts",
-    from: '    "run-end-report-pending",\n    "end-run",\n',
-    to: '    "end-run",\n    "run-end-report-pending",\n',
+    from: '    failable: [...outcome, "run-end-report-pending"],\n    always: [\n      input.interrupted ? "left-running" : "end-run",\n',
+    to: '    failable: [...outcome],\n    always: [\n      input.interrupted ? "left-running" : "end-run",\n      "run-end-report-pending",\n',
     command: unit,
     expect: "the run-end report is pending before end-run",
   },
@@ -2421,8 +2458,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run is told nothing of its canvas",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.incoming ?? null,\n            behind,\n            pinned,\n",
+    from: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          ...canvas,\n          pinned,\n",
+    to: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          pinned,\n",
     command: unit,
     expect: "then its canvas, before its cards entry",
   },
@@ -2900,8 +2937,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run lets its root go before its end",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          await end(lane, id)\n",
-    to: "          await lease[Symbol.asyncDispose]()\n          await end(lane, id)\n",
+    from: "          await end(lane, id, interrupted)\n",
+    to: "          await lease[Symbol.asyncDispose]()\n          await end(lane, id, interrupted)\n",
     command: unit,
     expect:
       "a run holds its lane's root from its start until its end's last step, through a failed step before end-run",
@@ -3291,8 +3328,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run's prompt change is never logged",
     file: "apps/pinetrie/host/runs.ts",
-    from: '          if (ran.kind === "ok" && ran.promptChanged.length > 0)\n',
-    to: '          if (ran.kind === "ok" && ran.promptChanged.length > 99)\n',
+    from: '        if (ran.kind === "ok" && ran.promptChanged.length > 0)\n',
+    to: '        if (ran.kind === "ok" && ran.promptChanged.length > 99)\n',
     command: unit,
     expect:
       "a run that wrote its lane's prompt anew logs the sections it changed, and one that did not logs none",

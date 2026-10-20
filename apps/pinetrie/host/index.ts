@@ -659,7 +659,7 @@ async function openHost(
     onSlow: slow(basics),
   })
   closers.defer(() => keeper.close("drop"))
-  // The roots of the lanes a crash interrupted a run in, read before
+  // The roots of the lanes the last host left a run open in, read before
   // `recover` clears what was running, opened in one step. Every other root
   // is loaded by the step that needs it (`planLoads`).
   progress.begin("roots")
@@ -1120,7 +1120,8 @@ async function openHost(
           // Queued steps, a compaction among them, finish their writes.
           return quiet()
         case "agent":
-          // Every harness closes, which ends running runs.
+          // Every harness closes. A run in flight ends interrupted, and its
+          // lane stays marked running for the next start.
           return agent.close()
         case "scribe":
           // Every session, the session document's too: a later write is refused.

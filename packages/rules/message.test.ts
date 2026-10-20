@@ -35,14 +35,15 @@ import {
   messageImageShas,
   participants,
   pendingRunEndReport,
+  planAfterStep,
   planResolution,
+  planRunSteps,
   planSshNews,
   planStack,
   planStartup,
   promptAuthor,
   renderableMessage,
   resolutionFloor,
-  settleRun,
   withMessageImages,
 } from "./index.ts"
 import { detailsFromStored, planMessage } from "./message.ts"
@@ -593,10 +594,32 @@ describe("settling and starting up", () => {
     },
     content: { command: null, unsent: null, origin: null },
   })
-  test("settleRun: a refused run keeps the message; an admitted one is done", () => {
-    expect(settleRun({ kind: "refused" })).toBe("keep")
-    expect(settleRun({ kind: "ok" })).toBe("done")
+  test("planRunSteps: a prompt on a lane left open resumes first; a resume is only a resume", () => {
+    const prompt = { kind: "prompt", text: "hi" } as const
+    const resume = { kind: "resume" } as const
+    expect(planRunSteps(prompt, true)).toEqual([resume, prompt])
+    expect(planRunSteps(prompt, false)).toEqual([prompt])
+    expect(planRunSteps(resume, true)).toEqual([resume])
+    expect(planRunSteps(resume, false)).toEqual([resume])
   })
+  test.each([
+    ["resume", "ok", true, "continue"],
+    ["resume", "ok", false, "continue"],
+    ["prompt", "ok", true, "end"],
+    ["resume", "interrupted", true, "end"],
+    ["prompt", "interrupted", true, "end"],
+    ["resume", "stopped", true, "keep"],
+    ["prompt", "stopped", true, "keep"],
+    ["prompt", "refused", true, "keep"],
+    ["resume", "refused", true, "keep"],
+    ["prompt", "refused", false, "end"],
+    ["resume", "refused", false, "end"],
+  ] as const)(
+    "planAfterStep: after a %s that ended %s, a chat (%s) does %s",
+    (step, outcome, chat, next) => {
+      expect(planAfterStep({ step, outcome, chat })).toBe(next)
+    },
+  )
   test("planStartup: every lane with queued cards drains, once", () => {
     const plan = planStartup({
       cards: [

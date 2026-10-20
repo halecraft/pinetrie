@@ -62,7 +62,7 @@ import type { Places } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
 import type { Records } from "./records.ts"
 import type { StepDocs } from "./roots.ts"
-import type { Runs } from "./runs.ts"
+import { type Runs, resumingLine } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
@@ -72,8 +72,8 @@ export interface StartupDeps {
   >
   /**
    * The roots this host opened at its start (`planLoads`): those of the lanes
-   * a crash interrupted a run in. Every other root is recovered as it first
-   * loads (`recoverRoot`).
+   * the last host left a run open in. Every other root is recovered as it
+   * first loads (`recoverRoot`).
    */
   readonly roots: readonly RootId[]
   readonly agent: Pick<Agent, "interrupted">
@@ -98,15 +98,16 @@ export interface StartupDeps {
 }
 
 /**
- * What a root holds that a crash or an older build left: lanes a crash
- * interrupted, resumed in their own directory (`planStartup`), and those of
- * another kind left as they are; records of a type no spec declares, deleted
- * (`planUndeclaredSweep`); stored lane names that are not a thread's, logged,
- * since no reader is given them. Run in the step whose documents are `roots`,
- * at startup for the roots it opened and later as each other root first
- * loads. A lane this host runs now is no crash's: the step that first loaded
- * its root may have started it. Returns the lanes it resumed or kept, for
- * the session's plan.
+ * What a root holds that the last host or an older build left: lanes whose
+ * operation a crash or a stop cut off, resumed in their own directory
+ * (`planStartup`), and those of another kind left as they are; records of a
+ * type no spec declares, deleted (`planUndeclaredSweep`); stored lane names
+ * that are not a thread's, logged, since no reader is given them. Run in the
+ * step whose documents are `roots`, at startup for the roots it opened and
+ * later as each other root first loads. A lane this host runs now is
+ * skipped: the step that first loaded its root may have started its run,
+ * which resumes an operation left open itself. Returns the lanes it resumed
+ * or kept, for the session's plan.
  */
 export async function recoverRoot(
   deps: Pick<StartupDeps, "agent" | "work" | "start"> & {
@@ -147,9 +148,7 @@ export async function recoverRoot(
       `[host] ignoring stored lanes that are no thread's: ${malformed.join(", ")}`,
     )
   for (const lane of planned.resume) {
-    log(
-      `[host] resuming ${readThreadName(session, lane)}, which a crash interrupted`,
-    )
+    log(resumingLine(readThreadName(session, lane), "alone"))
     deps.start(roots, lane, { kind: "resume" })
   }
   for (const foreign of planned.kept)

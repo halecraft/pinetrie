@@ -244,7 +244,7 @@ export function startStepWords(step: StartStep, machine: LaneMachine): string {
     case "model":
       return "the model"
     case "roots":
-      return "the threads a crash interrupted"
+      return "the threads the last host left running"
     case "lane-work":
       return "lanes' configs and ssh"
     case "lane-images":

@@ -5,6 +5,24 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a run the last host left open ──
+  {
+    name: "a left-open lane's prompt does not resume first",
+    file: "packages/rules/message.ts",
+    from: '  start.kind === "prompt" && leftOpen ? [RESUME, start] : [start]\n',
+    to: "  [start]\n",
+    command: unit,
+    expect:
+      "planRunSteps: a prompt on a lane left open resumes first; a resume is only a resume",
+  },
+  {
+    name: "a stopped chat is not kept",
+    file: "packages/rules/message.ts",
+    from: '    case "refused":\n    case "stopped":\n      return chat ? "keep" : "end"\n',
+    to: '    case "refused":\n      return chat ? "keep" : "end"\n    case "stopped":\n      return "end"\n',
+    command: unit,
+    expect: "planAfterStep: after a resume that ended stopped",
+  },
   // ── what threads are told and asked ──
   {
     name: "the pop ignores whether the host holds the text",
@@ -2026,10 +2044,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused run's message is dropped",
     file: "packages/rules/message.ts",
-    from: '): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")',
-    to: '): "done" | "keep" => "done"',
+    from: '    case "refused":\n    case "stopped":\n      return chat ? "keep" : "end"\n',
+    to: '    case "refused":\n      return "end"\n    case "stopped":\n      return chat ? "keep" : "end"\n',
     command: unit,
-    expect: "a refused run keeps the message",
+    expect:
+      "planAfterStep: after a prompt that ended refused, a chat (true) does keep",
   },
   {
     name: "startup drains nothing",

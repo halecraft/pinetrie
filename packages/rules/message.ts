@@ -437,15 +437,51 @@ export function promptAuthor(message: unknown): WriterId | null {
   )
 }
 
+/** One step of a run: resume pi's open operation, or run the prompt. */
+export type RunStep = "resume" | "prompt"
+
+const RESUME = { kind: "resume" } as const
+
 /**
- * After a run ends: a compelled message pi refused to run is still a person's
- * message, so it is appended, with no reply, rather than lost. A run pi
- * admitted, whatever became of the model's call, is done: its prompt is in
- * the tree.
+ * What a run does, in order: its start, as its first step. A prompt on a
+ * lane another process left open resumes that operation first: pi refuses a
+ * run on it as busy, and the prompt then runs behind it, with what it is
+ * told gathered after.
  */
-export const settleRun = (
-  ran: { readonly kind: "ok" } | { readonly kind: "refused" },
-): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
+export const planRunSteps = <S extends { readonly kind: RunStep }>(
+  start: S,
+  leftOpen: boolean,
+): readonly (S | typeof RESUME)[] =>
+  start.kind === "prompt" && leftOpen ? [RESUME, start] : [start]
+
+/** How a run's step ended, as the run reads it; `stopped` is a Stop the run saw itself. */
+export type StepOutcome = "ok" | "interrupted" | "refused" | "stopped"
+
+/**
+ * After each step of a run: go on to the next, keep the person's message
+ * unrun, or end. A chat pi refused or a Stop ended is still a person's
+ * message, so it is appended, with no reply, rather than lost. A step pi's
+ * harness closed under ends the run, with its operation left open for the
+ * next process. A refused resume ends a prompt that is not a chat: its
+ * prompt would meet the same open operation.
+ */
+export function planAfterStep(input: {
+  readonly step: RunStep
+  readonly outcome: StepOutcome
+  /** The run's prompt is a person's chat. */
+  readonly chat: boolean
+}): "continue" | "keep" | "end" {
+  const { step, outcome, chat } = input
+  switch (outcome) {
+    case "interrupted":
+      return "end"
+    case "refused":
+    case "stopped":
+      return chat ? "keep" : "end"
+    case "ok":
+      return step === "resume" ? "continue" : "end"
+  }
+}
 
 /**
  * What a send that starts a thread needs for its card:

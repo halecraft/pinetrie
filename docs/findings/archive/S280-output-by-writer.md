@@ -1,6 +1,7 @@
 # S280 — The kernel can say which step of a command wrote each byte of its output, background jobs' late output included
 
 - **Status:** Answered
+- **Led to:** ADR-0196
 
 Measured in a QEMU guest on the lane VM's kernel (Linux 6.18.57,
 `linux-virt`, the observer suite's), two emulated CPUs, from a lane.

@@ -828,6 +828,24 @@ describe("sendMessage", () => {
     expect(pi.calls.filter(c => c.method !== "commands")).toEqual([])
   })
 
+  test("a plain chat whose append pi refuses busy is busy, so its card is queued", async () => {
+    const { b, deps } = setUp()
+    writeLaneTip(b.root, LANE, E1)
+    putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
+    const lane = record<ThreadLaneHandle>({
+      name: LANE,
+      append: async () => ({ kind: "refused", code: ERR.BUSY }),
+    })
+    const out = await sendCleared(
+      { ...deps, agent: { ...deps.agent, lane: () => lane.port } },
+      ALICE,
+      "s-1",
+      { ...said("@bea a note"), card: { id: cardIdFor("c1"), seen: "" } },
+    )
+    expect(methods(lane.calls)).toEqual(["append"])
+    expect(out).toEqual({ kind: "busy" })
+  })
+
   test("a message with no card names no one else", async () => {
     const { pi, cards, deps } = setUp()
     await sendCleared(deps, ALICE, "s-1", said("plain"))

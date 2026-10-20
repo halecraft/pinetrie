@@ -172,6 +172,7 @@ export function fakeLane(
   const ran = deferred<RunOutcome>()
   const { port, calls } = record<ThreadLaneHandle>({
     name,
+    isLeftOpen: async () => false,
     run: async () => ran.promise,
     resume: async () => ran.promise,
     ...impl,

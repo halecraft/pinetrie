@@ -118,6 +118,7 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "CustomMessage",
   "dirnameEnvPath",
   "executionMode",
+  "HarnessFault",
   "InMemoryStorageState",
   "ModelsImpl",
   "OPENROUTER_API_KEY",

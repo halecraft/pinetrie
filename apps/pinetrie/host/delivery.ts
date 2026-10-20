@@ -4,7 +4,7 @@
 // a thread with no lane at its end. Shared by an answer to an ask and a
 // lane's ssh news, so one rule says when a message wakes.
 
-import type { ThreadId } from "@pinetrie/core"
+import { ERR, type ThreadId } from "@pinetrie/core"
 import type { Agent, Scribe } from "@pinetrie/pi"
 import { readThreads } from "@pinetrie/reads"
 import {
@@ -13,7 +13,7 @@ import {
   planDelivery,
   type SshFactMessage,
 } from "@pinetrie/rules"
-import type { Basics } from "./basics.ts"
+import { type Basics, notWritten } from "./basics.ts"
 import type { StepDocs } from "./roots.ts"
 import type { Runs } from "./runs.ts"
 import { threadsNow } from "./threads-now.ts"
@@ -33,7 +33,8 @@ export type Delivered =
 /**
  * Delivers into `thread` in a late step's documents. `steers`: it may enter
  * a running lane after the turn in flight. "busy" when the lane runs and it
- * may not: the caller decides what waits for the run's end.
+ * may not, or another process left its operation open: the caller decides
+ * what waits for the run's end.
  */
 export type Deliver = (
   roots: StepDocs,
@@ -43,7 +44,7 @@ export type Deliver = (
 ) => Promise<"delivered" | "busy">
 
 export function createDelivery(deps: {
-  readonly basics: Pick<Basics, "session" | "places" | "live">
+  readonly basics: Pick<Basics, "session" | "places" | "live" | "log">
   readonly agent: Pick<Agent, "lane">
   readonly scribe: Pick<Scribe, "appendToTree">
   readonly start: Runs["start"]
@@ -53,6 +54,15 @@ export function createDelivery(deps: {
   const threads = threadsNow(deps.basics)
   return async (roots, thread, delivered, steers) => {
     const { message, wakes } = delivered
+    // pi refuses a lane another process left open as busy, which then waits
+    // as a running lane's delivery does.
+    const append = async (lane: ThreadId): Promise<"delivered" | "busy"> => {
+      const appended = await deps.agent.lane(lane).append(message)
+      if (appended.kind === "refused" && appended.code === ERR.BUSY)
+        return "busy"
+      notWritten(deps.basics, "a delivered message", lane)(appended)
+      return "delivered"
+    }
     const found = await threads.thread(roots, thread)
     if (found === null) return "delivered"
     const to = planDelivery({
@@ -68,22 +78,20 @@ export function createDelivery(deps: {
         // thread, as one that wakes nobody does.
         const runnable = deps.runnable(to.thread)
         if (!delivered.wakes || typeof runnable === "object")
-          await deps.agent.lane(to.thread).append(message)
-        else
-          deps.start(roots, runnable, {
-            kind: "prompt",
-            message: delivered.message,
-            pinnedSeen: [],
-            incoming: null,
-          })
+          return append(to.thread)
+        deps.start(roots, runnable, {
+          kind: "prompt",
+          message: delivered.message,
+          pinnedSeen: [],
+          incoming: null,
+        })
         return "delivered"
       }
       case "steer":
         await deps.agent.lane(to.thread).steer(message)
         return "delivered"
       case "append-to-lane":
-        await deps.agent.lane(to.thread).append(message)
-        return "delivered"
+        return append(to.thread)
       case "append-to-tree": {
         const root = readThreads(deps.basics.session).get(thread)?.root
         if (root !== undefined && found.end !== null)

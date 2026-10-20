@@ -25,9 +25,11 @@ import {
   MESSAGE_TYPE,
   type PinnedMessage,
   type PromptMessage,
+  planAfterStep,
   planEndRun,
+  planRunSteps,
   planStream,
-  settleRun,
+  type StepOutcome,
 } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import {
@@ -39,7 +41,7 @@ import {
   readStreams,
 } from "@pinetrie/schema"
 import type { BaseNews } from "./base-news.ts"
-import { type Basics, failed } from "./basics.ts"
+import { type Basics, failed, notWritten } from "./basics.ts"
 import type { CanvasContext } from "./canvas.ts"
 import type { Lease, StepDocs } from "./roots.ts"
 import type { LaneWork } from "./work/index.ts"
@@ -108,9 +110,12 @@ export interface Runs {
    */
   start(roots: StepDocs, lane: RunnableLane, start: RunStart): RunId
   /**
-   * Stop a chat's run that has not reached pi yet: it is waiting for its
-   * pinned cards' text, where pi's `abort` reaches nothing. Its message is
-   * kept, unrun. False when no such run waits on `lane`.
+   * Stop a chat's run before its prompt reaches pi; its message is kept,
+   * unrun. True while it waits for its pinned cards' text, where pi's
+   * `abort` reaches nothing. While it resumes the operation the last host
+   * left open, its message is kept all the same, but the resume is pi's to
+   * stop, so this returns false and the caller asks pi to abort. False when
+   * no chat's run waits on `lane`.
    */
   cancel(lane: ThreadId): boolean
   /**
@@ -128,27 +133,40 @@ export type RunEndStep =
   | "split-ended"
   | "run-end-report-pending"
   | "end-run"
+  | "left-running"
   | "lane-stopped"
   | "ended"
 
 /**
- * A run's end, in order, from its prompt's role. A split checks its stack,
- * however it started. A resolution ends as any run does: its outcome is the
- * proposed changes' conflicts and the agent's asks in the tree. The run's
- * end report is pending before `end-run`: written after, a reader would see
- * the lane stopped beside the last run's end report. `end-run` comes before
- * `lane-stopped` and `ended`: it closes the lane's streams, and what follows
- * reads the lane as idle.
+ * A run's end, from its prompt's role and whether pi's harness closed under
+ * it. `failable` may fail, which is logged; `always` runs whatever came
+ * before. A split checks its stack, however it started. A resolution ends
+ * as any run does: its outcome is the proposed changes' conflicts and the
+ * agent's asks in the tree. The run's end report is pending before
+ * `end-run`: written after, a reader would see the lane stopped beside the
+ * last run's end report. `end-run` comes before `lane-stopped` and `ended`:
+ * it closes the lane's streams, and what follows reads the lane as idle. An
+ * interrupted run leaves its lane marked running instead: pi keeps its
+ * operation open, and the next host opens the lanes marked running and
+ * resumes them.
  */
-export function planRunEnd(role: Role | undefined): readonly RunEndStep[] {
-  const outcome: readonly RunEndStep[] = role === "stack" ? ["split-ended"] : []
-  return [
-    ...outcome,
-    "run-end-report-pending",
-    "end-run",
-    "lane-stopped",
-    "ended",
-  ]
+export function planRunEnd(input: {
+  readonly role: Role | undefined
+  readonly interrupted: boolean
+}): {
+  readonly failable: readonly RunEndStep[]
+  readonly always: readonly RunEndStep[]
+} {
+  const outcome: readonly RunEndStep[] =
+    input.role === "stack" ? ["split-ended"] : []
+  return {
+    failable: [...outcome, "run-end-report-pending"],
+    always: [
+      input.interrupted ? "left-running" : "end-run",
+      "lane-stopped",
+      "ended",
+    ],
+  }
 }
 
 /**
@@ -186,6 +204,17 @@ export const endRun = (live: LiveDocHandle, lane: ThreadId, run: RunId): void =>
     }),
   )
 
+/**
+ * A chat's run a Stop can still keep unrun: `pinned` while it gathers and
+ * waits for its pinned cards, where pi's `abort` reaches nothing; `resuming`
+ * while it resumes an operation the last host left open, which only pi's
+ * abort ends.
+ */
+interface Stoppable {
+  readonly stop: AbortController
+  phase: "pinned" | "resuming"
+}
+
 export function createRuns(deps: {
   readonly basics: Basics
   readonly runDocs: ReturnType<typeof createRunDocs>
@@ -203,21 +232,25 @@ export function createRuns(deps: {
   const { runDocs } = deps
   let ended: (lane: ThreadId, prompt: EntryId | null) => void = () => {}
   /**
-   * A chat's run between its start and pi's, by lane. Only a chat's: a land
-   * or stack run cancelled here would write no prompt, and `end` would read
-   * the lane's previous one, and could check an old split's stack again.
+   * Each chat's run a Stop can still keep unrun, by lane, until its prompt
+   * reaches pi. Only a chat's: a land or stack run cancelled here would
+   * write no prompt, and `end` would read the lane's previous one, and could
+   * check an old split's stack again.
    */
-  const waiting = new Map<ThreadId, AbortController>()
+  const stoppable = new Map<ThreadId, Stoppable>()
 
   /**
-   * Carry out `planRunEnd`. The steps before `end-run` may fail, and a failure
-   * is logged; `end-run` and every step after it always run.
+   * Carry out `planRunEnd`. Its `failable` steps may fail, and a failure is
+   * logged; its `always` steps run whatever came before.
    */
-  async function end(lane: ThreadId, id: RunId): Promise<void> {
+  async function end(
+    lane: ThreadId,
+    id: RunId,
+    interrupted: boolean,
+  ): Promise<void> {
     const doc = runDocs.docOf(lane)
     const prompt = doc === null ? null : readLatestPrompt(doc, lane)
-    const steps = planRunEnd(prompt?.role)
-    const cut = steps.indexOf("end-run")
+    const steps = planRunEnd({ role: prompt?.role, interrupted })
     const carry = async (step: RunEndStep) => {
       switch (step) {
         case "split-ended":
@@ -228,6 +261,9 @@ export function createRuns(deps: {
           return
         case "end-run":
           return endRun(live, lane, id)
+        case "left-running":
+          log(`[host] run ${id.slice(-8)} left running for the next start`)
+          return
         case "lane-stopped":
           work.runEnded(lane)
           baseNews.runEnded(lane)
@@ -238,11 +274,11 @@ export function createRuns(deps: {
       }
     }
     try {
-      for (const step of steps.slice(0, cut)) await carry(step)
+      for (const step of steps.failable) await carry(step)
     } catch (error) {
       failed(basics, "run end")(error)
     }
-    for (const step of steps.slice(cut)) await carry(step)
+    for (const step of steps.always) await carry(step)
   }
 
   return {
@@ -254,89 +290,128 @@ export function createRuns(deps: {
       const id = runId(basics.newId())
       applyLiveOps(live, [{ kind: "begin", lane, run: id }])
       const handle = agent.lane(lane)
+      const name = () => readThreadName(basics.session, lane)
       // A chat's message, which is kept if its run never happens.
       const personMessage =
         start.kind === "prompt" && start.message.customType === MESSAGE_TYPE
           ? start.message
           : null
       const stop = new AbortController()
-      if (personMessage !== null) waiting.set(lane, stop)
+      const stopping: Stoppable | null =
+        personMessage === null ? null : { stop, phase: "pinned" }
+      if (stopping !== null) stoppable.set(lane, stopping)
+      const leave = () => {
+        if (stoppable.get(lane) === stopping) stoppable.delete(lane)
+      }
+
+      /** The prompt: its pinned cards, then what it is told, then pi's run. */
+      const prompted = async (
+        prompt: Extract<RunStart, { kind: "prompt" }>,
+      ): Promise<StepOutcome> => {
+        if (stopping !== null) stopping.phase = "pinned"
+        // A Stop may come while the lane's state is gathered, before this wait.
+        if (stop.signal.aborted) return "stopped"
+        const pinned = await readPinned(
+          lane,
+          prompt.pinnedSeen,
+          stop.signal,
+        ).catch(error => {
+          failed(basics, "pinned cards")(error)
+          return null
+        })
+        leave()
+        if (stop.signal.aborted) return "stopped"
+        // A chat's run is told its base's new work first; a resolution or a
+        // split has a prompt of its own.
+        const behind =
+          personMessage === null
+            ? null
+            : await baseNews.atStart(lane).catch(error => {
+                failed(basics, "the base's news")(error)
+                return null
+              })
+        // What the run is told of its canvas, read after the pinned cards'
+        // wait, so it is as late as the run's start.
+        const canvas = await readCanvasContext(lane).catch(error => {
+          failed(basics, "the canvas's context")(error)
+          return []
+        })
+        // The cards entry stays the prompt's parent; what an asked agent
+        // heard goes first.
+        const before = [
+          prompt.incoming ?? null,
+          behind,
+          ...canvas,
+          pinned,
+        ].filter(m => m !== null)
+        const ran = await handle.run(prompt.message, before)
+        if (ran.kind === "ok" && ran.promptChanged.length > 0)
+          log(promptChangedLine(name(), ran.promptChanged))
+        return ran.kind
+      }
+
+      /**
+       * pi's resume of the lane's open operation. It runs even after a Stop:
+       * until it ends, pi would refuse the kept message as busy. A Stop
+       * during it is pi's abort, which ends the operation; the prompt's
+       * step then sees the Stop, and keeps the message.
+       */
+      const resumed = async (): Promise<StepOutcome> => {
+        if (stopping !== null) stopping.phase = "resuming"
+        return (await handle.resume()).kind
+      }
+
       void (async () => {
         // The step that starts a run has loaded its lane's root, so the
-        // lease holds it hydrated: nothing waits before the pinned cards'
-        // read, which a stop may cancel at once.
+        // lease holds it hydrated.
         await using _held = lease
+        let interrupted = false
         try {
           work.beforeRun(lane)
-          if (start.kind === "resume") {
-            await handle.resume()
-            return
-          }
-          const pinned = await readPinned(
-            lane,
-            start.pinnedSeen,
-            stop.signal,
-          ).catch(error => {
-            failed(basics, "pinned cards")(error)
-            return null
-          })
-          if (waiting.get(lane) === stop) waiting.delete(lane)
-          if (personMessage !== null && stop.signal.aborted) {
-            log(`[host] run ${id.slice(-8)} stopped before it started`)
-            await handle.append(personMessage)
-            return
-          }
-          // A chat's run is told its base's new work first; a resolution or a
-          // split has a prompt of its own.
-          const behind =
-            personMessage === null
-              ? null
-              : await baseNews.atStart(lane).catch(error => {
-                  failed(basics, "the base's news")(error)
-                  return null
-                })
-          // What the run is told of its canvas, read after the pinned cards'
-          // wait, so it is as late as the run's start.
-          const canvas = await readCanvasContext(lane).catch(error => {
-            failed(basics, "the canvas's context")(error)
-            return []
-          })
-          // The cards entry stays the prompt's parent; what an asked agent
-          // heard goes first.
-          const before = [
-            start.incoming ?? null,
-            behind,
-            ...canvas,
-            pinned,
-          ].filter(m => m !== null)
-          const ran = await handle.run(start.message, before)
-          if (ran.kind === "ok" && ran.promptChanged.length > 0)
-            log(
-              promptChangedLine(
-                readThreadName(basics.session, lane),
-                ran.promptChanged,
-              ),
-            )
-          if (personMessage !== null && settleRun(ran) === "keep") {
-            // The reply was already `started`, so the author cannot be told;
-            // at least their message is not lost.
-            log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-            await handle.append(personMessage)
+          // gather
+          const leftOpen =
+            start.kind === "prompt" && (await handle.isLeftOpen())
+          // plan
+          const steps = planRunSteps(start, leftOpen)
+          // execute
+          if (steps.length > 1) log(resumingLine(name(), "before-message"))
+          for (const step of steps) {
+            const outcome =
+              step.kind === "resume" ? await resumed() : await prompted(step)
+            if (outcome === "interrupted") interrupted = true
+            const next = planAfterStep({
+              step: step.kind,
+              outcome,
+              chat: personMessage !== null,
+            })
+            if (next === "keep" && personMessage !== null) {
+              // The reply was already `started`, so the author cannot be
+              // told; at least their message is not lost.
+              log(keptLine(id, outcome))
+              notWritten(
+                basics,
+                "a kept message",
+                lane,
+              )(await handle.append(personMessage))
+            }
+            if (next !== "continue") break
           }
         } catch (error) {
           failed(basics, "run")(error)
         } finally {
-          await end(lane, id)
+          leave()
+          await end(lane, id, interrupted)
           runDocs.drop(lane, lease)
         }
       })()
       return id
     },
     cancel(lane) {
-      const stop = waiting.get(lane)
-      if (stop === undefined) return false
-      waiting.delete(lane)
-      stop.abort()
+      const stopping = stoppable.get(lane)
+      if (stopping === undefined) return false
+      stopping.stop.abort()
+      if (stopping.phase === "resuming") return false
+      stoppable.delete(lane)
       return true
     },
     onEnded(listener) {
@@ -355,6 +430,21 @@ export const promptChangedLine = (
   sections: readonly string[],
 ): string =>
   `[host] ${thread}: the model's prompt changed: ${sections.join(", ")}`
+
+/**
+ * The line a resume of an operation the last host left open logs, whether a
+ * crash or a stop cut it off; `before-message` when a new message's run
+ * resumes it first.
+ */
+export const resumingLine = (
+  thread: string,
+  then: "alone" | "before-message",
+): string =>
+  `[host] resuming ${thread}, which the last host left running${then === "before-message" ? ", before its new message" : ""}`
+
+/** The line a chat's run logs as it keeps the message unrun: pi refused it, or a Stop came first. */
+export const keptLine = (run: RunId, outcome: StepOutcome): string =>
+  `[host] run ${run.slice(-8)} ${outcome === "refused" ? "REFUSED: kept as a message" : "stopped before it started"}`
 
 /**
  * A run on `lane`, proven runnable first (`LaneWork.runnable`); on a lane of

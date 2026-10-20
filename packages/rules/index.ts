@@ -442,10 +442,12 @@ export {
   messageImageShas,
   type PersonMessage,
   type PromptMessage,
+  planAfterStep,
   planDelivery,
+  planRunSteps,
   promptAuthor,
   renderableMessage,
-  settleRun,
+  type StepOutcome,
   type ThreadStarts,
   withMessageImages,
 } from "./message.ts"

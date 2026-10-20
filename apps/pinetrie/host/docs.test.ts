@@ -2,7 +2,7 @@ import { rootIdFor, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { planLoads, rootsOpenedWords } from "./docs.ts"
 
-test("planLoads: the roots of the lanes a crash interrupted a run in, once each, in order", () => {
+test("planLoads: the roots of the lanes the last host left running, once each, in order", () => {
   const [a, c] = [rootIdFor("a"), rootIdFor("c")]
   const rootOf = new Map([
     [threadIdFor("l1"), c],
@@ -20,10 +20,10 @@ test("planLoads: the roots of the lanes a crash interrupted a run in, once each,
 
 test("rootsOpenedWords: how many roots a starting host opened, and why", () => {
   expect(rootsOpenedWords({ opened: 2, total: 195 })).toBe(
-    "opened 2 of 195 roots: those a crash interrupted a run in",
+    "opened 2 of 195 roots: those the last host left a run open in",
   )
   expect(rootsOpenedWords({ opened: 1, total: 59 })).toBe(
-    "opened 1 of 59 roots: the one a crash interrupted a run in",
+    "opened 1 of 59 roots: the one the last host left a run open in",
   )
   expect(rootsOpenedWords({ opened: 0, total: 1 })).toBe(
     "opened none of 1 root",

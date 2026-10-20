@@ -140,6 +140,7 @@ describe("createThreadLane", () => {
     expect(await lane.append(message)).toEqual(unknown)
     expect(await lane.run(message, [])).toEqual(unknown)
     expect(await lane.resume()).toEqual(unknown)
+    expect(await lane.isLeftOpen()).toBe(false)
     await agent.close()
   })
 })

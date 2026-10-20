@@ -8,6 +8,7 @@ import path from "node:path"
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
   type EntryId,
+  ERR,
   messageText,
   pointId,
   ROOT,
@@ -22,7 +23,7 @@ import {
   encodeMessage,
   PINNED_RULE,
 } from "@pinetrie/rules"
-import { readEntries, rowMessage } from "@pinetrie/schema"
+import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
@@ -38,7 +39,7 @@ import {
   systemPromptFor,
 } from "./lanes.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
-import { scriptedModel } from "./scripted.ts"
+import { type ScriptedModel, scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
 import { threadContext } from "./thread-context.ts"
 import { assembleTools } from "./tools.ts"
@@ -444,6 +445,56 @@ describe("lanes in a harness", () => {
     return { agent, script, newLane, texts, doc }
   }
 
+  /** The next process's agent over `doc`, as a restart makes it, its tools unused. */
+  async function nextAgent(
+    doc: RootDocHandle,
+    script: ScriptedModel,
+    replicaId: string,
+    access: (lane: ThreadId) => LaneAccess | null = () => null,
+  ) {
+    const { agent } = await startPi(oneRoot(doc), {
+      replicaId,
+      model: { kind: "scripted", script },
+      project: root,
+      tools: {
+        bannerAsks: async () => {
+          throw new Error("unused")
+        },
+        access,
+        hooks: {
+          turnDone: async () => {},
+          askedAboutConflict: async () => false,
+          configWritten: async () => null,
+          getLatest: async () => {
+            throw new Error("no catch_up here")
+          },
+          resolveConflict: async () => {
+            throw new Error("no conflict here")
+          },
+          askSplit: async () => {
+            throw new Error("no split_proposed_changes here")
+          },
+          ask: async () => {
+            throw new Error("unused")
+          },
+          leave: async () => {
+            throw new Error("unused")
+          },
+          readCard: async () => {
+            throw new Error("read_card was not called")
+          },
+          putImage: async () => {
+            throw new Error("put_image was not called")
+          },
+          readBlob: async () => {
+            throw new Error("unused")
+          },
+        },
+      },
+    })
+    return agent
+  }
+
   /** Channels to the helpers `where` opened, closed after each test. */
   const opened: LaneChannel[] = []
   afterEach(async () => {
@@ -641,54 +692,14 @@ describe("lanes in a harness", () => {
     const lane = await first.newLane(where(before))
     first.script.use([{ tool: "bash", args: { command: "sleep 2" } }])
     // It ends only as the harness closes under it, below.
-    const crashed = first.agent
-      .lane(lane)
-      .run(prompt("crash"), [])
-      .catch(() => {})
+    const crashed = first.agent.lane(lane).run(prompt("crash"), [])
     await new Promise(r => setTimeout(r, 300))
     // The next process, over the same document: a second agent.
-    const wheres = new Map([[lane, where(after)]])
     const script = scriptedModel()
-    const { agent: second } = await startPi(oneRoot(first.doc), {
-      replicaId: "after",
-      model: { kind: "scripted", script },
-      project: root,
-      tools: {
-        bannerAsks: async () => {
-          throw new Error("unused")
-        },
-        access: l => wheres.get(l) ?? where(root),
-        hooks: {
-          turnDone: async () => {},
-          askedAboutConflict: async () => false,
-          configWritten: async () => null,
-          getLatest: async () => {
-            throw new Error("no catch_up here")
-          },
-          resolveConflict: async () => {
-            throw new Error("no conflict here")
-          },
-          askSplit: async () => {
-            throw new Error("no split_proposed_changes here")
-          },
-          ask: async () => {
-            throw new Error("unused")
-          },
-          leave: async () => {
-            throw new Error("unused")
-          },
-          readCard: async () => {
-            throw new Error("read_card was not called")
-          },
-          putImage: async () => {
-            throw new Error("put_image was not called")
-          },
-          readBlob: async () => {
-            throw new Error("unused")
-          },
-        },
-      },
-    })
+    const own = where(after)
+    const second = await nextAgent(first.doc, script, "after", l =>
+      l === lane ? own : where(root),
+    )
     expect(await second.interrupted([ONE_ROOT])).toEqual([lane])
     // A lane skipped is not asked of: its inspection would wait for a run.
     expect(await second.interrupted([ONE_ROOT], l => l === lane)).toEqual([])
@@ -707,7 +718,68 @@ describe("lanes in a harness", () => {
     await second.close()
     // The crashed process would be gone: its tool call must not write after.
     await first.agent.close()
-    await crashed
+    expect(await crashed).toEqual({ kind: "interrupted" })
+  })
+
+  /** Resolves once `held`'s request has reached the model. */
+  const reached = async (held: { readonly reached: boolean }) => {
+    while (!held.reached) await new Promise(r => setTimeout(r, 5))
+  }
+
+  test("an agent closed while its run waits on the model: the run is interrupted, and the next agent finds the lane left open", async () => {
+    const first = await setUp(new Map())
+    const lane = await first.newLane(null)
+    const held = first.script.hold("cut off")
+    const cut = first.agent.lane(lane).run(prompt("cut off"), [])
+    await reached(held)
+    await first.agent.close()
+    expect(await cut).toEqual({ kind: "interrupted" })
+    const next = await nextAgent(first.doc, first.script, "next")
+    const handle = next.lane(lane)
+    expect(await handle.isLeftOpen()).toBe(true)
+    const busy = { kind: "refused", code: ERR.BUSY }
+    expect(await handle.run(prompt("again"), [])).toEqual(busy)
+    expect(await handle.append(prompt("meanwhile"))).toEqual(busy)
+    first.script.use([{ text: "resumed" }])
+    expect(await handle.resume()).toEqual({ kind: "ok" })
+    expect(await handle.isLeftOpen()).toBe(false)
+    first.script.use([{ text: "and then" }])
+    expect(await handle.run(prompt("after"), [])).toMatchObject({ kind: "ok" })
+    await next.close()
+  })
+
+  test("a resume its agent closes under is interrupted, and the lane stays left open", async () => {
+    const first = await setUp(new Map())
+    const lane = await first.newLane(null)
+    const held = first.script.hold("cut off")
+    const cut = first.agent.lane(lane).run(prompt("cut off"), [])
+    await reached(held)
+    await first.agent.close()
+    await cut
+    const second = await nextAgent(first.doc, first.script, "second")
+    const again = first.script.hold("cut off")
+    const resumed = second.lane(lane).resume()
+    await reached(again)
+    await second.close()
+    expect(await resumed).toEqual({ kind: "interrupted" })
+    const third = await nextAgent(first.doc, first.script, "third")
+    expect(await third.lane(lane).isLeftOpen()).toBe(true)
+    await third.close()
+  })
+
+  test("a lane this agent is driving is not left open, and an append to it is queued into the run", async () => {
+    const { agent, script, newLane } = await setUp(new Map())
+    const lane = await newLane(null)
+    const held = script.hold("driving")
+    const ran = agent.lane(lane).run(prompt("driving"), [])
+    await reached(held)
+    expect(await agent.lane(lane).isLeftOpen()).toBe(false)
+    expect(await agent.lane(lane).append(prompt("into the run"))).toMatchObject(
+      { kind: "appended" },
+    )
+    held.finish()
+    expect(await ran).toMatchObject({ kind: "ok" })
+    await agent.close()
   })
 
   test("a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails", async () => {

@@ -153,6 +153,18 @@ knows of.
 
 ## A run's start
 
+- **A run gathers, plans, then carries out its steps** (ADR-0197). It asks
+  pi whether the lane holds an operation another process left open
+  (`ThreadLaneHandle.isLeftOpen`), plans with `planRunSteps`, and after each
+  step acts on `planAfterStep` (`packages/rules/TECHNICAL.md`). A prompt on
+  a lane left open resumes that operation first, logged as
+  `resumingLine`'s `before its new message`, then gathers what it is told
+  (base news, canvas, pinned cards) from the tree the resume left, and
+  runs. pi refuses a run on such a lane as busy, and would queue an append
+  in the operation's inbox (S282), so the check comes first, whatever left
+  the operation open and whatever order the root's first-load recovery and
+  the run's step take. It rests on the host never starting a run on a lane
+  it runs: the dispatcher, the drain and the relays gate on `readRunning`.
 - **A prompt's run reads its pinned cards first** (`readPinned`,
   `pinned.ts`): a chat's, a popped queued card's, a resolution's, a split's
   and a carry-on's. It
@@ -169,7 +181,14 @@ knows of.
   it running),
   but pi has no run yet. `Runs.cancel(lane)` aborts a chat's wait; the run
   then appends the chat, as a refused run does, and ends. `handleStop`
-  cancels first and asks pi to abort only when nothing was cancelled. A
+  cancels first and asks pi to abort only when nothing was cancelled.
+  A chat's run is stoppable in two phases (`runs.ts`): `pinned`, its
+  pinned cards' wait and the gather before it, where `cancel` returns true;
+  and `resuming`, its resume of a left-open operation, where `cancel` keeps
+  the message all the same but returns false, so `handleStop` asks pi to
+  abort the resume. The resume runs even after a Stop: until it ends, pi
+  would refuse the kept message as busy. After pi's abort the lane is idle,
+  and the message lands in the tree (S282). A
   land or stack start cannot be cancelled: it writes no prompt then, and
   `end()` would read the lane's previous one, and for a stack end an old
   split again. They carry no `seen`, so their window is as short as
@@ -183,9 +202,10 @@ knows of.
 
 ## A run's end
 
-`planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
-split's `split-ended`, then `run-end-report-pending`, `end-run`, `lane-stopped`,
-`ended`. A resolution ends as any run does (ADR-0080, S104): what it left
+`planRunEnd` returns the order, from the prompt's role and whether pi's
+harness closed under the run, and `runs.ts` carries it out: its `failable`
+steps, a split's `split-ended` then `run-end-report-pending`; then its
+`always` steps, `end-run` (or `left-running`), `lane-stopped`, `ended`. A resolution ends as any run does (ADR-0080, S104): what it left
 conflicted is the proposed changes', and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
 
@@ -201,8 +221,15 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   after, a page would see the lane stopped beside the last run's report,
   and draw its arrival. Its `end` is the run's last entry from its
   asks, as at `ended`.
-- **A failure before `end-run` is logged as `run end failed`,** and `end-run`
-  and every step after it still run.
+- **A failure in a `failable` step is logged as `run end failed`,** and
+  every `always` step still runs.
+- **An interrupted run leaves its lane marked running** (`left-running` in
+  place of `end-run`, ADR-0197). A run or resume whose drive pi's harness
+  closed under ends `interrupted` (`packages/pi/TECHNICAL.md`): pi keeps the
+  operation open, as after a crash (S282). The lane's mark in
+  `pinetrie:live` is cleared only when pi shows the operation closed, so the
+  next host opens its root at startup (`planLoads`) and resumes it. The
+  step logs `[host] run <id> left running for the next start`.
 - **`ended` is one function, set once** in `startHost`: `settle`, banners, and the run-end report with the final digest, then the thread's focus once that has settled (`RunEndSettled`, ADR-0173). It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
   `runs.ts` imports neither the queue's pop nor the commands.
@@ -344,10 +371,14 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   tab's new root before its first send.
 - **A starting host opens only the roots of the lanes `pinetrie:live`
   names as running** (`planLoads`), read before `recover` clears them, and
-  `recover` resumes the interrupted lanes among them. A root's first load
-  in a host's life queues `recoverRoot` as a step of its own: its
-  interrupted lanes resumed, records of a type no spec declares deleted,
-  malformed lanes logged.
+  `recover` resumes the interrupted lanes among them. A lane is still
+  marked when the last host's run in it crashed or was cut off by a stop
+  (ADR-0197). A root's first load in a host's life queues `recoverRoot` as
+  a step of its own: its interrupted lanes resumed, records of a type no
+  spec declares deleted, malformed lanes logged. It skips a lane this host
+  is running, since pi's inspection would wait behind its drive; the step
+  that loaded the root may have started that run, which resumes an
+  operation left open itself (§ A run's start).
 - **Archiving lets go of no root itself**: the upkeep does, as for any
   root. Its close unloads the canvas's stacks of moves (`unloadCanvas`), which
   keep their own lifetime (§ Moves' history). Restoring opens nothing.
@@ -632,7 +663,8 @@ before; a folder's `STATE` and `CONFLICT` records are kept whatever the
 kind), `ensureNames` (ADR-0039), `recoverRoot` for each root opened, in
 one step (its undeclared records deleted, its stored lane names that fail
 `isThreadId` logged, since no reader is given them, and each interrupted
-lane resumed before anything waiting for it, S36 item 18), `planStartup`
+lane resumed before anything waiting for it, S36 item 18, whether a
+crash or a stop left it), `planStartup`
 over the queued cards and those lanes, the
 project and commands records that changed in one write (`setIfChanged`),
 the sweep of what no one will type in again: empty cards, card documents
@@ -866,9 +898,16 @@ rejects `shutdown()`.
   observed move or a lane's fetch, a drain from a command) writes to a
   closing agent and document: its jj steps land and its record is lost
   (S73). A watch event after `close` finds the owner closed.
-- **Closing the agent ends running runs.** pi's harness seals every lane, so
-  a run's `run` rejects and `runs.ts`' `end` runs its steps: a refresh and a
-  `settle`. The closed queues refuse them.
+- **Closing the agent ends running runs interrupted.** pi's harness seals
+  every lane, so a drive in flight rejects with `HarnessClosed`, which pi's
+  boundary turns into `interrupted`, and `runs.ts`' `end` runs its steps
+  with `left-running` in place of `end-run`: the lane stays marked, and the
+  next start opens its root and resumes it (ADR-0197, S282). Its other
+  steps queue a refresh and a `settle`, which the closed queues refuse.
+- **A chat still waiting on its pinned cards at the stop is lost.** Its run
+  has no operation in pi yet, so nothing resumes it. Its later call to pi
+  meets a harness over the session the close ended, which faults (S282), so
+  the run fails, and its message is not kept.
 
 ## Commands
 

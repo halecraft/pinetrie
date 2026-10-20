@@ -15,7 +15,7 @@ export type StartStep =
   | "project"
   /** pi's setup: the model, packages, skills and prompts. */
   | "model"
-  /** The roots a crash interrupted a run in, opened. */
+  /** The roots the last host left a run open in, opened. */
   | "roots"
   /** Lanes' configs, shared directories and ssh. */
   | "lane-work"

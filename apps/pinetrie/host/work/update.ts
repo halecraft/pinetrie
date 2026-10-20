@@ -71,7 +71,7 @@ import {
   type UpdateRefusal,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import { failed, type LeaseBasics } from "../basics.ts"
+import { failed, type LeaseBasics, notWritten } from "../basics.ts"
 import type { Containers } from "./containers.ts"
 import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
@@ -615,7 +615,11 @@ export function createUpdates(deps: {
           })
           return applySettle(
             {
-              append: message => handle.append(message),
+              append: async message => {
+                const appended = await handle.append(message)
+                notWritten(basics, "an update", lane)(appended)
+                return appended
+              },
               recordUpdate: (entry, merge) => recordUpdate(lane, entry, merge),
             },
             settle,

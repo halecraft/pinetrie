@@ -13,8 +13,9 @@ import {
 } from "./run-end-report.ts"
 
 /**
- * What a starting host runs. A lane a crash interrupted holds its operation
- * open, so it is resumed before anything queued for it, and its run's end
+ * What a starting host runs. A lane the last host left running, crashed or
+ * stopped, holds its operation open, so it is resumed before anything queued
+ * for it, and its run's end
  * drains it. Every other lane with cards queued for it is drained, since no
  * run's end will. A run-end report left pending lost its request with the last host,
  * and is `unclassified`, unless its lane is resumed, whose run's end writes
@@ -24,7 +25,7 @@ import {
  */
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]
-  /** Lanes a crash interrupted, as pi reports them, each proven runnable or not. */
+  /** Lanes pi holds an operation open on, as it reports them, each proven runnable or not. */
   readonly interrupted: readonly (RunnableLane | ForeignLane)[]
   readonly runEndReports: readonly RunEndReportRecord[]
 }): {

@@ -181,7 +181,7 @@ export interface Agent {
    */
   createThreadLane(spot: Spot, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle
-  /** Lanes pi holds an operation open on, in `roots`: a crash interrupted them. */
+  /** Lanes pi holds an operation open on, in `roots`: a crash or a stop cut them off. */
   /**
    * `skip` names lanes not to ask of: pi's inspection of a lane waits for its
    * running operation to end, so a lane the host runs now is skipped.
@@ -382,6 +382,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     }
     return {
       name,
+      // pi's inspection needs no model, so a host without one is told too.
+      isLeftOpen: () => on(h => h.isLeftOpen(), false),
       append: message => on(h => h.append(message), UNKNOWN_LANE),
       run: (message, before) =>
         noModel

@@ -1,7 +1,12 @@
 // host/basics — what nearly every module of the host's shell takes, and how
 // it reports a failure.
 
-import { errorText, type RootId, type ThreadId } from "@pinetrie/core"
+import {
+  type ErrCode,
+  errorText,
+  type RootId,
+  type ThreadId,
+} from "@pinetrie/core"
 import type { StepSplit } from "@pinetrie/jj"
 import { type Keeper, KeeperClosed, type SlowStep } from "@pinetrie/keeper"
 import { readThreadName } from "@pinetrie/reads"
@@ -77,6 +82,31 @@ export function failed(
       lane === undefined
         ? `[host] ${what} failed: ${errorText(error)}`
         : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${errorText(error)}`,
+    )
+  }
+}
+
+/** An append's result, as `notWritten` reads it: pi's outcome, or what it threw. */
+export type AppendResult =
+  | { readonly kind: "appended" }
+  | { readonly kind: "refused"; readonly code: ErrCode }
+  | { readonly kind: "failed"; readonly message: string }
+
+/**
+ * A handler for an append's result that logs `[host] <thread>: <what> was
+ * not written: <code or error>` when it was not written. pi refuses `busy`
+ * on a lane another process left open, where it would otherwise queue the
+ * text in the operation's inbox.
+ */
+export function notWritten(
+  basics: Pick<Basics, "session" | "log">,
+  what: string,
+  lane: ThreadId,
+): (result: AppendResult) => void {
+  return result => {
+    if (result.kind === "appended") return
+    basics.log(
+      `[host] ${readThreadName(basics.session, lane)}: ${what} was not written: ${result.kind === "refused" ? result.code : result.message}`,
     )
   }
 }

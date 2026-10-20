@@ -58,34 +58,42 @@ const said = encodeMessage(
 )
 
 describe("planRunEnd", () => {
+  const ROLES = [undefined, "person", "land", "stack"] as const
   test("end-run comes before lane-stopped, and ended is last, for every role", () => {
-    for (const role of [undefined, "person", "land", "stack"] as const) {
-      const steps = planRunEnd(role)
-      expect(steps.indexOf("end-run")).toBeLessThan(
-        steps.indexOf("lane-stopped"),
+    for (const role of ROLES) {
+      const { always } = planRunEnd({ role, interrupted: false })
+      expect(always.indexOf("end-run")).toBeLessThan(
+        always.indexOf("lane-stopped"),
       )
-      expect(steps.at(-1)).toBe("ended")
+      expect(always.at(-1)).toBe("ended")
     }
   })
 
   test("a stack prompt adds split-ended before end-run; a land prompt ends as any run", () => {
-    expect(planRunEnd("land")).toEqual(planRunEnd("person"))
-    expect(planRunEnd("stack")).toEqual([
-      "split-ended",
-      "run-end-report-pending",
-      "end-run",
-      "lane-stopped",
-      "ended",
-    ])
-    expect(planRunEnd(undefined)).not.toContain("split-ended")
+    const end = (role: (typeof ROLES)[number]) =>
+      planRunEnd({ role, interrupted: false })
+    expect(end("land")).toEqual(end("person"))
+    expect(end("stack")).toEqual({
+      failable: ["split-ended", "run-end-report-pending"],
+      always: ["end-run", "lane-stopped", "ended"],
+    })
+    expect(end(undefined).failable).not.toContain("split-ended")
   })
 
   test("the run-end report is pending before end-run, for every role", () => {
-    for (const role of [undefined, "person", "land", "stack"] as const) {
-      const steps = planRunEnd(role)
-      expect(steps.indexOf("run-end-report-pending")).toBeGreaterThanOrEqual(0)
-      expect(steps.indexOf("run-end-report-pending")).toBeLessThan(
-        steps.indexOf("end-run"),
+    for (const role of ROLES) {
+      const { failable, always } = planRunEnd({ role, interrupted: false })
+      expect(failable).toContain("run-end-report-pending")
+      expect(always).toContain("end-run")
+    }
+  })
+
+  test("an interrupted run leaves its lane running, and ended is still last", () => {
+    for (const role of ROLES) {
+      const { failable, always } = planRunEnd({ role, interrupted: true })
+      expect(always).toEqual(["left-running", "lane-stopped", "ended"])
+      expect(failable).toEqual(
+        planRunEnd({ role, interrupted: false }).failable,
       )
     }
   })
@@ -407,23 +415,23 @@ describe("a run's pinned cards", () => {
     const lane = fakeLane(LANE, {
       append: async () => ({ kind: "appended", id: entryId("e-1") }),
     })
-    const { runs, ended } = setUp(
-      lane,
-      undefined,
-      (_, __, signal) =>
-        new Promise(resolve =>
-          signal.addEventListener("abort", () => resolve(pinned)),
-        ),
-    )
+    const reading = deferred<void>()
+    const { runs, ended } = setUp(lane, undefined, (_, __, signal) => {
+      reading.resolve()
+      return new Promise(resolve =>
+        signal.addEventListener("abort", () => resolve(pinned)),
+      )
+    })
     runs.start(runnableFor(LANE), {
       kind: "prompt",
       message: said,
       pinnedSeen: [],
     })
+    await reading.promise
     expect(runs.cancel(LANE)).toBe(true)
     expect((await ended).running).toBe(false)
-    expect(methods(lane.calls)).toEqual(["append"])
-    expect(lane.calls[0]?.args).toEqual([said])
+    expect(methods(lane.calls)).toEqual(["isLeftOpen", "append"])
+    expect(lane.calls[1]?.args).toEqual([said])
     expect(runs.cancel(LANE)).toBe(false)
   })
 
@@ -448,7 +456,7 @@ describe("a run's pinned cards", () => {
     expect(runs.cancel(LANE)).toBe(false)
     lane.finish(RAN)
     await ended
-    expect(methods(lane.calls)).toEqual(["run"])
+    expect(methods(lane.calls)).toEqual(["isLeftOpen", "run"])
   })
 
   test("once a chat's run has reached pi, cancel returns false, so pi's abort is used", async () => {
@@ -462,6 +470,91 @@ describe("a run's pinned cards", () => {
     expect(runs.cancel(LANE)).toBe(false)
     lane.finish(RAN)
     await ended
+  })
+})
+
+describe("a lane another process left open", () => {
+  test("a prompt on it resumes the operation, then runs with what it is told gathered after", async () => {
+    const order: string[] = []
+    const resumed = deferred<{ readonly kind: "ok" }>()
+    const lane = fakeLane(LANE, {
+      isLeftOpen: async () => true,
+      resume: async () => {
+        order.push("resume")
+        return resumed.promise
+      },
+      run: async () => RAN,
+    })
+    const { runs, ended } = setUp(lane, undefined, async () => {
+      order.push("pinned")
+      return null
+    })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    resumed.resolve({ kind: "ok" })
+    await ended
+    expect(methods(lane.calls)).toEqual(["isLeftOpen", "resume", "run"])
+    expect(order).toEqual(["resume", "pinned"])
+  })
+
+  test("a Stop while a chat's run resumes it keeps the message, unrun, and leaves the abort to pi", async () => {
+    const resumed = deferred<{ readonly kind: "ok" }>()
+    const lane = fakeLane(LANE, {
+      isLeftOpen: async () => true,
+      resume: async () => resumed.promise,
+      append: async () => ({ kind: "appended", id: entryId("e-1") }),
+    })
+    const { runs, ended } = setUp(lane)
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    while (!methods(lane.calls).includes("resume"))
+      await new Promise(resolve => setImmediate(resolve))
+    expect(runs.cancel(LANE)).toBe(false)
+    resumed.resolve({ kind: "ok" })
+    await ended
+    expect(methods(lane.calls)).toEqual(["isLeftOpen", "resume", "append"])
+    expect(lane.calls[2]?.args).toEqual([said])
+  })
+
+  test("a Stop during the pinned cards' wait after a resume cancels the run", async () => {
+    const reading = deferred<void>()
+    const lane = fakeLane(LANE, {
+      isLeftOpen: async () => true,
+      resume: async () => ({ kind: "ok" }),
+      append: async () => ({ kind: "appended", id: entryId("e-1") }),
+    })
+    const { runs, ended } = setUp(lane, undefined, (_, __, signal) => {
+      reading.resolve()
+      return new Promise(resolve =>
+        signal.addEventListener("abort", () => resolve(null)),
+      )
+    })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    await reading.promise
+    expect(runs.cancel(LANE)).toBe(true)
+    await ended
+    expect(methods(lane.calls)).toEqual(["isLeftOpen", "resume", "append"])
+  })
+
+  test("an interrupted run's end leaves its lane running in pinetrie:live, and ended still runs", async () => {
+    const { lane, runs, ended } = setUp()
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    lane.finish({ kind: "interrupted" })
+    expect((await ended).running).toBe(true)
   })
 })
 

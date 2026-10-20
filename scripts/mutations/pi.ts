@@ -5,6 +5,44 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 const config = ["pnpm", "exec", "vitest", "run", "packages/pi/config.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a run the last process left open ──
+  {
+    name: "LaneBusy is refused generically",
+    file: "packages/pi/thread-lanes.ts",
+    from: '  if (tag === "LaneBusy") return ERR.BUSY\n',
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/pi/lanes.test.ts"],
+    expect:
+      "an agent closed while its run waits on the model: the run is interrupted, and the next agent finds the lane left open",
+  },
+  {
+    name: "a closed drive is not interrupted",
+    file: "packages/pi/thread-lanes.ts",
+    from: "    if (error instanceof HarnessClosed) return INTERRUPTED\n",
+    to: "",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "a host stopped mid-run resumes it as it next starts, before its queued card",
+  },
+  {
+    name: "an append to a left-open lane is queued",
+    file: "packages/pi/thread-lanes.ts",
+    from: "          (await leftOpen(name, lane))\n            ? BUSY\n",
+    to: "          false\n            ? BUSY\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/pi/lanes.test.ts"],
+    expect:
+      "an agent closed while its run waits on the model: the run is interrupted, and the next agent finds the lane left open",
+  },
+  {
+    name: "a driven lane counts as left open",
+    file: "packages/pi/thread-lanes.ts",
+    from: "    !driving.has(name) && (await lane.inspectExecution(CTX)).current !== null\n",
+    to: "    (await lane.inspectExecution(CTX)).current !== null\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/pi/lanes.test.ts"],
+    expect:
+      "a lane this agent is driving is not left open, and an append to it is queued into the run",
+  },
   {
     name: "pi's execute sees the intent",
     file: "packages/pi/intent.ts",

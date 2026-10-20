@@ -11,15 +11,20 @@ import {
   projectSpine,
   ROOT,
   rootDocId,
-  runId,
   threadIdFor,
   transcriptCalls,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import { readParticipantNames, readPlaces } from "@pinetrie/reads"
+import {
+  readParticipantNames,
+  readPlaces,
+  readThreadName,
+  readThreads,
+} from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
-import { beginRun } from "@pinetrie/schema/fixtures"
+import { rootsOpenedWords } from "../../host/docs.ts"
+import { resumingLine } from "../../host/runs.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import { gateClose, gateCommand, gateFeed, newGate } from "../gate.ts"
@@ -305,10 +310,22 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${carried?.kind}, then ${again?.kind}; ${prompt?.role}: ${reply?.text.slice(0, 40)}`,
     )
 
-    // 6. Restart over the same store: everything is there, and a card queued
-    // while the lane ran is popped by the new host's startup, since no run's
-    // end will. The run is the document's record alone, which a stopping
-    // host leaves and a starting one clears (`planClear`).
+    // 6. Restart over the same store, with a run waiting on the model and a
+    // card queued behind it: everything is there, the stopping host leaves
+    // the cut-off run's lane marked running, and the new host opens its root
+    // at startup, resumes the run, and its end pops the card.
+    const l6 = tlane()
+    const heldText = "@Bob queued across a restart"
+    const cutText = "held across a restart"
+    const resumedText = "resumed after the restart"
+    // The held request takes the first reply, which never streams; the
+    // resume's request, on the next host, takes the second.
+    script.use([{ text: "cut off by the restart" }, { text: resumedText }])
+    const cut = script.hold(cutText)
+    if (l6 !== undefined && l6.tip !== null) {
+      await u.send(cutText, at(l6.tip), { thread: l6.name })
+      await waitFor(() => cut.reached, 10_000)
+    }
     const before = {
       entries: Object.keys(heldEntries(th)).length,
       lanes: heldLanes(th, ttree(), readPlaces(th.places)).map(
@@ -316,10 +333,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       ),
       names: [...readParticipantNames(th.session).values()].sort(),
     }
-    const l6 = tlane()
-    const heldText = "@Bob queued across a restart"
     if (l6 !== undefined && l6.tip !== null) {
-      beginRun(th.live, l6.name, runId("r-held"))
       const held = await composeCard(
         u,
         { entry: l6.tip, lane: l6.name },
@@ -355,7 +369,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // from an empty session, and leave the queued card unpopped.
     opened = openStore(dbFile)
     stored = opened.store
-    th = await open(() => {}, slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS))
+    const restartLog: string[] = []
+    th = await open(
+      m => restartLog.push(m),
+      slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS),
+    )
     const linesAfter = await storedLines(stored)
     check(
       "a starting host keeps no command Line from before: no client can resume one",
@@ -376,8 +394,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         afterRestart.records < beforeRestart.records,
       `${beforeRestart.records} records -> ${afterRestart.records}`,
     )
+    // The popped card's entry, and the resume's two: the cut-off request's
+    // empty reply and the resumed one.
     const after = {
-      entries: Object.keys(heldEntries(th)).length - 1,
+      entries: Object.keys(heldEntries(th)).length - 3,
       lanes: heldLanes(th, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
@@ -392,6 +412,32 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         after.entries === before.entries &&
         noQueued(th),
       `${after.entries} entries`,
+    )
+    // Opened at startup, not by a later step's first load: only a mark the
+    // stopping host left names its root, and the drain would load it too.
+    const roots = new Set(
+      [...readThreads(th.session).values()].map(t => t.root),
+    )
+    const l6Now = heldLanes(th, ttree(), readPlaces(th.places)).find(
+      l => l.name === l6?.name,
+    )
+    const texts = projectSpine(ttree(), l6Now?.tip ?? null).spine.map(
+      e => e.text,
+    )
+    const resumedAt = texts.indexOf(resumedText)
+    const poppedAt = texts.findIndex(t => t.includes(heldText))
+    check(
+      "a host stopped mid-run resumes it as it next starts, before its queued card",
+      l6 !== undefined &&
+        restartLog.includes(
+          `[host] ${rootsOpenedWords({ opened: 1, total: roots.size })}`,
+        ) &&
+        restartLog.includes(
+          resumingLine(readThreadName(th.session, l6.name), "alone"),
+        ) &&
+        resumedAt >= 0 &&
+        resumedAt < poppedAt,
+      `${restartLog.filter(m => m.includes("opened") || m.includes("resuming")).join(" | ")}; resumed at ${resumedAt}, popped at ${poppedAt}`,
     )
     const u2 = await join(th, "uma", "tools")
     script.use([{ text: "back again" }])

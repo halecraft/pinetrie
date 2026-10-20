@@ -58,7 +58,7 @@ import {
   threadCardHolding,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
-import type { StepBasics } from "./basics.ts"
+import { notWritten, type StepBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { OpenChange, Places } from "./places.ts"
 import type { Records } from "./records.ts"
@@ -366,7 +366,7 @@ async function appendFact(
   lane: ThreadId,
   fact: QueuedFact,
 ): Promise<"next"> {
-  const { session, log, now } = deps.basics
+  const { session, now } = deps.basics
   const message = encodeFact(
     fact,
     displayName(fact.by, readParticipantNames(session).get(fact.by)),
@@ -376,11 +376,11 @@ async function appendFact(
   const appended = await (spot === null
     ? deps.agent.lane(lane).append(message)
     : deps.scribe.appendToTree(message, spot, lane)
-  ).catch((error: unknown) => ({ kind: "failed", message: errorText(error) }))
-  if (appended.kind !== "appended")
-    log(
-      `[host] ${readThreadName(session, lane)}: a fact was not written: ${"message" in appended ? appended.message : appended.kind}`,
-    )
+  ).catch((error: unknown) => ({
+    kind: "failed" as const,
+    message: errorText(error),
+  }))
+  notWritten(deps.basics, "a fact", lane)(appended)
   return "next"
 }
 

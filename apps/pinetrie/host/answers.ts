@@ -22,7 +22,7 @@ import {
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
 import type { Allowances } from "./allowances.ts"
-import type { Basics, HostKeeper } from "./basics.ts"
+import { type Basics, type HostKeeper, notWritten } from "./basics.ts"
 import type { Deliver } from "./delivery.ts"
 import type { Later, LateWrite } from "./later.ts"
 import type { Relays } from "./relays.ts"
@@ -138,7 +138,11 @@ export function createAnswers(deps: {
             ? { facts: plan.facts }
             : {
                 after: async () => {
-                  await deps.agent.lane(asker).append(held.message)
+                  notWritten(
+                    basics,
+                    "an answer",
+                    asker,
+                  )(await deps.agent.lane(asker).append(held.message))
                 },
               }
         },

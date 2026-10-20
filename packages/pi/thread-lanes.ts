@@ -3,7 +3,10 @@
 // handles that speak only pinetrie's types. A lane is never moved, and its tip
 // is never read here: readers use the document.
 
-import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
+import {
+  BACKGROUND_CONTEXT,
+  HarnessClosed,
+} from "@earendil-works/pi-agent-core"
 import {
   type EntryId,
   ERR,
@@ -55,13 +58,25 @@ export interface LaneRefusal {
 /** The result of a write that runs or queues: pi may refuse to admit it. */
 export type WriteOutcome = { readonly kind: "ok" } | LaneRefusal
 
-/** The result of a run: refused, or ran, naming the prompt's sections it changed. */
+/**
+ * pi's harness closed while the run or resume was in flight. pi keeps its
+ * operation open, so the next process finds the lane interrupted.
+ */
+export interface Interrupted {
+  readonly kind: "interrupted"
+}
+
+/** The result of a resume: it ran, was cut off, or pi refused it. */
+export type ResumeOutcome = { readonly kind: "ok" } | Interrupted | LaneRefusal
+
+/** The result of a run: ran, naming the prompt's sections it changed; cut off; or refused. */
 export type RunOutcome =
   | {
       readonly kind: "ok"
       /** The sections of the lane's prompt the run wrote anew; empty when none, or when the lane held no prompt before. */
       readonly promptChanged: readonly string[]
     }
+  | Interrupted
   | LaneRefusal
 
 export type AppendOutcome =
@@ -74,9 +89,9 @@ export type CreateOutcome =
 
 /**
  * pi's refusal tag as our `ErrCode`, so none of pi's vocabulary passes the
- * boundary. The host never writes to a running lane, but after a crash pi
- * holds the interrupted operation open, and the lane is `LaneBusy` until it
- * is resumed.
+ * boundary. The host never writes to a running lane, but after a crash or a
+ * stop pi holds the interrupted operation open, and the lane is `LaneBusy`
+ * until it is resumed.
  */
 export function laneErrCode(tag: string): ErrCode {
   if (tag === "UnknownTarget") return ERR.UNKNOWN_TARGET
@@ -90,7 +105,27 @@ const refusedBy = (tag: string): LaneRefusal => ({
 })
 
 const UNKNOWN: LaneRefusal = { kind: "refused", code: ERR.UNKNOWN_TARGET }
+const BUSY: LaneRefusal = { kind: "refused", code: ERR.BUSY }
 const OK: WriteOutcome = { kind: "ok" }
+const INTERRUPTED: Interrupted = { kind: "interrupted" }
+
+/**
+ * `drive`'s result, or `INTERRUPTED` when pi's harness closed under it. pi
+ * rejects with `HarnessClosed` only for a close during the call: a drive's
+ * operation stays open, and a close during its admission leaves a mark the
+ * next start finds nothing behind and clears. A close before the call is
+ * pi's `Closed`, a refusal; a call on a harness rebuilt after it faults.
+ */
+async function driven(
+  drive: Promise<PiResult>,
+): Promise<PiResult | Interrupted> {
+  try {
+    return await drive
+  } catch (error) {
+    if (error instanceof HarnessClosed) return INTERRUPTED
+    throw error
+  }
+}
 
 /**
  * `f`'s result, or the refusal for a pi TaggedError it throws. Where most of
@@ -137,10 +172,20 @@ export type BeforePrompt =
 export interface ThreadLaneHandle {
   readonly name: ThreadId
   /**
+   * Whether pi holds an operation open on the lane that no run or resume of
+   * this process drives: one a crash or a stop cut off. False for a lane this
+   * process drives, whose open operation is its own run's, and which is not
+   * inspected; false for an unknown lane.
+   */
+  isLeftOpen(): Promise<boolean>
+  /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn.
    * A chat, or a host's fact: an update, what a command on the thread's
-   * proposed changes did, or its ssh news.
+   * proposed changes did, or its ssh news. Refused `busy` on a lane left
+   * open, where pi would queue it in the operation's inbox, which only a
+   * resume delivers, as a turn no one asked for. On a lane this process
+   * drives, pi queues it into the run in flight.
    */
   append(
     message:
@@ -178,8 +223,8 @@ export interface ThreadLaneHandle {
       | CarryOnMessage
       | SshFactMessage,
   ): Promise<WriteOutcome>
-  /** Resume the operation a crash interrupted, in the lane's own directory. */
-  resume(): Promise<WriteOutcome>
+  /** Resume the operation a crash or a stop cut off, in the lane's own directory. */
+  resume(): Promise<ResumeOutcome>
   /**
    * End the lane's running turn. A tool running is aborted, and its result
    * recorded as aborted; the lane then takes its next message.
@@ -195,7 +240,7 @@ export interface ThreadLanes {
    */
   createThreadLane(at: Position, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle
-  /** Lanes pi holds an operation open on: a crash interrupted them. */
+  /** Lanes pi holds an operation open on: a crash or a stop cut them off. */
   interrupted(skip?: (lane: ThreadId) => boolean): Promise<readonly ThreadId[]>
 }
 
@@ -212,6 +257,12 @@ export function threadLanes(input: {
 }): ThreadLanes {
   const { harness, doc } = input
   const held = new Map<ThreadId, PiLane>()
+  /** Lanes with a run or resume of this process in flight. */
+  const driving = new Set<ThreadId>()
+
+  /** Whether `lane` holds an operation no drive of this process runs. */
+  const leftOpen = async (name: ThreadId, lane: PiLane): Promise<boolean> =>
+    !driving.has(name) && (await lane.inspectExecution(CTX)).current !== null
 
   /**
    * A thread's pi lane: held, or restored after a restart. Checked against the
@@ -242,26 +293,40 @@ export function threadLanes(input: {
   function handle(name: ThreadId): ThreadLaneHandle {
     const ctx = threadContext(name, CTX)
     // A run that pi admitted and that then failed is still "ok" here: it
-    // ran. Only an admission refusal is `refused`.
+    // ran. Only an admission refusal is `refused`. A cut-off drive records
+    // no turn: the process that resumes it does.
     const turn = <T>(
-      start: (
-        lane: PiLane,
-      ) => Promise<{ readonly result: PiResult; readonly ok: T }>,
+      start: (lane: PiLane) => Promise<{
+        readonly result: PiResult | Interrupted
+        readonly ok: T
+      }>,
     ) =>
-      onLane<T | LaneRefusal>(name, async lane => {
-        const { result, ok } = await start(lane)
-        if (!result.ok) return refusedBy(result.error._tag)
-        await input.recordTurn(name)
-        return ok
+      onLane<T | Interrupted | LaneRefusal>(name, async lane => {
+        driving.add(name)
+        try {
+          const { result, ok } = await start(lane)
+          if (!("ok" in result)) return result
+          if (!result.ok) return refusedBy(result.error._tag)
+          await input.recordTurn(name)
+          return ok
+        } finally {
+          driving.delete(name)
+        }
       })
     return {
       name,
+      isLeftOpen: async () => {
+        const lane = await existing(name)
+        return lane !== undefined && leftOpen(name, lane)
+      },
       append: message =>
-        onLane<AppendOutcome>(name, lane =>
-          orRefused(async () => ({
-            kind: "appended",
-            id: entryId(await lane.appendMessage(message, ctx)),
-          })),
+        onLane<AppendOutcome>(name, async lane =>
+          (await leftOpen(name, lane))
+            ? BUSY
+            : orRefused(async () => ({
+                kind: "appended",
+                id: entryId(await lane.appendMessage(message, ctx)),
+              })),
         ),
       run: (message, before) =>
         turn<RunOutcome>(async lane => {
@@ -279,9 +344,11 @@ export function threadLanes(input: {
           const first = patch === null ? [] : [patch.message]
           // execute
           const messages = [...first, ...before]
-          const result = await lane.prompt(
-            messages.length === 0 ? message : [...messages, message],
-            ctx,
+          const result = await driven(
+            lane.prompt(
+              messages.length === 0 ? message : [...messages, message],
+              ctx,
+            ),
           )
           return {
             result,
@@ -293,10 +360,14 @@ export function threadLanes(input: {
           const queued = await lane.steer(message, undefined, ctx)
           return queued.ok ? OK : refusedBy(queued.error._tag)
         }),
-      // pi records a tool call the crash interrupted as interrupted, never
-      // running it again; the run then continues in the lane's directory.
+      // pi records a tool call a crash or a stop cut off as interrupted,
+      // never running it again; the run then continues in the lane's
+      // directory.
       resume: () =>
-        turn(async lane => ({ result: await lane.resume(ctx), ok: OK })),
+        turn<ResumeOutcome>(async lane => ({
+          result: await driven(lane.resume(ctx)),
+          ok: OK,
+        })),
       async abort() {
         const lane = await existing(name)
         if (lane !== undefined) await lane.abort(ctx)
@@ -321,9 +392,7 @@ export function threadLanes(input: {
       for (const name of readLaneNames(doc)) {
         if (skip?.(name) === true) continue
         const lane = await existing(name)
-        if (lane === undefined) continue
-        const info = await lane.inspectExecution(CTX)
-        if (info.current !== null) out.push(name)
+        if (lane !== undefined && (await leftOpen(name, lane))) out.push(name)
       }
       return out
     },

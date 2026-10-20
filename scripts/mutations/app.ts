@@ -41,8 +41,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relayed run is not given what its agent heard",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    from: "        const before = [\n          prompt.incoming ?? null,\n          behind,\n          ...canvas,\n          pinned,\n",
+    to: "        const before = [\n          null,\n          behind,\n          ...canvas,\n          pinned,\n",
     suite: "host",
     scenario: "agents",
     expect:
