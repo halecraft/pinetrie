@@ -13,10 +13,7 @@
 import {
   cardIdOfKind,
   type EntryId,
-  lastIncomingEntry,
-  lastInvitation,
   messageText,
-  projectTranscript,
   type QueuedFact,
   type RelayDetails,
   type ThreadId,
@@ -27,9 +24,7 @@ import { readArchived, readNames, readPlaces } from "@pinetrie/reads"
 import {
   encodeIncoming,
   encodeRelayMessage,
-  planAskCard,
-  planDelivery,
-  planRelay,
+  planRelayDelivery,
   type RelayRefusal,
   reachableAgents,
   relayRefusalText,
@@ -146,6 +141,7 @@ export function createRelays(deps: {
     end?: EntryId,
   ): Promise<Delivered> {
     const reaches = bothReaches(fromThread, to)
+    // Refused before either root is opened: an archived one stays unloaded.
     const away = unreachableRefusal(reaches)
     if (away !== null) return { kind: "refused", why: away }
     const now = await threads.thread(roots, fromThread)
@@ -154,77 +150,47 @@ export function createRelays(deps: {
         kind: "refused",
         why: { kind: "unknown", name: nameOf(fromThread) },
       }
-    const from = end === undefined ? now : { ...now, end }
-    // Proven once: the plan refuses a lane of another kind, and a run
-    // starts only with the proof.
-    const runnable = deps.runnable(to)
-    const target = await threads.thread(roots, to)
-    const planned = planRelay({
+    const planned = planRelayDelivery({
       ...reaches,
-      from: from.thread,
+      from: fromThread,
       to,
-      members: threadMembers(from.index, from.end),
-      toLane: target?.lane ?? { kind: "none" },
-      toForeign: typeof runnable === "object" ? runnable : null,
-      path: projectTranscript(from.index, from.end),
-      lastIncoming:
-        target === null
-          ? null
-          : lastIncomingEntry(target.index, target.end, from.thread),
-      lastInvitation: lastInvitation(from.index, from.end, to),
-      source: relay.source,
-      asker: relay.asker,
-      askerName: relay.askerName,
-      text: relay.text,
-      allowance: relay.allowance,
+      asking: end === undefined ? now : { ...now, end },
+      asked: await threads.thread(roots, to),
+      runnable: deps.runnable(to),
+      relay,
       spent: allowances.spent(relay.allowance),
-      by: relay.by,
-    })
-    if (planned.kind === "refused") return planned
-    const lane = target?.lane ?? { kind: "none" }
-    const to_ = planDelivery({
-      lane,
-      compelled: true,
-      mode: "queue",
-      race: null,
-      steers: false,
-    })
-    if (to_.kind === "run") {
-      if (typeof runnable === "object")
-        return {
-          kind: "refused",
-          why: { kind: "foreign", name: nameOf(to), lane: runnable },
-        }
-      const now = basics.now()
-      deps.start(roots, runnable, {
-        kind: "prompt",
-        message: encodeRelayMessage(planned.relay, now),
-        pinnedSeen: [],
-        incoming:
-          planned.incoming === null
-            ? null
-            : encodeIncoming(
-                planned.incoming.details,
-                planned.incoming.lines,
-                now,
-              ),
-      })
-      return { kind: "ran" }
-    }
-    const card = planAskCard({
       cards: readPlaces(places),
-      id: cardIdOfKind("ask", basics.newId()),
-      lane: to,
-      relay: planned.relay,
+      askCard: cardIdOfKind("ask", basics.newId()),
     })
-    if (card !== null)
-      await deps.placesWriter.change({ kind: "host" }, open =>
-        open.apply([card]),
-      )
-    deps.drain(to)
-    return {
-      kind: "queued",
-      held: lane.kind === "lane" && lane.heldBy !== null,
+    switch (planned.kind) {
+      case "refused":
+        return planned
+      case "run": {
+        const at = basics.now()
+        deps.start(roots, planned.lane, {
+          kind: "prompt",
+          message: encodeRelayMessage(planned.relay, at),
+          pinnedSeen: [],
+          incoming:
+            planned.incoming === null
+              ? null
+              : encodeIncoming(
+                  planned.incoming.details,
+                  planned.incoming.lines,
+                  at,
+                ),
+        })
+        return { kind: "ran" }
+      }
+      case "queue": {
+        const { card } = planned
+        if (card !== null)
+          await deps.placesWriter.change({ kind: "host" }, open =>
+            open.apply([card]),
+          )
+        deps.drain(to)
+        return { kind: "queued", held: planned.held }
+      }
     }
   }
 

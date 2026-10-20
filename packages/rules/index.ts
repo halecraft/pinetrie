@@ -175,7 +175,6 @@ export {
   MEDIA_LINE_CAP,
   NEW_MEDIA_TITLE,
   planCanvasFacts,
-  planCanvasRead,
   UNTITLED_IMAGE,
 } from "./canvas.ts"
 export {
@@ -206,7 +205,6 @@ export {
   canvasPinnedContent,
   decodeCanvasPinned,
   encodeCanvasPinned,
-  planCanvasPinnedRead,
 } from "./canvas-pinned.ts"
 export {
   cardEnd,
@@ -315,7 +313,6 @@ export {
 export {
   type Answer,
   type AskLines,
-  askLines,
   DIGEST,
   type DigestBody,
   type DigestRecord,
@@ -323,9 +320,7 @@ export {
   digestText,
   digestToWrite,
   parseDigest,
-  planDigest,
   pointsText,
-  readsAsk,
   URGENCY_ALONE,
   URGENCY_THEN_DIGEST,
 } from "./digest.ts"
@@ -515,7 +510,6 @@ export {
   type PinnedStatus,
   pinnedDiff,
   pinnedReads,
-  planPinnedRead,
 } from "./pinned.ts"
 export {
   inventoryFull,
@@ -558,7 +552,6 @@ export {
   isQueuedText,
   type NextQueuedCardPopStep,
   NONE_BLANK,
-  planAskCard,
   planCarry,
   planFactCard,
   planNextQueuedCardPop,
@@ -599,7 +592,6 @@ export {
   ANSWER,
   ANSWER_TYPE,
   type AnswerMessage,
-  type AnswerPlan,
   answerContent,
   decodeAnswer,
   decodeIncoming,
@@ -611,8 +603,6 @@ export {
   INCOMING_TYPE,
   type IncomingEntriesMessage,
   incomingLine,
-  planAnswer,
-  planRelay,
   RELAY,
   RELAY_TYPE,
   type RelayEnd,
@@ -652,7 +642,6 @@ export {
 export { ROOT, type RootRecord } from "./roots.ts"
 export {
   NOTHING_NEXT,
-  parseRoundReply,
   type RoundNext,
   roundRequest,
 } from "./round.ts"
@@ -661,7 +650,6 @@ export {
   parseEndReply,
   parseUrgencyLine,
   pendingRunEndReport,
-  planRunEnded,
   RUN_END_REPORT,
   type RunEndReport,
   type RunEndReportRecord,
@@ -755,7 +743,6 @@ export {
   type CarryOnMessage,
   carryOnState,
   decodeCarryOn,
-  endedOutcome,
   planCarryOn,
   planStop,
   runStopper,
@@ -770,6 +757,24 @@ export {
   titleRequest,
   titleStillWanted,
 } from "./title.ts"
+export {
+  canvasContextCards,
+  canvasTitle,
+  pinnedContextCards,
+  planCanvasContext,
+  planHeldAnswer,
+  planLiveDigest,
+  planPendingRunEndReport,
+  planPinnedContext,
+  planQueuedPop,
+  planRelayAnswer,
+  planRelayDelivery,
+  planRoundAsk,
+  planRoundNext,
+  planRunEndReport,
+  queuedTextCards,
+  type RelayAnswer,
+} from "./told.ts"
 export {
   encodeUpdate,
   folderLatest,

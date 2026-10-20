@@ -5,6 +5,111 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── what threads are told and asked ──
+  {
+    name: "the pop ignores whether the host holds the text",
+    file: "packages/rules/told.ts",
+    from: "  if (isQueuedText(card) && texts.get(card.id)?.current !== true)",
+    to: "  if (isQueuedText(card) && false)",
+    command: unit,
+    expect:
+      "a card whose text is not yet its queuer's stays, behind, and is not passed over as blank",
+  },
+  {
+    name: "an answer for an asker out of reach is appended",
+    file: "packages/rules/told.ts",
+    from: '  return askerReach.kind === "open"\n',
+    to: "  return true\n",
+    command: unit,
+    expect:
+      "a held answer is appended while its asker is in reach; otherwise its answerer is told",
+  },
+  {
+    name: "a relay into a held queue says it is not",
+    file: "packages/rules/told.ts",
+    from: '    held: lane.kind === "lane" && lane.heldBy !== null,',
+    to: "    held: false,",
+    command: unit,
+    expect:
+      "an idle asked lane runs the relay; a busy one queues its ask card, held when its queue is",
+  },
+  {
+    name: "an unanswered run is told as stopped",
+    file: "packages/rules/told.ts",
+    from: "            why: plan.why,",
+    to: '            why: "stopped",',
+    command: unit,
+    expect:
+      "a run that wrote no word leaves the asker a fact that it went unanswered",
+  },
+  {
+    name: "one member asked starts a round",
+    file: "packages/rules/told.ts",
+    from: "    asked.length < 2 ||",
+    to: "    asked.length < 1 ||",
+    command: unit,
+    expect:
+      "no round for one member asked, a spent budget, or a thread out of reach",
+  },
+  {
+    name: "a spent budget asks for a round",
+    file: "packages/rules/told.ts",
+    from: "    input.spent\n",
+    to: "    false\n",
+    command: unit,
+    expect:
+      "no round for one member asked, a spent budget, or a thread out of reach",
+  },
+  {
+    name: "a live digest asks with nobody reading",
+    file: "packages/rules/told.ts",
+    from: "    reading: readsAsk(input.reading, asks, ask, at),",
+    to: "    reading: true,",
+    command: unit,
+    expect:
+      "a turn's ask is digested while someone reads the thread, and not otherwise",
+  },
+  {
+    name: "another run's end report is overwritten",
+    file: "packages/rules/told.ts",
+    from: "    current: input.report?.ask === prompt,",
+    to: "    current: true,",
+    command: unit,
+    expect:
+      "a run's end is its ask's newest entry, and its report is written only while the stored one is its own",
+  },
+  {
+    name: "a pending report ends at its prompt",
+    file: "packages/rules/told.ts",
+    from: "  const end = indexAsks(input.index).last.get(input.prompt) ?? input.prompt",
+    to: "  const end = input.prompt",
+    command: unit,
+    expect: "a stopping run's pending report names its ask's newest entry",
+  },
+  {
+    name: "a blank queued card is popped",
+    file: "packages/rules/told.ts",
+    from: "    holds: card => texts.get(card)?.current === true,",
+    to: "    holds: () => false,",
+    command: unit,
+    expect: "a blank card is passed over for the one after it",
+  },
+  {
+    name: "a thread's pinned cards are read empty",
+    file: "packages/rules/told.ts",
+    from: '      pinnedCardsAtEnd(tip, input.cards, index),\n      card => input.texts.get(card) ?? "",\n',
+    to: '      pinnedCardsAtEnd(tip, input.cards, index),\n      () => "",\n',
+    command: unit,
+    expect: "a thread's pinned cards are read with the texts loaded for them",
+  },
+  {
+    name: "a canvas's pinned cards are read empty",
+    file: "packages/rules/told.ts",
+    from: '        canvasPinnedCards(cards, canvas),\n        card => input.texts.get(card) ?? "",\n',
+    to: '        canvasPinnedCards(cards, canvas),\n        () => "",\n',
+    command: unit,
+    expect: "a canvas's pinned cards are read with the texts loaded for them",
+  },
   // ── a send planned in phases ──
   {
     name: "sendMessage leaves details' shares empty",

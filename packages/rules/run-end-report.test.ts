@@ -14,11 +14,14 @@ import {
   parseEndReply,
   parseUrgencyLine,
   pendingRunEndReport,
-  planRunEnded,
   RUN_END_REPORT,
   runEndedToWrite,
 } from "./index.ts"
-import { REASON_WORDS, type RunEndReportRecord } from "./run-end-report.ts"
+import {
+  planRunEnded,
+  REASON_WORDS,
+  type RunEndReportRecord,
+} from "./run-end-report.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("1")

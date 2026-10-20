@@ -6,31 +6,19 @@
 // `undelivered` fact, never a message the asker would get. Where an answer
 // goes in its asker's thread is `delivery.ts`'.
 
-import {
-  type Away,
-  askOutcome,
-  type EntryId,
-  entryMessage,
-  indexAsks,
-  isRoundAnswered,
-  lastWord,
-  projectTranscript,
-  type QueuedFact,
-  type RelayDetails,
-  type ThreadId,
-  threadMembers,
-} from "@pinetrie/core"
+import type { EntryId, RelayDetails, ThreadId } from "@pinetrie/core"
 import type { Agent, PiSetup } from "@pinetrie/pi"
-import { readTreeIndex } from "@pinetrie/reads"
+import { readNames, readTreeIndex } from "@pinetrie/reads"
 import {
   type AnswerMessage,
-  type AnswerPlan,
   decodeRelay,
   encodeAnswer,
-  parseRoundReply,
-  planAnswer,
+  planHeldAnswer,
+  planRelayAnswer,
+  planRoundAsk,
+  planRoundNext,
+  type RelayAnswer,
   roundRequest,
-  transcriptLines,
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
 import type { Allowances } from "./allowances.ts"
@@ -86,40 +74,15 @@ export function createAnswers(deps: {
   // them, as it drops the run they waited behind.
   const pending = new Map<ThreadId, HeldAnswer[]>()
 
-  /** The answering thread's fact that its answer reached nobody. */
-  const undelivered = (
-    held: Pick<HeldAnswer, "relay" | "lane">,
-    why: Away,
-  ): QueuedFact => ({
-    kind: "undelivered",
-    lane: held.lane,
-    to: held.relay.from,
-    toName: threads.nameOf(held.relay.from),
-    why,
-    by: held.relay.by,
-  })
-
-  /** What `lane`'s answer to `relay` writes, as `planAnswer` decided it. */
+  /** What `lane`'s answer to `relay` writes, as `planRelayAnswer` decided it. */
   function answerWrite(
     lane: ThreadId,
     relay: RelayDetails,
-    plan: AnswerPlan,
+    plan: RelayAnswer,
   ): LateWrite {
     switch (plan.kind) {
-      case "undelivered":
-        return { facts: [undelivered({ relay, lane }, plan.reach)] }
-      case "unanswered":
-        return {
-          facts: [
-            {
-              kind: "unanswered",
-              lane: relay.from,
-              member: lane,
-              why: plan.why,
-              by: relay.by,
-            },
-          ],
-        }
+      case "facts":
+        return { facts: plan.facts }
       case "answer":
         return {
           after: roots =>
@@ -165,14 +128,19 @@ export function createAnswers(deps: {
         { kind: "thread", thread: held.lane },
         "an answer held for its asker's run",
         () => {
-          const reach = threads.reach(asker)
-          return reach.kind === "open"
-            ? {
+          const plan = planHeldAnswer({
+            lane: held.lane,
+            relay: held.relay,
+            askerReach: threads.reach(asker),
+            askerName: threads.nameOf(asker),
+          })
+          return plan.kind === "facts"
+            ? { facts: plan.facts }
+            : {
                 after: async () => {
                   await deps.agent.lane(asker).append(held.message)
                 },
               }
-            : { facts: [undelivered(held, reach)] }
         },
       ),
     )
@@ -183,27 +151,18 @@ export function createAnswers(deps: {
     later.step({ kind: "thread", thread: lane }, "an answer", async roots => {
       const doc = (await roots.lane(lane))?.doc
       if (doc === undefined) return null
-      const index = readTreeIndex(doc)
-      const asks = indexAsks(index)
-      const outcome = askOutcome(index, asks, prompt, { running: false })
-      const word = lastWord(index, asks, prompt)
-      const text = word === null ? "" : (entryMessage(index, word)?.text ?? "")
       return answerWrite(
         lane,
         relay,
-        planAnswer({
+        planRelayAnswer({
           relay,
-          relayEntry: prompt,
+          prompt,
           thread: lane,
           name: threads.nameOf(lane),
-          end:
-            outcome.kind === "stopped"
-              ? { kind: "stopped" }
-              : outcome.kind === "failed" || text === ""
-                ? { kind: "failed" }
-                : { kind: "answered", text },
+          index: readTreeIndex(doc),
           spent: allowances.spent(relay.allowance),
           fromReach: threads.reach(relay.from),
+          fromName: threads.nameOf(relay.from),
         }),
       )
     })
@@ -214,33 +173,26 @@ export function createAnswers(deps: {
    * round no one could hear asks nothing.
    */
   async function round(relay: RelayDetails): Promise<void> {
-    if (threads.reach(relay.from).kind !== "open") return
-    const from = await deps.keeper.run(roots =>
+    const asking = await deps.keeper.run(roots =>
       threads.thread(roots, relay.from),
     )
-    if (from === null) return
-    const source = from.index.entries[relay.source]?.message
-    const asked = source?.role === "person" ? (source.asks ?? []) : []
-    if (
-      asked.length < 2 ||
-      !isRoundAnswered(from.index, from.end, relay.source)
-    )
-      return
-    if (allowances.spent(relay.allowance)) return
+    const ask = planRoundAsk({
+      relay,
+      asking,
+      reach: threads.reach(relay.from),
+      spent: allowances.spent(relay.allowance),
+      names: readNames(basics.session),
+    })
+    if (ask === null) return
     const skill = await deps.piSetup.skill("pinetrie:skill:agents-round")
     if (skill === null) {
       basics.log("[host] no agents-round skill")
       return
     }
-    const members = new Map(
-      threadMembers(from.index, from.end).map(
-        t => [threads.nameOf(t), t] as const,
-      ),
-    )
     const request = roundRequest({
       skill: skill.content,
-      members: [...members.keys()],
-      lines: transcriptLines(projectTranscript(from.index, from.end)),
+      members: [...ask.members.keys()],
+      lines: ask.lines,
     })
     await later.outside({
       scope: { kind: "thread", thread: relay.from },
@@ -253,19 +205,10 @@ export function createAnswers(deps: {
         return text
       },
       plan: reply => {
-        const next = parseRoundReply(reply, members)
+        const next = planRoundNext({ reply, round: ask, relay })
         switch (next.kind) {
-          case "people":
-            return {
-              facts: [
-                {
-                  kind: "round",
-                  lane: relay.from,
-                  line: next.line,
-                  by: relay.by,
-                },
-              ],
-            }
+          case "facts":
+            return { facts: next.facts }
           case "ask":
             return {
               after: async roots => {

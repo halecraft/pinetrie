@@ -20,6 +20,7 @@ import {
   HEADLINE_WORDS,
   MAX_POINTS,
   POINT_WORDS,
+  planDigest,
 } from "./digest.ts"
 import {
   DIGEST,
@@ -29,7 +30,6 @@ import {
   digestText,
   digestToWrite,
   parseDigest,
-  planDigest,
   setRecord,
 } from "./index.ts"
 

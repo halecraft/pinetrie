@@ -23,6 +23,7 @@ import {
 } from "@pinetrie/reads"
 import {
   type CardOnCanvas,
+  canvasTitle,
   displayName,
   encodeCanvasFact,
   type ImageInColumn,
@@ -33,7 +34,6 @@ import {
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
-import { canvasTitle } from "./canvas.ts"
 import type { PlacesChange } from "./provenance.ts"
 
 /** An image's title as a fact names it, with its column's. */

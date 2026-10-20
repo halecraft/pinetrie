@@ -86,6 +86,12 @@ exported only where another package decides with it on its own
   of moves it is a step of, the records after it and whether threads are
   named (`CardPlan`); an undo's and a spin-off's phases. The planners it
   builds on stay in their modules.
+- `told.ts`: what a thread is told and asked, each planned whole from the
+  facts its shell reads once: a relay's delivery, a relayed run's answer and
+  one held for its asker, the round's two plans, a live digest, a run's end
+  report and its pending one, what a run reads of its canvas and its pinned
+  cards, and a queued card popped. Each reads its own asks and ends from the
+  tree; the planners it builds on stay in their modules (ADR-0193).
 - `place-steps.ts`: a write to the places document (`PlaceStep`), the one
   rule every card is made by (`planMake`) and who may move into a place,
   which the planners of moves, queues, notes and canvases all build on.

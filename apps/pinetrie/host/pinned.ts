@@ -2,15 +2,10 @@
 //
 // Gather the thread's pinned cards and their texts, waiting a bounded time
 // for each as its sender had it; plan the cards entry against what the model
-// last read on the lane's path (`planPinnedRead`). `runs.ts` only awaits the
+// last read on the lane's path (`planPinnedContext`). `runs.ts` only awaits the
 // result, so a run's lifecycle knows nothing of cards.
 
-import {
-  pinnedInView,
-  type SentCard,
-  type ThreadId,
-  type WriterId,
-} from "@pinetrie/core"
+import type { SentCard, ThreadId, WriterId } from "@pinetrie/core"
 import {
   readParticipantNames,
   readPlaces,
@@ -20,9 +15,8 @@ import {
   displayName,
   encodePinned,
   type PinnedMessage,
-  pinnedCardsAtEnd,
-  pinnedReads,
-  planPinnedRead,
+  pinnedContextCards,
+  planPinnedContext,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -62,14 +56,19 @@ export function createPinned(deps: {
   const docs = deps.runs
   const { cards } = deps
 
-  /** The pinned cards at the lane's tip: its thread's end. */
+  /** The lane's tree and tip, and the pinned cards there whose texts are read. */
   function pinnedOn(lane: ThreadId) {
     const doc = docs.docOf(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)
     const records = readPlaces(places)
-    return { index, tip, pinned: pinnedCardsAtEnd(tip, records, index) }
+    return {
+      index,
+      tip,
+      cards: records,
+      read: pinnedContextCards(tip, records, index),
+    }
   }
 
   /**
@@ -85,8 +84,8 @@ export function createPinned(deps: {
     // gather: the texts, loaded, then as the sender had them, within the wait
     const before = pinnedOn(lane)
     if (before === null) return null
-    await cards.hydrate(before.pinned.map(c => c.id))
-    const ids = new Set(before.pinned.map(c => c.id))
+    await cards.hydrate(before.read)
+    const ids = new Set<string>(before.read)
     await waitFor(
       cards,
       seen.filter(s => ids.has(s.id)),
@@ -96,15 +95,16 @@ export function createPinned(deps: {
     // A card may have been pinned or unpinned during the wait: read again.
     const after = pinnedOn(lane)
     if (after === null) return null
-    await cards.hydrate(after.pinned.map(c => c.id))
+    await cards.hydrate(after.read)
     const names = readParticipantNames(session)
     const nameOf = (w: WriterId) => displayName(w, names.get(w))
-
     // plan
-    const view = planPinnedRead({
-      inView: pinnedInView(after.index, after.tip),
-      now: pinnedReads(after.pinned, cards.textNow),
+    const view = planPinnedContext({
       lane,
+      index: after.index,
+      tip: after.tip,
+      cards: after.cards,
+      texts: new Map(after.read.map(card => [card, cards.textNow(card)])),
     })
     return view === null ? null : encodePinned(view, nameOf, now())
   }

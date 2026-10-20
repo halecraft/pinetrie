@@ -41,22 +41,20 @@ import {
   readTypingIn,
 } from "@pinetrie/reads"
 import {
-  blankQueued,
   type CarryPlan,
   displayName,
   encodeFact,
   foreignLaneWords,
-  isQueuedText,
   mintContainer,
   planCarry,
-  planNextQueuedCardPop,
+  planQueuedPop,
   planQueueHold,
   planUnsent,
   type QueuedCard,
   type QueuedMessage,
   type QueuedText,
   queuedOn,
-  sourceWords,
+  queuedTextCards,
   threadCardHolding,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
@@ -121,26 +119,32 @@ export function popNextQueuedCard(
   open: Pick<OpenChange, "apply">,
   places: PlacesDocHandle,
   lane: ThreadId,
-  facts: Omit<Parameters<typeof planNextQueuedCardPop>[2], "blank">,
+  facts: Pick<
+    Parameters<typeof planQueuedPop>[0],
+    "running" | "away" | "held" | "typing"
+  >,
   texts: Pick<CardPort, "textNow" | "holds">,
   quotes: ReadonlyMap<Sha256, string> = new Map(),
 ): NextQueuedCardPop {
   const cards = readPlaces(places)
-  const blank = blankQueued(queuedOn(cards, lane), {
-    holds: texts.holds,
-    text: texts.textNow,
+  const step = planQueuedPop({
+    ...facts,
+    cards,
+    lane,
+    texts: new Map(
+      queuedTextCards(cards, lane).map(card => [
+        card.id,
+        {
+          text: texts.textNow(card.id),
+          current: texts.holds(card.id, card.place.seen),
+        },
+      ]),
+    ),
+    quotes,
   })
-  const step = planNextQueuedCardPop(cards, lane, { ...facts, blank })
   if (step.kind !== "pop") return step
-  const { card } = step
-  if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))
-    return { kind: "behind", card }
-  const text = sourceWords(cardTextSource(card), {
-    doc: texts.textNow,
-    blob: sha => quotes.get(sha) ?? "",
-  })
-  open.apply([{ kind: "remove", id: card.id }])
-  return { kind: "popped", popped: { card, text } }
+  open.apply([step.step])
+  return { kind: "popped", popped: { card: step.card, text: step.text } }
 }
 
 /**

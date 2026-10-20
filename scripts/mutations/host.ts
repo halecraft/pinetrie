@@ -922,8 +922,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "popNextQueuedCard deletes after a microtask",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '  open.apply([{ kind: "remove", id: card.id }])',
-    to: '  queueMicrotask(() => open.apply([{ kind: "remove", id: card.id }]))',
+    from: "  open.apply([step.step])",
+    to: "  queueMicrotask(() => open.apply([step.step]))",
     command: unit,
     expect:
       "reads the top queued card and deletes its record before it returns",
@@ -1550,14 +1550,6 @@ export const mutations: readonly Mutation[] = [
     to: '    const gate = { kind: "cleared", command: outgoing } as never\n',
     command: unit,
     expect: "a popped queued card in an archived root is refused",
-  },
-  {
-    name: "the pop ignores whether the host holds the text",
-    file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "  if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))",
-    to: "  if (isQueuedText(card) && false)",
-    command: unit,
-    expect: "a top card whose text the host does not yet hold is behind",
   },
   {
     name: "a malformed lane is silent at startup",
@@ -2481,8 +2473,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a run's own thread is not marked on its canvas",
-    file: "apps/pinetrie/host/canvas.ts",
-    from: "        reading: lane,",
+    file: "packages/rules/told.ts",
+    from: "        reading: input.lane,",
     to: "        reading: null,",
     command: unit,
     expect: "a run is told its canvas, its thread marked",
@@ -2558,9 +2550,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the drain reads no queued quote",
-    file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '    blob: sha => quotes.get(sha) ?? "",\n',
-    to: '    blob: () => "",\n',
+    file: "packages/rules/told.ts",
+    from: '      blob: sha => input.quotes.get(sha) ?? "",\n',
+    to: '      blob: () => "",\n',
     command: unit,
     expect:
       "a queued reference's quote, read from its blob, is sent as its queuer's message",
@@ -2880,15 +2872,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an idle canvas moved to Done with its last run's end report pending leaves it unclassified",
-  },
-  {
-    name: "an answer for an asker out of reach is appended",
-    file: "apps/pinetrie/host/answers.ts",
-    from: '          return reach.kind === "open"\n',
-    to: "          return true\n",
-    command: unit,
-    expect:
-      "an answer held for an asker archived meanwhile is the answering thread's undelivered fact",
   },
   {
     name: "the upkeep lets a leased root go",

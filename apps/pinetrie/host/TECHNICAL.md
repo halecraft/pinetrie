@@ -35,11 +35,11 @@ knows of.
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5, S92): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `canvas.ts` | what a run is told of its thread's canvas (ADR-0116): `readCanvasContext`, the canvas list and the cards pinned to the canvas, each written only when it differs from the newest of its kind on the lane's path, so an unchanged canvas keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
+| `canvas.ts` | what a run is told of its thread's canvas (ADR-0116): `readCanvasContext`, the canvas list and the cards pinned to the canvas (`planCanvasContext`), each written only when it differs from the newest of its kind on the lane's path, so an unchanged canvas keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended (through the scribe at the thread's end for a thread with no lane, `lanelessSpot`), getting the latest, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard` (`planQueuedPop`), and `drain`, which carries each out as `planCarry` decides: a fact appended (through the scribe at the thread's end for a thread with no lane, `lanelessSpot`), getting the latest, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the upkeep (§ Roots: steps, leases and the upkeep) |
 | `housekeeping.ts` | deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7), and trashed cards past their week (`sweepTrash`); which of them a start and an upkeep run, in order (`planSweeps`), carried out in one keeper step by `sweepUnused` |
 | `forward.ts` | `forward`: a call `startHost` hands to a module made before what carries it out, bound once that exists; a call before the bind is held, dropped or refused, as its site says (§ Startup) |
@@ -156,11 +156,11 @@ knows of.
 - **A prompt's run reads its pinned cards first** (`readPinned`,
   `pinned.ts`): a chat's, a popped queued card's, a resolution's, a split's
   and a carry-on's. It
-  gathers the thread's pinned cards at the lane's tip (`pinnedCardsAtEnd`), loads
+  gathers the thread's pinned cards at the lane's tip (`pinnedContextCards`), loads
   their texts, waits for each as the chat's sender had it (`seen`, at most
   `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
   unpinned meanwhile), and plans against what the model last read on the
-  path (`pinnedInView`, `planPinnedRead`). `runs.ts` only awaits it and
+  path (`planPinnedContext`, over the texts it loaded). `runs.ts` only awaits it and
   passes the entry to `handle.run`; a failure is logged and the run goes
   without cards. A resume reads nothing: its prompt and entry were written
   when it began.
@@ -1393,7 +1393,8 @@ queued cards, which `planArchive` refuses.
 
 - **Always made.** The config's `digests` (`enabled`) turns off live
   digests and the final digest; a run's end still asks for its urgency.
-- **A run's end is one request** (`planRunEnded`): a failed or stopped run's
+- **A run's end is one request** (`planRunEndReport`, over `planRunEnded`):
+  a failed or stopped run's
   end report is written from its facts and only a due digest is asked for;
   an answered run asks for its urgency line, with the final digest when
   `planDigest` gives one, and for a short ask the urgency line alone. The
@@ -1419,9 +1420,10 @@ queued cards, which `planArchive` refuses.
   queued card popped there would lose the ask its final digest, and a next
   run with work would take it, which then refuses that run every later
   digest.
-- **`planDigest` decides** in one step, from the stored digest, the request
-  out, and presence: the host holds the presence document, and `readsAsk`
-  reads its `reading` ends (S70).
+- **`planLiveDigest` decides** in one step, from the tree, the stored
+  digests, the requests out, and presence: the host holds the presence
+  document and gives the plan its `reading` ends (S70); the plan reads the
+  turn's ask from the tree.
 - **Only the ask goes out**: its message, worded from its prompt entry so a
   land or stack ask is named too, its run's messages read up from the run's
   last entry, newest first within the budget, its last word, and the last
@@ -1454,9 +1456,10 @@ queued cards, which `planArchive` refuses.
 ## Agents talking (`relays.ts`, `answers.ts`, `allowances.ts`, ADR-0128)
 
 - **A relay is a run in the asked thread.** `deliver` gathers both
-  threads as they are now, plans with `planRelay` and `planDelivery`, and
-  starts the run with the incoming entry first (`RunStart.incoming`), or makes an
-  ask card on a busy lane and asks for its drain. Every step is one keeper
+  threads as they are now and plans (`planRelayDelivery`, over `planRelay`
+  and `planDelivery`): it starts the run with the incoming entry first
+  (`RunStart.incoming`), or makes the ask card the plan gave on a busy lane
+  and asks for its drain. Every step is one keeper
   step; the `ask` hook's too, as `split-call.ts` is.
 - **Whose agents a send may name is every open canvas's named threads**
   (`readReachableAgents`, over `reachableAgents`), wherever it is sent, so
@@ -1466,9 +1469,12 @@ queued cards, which `planArchive` refuses.
   out of reach (`unreachableRefusal`) before `threadsNow`, which opens a
   root only for a live thread (`threads-now.ts`): an archived canvas's root
   stays let go.
-  `planRelay` and `planAnswer` take the reaches too, so an ask card whose
-  asker was archived since is refused, and an answer for it becomes an
-  `undelivered` fact in the answering thread.
+  `planRelay` and `planRelayAnswer` take the reaches too, so an ask card
+  whose asker was archived since is refused, and an answer for it becomes
+  an `undelivered` fact in the answering thread, as an answer held for its
+  asker's run does (`planHeldAnswer`). The round is two plans across the
+  model's request: whether to ask and about whom (`planRoundAsk`), then
+  what its reply decides (`planRoundNext`).
 - **A person's chat is relayed after it is written** (`relayMessage`, queued
   by `sendMessage`, not awaited inside its step): it finds the chat by its
   send's id, sets its allowance, and relays each member it asks.

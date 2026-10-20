@@ -16,14 +16,7 @@
 // A run's end settles once its reply is written, with the ask's final digest
 // (`RunEndSettled`): the thread's focus is asked from that (`focuses.ts`).
 
-import {
-  type EntryId,
-  indexAsks,
-  type RootId,
-  runPrompt,
-  type ThreadId,
-  type ValueWrite,
-} from "@pinetrie/core"
+import type { EntryId, RootId, ThreadId, ValueWrite } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readDigests,
@@ -34,22 +27,16 @@ import {
 } from "@pinetrie/reads"
 import {
   type Answer,
-  askLines,
   DIGEST,
   type DigestRecord,
   digestRequest,
   digestToWrite,
   type EndReply,
-  endedOutcome,
   parseEndReply,
-  pendingRunEndReport,
-  planDigest,
-  planRunEnded,
-  queuedOn,
-  RUN_END_REPORT,
-  readsAsk,
+  planLiveDigest,
+  planPendingRunEndReport,
+  planRunEndReport,
   runEndedToWrite,
-  setRecord,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import { askModel } from "./ask-model.ts"
@@ -126,9 +113,8 @@ export const writePendingRunEndReport =
   async (lane: ThreadId, prompt: EntryId): Promise<void> => {
     const doc = deps.runs.docOf(lane)
     if (doc === null) return
-    const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
     await deps.records.writeValues([
-      setRecord(RUN_END_REPORT, pendingRunEndReport(lane, prompt, end)),
+      planPendingRunEndReport({ lane, prompt, index: readTreeIndex(doc) }),
     ])
   }
 
@@ -193,26 +179,16 @@ export function createDigests(deps: {
         const root = docs.rootOfLane(lane)
         if (!enabled || root === null) return null
         const doc = await roots.root(root)
-        const index = readTreeIndex(doc)
-        const ask = runPrompt(index, at)
-        if (ask === null) return null
-        const asks = indexAsks(index)
-        const plan = planDigest({
-          index,
-          asks,
-          ask: ask,
-          ended: false,
-          stored: readDigests(doc).get(ask),
-          inFlight: asking.has(ask),
-          reading: readsAsk(
-            readReading(presence).map(([, end]) => end),
-            asks,
-            ask,
-            at,
-          ),
+        const due = planLiveDigest({
+          index: readTreeIndex(doc),
+          at,
+          digests: readDigests(doc),
+          asking,
+          reading: readReading(presence).map(([, end]) => end),
           now: basics.now(),
         })
-        if (plan === null) return null
+        if (due === null) return null
+        const { ask, plan } = due
         void later.outside({
           scope: { kind: "thread", thread: lane },
           what: "a digest",
@@ -266,36 +242,19 @@ export function createDigests(deps: {
         "a run's end report",
         async roots => {
           const doc = await roots.root(root)
-          const index = readTreeIndex(doc)
-          const asks = indexAsks(index)
-          const end = asks.last.get(prompt) ?? prompt
-          digest = readDigests(doc).get(prompt) ?? null
-          const plan = planRunEnded({
-            current:
-              readRunEndReports(basics.session).get(lane)?.ask === prompt,
-            // Until its fact is appended, a stop's queued fact names who
-            // stopped the run.
-            outcome: endedOutcome(
-              index,
-              asks,
-              prompt,
-              queuedOn(readPlaces(basics.places), lane),
-            ),
-            lines: askLines(index, asks, prompt),
-            digest: enabled
-              ? planDigest({
-                  index,
-                  asks,
-                  ask: prompt,
-                  ended: true,
-                  stored: readDigests(doc).get(prompt),
-                  inFlight: false,
-                  reading: false,
-                  now: basics.now(),
-                })
-              : null,
+          const digests = readDigests(doc)
+          digest = digests.get(prompt) ?? null
+          const plan = planRunEndReport({
+            lane,
+            prompt,
+            index: readTreeIndex(doc),
+            digests,
+            report: readRunEndReports(basics.session).get(lane),
+            cards: readPlaces(basics.places),
+            enabled,
+            now: basics.now(),
           })
-          const { request } = plan
+          const { end, request } = plan
           if (request !== null) {
             const answer: Answer = request.answer
             settling = later.outside({
@@ -337,18 +296,7 @@ export function createDigests(deps: {
               },
             })
           }
-          return plan.report === null
-            ? null
-            : {
-                records: [
-                  setRecord(RUN_END_REPORT, {
-                    lane,
-                    ask: prompt,
-                    end,
-                    report: plan.report,
-                  }),
-                ],
-              }
+          return plan.writes.length === 0 ? null : { records: plan.writes }
         },
       )
       .catch(failed)
