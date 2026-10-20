@@ -1,6 +1,6 @@
 {
   "name": "pinetrie",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate.",
