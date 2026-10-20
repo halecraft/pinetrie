@@ -2795,6 +2795,24 @@ export const mutations: readonly Mutation[] = [
     expect: "titleRequest: the first line always, then the newest that fit",
   },
   {
+    name: "a title request sends each message whole",
+    file: "packages/rules/title.ts",
+    from: "input.lines.map(l => clippedText(l, TITLE_LINE))",
+    to: "input.lines",
+    command: unit,
+    expect:
+      "titleRequest: a long message is cut, and the ones before it still fit",
+  },
+  {
+    name: "a cut message loses its end",
+    file: "packages/rules/request.ts",
+    from: "  return `${text.slice(0, keep.head)}${CUT_MARK}${text.slice(text.length - keep.tail)}`\n",
+    to: "  return `${text.slice(0, keep.head)}${CUT_MARK}`\n",
+    command: unit,
+    expect:
+      "clippedText keeps a long text's opening and end, and a short one whole",
+  },
+  {
     name: "a title keeps the quotes around it",
     file: "packages/rules/request.ts",
     from: '    .replace(WRAPPED, "")\n',

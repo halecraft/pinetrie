@@ -160,6 +160,20 @@ test("titleRequest: the first line always, then the newest that fit", () => {
   ).toBe("How it began:\n- Ada: hi\n\n")
 })
 
+test("titleRequest: a long message is cut, and the ones before it still fit", () => {
+  const long = (i: number) => `agent: opens ${i} ${"x".repeat(5_000)} ends ${i}`
+  const lines = [
+    "Ada: the rail",
+    ...Array.from({ length: 12 }, (_, i) => long(i)),
+  ]
+  const { user } = titleRequest({ skill: "", lines, budget: 24_000 })
+  expect(user).toContain("- agent: opens 11 ")
+  expect(user).toContain(" ends 11\n")
+  expect(user).toContain("- agent: opens 10 ")
+  expect(user).not.toContain("x".repeat(5_000))
+  expect(user.length).toBeLessThanOrEqual(24_000)
+})
+
 describe("replyTitle", () => {
   test("bare words, without quotes or trailing punctuation", () => {
     expect(replyTitle(" Rail layout ")).toBe("Rail layout")

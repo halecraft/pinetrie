@@ -44,6 +44,23 @@ export const transcriptLines = (
   messages: readonly TranscriptMessage[],
 ): string[] => messages.filter(isSpoken).map(transcriptLine)
 
+/** What stands where `clippedText` cut a message's middle out. */
+export const CUT_MARK = " … "
+
+/**
+ * `text` whole when it has at most `keep.head` + `keep.tail` characters;
+ * otherwise its first `keep.head` and last `keep.tail`, joined by
+ * `CUT_MARK`. A long message so keeps both what it set out to do and what
+ * it ended on, and leaves room in a request for the messages beside it.
+ */
+export function clippedText(
+  text: string,
+  keep: { readonly head: number; readonly tail: number },
+): string {
+  if (text.length <= keep.head + keep.tail) return text
+  return `${text.slice(0, keep.head)}${CUT_MARK}${text.slice(text.length - keep.tail)}`
+}
+
 /**
  * The newest `lines` that fit in `room` characters, each as `- line\n`, and
  * how many older ones were left out. It stops at the first that does not

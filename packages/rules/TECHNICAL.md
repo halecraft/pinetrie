@@ -46,7 +46,9 @@ follow this list. A name only this package uses is imported from its module.
 - `config.ts`: `modelRef`, the parser a model setting's kind wraps; the
   config's files are `@pinetrie/config`'s, and the host declares every
   setting. `request.ts`: what fits a model request's budget
-  (`fitNewest`, `firstAndNewest`), and a one-line reply read back
+  (`fitNewest`, `firstAndNewest`; `fitNewest` stops at the first line that
+  does not fit, so a request whose lines can be long cuts each first,
+  `clippedText`, as a title's does), and a one-line reply read back
   (`bareLine`, `oneLine`, `wordCount`), which titles, urgency lines and
   focuses share.
 - `message.ts`, `participant.ts`, `shares.ts`, `commands.ts`: a person's

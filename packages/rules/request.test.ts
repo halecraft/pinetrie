@@ -2,6 +2,8 @@ import { entryId, writerId } from "@pinetrie/core"
 import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
+  CUT_MARK,
+  clippedText,
   describeRequest,
   firstAndNewest,
   fitNewest,
@@ -116,6 +118,12 @@ describe("oneLine", () => {
     expect(wordCount("  a  b c ")).toBe(3)
     expect(wordCount("")).toBe(0)
   })
+})
+
+test("clippedText keeps a long text's opening and end, and a short one whole", () => {
+  const keep = { head: 3, tail: 2 }
+  expect(clippedText("abcdefghij", keep)).toBe(`abc${CUT_MARK}ij`)
+  expect(clippedText("abcde", keep)).toBe("abcde")
 })
 
 test("firstAndNewest keeps the first line, and cuts the oldest of the rest first", () => {

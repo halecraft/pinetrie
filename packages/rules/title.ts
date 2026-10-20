@@ -19,6 +19,7 @@ import {
 import type { ModelRef } from "./config.ts"
 import type { MarkRecord } from "./mark.ts"
 import {
+  clippedText,
   firstAndNewest,
   oneLine,
   spokenLine,
@@ -114,16 +115,24 @@ export function planTitling(input: {
 export const TITLE_REQUEST_HEAD = "How it began:"
 
 /**
+ * How much of one message a title request keeps (`clippedText`). Uncut,
+ * one long reply could fill the whole budget, and since `fitNewest` stops
+ * at the first line that does not fit, the request would then hold the
+ * first message alone.
+ */
+const TITLE_LINE = { head: 1_500, tail: 500 } as const
+
+/**
  * The request: the skill, the root's first message always, since it
  * usually says what the thread is for, then the newest that fit
- * (`firstAndNewest`).
+ * (`firstAndNewest`), each cut to `TITLE_LINE`.
  */
 export function titleRequest(input: {
   readonly skill: string
   readonly lines: readonly string[]
   readonly budget: number
 }): { readonly system: string; readonly user: string } {
-  const [first = "", ...rest] = input.lines
+  const [first = "", ...rest] = input.lines.map(l => clippedText(l, TITLE_LINE))
   const head = `${TITLE_REQUEST_HEAD}\n`
   const label = "\nWhat was said since:\n"
   const listed = firstAndNewest(

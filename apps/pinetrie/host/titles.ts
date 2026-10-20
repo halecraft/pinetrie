@@ -37,8 +37,11 @@ import { canvasesNow } from "./canvases.ts"
 import type { Later } from "./later.ts"
 import type { StepDocs } from "./roots.ts"
 
-/** A title request's size: the skill aside, the first message and the newest. */
-const TITLE_BUDGET = 6_000
+/**
+ * A title request's size, the skill aside: the first message and at least
+ * ten of the newest, each cut to `TITLE_LINE`: about 6k tokens.
+ */
+const TITLE_BUDGET = 24_000
 
 export interface Titles {
   /**
