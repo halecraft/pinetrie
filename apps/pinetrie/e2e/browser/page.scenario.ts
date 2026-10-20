@@ -12,6 +12,7 @@ import {
   ROOT,
   type ThreadId,
   textCardId,
+  threadFirstMessage,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -978,7 +979,8 @@ async function run(check: Checks["check"]): Promise<void> {
           k =>
             document.querySelector(".column")?.getAttribute("data-key") === k,
           unmoved[2],
-          { timeout: 5_000 },
+          // The host orders it: a busy host answers late.
+          { timeout: 15_000 },
         )
         .catch(() => {})
       const dropped = await keys()
@@ -986,7 +988,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "a dropped column moves there, and the others keep their order",
         dropped.join() ===
           [unmoved[2], unmoved[0], unmoved[1], ...unmoved.slice(3)].join(),
-        `${unmoved.length} columns`,
+        `${unmoved.join()} → ${dropped.join()}`,
       )
       if (narrow !== null) await page.setViewportSize(narrow)
       await page.waitForFunction(
@@ -1593,20 +1595,41 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check("the bin on a branch's column takes it off the canvas", asideClosed)
+      // The strip, a column narrower, clamps its scroll on the next frame, and
+      // a scroll that moves a menu's trigger closes the menu: let it land
+      // before ＋'s ▾ opens.
+      await twoFrames(page)
       // ＋ past the last column: its ▾'s chat makes a column at the canvas's
       // end, a new root's thread in this canvas, ready to type in.
+      // What the page showed, should the column ＋ makes not come.
+      const plusState = () =>
+        page.evaluate(
+          () =>
+            `focus on ${document.activeElement?.className ?? "nothing"}; ${document.querySelectorAll(".menu").length} menu(s) open; columns ${[...document.querySelectorAll("#strip > .column")].map(c => c.getAttribute("data-position")).join(",")}`,
+        )
       await page.focus("#strip > .canvas-end .add-menu")
       await page.keyboard.press("ArrowDown")
-      await page
+      const chatFocused = await page
         .waitForFunction(
           () => document.activeElement?.classList.contains("add-chat"),
           undefined,
           { timeout: 5_000 },
         )
-        .catch(() => null)
+        .then(
+          () => true,
+          () => false,
+        )
+      if (!chatFocused)
+        throw new Error(`＋'s ▾ did not focus its chat: ${await plusState()}`)
       await page.keyboard.press("Enter")
       const madeCol = col(before + 2)
-      await page.waitForSelector(`${madeCol} .composer`, { timeout: 15_000 })
+      await page
+        .waitForSelector(`${madeCol} .composer`, { timeout: 15_000 })
+        .catch(async (e: unknown) => {
+          throw new Error(
+            `the column ＋ made did not come: ${await plusState()}\n${String(e)}`,
+          )
+        })
       const made = (await page.getAttribute(madeCol, "data-card")) ?? ""
       const agentCard = (await page.getAttribute(agentCol, "data-card")) ?? ""
       await waitFor(
@@ -4767,13 +4790,21 @@ async function run(check: Checks["check"]): Promise<void> {
         },
         { actedAt: { kind: "column", key: "k-api" }, slot: null },
       )
+      // The rail draws messages a person reads: a root's first entry can be
+      // its thread's system prompt, so its tree is found by its first message.
+      const ownTree = heldTree(host)
+      const ownThread = ownTree.entries[entryId(downRoot)]?.thread
+      const ownFirst =
+        ownThread === undefined
+          ? downRoot
+          : (threadFirstMessage(ownTree, ownThread) ?? downRoot)
       const twoRoots = await page
         .waitForFunction(
           ([thread, entry, own]) =>
             document.querySelector(`#strip [data-card="${thread}"]`) !== null &&
             document.querySelector(`.rail [data-entry="${entry}"]`) !== null &&
             document.querySelector(`.rail [data-entry="${own}"]`) !== null,
-          [farThread, farEntry, downRoot],
+          [farThread, farEntry, ownFirst],
           { timeout: 20_000 },
         )
         .then(
