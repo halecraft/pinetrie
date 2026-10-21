@@ -276,6 +276,8 @@ if start 256 $OF 16; then
   kill -STOP $op
   piperun $PA 40 /bin/bash-pt /tmp/oflood.sh
   kill -CONT $op
+  # 100 MiB the guest's memory need not keep.
+  rm -f /tmp/out40.1 /tmp/out40.2
   flush end $OF
   stop
 fi

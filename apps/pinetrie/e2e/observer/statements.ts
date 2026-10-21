@@ -80,8 +80,18 @@ const LINES: readonly (readonly (readonly [string, string])[])[] = [
   [["/bin/echo S{n}", ""]],
 ]
 
-/** Signals the command's nested shells and forgeries make, each refused. */
-export const FORGED_SIGNALS = 2 + 3 + 3
+/**
+ * Signals the command's nested shells and forgeries make, each refused: one
+ * per `work forge`, and one per statement of each nested `bash-pt -c`.
+ */
+export const FORGED_SIGNALS = LINES.flat().reduce((sum, [text]) => {
+  const nested = /bash-pt -c '([^']*)'/.exec(text)?.[1]
+  return (
+    sum +
+    (text.includes("work forge") ? 1 : 0) +
+    (nested === undefined ? 0 : nested.split(";").length)
+  )
+}, 0)
 
 /** The command, as the guest's bash is given it. */
 export function statementsCommand(): string {
