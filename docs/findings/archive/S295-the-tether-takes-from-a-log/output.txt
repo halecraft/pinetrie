@@ -1,0 +1,27 @@
+1 chats taken with no lane: 2
+1 lane created at the chats; the model read, last three: ["Ada: hello, Bea","Bea: hi Ada","Ada: @agent summarise what we said"]
+1 record, in order: ["i001","i002","i003","R1"]
+1 the model read them in the record's order: ["Ada","Bea","Ada"]
+3 same end: framings: [["i004","as-written"],["i005","same-time"]]
+3 same end: one turn, runs: 2
+3 same end: the model read, last two: ["Ada: please also list the open questions","(Bea wrote this at the same time as Ada's \"please also list the open questions\", before you answered.)\nBea: and keep it short"]
+3 older end: Bea's parent: "01a15bee-e085-74fa-8702-011e160794e7"
+3 older end: framing: [["i007",{"kind":"before-reply","reply":"01a15bee-e08a-74fa-8702-012922c60fcd","to":"i006"}]]
+3 older end: the model read: "(Bea wrote this before seeing your reply to Ada's \"what about the deadline?\". It may be out of date.)\nBea: never mind the open questions"
+3 while replying: plan: "wait-for-run"
+3 after the reply: framing: [["i009","before-reply","i008"]]
+3 after the reply: the model read: "(Bea wrote this before seeing your reply to Ada's \"is the plan ready?\". It may be out of date.)\nBea: add the budget to it"
+2 the first step took, of: [1,3]
+2 after the restart, taken: [["i011","as-written"],["i012","same-time"]]
+2 a step with nothing new takes: 0
+2 every message taken once: true
+2 entries per intent: [1,1,12,12]
+2 the model read, after the restart: ["Ada: first of three","Ada: second of three","(Bea wrote this at the same time as Ada's \"second of three\", before you answered.)\nBea: a word from Bea"]
+4 an edit is never taken: [0,3]
+4 the edited message, as drawn: {"kind":"person","intent":"i004","author":"Ada","text":"please also list the open questions, numbered","agentRead":"please also list the open questions","framing":{"kind":"as-written"}}
+4 the agent's first reply, as drawn: {"kind":"agent","entry":"01a15bee-e073-74fa-8702-0113e12a399b","text":"R1"}
+4 a message not yet taken, as drawn: {"kind":"person","intent":"i016","author":"Bea","text":"a message not yet taken","agentRead":null,"framing":null}
+4 rows drawn: ["Ada","Bea","Ada","R1","Ada (edited after the agent read it)","Bea [same-time]","R2","Ada","R3","Bea [before-reply]","R4","Ada","R5","Bea [before-reply]","R6","Ada","Ada","Bea [same-time]","R7","Bea (pending)"]
+4 the page's framings match the plan's at each take: true
+changefeed triggers seen by the tether: 15
+runs: 7
