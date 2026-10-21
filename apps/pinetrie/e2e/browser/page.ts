@@ -95,6 +95,21 @@ export async function chooseFromMenu(
 }
 
 /**
+ * `chooseFromMenu` for a step that goes on only once it chose: throws, naming
+ * the item, rather than leaving later waits to time out far from the cause.
+ */
+export async function chooseFromMenuOrThrow(
+  p: Page,
+  trigger: string,
+  item: string,
+): Promise<void> {
+  if (!(await chooseFromMenu(p, trigger, item)))
+    throw new Error(
+      `the menu behind ${trigger} offered no ${item} that could be seen and chosen`,
+    )
+}
+
+/**
  * Choose `item` in the ⋯ of the card framed by `frame`. A column
  * that scrolls as its cards change closes a menu it holds (`popover.tsx`),
  * so the menu is opened again until the item is chosen. Whether it was.
@@ -403,7 +418,7 @@ export async function chooseDensity(
     )
   if (!shown) return
   if ((await p.getAttribute(col(n), "data-density")) === density) return
-  await chooseFromMenu(
+  await chooseFromMenuOrThrow(
     p,
     `${col(n)} .column-head .column-menu`,
     `.column-density-${density}`,

@@ -61,6 +61,7 @@ import {
   boardSel,
   chooseDensity,
   chooseFromMenu,
+  chooseFromMenuOrThrow,
   col,
   componentRenders,
   launchBrowser,
@@ -773,7 +774,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             ))
           const onUnfinished = await startSaid()
           if (offered)
-            await chooseFromMenu(tp, trigger, '.start-base[data-base=""]')
+            await chooseFromMenuOrThrow(
+              tp,
+              trigger,
+              '.start-base[data-base=""]',
+            )
           const back = await startSaid()
           await inWork("abandon", "wip/e2e")
           await inWork("bookmark", "delete", "wip/e2e")

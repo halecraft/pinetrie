@@ -18,7 +18,7 @@ import type { Scenario } from "../scenario.ts"
 import {
   asPerson,
   chooseDensity,
-  chooseFromMenu,
+  chooseFromMenuOrThrow,
   col,
   launchBrowser,
   openProfile,
@@ -153,7 +153,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await qp
           .waitForSelector("#board .reader-trigger", { timeout: 20_000 })
           .catch(() => null)
-        await chooseFromMenu(qp, "#board .reader-trigger", ".here-thread")
+        await chooseFromMenuOrThrow(
+          qp,
+          "#board .reader-trigger",
+          ".here-thread",
+        )
         const theirs = await loaded(qp)
         check(
           "another window draws it too",

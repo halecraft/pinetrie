@@ -26,7 +26,11 @@ a scenario needs of the place it runs in, and what this place has: §
 Requirements), and `suite-facts.ts` (each suite requirement's probe). A
 suite's own helpers are beside its scenarios:
 `host/support.ts` (among them `clockedStore`), `lanes/support.ts`,
-`browser/page.ts`.
+`browser/page.ts`, and `browser/page-kit.ts` for the scenarios split from
+`page`: `startKit` (the host, Ada's page and its helpers) and `twoCanvases`,
+the canvases `page`'s first part leaves, made through the session as Ada
+on another device, so `sidebar` and `second-window` start without its
+steps.
 
 ## Scenarios
 
@@ -268,7 +272,9 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/vcs` | version control at a host's start: with no jj on its `PATH`, a folder project served and accepted into, and a folder under git refused, naming jj; with jj, a git repo made colocated, its branch and your edits as they were (ADR-0216, S348) |
 | `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147), its Docker's cache capped (ADR-0169) |
 | `observer/kernel` | the observer that attributes a lane's file calls to its runs, on the lane VM's own kernel (ADR-0135; S172, S176) |
-| `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the dock's queue (ADR-0113); cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); copy, cut and paste (ADR-0132); the rail's outline of a column (ADR-0058); a second window's presence (ADR-0024); what a reload keeps (ADR-0027) |
+| `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the dock's queue (ADR-0113); copy and paste, and a paste's undo (ADR-0132, ADR-0052) |
+| `browser/sidebar` | the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the rail's outline of a column (ADR-0058) |
+| `browser/second-window` | a second window's presence (ADR-0024); cards, pinned cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); cut and paste of a note (ADR-0132); threads as cards (ADR-0117); what a reload keeps (ADR-0027) |
 | `browser/health-page` | the Health page (ADR-0210): the footer's glyph opens it, a running lane named by its thread, the memory's last hour drawn from the host's samples, and Copy diagnostics with the host's version |
 | `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and the work strip (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030), a proposal's card, Open and Send (ADR-0157); a column's height and width while its agent works (S35, S37), following past a pick (S33) |
 
@@ -407,6 +413,17 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
 
 ## Gotchas
 
+- **A menu's trigger is scrolled into view, and clicked once it stops
+  moving** (`seeInMenu`, `browser/page.ts`). Playwright's click scrolls a
+  trigger off screen into view itself, and that scroll's event can reach
+  the page after the box opened: the popover closes on a scroll of
+  anything holding its trigger (`packages/web/popover.tsx`), so the menu
+  shut before its item could be chosen. A step that goes on only once it
+  chose calls `chooseFromMenuOrThrow`, which fails at once naming the item;
+  `chooseFromMenu`'s boolean is for a check that reads it.
+- **A thread made through the session is folded on a person's page** until
+  they open it: which columns are open is their own layout. A scenario
+  that needs one open unfolds it, as `twoCanvases`' callers do.
 - **A gate is a FIFO in the lane's `/tmp`** (`gate.ts`). Its command
   (`gateCommand`) makes the FIFO, holds it open for reading and writing so a
   feed never blocks, and prints each line it reads until `gateClose`'s end

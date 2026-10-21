@@ -69,7 +69,7 @@ export const mutations: readonly Mutation[] = [
     from: "    else document.documentElement.dataset.theme = attribute\n",
     to: "    else delete document.documentElement.dataset.theme\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Dark in the account menu draws the page dark over a light system, and a reload keeps it",
   },
@@ -299,7 +299,7 @@ export const mutations: readonly Mutation[] = [
     from: '              <div className="bench-empty">',
     to: '              <div className="bench-empty" hidden>',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "selecting a slot shows its card on the bench, read only, and the panel keeps its size",
   },
@@ -309,7 +309,7 @@ export const mutations: readonly Mutation[] = [
     from: "      ;(box ?? control ?? at)?.focus()",
     to: "      ;(control ?? at)?.focus()",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Enter opens the card on the bench, caret in its box, and Escape folds it back to its slot",
   },
@@ -319,7 +319,7 @@ export const mutations: readonly Mutation[] = [
     from: '        if (e.movementX !== 0 || e.movementY !== 0) act({ kind: "engage" })',
     to: '        if (false) act({ kind: "engage" })',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a take while the inventory is closed peeks, and a pointer over it keeps it open",
   },
@@ -445,7 +445,7 @@ export const mutations: readonly Mutation[] = [
     from: "                  if (benchCard !== null && trashable) trash(benchCard)",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "the bench's trash trashes the selected card, and the undo key outside a box brings it back",
   },
@@ -455,7 +455,7 @@ export const mutations: readonly Mutation[] = [
     from: "              onClick={p.onClose}",
     to: "              onClick={p.onTrash}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "the × of a card open on the bench closes it, and the card stays in its slot",
   },
@@ -465,7 +465,7 @@ export const mutations: readonly Mutation[] = [
     from: "            if (selectedCard !== null) p.onTrash(selectedCard)",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "Delete on a selected slot trashes its card",
   },
   {
@@ -504,7 +504,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const watches = writable && threadEnd !== null",
     to: "  const watches = false",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a card someone else pins while you are away leaves a trace where it was, which leads to it, and its history names them",
   },
@@ -591,7 +591,7 @@ export const mutations: readonly Mutation[] = [
     from: "      const spot = spotFor(spots.load(), ids)",
     to: "      if (i === 0) continue\n      const spot = spotFor(spots.load(), ids)",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a branch column is level with its fork point after a return to its root",
   },
@@ -783,7 +783,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return useMemo(() => othersReading(reading, me), [reading, me])",
     to: '  return useMemo(() => othersReading(reading, "w-nobody" as never), [reading, me])',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "another window shows on its root's thread card, and you never do",
   },
   {
@@ -802,7 +802,7 @@ export const mutations: readonly Mutation[] = [
     from: "    session.cards.current,\n  )",
     to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.typing())",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "your typing redraws nothing outside your composer",
   },
   {
@@ -811,7 +811,7 @@ export const mutations: readonly Mutation[] = [
     from: "    session.cards.current,\n  )",
     to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.reading())",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "another person following this thread shows in its header and redraws no column",
   },
@@ -821,7 +821,7 @@ export const mutations: readonly Mutation[] = [
     from: "export const MessageList = memo(MessageListView, sameMessageListProps)",
     to: "export const MessageList = MessageListView",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window's card redraws the column and none of its messages",
   },
   {
@@ -878,7 +878,7 @@ export const mutations: readonly Mutation[] = [
     from: "  stores.identity.load() ?? stores.identity.save(await askIdentity(root))",
     to: "  stores.identity.save(await askIdentity(root))",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "a browser that knows who you are connects without asking",
   },
   {
@@ -907,7 +907,7 @@ export const mutations: readonly Mutation[] = [
     from: "    () => stores.layout.load() ?? initialLayout(),",
     to: "    initialLayout,",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a reload keeps the root you were on, and its open columns, in order",
   },
@@ -917,7 +917,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (settled)\n      dispatch({\n        kind: "prune",',
     to: '    dispatch({\n        kind: "prune",',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     // Pruned before the document arrives, a reload drops the columns whose
     // roots have not arrived yet.
     expect:
@@ -957,7 +957,7 @@ export const mutations: readonly Mutation[] = [
     from: "const settle = (body: HTMLElement) => body.dispatchEvent(new Event(PLACED))",
     to: "const settle = (body: HTMLElement) => void body",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "↓ new below shows on a column that moved on while its tab was hidden, and none before",
   },
@@ -967,7 +967,7 @@ export const mutations: readonly Mutation[] = [
     from: "    unstarted,\n    inventoryHolders,\n  ])\n  // Every change is saved",
     to: '    unstarted,\n    inventoryHolders,\n  ])\n  const othersCanvases = canvases.byId.size\n  useEffect(() => {\n    const newest = [...canvases.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "canvas", canvas: newest } })\n  }, [othersCanvases])\n  // Every change is saved',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a root another writer starts is not added to the sidebar, and the page stays where it is",
   },
@@ -977,7 +977,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (!el.matches(":popover-open")) el.showPopover()\n',
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "Rename in a root's ⋯ titles it, for everyone, and gives its item focus back",
   },
@@ -987,7 +987,7 @@ export const mutations: readonly Mutation[] = [
     from: "        e.target.contains(trigger)\n",
     to: "        !(box.current?.contains(e.target) ?? false)\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "an open menu stays open while an entry arrives and its column scrolls to follow it",
   },
@@ -997,7 +997,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (gone && !open) return null",
     to: "  if (gone) return null",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
@@ -1007,7 +1007,7 @@ export const mutations: readonly Mutation[] = [
     from: "    setBoardMine(false)",
     to: "    void setBoardMine",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "the banner's Clear lifts the filter's words and mine",
   },
   {
@@ -1016,7 +1016,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (claim({ kind: "board" })) searchRef.current?.focus()',
     to: '    if (claim({ kind: "board" }) && false) searchRef.current?.focus()',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "▦ opens the board with its search focused in the footer, and a filter shows a banner without moving the field",
   },
@@ -1077,7 +1077,7 @@ export const mutations: readonly Mutation[] = [
     from: '    case "root":\n    case "image":\n      return [drop.intent]',
     to: '    case "image":\n      return [drop.intent]\n    case "root":\n      return []',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "dragging a thread card to another state moves it for the other window",
   },
@@ -1117,7 +1117,7 @@ export const mutations: readonly Mutation[] = [
     from: '        menuOpen: self.current?.querySelector(".open") != null,',
     to: "        menuOpen: false,",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
@@ -1127,7 +1127,7 @@ export const mutations: readonly Mutation[] = [
     from: "        at !== document.body &&",
     to: "        true &&",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
@@ -1157,7 +1157,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const needsYou = inboxCount(attention.items, inbox.unseen)",
     to: "  const needsYou = inboxCount(attention.items, 0)",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a mention counts on the inbox badge, and choosing it opens its thread with the message drawn",
   },
@@ -1167,7 +1167,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (next !== from) attention.setInbox(next)",
     to: "      if (next !== from) return",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "after a reload, what was seen stays seen, and a mention made meanwhile counts",
   },
@@ -1208,7 +1208,7 @@ export const mutations: readonly Mutation[] = [
     from: '          {avatar("me")}',
     to: '          {avatar("avatar")}',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "another window shows on its root's thread card, and you never do",
   },
   // ── a person's picture (packages/web/presence.tsx) ──
@@ -1259,7 +1259,7 @@ export const mutations: readonly Mutation[] = [
     from: "      .footer-you .account { display: flex; flex: 1 1 auto; min-width: 0; }",
     to: "      .footer-you .account { display: flex; flex: 1 1 auto; }",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "the corner holds you, your inbox and your inventory side by side at 11.5rem with a two-digit badge",
   },
@@ -1353,7 +1353,7 @@ export const mutations: readonly Mutation[] = [
     from: "    !tools.copy &&\n    !tools.comment &&\n",
     to: "    !tools.comment &&\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "moving a root to Done closes it for the window that moved it, and the page someone else is on reads it",
   },
@@ -1534,7 +1534,7 @@ export const mutations: readonly Mutation[] = [
     from: '      {...(state.archive ? {} : dropProps({ kind: "state", state: state.id }))}',
     to: "      {...{}}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a card dropped on a state in the footer's strip becomes a thread there, and the undo key lifts it back into the card",
   },
@@ -1644,7 +1644,7 @@ export const mutations: readonly Mutation[] = [
     from: '      window.removeEventListener("pagehide", left)\n      left()\n',
     to: '      window.removeEventListener("pagehide", left)\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "↓ new below shows on a column that moved on while its tab was hidden, and none before",
   },
@@ -1654,7 +1654,7 @@ export const mutations: readonly Mutation[] = [
     from: "  } = useSelector(heldView, readSessionFacts)",
     to: "  } = useSelector(heldView, v => readSessionFacts(v))",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window's card redraws the column and none of its messages",
   },
   {
@@ -1663,7 +1663,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const nameOf = useSelector(doc, readParticipantNames)",
     to: "  const nameOf = useSelector(doc, d => readParticipantNames(d))",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window's card redraws the column and none of its messages",
   },
   {
@@ -1672,7 +1672,7 @@ export const mutations: readonly Mutation[] = [
     from: "export const Message = memo(MessageView, sameMessageProps)",
     to: "export const Message = MessageView",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "a message in another thread redraws none of this tab's messages",
   },
   {
@@ -1899,7 +1899,7 @@ export const mutations: readonly Mutation[] = [
     from: "        undo: options => undo.undo({ ...options, docs }),",
     to: "        undo: options => undo.undo({ ...options }),",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Cmd+Z in a card undoes only that card, never a newer step in another root",
   },
@@ -1909,7 +1909,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return subscribe(doc, read)",
     to: "      return () => {}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a card emptied marks nothing, though its record stays",
   },
   {
@@ -1918,7 +1918,7 @@ export const mutations: readonly Mutation[] = [
     from: "        archived: archivedCanvases,\n        canvases: canvases.index,\n        index,\n      }),",
     to: "        archived: new Set(),\n        canvases: canvases.index,\n        index,\n      }),",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "an archived root holding your card marks its thread card, not ▦",
   },
   {
@@ -2361,7 +2361,7 @@ export const mutations: readonly Mutation[] = [
     from: '    el.addEventListener("scroll", schedule, { passive: true })',
     to: "    void schedule",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "the rail outlines what a column shows: its first message at its top, its end at its end",
   },
@@ -2371,7 +2371,7 @@ export const mutations: readonly Mutation[] = [
     from: "    rail.scrollTop = to\n",
     to: "    void to\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "the rail scrolls to keep a column's outline in view",
   },
   {
@@ -2380,7 +2380,7 @@ export const mutations: readonly Mutation[] = [
     from: "    const since = over.current ? 0 : performance.now() - reader.current",
     to: "    const since = performance.now() - reader.current",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "the rail holds still while the pointer is over it",
   },
   {
@@ -2389,7 +2389,7 @@ export const mutations: readonly Mutation[] = [
     from: "      {ticks.map(t => (",
     to: "      {ticks.slice(0, 0).map(t => (",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a view in part of a capsule outlines the capsule whole, with a thin line at each edge of the view inside it",
   },
@@ -2399,7 +2399,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const height = Math.max(2, (t.to - t.from) * length)",
     to: "  const height = Math.max(2, length / 2)",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "a view in part of a capsule outlines the capsule whole, with a thin line at each edge of the view inside it",
   },
@@ -2409,7 +2409,7 @@ export const mutations: readonly Mutation[] = [
     from: "      p.spots.save(\n",
     to: "      p.spots.load(\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "a column shown again is where its reader left it",
   },
   {
@@ -2532,7 +2532,7 @@ export const mutations: readonly Mutation[] = [
     from: "      .sidebar-item:hover .open-more, .sidebar-item:focus-within .open-more, .open-more.open,",
     to: "      .sidebar-item:focus-within .open-more, .open-more.open,",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "another root in the sidebar shows its ⋯ on hover, and not at rest",
   },
   {
@@ -2541,7 +2541,7 @@ export const mutations: readonly Mutation[] = [
     from: "                        thread={readerRow}\n                        view={boardShown}",
     to: "                        thread={() => null}\n                        view={boardShown}",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "choosing a reader's thread on a thread card opens it in the sidebar",
   },
@@ -2551,7 +2551,7 @@ export const mutations: readonly Mutation[] = [
     from: "                <Readers {...readers} canvases={[item.canvas]} />\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "another window shows on the root it is on in the sidebar, and leaves it when it switches",
   },
@@ -2561,7 +2561,7 @@ export const mutations: readonly Mutation[] = [
     from: "        finish(step.save, step.refocus)",
     to: "        finish(true, step.refocus)",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "Escape leaves a root's title as it was, and sends nothing",
   },
   {
@@ -2570,7 +2570,7 @@ export const mutations: readonly Mutation[] = [
     from: "    more: null,",
     to: '    more: {\n      items: [\n        { key: "chat", label: "chat", name: "new chat", title: "a chat", intent: { kind: "new-canvas" } },\n      ],\n      label: "other ways to start",\n    },',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "＋ canvas opens a canvas whose box starts with @agent; deleting it sends to people only",
   },
@@ -2580,7 +2580,7 @@ export const mutations: readonly Mutation[] = [
     from: "    markAllSeen: () => save(markAllSeen(inbox, items), inbox),",
     to: "    markAllSeen: () => {},",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "two tabs of one device share the inbox: mark all seen in one clears the other",
   },
@@ -2590,7 +2590,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (!el.matches(":popover-open")) el.showPopover()\n',
     to: '    if (!el.matches(":popover-open") && el.closest("#sidebar") === null)\n      el.showPopover()\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "a root's ⋯ in the sidebar opens a menu drawn in full",
   },
   {
@@ -2599,7 +2599,7 @@ export const mutations: readonly Mutation[] = [
     from: "                    onClick={() => {\n                      if (readOnly.action !== null)\n                        p.onIntent(readOnly.action.intent)\n                    }}",
     to: "                    onClick={() => {}}",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "restoring it in place brings back the composer with its text, and adds it to no other window's list",
   },
@@ -2609,7 +2609,7 @@ export const mutations: readonly Mutation[] = [
     from: "            writable: p.writable,",
     to: "            writable: true,",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "an archived root opened from the board draws its rail and column, with nothing that writes, and copy",
   },
@@ -2619,18 +2619,18 @@ export const mutations: readonly Mutation[] = [
     from: '          onChoose: () => onIntent({ kind: "sign-out" }),',
     to: "          onChoose: () => {},",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "Not you? asks who you are again",
   },
   {
     // The alignment checks after it hold for a fork in view as well: this one
     // is their control, so the bug is in the thread it builds.
     name: "the long thread is too short to reach below a screenful",
-    file: "apps/pinetrie/e2e/browser/page.scenario.ts",
+    file: "apps/pinetrie/e2e/browser/sidebar.scenario.ts",
     from: "          for (let n = 0; n < 30; n++) {",
     to: "          for (let n = 0; n < 4; n++) {",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "a fork far down a long column lies below its first screenful",
   },
   {
@@ -2639,7 +2639,7 @@ export const mutations: readonly Mutation[] = [
     from: "      data-here={p.people.length > 0 ? String(p.people.length) : undefined}",
     to: "      data-here={undefined}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window following a thread rings its end on the rail",
   },
   {
@@ -2648,7 +2648,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />",
     to: "  return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={[]} />",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "the column following that thread shows the other window in its header",
   },
@@ -2658,7 +2658,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (typing.length === 0) return null",
     to: "  if (typing.length >= 0) return null",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "the other window's typing shows in that thread's composer",
   },
   {
@@ -2667,7 +2667,7 @@ export const mutations: readonly Mutation[] = [
     from: "        p.seats === undefined\n          ? []\n",
     to: "        true\n          ? []\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "the other window's edit reaches the note's owner, and the note names who wrote in it",
   },
@@ -2677,7 +2677,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const off = attach(el, doc.text, { undo: session.undoFor(id) })",
     to: "  const off = attach(el, doc.text)",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it",
   },
   {
@@ -2686,7 +2686,7 @@ export const mutations: readonly Mutation[] = [
     from: "      undo.gesture(() => {\n        texts.text(card.id).text.insert(0, text)\n      })",
     to: "      texts.text(card.id).text.insert(0, text)",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Cmd+Z past a card's creation empties it and keeps its record, and Cmd+Shift+Z in its box brings its text back",
   },
@@ -2696,7 +2696,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const mine = unstarted\n    ? yourCard(",
     to: "  const mine = unstarted\n    ? undefined && yourCard(",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a new branch's text is kept across a tab switch",
   },
   {
@@ -2705,7 +2705,7 @@ export const mutations: readonly Mutation[] = [
     from: '      {p.mine !== null && <SignalMark color={p.mine} signal="unsent" />}',
     to: '      {false && <SignalMark color={p.mine} signal="unsent" />}',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a card of yours with text marks its root's item in the sidebar and its thread's end on the rail",
   },
@@ -2715,7 +2715,7 @@ export const mutations: readonly Mutation[] = [
     from: "                pip={unsent.elsewhere ? pip : null}",
     to: "                pip={null}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "an archived root holding your card marks ▦ and its thread card, and comes back as it was",
   },
@@ -2725,7 +2725,7 @@ export const mutations: readonly Mutation[] = [
     from: "    p.session.presence,\n    p.session.writer,\n    p.index,\n    p.end,\n",
     to: '    p.session.presence,\n    "nobody" as WriterId,\n    p.index,\n    p.end,\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a reload keeps who you are: your name",
   },
   {
@@ -2734,7 +2734,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (claim({ kind: "column", key: p.how.column })) box.current?.focus()',
     to: '    if (claim({ kind: "column", key: p.how.column }) || true) box.current?.focus()',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a reload focuses no box: only a column you open takes focus",
   },
   {
@@ -2743,7 +2743,7 @@ export const mutations: readonly Mutation[] = [
     from: "    tab: sessionStorage,\n    device: localStorage,\n  }),\n  /**\n   * Who this device says",
     to: "    tab: sessionStorage,\n    device: sessionStorage,\n  }),\n  /**\n   * Who this device says",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a new tab opens the device's last layout",
   },
   {
@@ -2752,7 +2752,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return useMemo(() => othersReading(reading, me), [reading, me])",
     to: '  return useMemo(() => othersReading(reading, "nobody" as WriterId), [reading, me])',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a second tab is the same person: your name, and never an avatar of you",
   },
@@ -2763,6 +2763,24 @@ export const mutations: readonly Mutation[] = [
     to: "      <Fragment>",
     suite: "browser",
     scenario: "page",
+    expect: "no page errors overall",
+  },
+  {
+    name: "a column's messages are drawn with no keys, in sidebar",
+    file: "packages/web/message-list.tsx",
+    from: "      <Fragment key={node.id}>",
+    to: "      <Fragment>",
+    suite: "browser",
+    scenario: "sidebar",
+    expect: "no page errors overall",
+  },
+  {
+    name: "a column's messages are drawn with no keys, in second-window",
+    file: "packages/web/message-list.tsx",
+    from: "      <Fragment key={node.id}>",
+    to: "      <Fragment>",
+    suite: "browser",
+    scenario: "second-window",
     expect: "no page errors overall",
   },
   // ── your inventory ──
@@ -2800,7 +2818,7 @@ export const mutations: readonly Mutation[] = [
     from: '    document.addEventListener("keydown", onKey)\n',
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Ctrl+Shift+I takes the composer's card into your inventory, which shows its first line, and the composer empties",
   },
@@ -2810,7 +2828,7 @@ export const mutations: readonly Mutation[] = [
     from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null }\n        : null,",
     to: "      null,",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Ctrl+Shift+O puts the selected card in the column you were in, as a note there",
   },
@@ -2820,7 +2838,7 @@ export const mutations: readonly Mutation[] = [
     from: '    case "undo-moves":\n      void ports.session\n',
     to: '    case "undo-moves":\n      return\n      void ports.session\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "the undo key outside a box undoes the put: the card is back in its slot",
   },
@@ -2830,7 +2848,7 @@ export const mutations: readonly Mutation[] = [
     from: '            {\n              kind: "put",\n              source: { kind: "card", card: source.card },',
     to: '            {\n              kind: "fold-list",\n              source: { kind: "card", card: source.card },',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "dragging a slot onto another column's foot puts its card there",
   },
   {
@@ -2839,7 +2857,7 @@ export const mutations: readonly Mutation[] = [
     from: '                      kind: "restore",',
     to: '                      kind: "fold-list",',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Move to trash on a branch trashes it, the canvas's trash lists it, and restore brings it back with its text",
   },
@@ -2849,7 +2867,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])",
     to: '      return kind === undefined || kind === "inventory"\n        ? undefined\n        : Interpret(SCHEMA_OF[kind])',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a reload keeps your inventory's cards in their slots",
   },
   {
@@ -2897,7 +2915,7 @@ export const mutations: readonly Mutation[] = [
     from: "      swaps.gesture(() =>\n        inventory.write(",
     to: "      void swaps, ((f: () => void) => f())(() =>\n        inventory.write(",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "with the panel focused, the undo key swaps back",
   },
   {
@@ -2906,7 +2924,7 @@ export const mutations: readonly Mutation[] = [
     from: "  roots.onReleasing(async root => scribe.release(root))\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a sent card leaves the box empty, and a tab switch does not bring it back",
   },
@@ -2945,7 +2963,7 @@ export const mutations: readonly Mutation[] = [
     from: "        label: SIDEBAR_WORDS.retitle.label,\n        onChoose: () => onIntent(item.intent),",
     to: "        label: SIDEBAR_WORDS.retitle.label,\n        onChoose: () => {},",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "Auto-update title in a root's ⋯ titles it from the model",
   },
   {
@@ -2973,7 +2991,7 @@ export const mutations: readonly Mutation[] = [
     from: "      .pinned-strip { max-height: 30vh;",
     to: "      .pinned-strip { position: absolute; bottom: 0; max-height: 30vh;",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
   },
@@ -2983,7 +3001,7 @@ export const mutations: readonly Mutation[] = [
     from: "          .filter(note => note.id !== writing)",
     to: "          .filter(() => false)",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "your message shows only in your window; moved to the notes, it shows in the other's note column",
   },
@@ -2993,7 +3011,7 @@ export const mutations: readonly Mutation[] = [
     from: '      } else if (now.kind === "bound") {',
     to: "      } else if (false) {",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "dragging a slot onto another column's foot puts its card there",
   },
   {
@@ -3002,7 +3020,7 @@ export const mutations: readonly Mutation[] = [
     from: '      el.readOnly = p.readOnly || current.current.kind === "sending"\n',
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "what you type is still there after switching tabs",
   },
   {
@@ -3011,9 +3029,9 @@ export const mutations: readonly Mutation[] = [
     from: "                        onLeave={() => setPinning(false)}",
     to: "                        onLeave={() => {}}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
-      '"+ pin" in a header opens a box in the strip where Enter is a new line; Alt+↑ there hands the card it makes to the strip, focused, and it stays pinned',
+      "Pin a card in a column's ⋯ opens a box in the strip where Enter is a new line; Alt+↑ there hands the card it makes to the strip, focused, and it stays pinned",
   },
   {
     name: "a run's prompt draws no marker of the pinned cards it read",
@@ -3021,7 +3039,7 @@ export const mutations: readonly Mutation[] = [
     from: "        pinned={markers.get(node.id)}",
     to: "        pinned={undefined}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "after a run, the marker of the pinned cards it read is drawn above its prompt",
   },
@@ -3102,7 +3120,7 @@ export const mutations: readonly Mutation[] = [
     from: "    const notes = p.noteViews.get(item.card)",
     to: "    const notes = undefined",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "your message shows only in your window; moved to the notes, it shows in the other's note column",
   },
@@ -3122,7 +3140,7 @@ export const mutations: readonly Mutation[] = [
     from: "    detach.current = bindText(session, id, el, setText)\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a note written in the box at its note column's end is made at the first keystroke, in that box",
   },
@@ -3132,7 +3150,7 @@ export const mutations: readonly Mutation[] = [
     from: "          among={view.notes}\n          focusOnMount={false}",
     to: "          among={[]}\n          focusOnMount={false}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
@@ -3142,7 +3160,7 @@ export const mutations: readonly Mutation[] = [
     from: "            for (const act of keys.acts) p.onAct(act)",
     to: "            void keys.acts",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
@@ -3152,7 +3170,7 @@ export const mutations: readonly Mutation[] = [
     from: "                among={view.notes}",
     to: "                among={[]}",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
@@ -3162,7 +3180,7 @@ export const mutations: readonly Mutation[] = [
     from: "              onIntent={p.onIntent}\n              placeholder={p.title}\n",
     to: "              onIntent={() => {}}\n              placeholder={p.title}\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "a note column is renamed from its header, for everyone",
   },
   {
@@ -3191,7 +3209,7 @@ export const mutations: readonly Mutation[] = [
     from: "        return entry === undefined ? [] : [{ root, entry }]\n",
     to: '        return entry === undefined || root !== canvases.byId.get(hereCanvas ?? ("" as never))?.roots[0] ? [] : [{ root, entry }]\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a thread moved onto the canvas from another canvas's makes a canvas of two roots: its column, and its root's tree on the rail",
   },
@@ -3201,7 +3219,7 @@ export const mutations: readonly Mutation[] = [
     from: '            if (item.kind === "intent") p.onIntent(item.intent)\n',
     to: '            if (item.kind === "intent" && item.intent.kind !== "copy-thread") p.onIntent(item.intent)\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Copy to this canvas makes a copy beside its source, its fork row naming what it was copied from",
   },
@@ -3211,7 +3229,7 @@ export const mutations: readonly Mutation[] = [
     from: '            if (item.kind === "intent") p.onIntent(item.intent)\n',
     to: '            if (item.kind === "intent" && item.intent.kind !== "trash") p.onIntent(item.intent)\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "Move to trash on a branch trashes it, the canvas's trash lists it, and restore brings it back with its text",
   },
@@ -3225,7 +3243,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (!el.matches(":popover-open")) el.showPopover()\n',
     to: '    if (!el.matches(":popover-open") && el.closest(".column-head") === null)\n      el.showPopover()\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a column's ⋯ opens over the column's messages, each item on top where it is drawn",
   },
@@ -3235,7 +3253,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const forks = useSameData(colors.forks)",
     to: "  const forks = colors.forks",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window's card redraws the column and none of its messages",
   },
   // Its list's props are rebuilt with the same data, which React measures
@@ -3246,7 +3264,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const columns: readonly ColumnSpec[] = useSameData(\n",
     to: "  const columns: readonly ColumnSpec[] = ((x: readonly ColumnSpec[]) => x)(\n",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect: "another window's card redraws the column and none of its messages",
   },
   {
@@ -3265,7 +3283,7 @@ export const mutations: readonly Mutation[] = [
     from: "      {...(endDrop === null ? {} : dropProps(endDrop))}\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a card dropped on the canvas past its last column lands in a note column made for it there, and the undo key takes back both",
   },
@@ -3354,7 +3372,7 @@ export const mutations: readonly Mutation[] = [
     from: "        tabIndex={card === null ? undefined : 0}\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "second-window",
     expect:
       "a note's header focused, Cmd+X cuts it to your trash, and Cmd+V on another note's header moves that same card back",
   },
@@ -3404,7 +3422,7 @@ export const mutations: readonly Mutation[] = [
     from: '      {endDrop !== null && (\n        <div className="canvas-end">\n',
     to: '      {p.canvasColumn !== null && (\n        <div className="canvas-end">\n',
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect: "an archived canvas offers no ＋ to make a column",
   },
   {
@@ -3423,7 +3441,7 @@ export const mutations: readonly Mutation[] = [
     from: "        ...planCanvasesTrashed(cards, emptied, sender),\n",
     to: "",
     suite: "browser",
-    scenario: "page",
+    scenario: "sidebar",
     expect:
       "an unsent new canvas trashed with its bin takes its canvas away, and its thread's card to the trash, asking nothing",
   },
