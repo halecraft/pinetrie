@@ -544,8 +544,12 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   button's intent (`status`: the details' other state, folded or not); and,
   unfolded only, its ⋯. The ⋯'s items are shaped as the sidebar's
   (`ColumnMenuItem`): an `intent`, or a `rename` or `pin` the page opens
-  itself, a list column's Rename for a reader who may write and a thread's
-  Pin a card where `newPinPlace` says `menu` (ADR-0200). The ⋯ ends in a
+  itself: the title's row for a reader who may write, since every column
+  with a head is a titled card's (`isTitledCardId`), worded by
+  `titleWords` (Rename for a list column, Edit title for a thread,
+  ADR-0207), and a thread's Pin a card where `newPinPlace` says `menu`
+  (ADR-0200). `titleWords` reads one table over `TitledKind`, so a kind
+  made titled does not compile until it has its words. The ⋯ ends in a
   `trash` section, Move to trash, on every column for a reader who may
   write; the bin and it ask one `trash` intent, built once.
 - **A thread's ⋯ starts with how it reads** (`columnHead`'s `reading`
@@ -837,7 +841,8 @@ pending.
   while its lane is idle and its canvas not archived, and whether it is
   still `raised`. `attentionItems` keeps the raised ones; a named column's
   `columnStatus` reads any, and `headLine` draws its reason under the line
-  while raised, the focus once it is `quiet` (read or dismissed, ADR-0203).
+  while raised, what the thread is about once it is `quiet` (read or
+  dismissed, ADR-0203).
   So the sidebar and the column cannot disagree.
   The line's words are `reasonedWords`: the level's signal words, then
   `attentionWords`' reason, as every status's title is (`statusWords`,
@@ -1295,8 +1300,9 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 
 - `head` (`HeadShows`), what the header tells: who works in the column
   (`identity`, its thread's name, ADR-0039), what shows under its line
-  (`line`, `headLine`'s value: a raised run-end status, else the focus,
-  never a quiet status), where it forks (`origin`), an ssh ask (`access`),
+  (`line`, `headLine`'s or `chatLine`'s value: a raised run-end status,
+  else the title, else the focus, never a quiet status), where it forks
+  (`origin`), an ssh ask (`access`),
   who started it and from where (`facts`, `ThreadFacts`, built by
   `threadFactsOf`; `base`), which `handleTitle` words as the name's title;
 - `dock` (`DockShows`), what the dock does: the work strip (`strip`), whether
@@ -1474,16 +1480,25 @@ composer*).
   (`IconLookup`) that the glances and the list share. `ThreadIcon.kind` says how it is drawn: a
   `banner` on black, blended off; a `built-in` sprite on a transparent
   ground, unblended.
-- **The header's focus is its named agent's thread's** (ADR-0173):
-  `columnView` reads it, and the run-end status, only for `HeadIdentity`'s
-  `agent` case, so a chat or a pending column shows neither. `threadFocus` (`thread-face.ts`)
-  is the one place its words are decided: the thread's `FocusRecord`, a
-  model's (`kind: "model"`), else the first line of how the thread began
-  (`threadOpening`, `kind: "opening"`), else null. The header, a thread's
-  preview and the folded strip's handle's title (`foldedWords`' `hint`)
-  take it, and
-  `focusTitle` words its tooltip. `ThreadFace.first` is `threadOpening`
-  too, never computed again.
+- **What a thread is about is decided in `thread-glance.ts`** (ADR-0173,
+  ADR-0207), each part by its own function: `threadTitle`, a person's
+  title (its `CARD_TITLE` record), else null; `threadFocus`, the thread's
+  `FocusRecord`, a model's (`kind: "model"`), else the first line of how
+  the thread began (`threadOpening`, `kind: "opening"`), else null; and
+  `threadAbout`, the title, else the focus, as a `ThreadAbout`. A title and
+  a focus are two types, so nothing reads a title as a model's.
+  `aboutTooltip` words the tooltip ("set by" its setter, the agent worded
+  itself since `displayName` takes a writer; "written by a model"), and
+  `aboutText` the words. `ThreadGlance.first` is `threadOpening` too, never
+  computed again.
+- **The header's line**: `columnView` builds a named agent's with
+  `headLine` (the raised run-end status, else `threadAbout`), and a chat's
+  or a pending column's with `chatLine`, which takes a `ThreadTitle` alone,
+  so an untitled chat has no line and none shows a focus. A thread's
+  preview (`compact.ts`) shows a title or a model's focus as its second
+  line, by a `switch` over both kinds that a new kind does not compile
+  through; an opening falls to its last and first lines. The folded
+  strip's handle's title (`foldedWords`' `hint`) is `aboutText`.
 - **The header's icon is its named agent's, by type**: `HeadIdentity`'s
   `agent` case carries it, as it carries `details`, so a pending or absent
   identity cannot have one. `identityOf` makes it from `headLane`'s lane
@@ -2183,7 +2198,7 @@ gone.
   whether the box lets its card go. Its steps are `editorState`'s, your
   message's, with `release` for focus leaving it.
 - **Renaming a note column is `rename` with a `MarkTarget`**: the same
-  `TitleField` and `planTitle` as a canvas's, sent as `mark`.
+  `planTitle` as a canvas's, sent as `mark` (`CardTitleField`, web).
 - **A card leaving a queue or a pinned strip** is sent to its thread's
   nearest notes (`notesTarget`, the `notes` key), which the host resolves; the
   page draws the move pending in the column the host would choose

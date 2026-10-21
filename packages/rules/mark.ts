@@ -4,9 +4,9 @@ import {
   type AgentId,
   type CanvasId,
   ERR,
+  isAgentId,
   type Refusal,
   refused,
-  THE_AGENT,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
@@ -58,8 +58,6 @@ export const MARK: RecordSpec<MarkRecord, CanvasId, "session"> = {
     })),
 }
 
-const isAgent = (by: WriterId | AgentId): by is AgentId => by === THE_AGENT
-
 type MarkPlan =
   | Refusal
   /** The title is already stored, or there is none to clear: nothing is written. */
@@ -108,7 +106,7 @@ export function planMark(input: {
     case "card": {
       const { card } = of
       const only = KINDS[kindOfCard(card)].titled
-      if (!input.titled.has(card) || (isAgent(by) && only === "person"))
+      if (!input.titled.has(card) || (isAgentId(by) && only === "person"))
         return refused(ERR.UNKNOWN_TARGET, "no such card to title")
       const stored = input.cardTitles.get(card)?.title ?? null
       if (stored === title) return { kind: "unchanged" }

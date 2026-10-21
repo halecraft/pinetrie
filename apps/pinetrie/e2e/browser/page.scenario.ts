@@ -828,6 +828,50 @@ async function run(check: Checks["check"]): Promise<void> {
           "under a column's line, with no press, is what its thread is doing",
           focusShown,
         )
+        // Edit title in its ⋯: the title, stored by the host, shows under
+        // the line in place of the focus, and an empty save brings the
+        // focus back.
+        const lineSel = `.column[data-card="${card}"] .column-head [data-role="focus"]`
+        const titleSel = `.column[data-card="${card}"] .open-title-input`
+        const retitle = async (text: string) => {
+          const chosen = await chooseFromMenu(
+            page,
+            `.column[data-card="${card}"] .column-menu`,
+            ".column-rename",
+          )
+          if (!chosen) return false
+          await page.waitForSelector(titleSel, { timeout: 15_000 })
+          await page.fill(titleSel, text)
+          await page.press(titleSel, "Enter")
+          return true
+        }
+        const lineShows = (title: string | null) =>
+          page
+            .waitForFunction(
+              ([sel, want]) => {
+                const line = document.querySelector(sel)
+                if (line === null) return false
+                return want === null
+                  ? line.getAttribute("data-kind") !== "title"
+                  : line.getAttribute("data-kind") === "title" &&
+                      line.textContent === want
+              },
+              [lineSel, title] as const,
+              { timeout: 15_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+        const THREAD_TITLE = "Tabs, in order"
+        const titled =
+          (await retitle(THREAD_TITLE)) && (await lineShows(THREAD_TITLE))
+        const cleared = (await retitle("")) && (await lineShows(null))
+        check(
+          "Edit title in a thread's ⋯ shows its title under the line, and clearing it brings back the focus",
+          titled && cleared,
+          JSON.stringify({ titled, cleared }),
+        )
         // A press on the name, the handle, does nothing but drag: the column
         // stays as it is.
         await page

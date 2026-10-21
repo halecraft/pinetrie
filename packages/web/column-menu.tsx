@@ -87,13 +87,14 @@ export function ColumnHandle(p: {
 
 /**
  * An unfolded head's ⋯: what changes the canvas everyone shares. Rename and
- * Pin a card open what the page draws itself; a column without them passes
- * nothing.
+ * Pin a card open what the page draws itself; a column without Pin a card
+ * passes nothing for it.
  */
 export function ColumnMenu(p: {
   sections: readonly ColumnMenuSection[]
   onIntent: (intent: Intent) => void
-  onRename?: () => void
+  /** Every column's ⋯ offers its title's row to a reader who may write. */
+  onRename: () => void
   onPin?: () => void
   /** Read the column so: its reading choices, which a list column has none of. */
   onDensity?: (density: Density) => void
@@ -121,7 +122,7 @@ export function ColumnMenu(p: {
             ),
           onChoose: () => {
             if (item.kind === "intent") p.onIntent(item.intent)
-            else if (item.kind === "rename") p.onRename?.()
+            else if (item.kind === "rename") p.onRename()
             else if (item.kind === "density") p.onDensity?.(item.density)
             else p.onPin?.()
           },

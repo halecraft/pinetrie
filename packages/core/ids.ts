@@ -281,6 +281,10 @@ export type AgentId = string & { readonly [agentIdBrand]: true }
 /** The host's agent, addressed as `@agent`. */
 export const THE_AGENT = "agent" as AgentId
 
+/** Whether an author is the agent: a writer's id always starts `w-` (`writerId`), so neither is read as the other. */
+export const isAgentId = (by: WriterId | AgentId): by is AgentId =>
+  by === THE_AGENT
+
 /**
  * `text` as a message that asks the agent, whatever else it mentions: a
  * mention of a person alone would address the message to them instead.

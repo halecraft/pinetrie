@@ -778,13 +778,13 @@ which are swept.
   (its thread's holder's inventory full, or a thread with no card) it stays
   queued, saying why, and the host holds its queue, so the drain passes it
   by until someone moves it.
-- **A card's title** (a note column's, a media column's, an image's,
-  ADR-0182) is one record (`CARD_TITLE`, `card-title.ts`, keyed by the
+- **A card's title** (a thread's, ADR-0207; a note column's, a media
+  column's, an image's, ADR-0182) is one record (`CARD_TITLE`, `card-title.ts`, keyed by the
   card's id: title, who set it, when), absent while untitled. `mark` sets it
   as it sets a canvas's (`planMark` over a `MarkTarget`): last write wins,
   null clears it, a card in a trash is refused `UNKNOWN_TARGET` (`titledCards`),
   and so is the agent where its kind is a person's alone to title (`KINDS`'
-  `titled`: a note column). The archive gate reads a card's canvas from the
+  `titled`: a thread and a note column). The archive gate reads a card's canvas from the
   card (`writesIn`). The note columns' own records were moved to it once
   (`0004-card-titles`).
 - **A media column holds images** (ADR-0182, `media.ts`, `put-images.ts`):
@@ -1149,7 +1149,9 @@ trash, have no agent and no runner. Where its card leaves it is
   move's drop does. No entry is written: its first send is a branch at its
   fork, which the gate lets through by the copy's own holding
   (`runThreads`'s fork rule) and `sendMessage` writes in the thread whose
-  record names that fork (`forkEntry`), with no second record or card.
+  record names that fork (`forkEntry`), with no second record or card. A
+  titled source's copy has its `CARD_TITLE` too, with the source's `by`,
+  among its records (ADR-0207).
 
 # The gate (`gate.ts`)
 
@@ -2179,7 +2181,9 @@ and the total `decodePinned` are the only code that builds or reads it, and
 - **The canvas list** (`canvasList`): a line per card on the canvas, in
   its order, at most `CANVAS_CAP` (50), the rest counted: its kind, its
   title and who put it there, never its contents, which only pinned cards
-  give. A column's line reads its glance (`columnGlances`): a note column's
+  give. A column's line reads its glance (`columnGlances`): a thread's
+  title, quoted after its name while it has one (ADR-0207), which
+  `CANVAS_RULE` explains; a note column's
   count, a media column's images, each its title, id and how many versions,
   at most `MEDIA_LINE_CAP` and the rest counted, so a column of many images
   is still one line (ADR-0182). A note column's and a media column's line

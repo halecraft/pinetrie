@@ -14,13 +14,7 @@ import {
 import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/threads"
 import { useState } from "react"
 import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
-import { TitleField } from "./title-field.tsx"
-
-/** What each list column's header calls it. */
-const NAME: Readonly<Record<ListKind, string>> = {
-  "note-column": "note column",
-  media: "media column",
-}
+import { CardTitleField } from "./title-field.tsx"
 
 export function ListColumnHead(p: {
   kind: ListKind
@@ -36,7 +30,6 @@ export function ListColumnHead(p: {
   onIntent: (intent: Intent) => void
 }) {
   const [renaming, setRenaming] = useState(false)
-  const name = NAME[p.kind]
   const writable = p.readOnly === null
   const head = columnHead({
     card: p.card,
@@ -48,7 +41,6 @@ export function ListColumnHead(p: {
     density: null,
     start: null,
     pin: false,
-    renamable: writable,
   })
   return (
     <header className="column-head" data-column-head="">
@@ -59,16 +51,10 @@ export function ListColumnHead(p: {
             <span aria-hidden="true" className="note-column-mark">
               {KIND_ICON[p.kind]}
             </span>
-            <TitleField
-              label={`title for this ${name}`}
+            <CardTitleField
+              card={p.card}
               onEnd={() => setRenaming(false)}
-              onSend={title =>
-                p.onIntent({
-                  kind: "rename",
-                  of: { kind: "card", card: p.card },
-                  title,
-                })
-              }
+              onIntent={p.onIntent}
               placeholder={p.title}
               stored={p.titled}
             />

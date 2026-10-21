@@ -13,6 +13,10 @@ export type TitledCardId = IdOf<TitledKind>
 export const isTitledCardId = (card: CardId): card is TitledCardId =>
   isTitledKind(kindOfCard(card))
 
+/** A titled card's kind: its id's prefix is a titled kind's, as `isTitledCardId` checked. */
+export const titledKindOfCard = (card: TitledCardId): TitledKind =>
+  kindOfCard(card) as TitledKind
+
 /** What a title names: a canvas, or a titled card. */
 export type MarkTarget =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }

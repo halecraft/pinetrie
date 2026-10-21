@@ -20,15 +20,15 @@ const menuOf = (
     density: null,
     start: null,
     pin: false,
-    renamable: false,
   }).menu
 
 test("a column's ⋯ makes its card wide, or narrow again, for everyone", () => {
   const card = threadIdFor("a")
   expect(menuOf(card, 1)[0]?.items).toMatchObject([
+    { kind: "rename" },
     { label: "Make wide", intent: { kind: "card-width", card, width: 2 } },
   ])
-  expect(menuOf(card, 2)[0]?.items[0]).toMatchObject({
+  expect(menuOf(card, 2)[0]?.items[1]).toMatchObject({
     label: "Make narrow",
     intent: { kind: "card-width", card, width: 1 },
   })
@@ -82,7 +82,6 @@ test("a column's head starts with its toggle: it folds a started thread or a not
       density: null,
       start: null,
       pin: false,
-      renamable: false,
     })
   for (const [card, writable] of [
     [thread, true],
@@ -120,7 +119,6 @@ test("folded, a column's head unfolds it from the same toggle, keeps its box, an
     density: null,
     start: null,
     pin: false,
-    renamable: false,
   })
   expect(folded.toggle).toEqual({
     words: foldToggle(true),
@@ -143,7 +141,6 @@ test("a column's box asks the other state, for everyone; a reader who may not ch
       density: null,
       start: null,
       pin: false,
-      renamable: false,
     }).box
   expect(box(false, true).intent).toEqual({
     kind: "card-tick",
@@ -169,19 +166,25 @@ const head = (over: Partial<Parameters<typeof columnHead>[0]> = {}) =>
     density: null,
     start: null,
     pin: false,
-    renamable: false,
     ...over,
   })
 
-test("a list column's ⋯ starts with Rename for a reader who may write; a thread's offers Pin a card when it may pin", () => {
-  const first = (h: ReturnType<typeof head>) =>
-    h.menu[0]?.items.map(i => i.kind)
-  expect(first(head({ renamable: true }))).toEqual(["rename", "intent"])
-  expect(first(head())).toEqual(["intent"])
-  expect(first(head({ card: threadIdFor("a"), pin: true }))).toEqual([
-    "pin",
-    "intent",
-  ])
+test("a column's ⋯ starts with its title's row for a reader who may write: Rename for a list column, Edit title for a thread", () => {
+  const first = (h: ReturnType<typeof head>) => h.menu[0]?.items[0]
+  expect(first(head())).toMatchObject({ kind: "rename", label: "Rename" })
+  expect(first(head({ card: threadIdFor("a") }))).toMatchObject({
+    kind: "rename",
+    label: "Edit title",
+  })
+  expect(first(head({ writable: false }))).not.toMatchObject({
+    kind: "rename",
+  })
+})
+
+test("a thread's ⋯ offers Pin a card when it may pin", () => {
+  expect(
+    head({ card: threadIdFor("a"), pin: true }).menu[0]?.items.map(i => i.kind),
+  ).toEqual(["rename", "pin", "intent"])
 })
 
 test("a thread's ⋯ starts with three reading choices, the current one checked, then Go to where it started when there is a start", () => {

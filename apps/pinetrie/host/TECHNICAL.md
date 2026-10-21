@@ -985,8 +985,9 @@ rejects `shutdown()`.
   host's change takes nothing. Provenance itself writes no fact. A move, an
   undo or a redo take alike.
 - **A copy** (`copyThread`, `commands/cards.ts`): `planThreadCopy` over the
-  source's record and tree; the copy's `THREAD` record first, then its card,
-  then its name (`names.ensure`). Its first send is a branch at its fork:
+  source's record and tree, and the card titles; the copy's `THREAD`
+  record and its source's title first, then its card, then its name
+  (`names.ensure`). Its first send is a branch at its fork:
   `sendMessage` refuses a branch naming a recorded thread anywhere else, and
   writes no record or card for it.
 - **A thread is opened before its first send** (ADR-0126, `open-thread`

@@ -452,6 +452,7 @@ describe("planThreadCopy", () => {
           },
         } as Parameters<typeof planThreadCopy>[0]["copy"],
         threads: THREADS,
+        titles: new Map(),
         index: null,
       }),
     ).toEqual({ kind: "declined", why: "unknown" })

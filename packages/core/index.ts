@@ -110,6 +110,7 @@ export {
   emailLocalPart,
   entryId,
   historyScope,
+  isAgentId,
   isCanvasId,
   isRootId,
   isThreadId,

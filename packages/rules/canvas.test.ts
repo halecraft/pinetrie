@@ -10,6 +10,7 @@ import {
   cardIdOfKind,
   type ImageCard,
   makeCard,
+  type TitledCardId,
   UNTICKED,
 } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
@@ -30,6 +31,7 @@ import {
 } from "./canvas.ts"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { encodeCanvasPinned, planCanvasPinnedRead } from "./canvas-pinned.ts"
+import type { CardTitleRecord } from "./card-title.ts"
 import {
   CONTEXT,
   CONTEXT_KINDS,
@@ -125,6 +127,27 @@ describe("the canvas list", () => {
       `note column "Decisions" (${N}), 4 notes, put by Bea, box ticked`,
       "thread calm-owl, running, put by Bea, box ticked",
     ])
+  })
+
+  test("a titled thread's line quotes its title after its name; an untitled one's names it alone", () => {
+    const onCanvas = cardsFor([A, N, B])
+    const glances = columnGlances({
+      cards: [],
+      onCanvas,
+      titles: new Map<TitledCardId, CardTitleRecord>([
+        [A, { card: A, title: "Sync, again", by: ADA, at: 1 }],
+        [B, { card: B, title: "Billing", by: BEA, at: 1 }],
+        [N, { card: N, title: "Decisions", by: ADA, at: 1 }],
+      ]),
+    })
+    expect(canvasList(facts({ onCanvas, glances })).lines).toEqual([
+      'thread amber-fox "Sync, again" (this thread), put by Ada',
+      `note column "Decisions" (${N}), no notes, put by Bea`,
+      'thread calm-owl "Billing", running, put by Bea',
+    ])
+    expect(
+      columnGlances({ cards: [], onCanvas, titles: new Map() }).get(A),
+    ).toEqual({ kind: "thread", title: null })
   })
 
   test("at most CANVAS_CAP lines, the rest counted", () => {

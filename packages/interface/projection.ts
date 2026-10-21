@@ -184,6 +184,7 @@ function readFacts(view: HeldView): SessionFacts {
   const { session: doc, live, roots } = view
   const index = readHeldIndex(roots)
   const activity = roots.flatMap(root => readAgentActivity({ doc: root, live }))
+  const cardTitles = readCardTitles(doc)
   return {
     index,
     asks: indexAsks(index),
@@ -194,7 +195,7 @@ function readFacts(view: HeldView): SessionFacts {
     seats: readSeats(doc),
     workflow: readWorkflow(doc),
     marks: readMarks(doc),
-    cardTitles: readCardTitles(doc),
+    cardTitles,
     threads: readThreads(doc),
     runEndReports: readRunEndReports(doc),
     histories: readCardHistories(doc),
@@ -207,6 +208,7 @@ function readFacts(view: HeldView): SessionFacts {
       proposedByLane: readProposedByLane(doc),
       names: readNames(doc),
       focuses: readFocuses(doc),
+      titles: cardTitles,
       banners: readBanners(doc),
       icons: readIcons(doc),
       access: readAccess(doc),

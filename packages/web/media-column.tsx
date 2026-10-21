@@ -21,6 +21,7 @@ import {
   type Reader,
   type ReadOnly,
   type SeatRecord,
+  titleWords,
   versionWords,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
@@ -42,7 +43,7 @@ import { TrashIcon } from "./icons.tsx"
 import { uploadImages } from "./image-upload.ts"
 import { ListColumnHead } from "./list-column-head.tsx"
 import { Margin, MarginCount } from "./margin.tsx"
-import { TitleField } from "./title-field.tsx"
+import { CardTitleField } from "./title-field.tsx"
 
 export function MediaColumn(p: {
   session: SessionClient
@@ -241,16 +242,10 @@ function MediaImage(p: {
         </a>
         <figcaption className="media-image-bar">
           {renaming && writable ? (
-            <TitleField
-              label="title for this image"
+            <CardTitleField
+              card={image.image}
               onEnd={() => setRenaming(false)}
-              onSend={title =>
-                p.onIntent({
-                  kind: "rename",
-                  of: { kind: "card", card: image.image },
-                  title,
-                })
-              }
+              onIntent={p.onIntent}
               placeholder={image.title}
               stored={image.titled}
             />
@@ -260,7 +255,7 @@ function MediaImage(p: {
               className="media-image-title"
               disabled={!writable}
               onClick={() => setRenaming(true)}
-              title="rename this image"
+              title={titleWords(image.image).title}
             >
               {image.title}
             </Button>

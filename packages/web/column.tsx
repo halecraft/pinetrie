@@ -16,6 +16,9 @@ import {
 } from "@pinetrie/core"
 import {
   type AccessView,
+  aboutKind,
+  aboutText,
+  aboutTooltip,
   accessWords,
   actingSaid,
   agentsRow,
@@ -42,7 +45,6 @@ import {
   endTraces,
   entryMarginCounts,
   type FoldMemory,
-  focusTitle,
   gridKeyAct,
   type HeadIdentity,
   type HeadLine,
@@ -81,6 +83,7 @@ import {
   threadIcon,
   threadLink,
   threadReach,
+  titleWords,
   traceEnd,
   traceGroups,
   traceWords,
@@ -107,6 +110,7 @@ import {
   type CardRecord,
   type CardWidth,
   entryMargin,
+  isTitledCardId,
   type LaneView,
   type MediaId,
   nearestRevision,
@@ -165,6 +169,7 @@ import { Avatars, nameFor } from "./presence.tsx"
 import { ColumnDot } from "./root-signals.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadMark } from "./thread-mark.tsx"
+import { CardTitleField } from "./title-field.tsx"
 import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
@@ -928,6 +933,7 @@ export function Column(p: ColumnProps) {
   // open, the strip leaves out the card it shows, as the column leaves out
   // the composer's. It closes when focus leaves it.
   const [pinning, setPinning] = useState(false)
+  const [retitling, setRetitling] = useState(false)
   const [pinShown, setPinShown] = useState<TextCardId | null>(null)
   const newPin = newPinPlace({
     canPin: pinKey !== null && !unstarted && threadEnd !== null,
@@ -953,7 +959,6 @@ export function Column(p: ColumnProps) {
           density: view.nodes.length > 0 ? density : null,
           start: shows.head.facts?.start ?? null,
           pin: newPin === "menu",
-          renamable: false,
         })
   // Your traces where your cards were at this thread's end, when someone
   // else moved them while you were away. Drawn in a page you can
@@ -1051,13 +1056,32 @@ export function Column(p: ColumnProps) {
                   onDensity={chooseDensity}
                   onIntent={p.onIntent}
                   onPin={openPin}
+                  onRename={() => setRetitling(true)}
                   sections={head.menu}
                 />
               )}
             </div>
             {/* Under the line, always: why it needs you, else what it is
             doing; where it came from; and an ssh ask, for its owner. */}
-            <HeadLineView line={shows.head.line} onOpen={openAt} />
+            {retitling && writable && card !== null && isTitledCardId(card) ? (
+              <CardTitleField
+                card={card}
+                onEnd={() => setRetitling(false)}
+                onIntent={p.onIntent}
+                placeholder={
+                  shows.head.line.kind === "about"
+                    ? aboutText(shows.head.line.about)
+                    : titleWords(card).field
+                }
+                stored={p.work.titles.get(card)?.title ?? null}
+              />
+            ) : (
+              <HeadLineView
+                line={shows.head.line}
+                nameOf={p.nameOf}
+                onOpen={openAt}
+              />
+            )}
             <Origin
               onLink={openLink}
               onOpen={openAt}
@@ -1439,14 +1463,16 @@ function HeadHandle({
 /**
  * Under a column's line, always (`headLine`): the reason of a run-end status
  * raised for you, alone, in its level's colour, its title the level then the
- * reason, a press bringing the run's last entry into view; else the
- * thread's focus, dimmed; else nothing.
+ * reason, a press bringing the run's last entry into view; else what the
+ * thread is about, its opening line dimmed; else nothing.
  */
 function HeadLineView({
   line,
+  nameOf,
   onOpen,
 }: {
   line: HeadLine
+  nameOf: ReadonlyMap<WriterId, string>
   onOpen: (id: EntryId) => void
 }) {
   switch (line.kind) {
@@ -1467,17 +1493,19 @@ function HeadLineView({
         </Button>
       )
     }
-    case "focus":
+    case "about": {
+      const { about } = line
       return (
         <div
           className="head-focus"
-          data-kind={line.focus.kind}
+          data-kind={aboutKind(about)}
           data-role="focus"
-          title={focusTitle(line.focus)}
+          title={aboutTooltip(about, nameOf)}
         >
-          {line.focus.text}
+          {aboutText(about)}
         </div>
       )
+    }
   }
 }
 

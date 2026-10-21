@@ -127,7 +127,7 @@ export {
   type SendMode,
   type ThreadStart,
 } from "./intents.ts"
-export { KINDS } from "./kinds.ts"
+export { KINDS, type TitledKind } from "./kinds.ts"
 export {
   type LiveOp,
   type Stream,
@@ -143,6 +143,7 @@ export {
   type MarkTarget,
   parseTitle,
   type TitledCardId,
+  titledKindOfCard,
 } from "./marks.ts"
 export {
   type AgentCandidate,

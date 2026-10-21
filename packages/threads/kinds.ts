@@ -86,7 +86,7 @@ export const KINDS = {
     moves: true,
     reordered: true,
     text: "none",
-    titled: null,
+    titled: "person",
   },
   canvas: {
     prefix: "k-",

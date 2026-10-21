@@ -133,6 +133,32 @@ function twoLines(text: string): readonly [string, string | null] {
 
 const text = (t: string): CompactText => ({ kind: "text", text: t })
 
+/**
+ * A thread's slot's second line: its title, or a model's focus, else the
+ * first line of where it ended, else of where it began. An opening line is
+ * never shown as a focus here, since `first` already is it.
+ */
+function glanceSecond(glance: ThreadGlance): string | null {
+  const fallback = glance.last ?? (glance.first === "" ? null : glance.first)
+  const { about } = glance
+  if (about === null) return fallback
+  switch (about.kind) {
+    case "title":
+      return about.title.title
+    case "focus":
+      switch (about.focus.kind) {
+        case "model":
+          return about.focus.text
+        case "opening":
+          return fallback
+        default:
+          return about.focus.kind satisfies never
+      }
+    default:
+      return about satisfies never
+  }
+}
+
 /** `card` at its least detail. */
 export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
   const base = { kind: card.kind, card: card.id, tone: facts.tone }
@@ -173,10 +199,7 @@ export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
         mark: { kind: "thread", icon: glance.icon, status: glance.status },
         command: null,
         lead: text(glance.name ?? UNNAMED_THREAD),
-        second:
-          glance.focus?.kind === "model"
-            ? glance.focus.text
-            : (glance.last ?? (glance.first === "" ? null : glance.first)),
+        second: glanceSecond(glance),
         badge: status === null ? key : { kind: "status", glance },
       }
     }

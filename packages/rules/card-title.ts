@@ -1,6 +1,6 @@
-// card-title — the title of a card with one of its own: a note column's, a
-// media column's or an image's (`KINDS`' `titled`). A canvas's title is a
-// mark (`mark.ts`).
+// card-title — the title of a card with one of its own: a thread's, a note
+// column's, a media column's or an image's (`KINDS`' `titled`). A canvas's
+// title is a mark (`mark.ts`).
 
 import type { AgentId, WriterId } from "@pinetrie/core"
 import {

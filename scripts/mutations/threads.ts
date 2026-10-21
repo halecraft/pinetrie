@@ -743,6 +743,14 @@ export const mutations: readonly Mutation[] = [
       "every id prefix is distinct, and none can begin a uuidv7: a bare id is a text card's",
   },
   {
+    name: "the agent may title a thread",
+    file: "packages/threads/kinds.ts",
+    from: '    prefix: "t-",\n    places: ["canvas", "inventory", "trash"],\n    moves: true,\n    reordered: true,\n    text: "none",\n    titled: "person",',
+    to: '    prefix: "t-",\n    places: ["canvas", "inventory", "trash"],\n    moves: true,\n    reordered: true,\n    text: "none",\n    titled: "anyone",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/rules/mark.test.ts"],
+    expect: "the agent never titles a thread",
+  },
+  {
     name: "a stop's fact is drawn apart from its ask",
     file: asks,
     from: "      steered.set(entry.id, stop.prompt)\n",

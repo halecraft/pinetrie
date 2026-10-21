@@ -1,14 +1,21 @@
-// web/title-field — the field a title is edited in: a root's, in the sidebar,
-// and a note column's. `planTitle` decides what a save sends.
+// web/title-field — the field a title is edited in: a canvas's, in the
+// sidebar and its column, and a titled card's (`CardTitleField`). `planTitle`
+// decides what a save sends.
 
-import { planTitle, renameKey, SIDEBAR_WORDS } from "@pinetrie/interface"
-import { MAX_TITLE } from "@pinetrie/threads"
+import {
+  type Intent,
+  planTitle,
+  renameKey,
+  SIDEBAR_WORDS,
+  titleWords,
+} from "@pinetrie/interface"
+import { MAX_TITLE, type TitledCardId } from "@pinetrie/threads"
 import { useLayoutEffect, useRef, useState } from "react"
 
 /**
- * A field holding a title while it is renamed: a root's in the sidebar, a
- * note column's in its head. Enter and leaving the field save, and Escape
- * cancels.
+ * A field holding a title while it is renamed: a canvas's in the sidebar or
+ * its column, a card's through `CardTitleField`. Enter and leaving the field
+ * save, and Escape cancels.
  */
 export function TitleField({
   stored,
@@ -68,6 +75,37 @@ export function TitleField({
       placeholder={placeholder}
       ref={input}
       value={text}
+    />
+  )
+}
+
+/**
+ * The field a titled card's title is edited in: a thread's, a list
+ * column's or an image's. A save asks `rename` for the card, which clears its
+ * title when the field is left empty.
+ */
+export function CardTitleField({
+  card,
+  stored,
+  placeholder,
+  onIntent,
+  onEnd,
+}: {
+  card: TitledCardId
+  stored: string | null
+  placeholder: string
+  onIntent: (intent: Intent) => void
+  onEnd: (focusItem: boolean) => void
+}) {
+  return (
+    <TitleField
+      label={titleWords(card).field}
+      onEnd={onEnd}
+      onSend={title =>
+        onIntent({ kind: "rename", of: { kind: "card", card }, title })
+      }
+      placeholder={placeholder}
+      stored={stored}
     />
   )
 }

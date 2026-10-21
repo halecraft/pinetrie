@@ -5,14 +5,14 @@
 // ending in its trash.
 
 import { type EntryId, isThreadId } from "@pinetrie/core"
-import type { CardId, CardWidth } from "@pinetrie/threads"
+import { type CardId, type CardWidth, isTitledCardId } from "@pinetrie/threads"
 import { DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { moveWords } from "./card-frame.ts"
 import {
   type ControlWords,
   NEW_PIN_TITLE,
   PIN_A_CARD,
-  RENAME,
+  titleWords,
 } from "./card-words.ts"
 import { foldToggle } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
@@ -124,8 +124,6 @@ export function columnHead(input: {
   readonly start: EntryId | null
   /** Its ⋯ offers Pin a card (`newPinPlace` says `menu`). */
   readonly pin: boolean
-  /** Its ⋯ offers Rename: a list column a reader may write. */
-  readonly renamable: boolean
 }): ColumnHead {
   const { card, folded, ticked, writable } = input
   return {
@@ -165,10 +163,9 @@ function columnMenu(input: {
   readonly density: Density | null
   readonly start: EntryId | null
   readonly pin: boolean
-  readonly renamable: boolean
 }): readonly ColumnMenuSection[] {
   const wide = input.width === 2
-  const { density } = input
+  const { card, density } = input
   const reading: readonly ColumnMenuSection[] =
     density === null
       ? []
@@ -187,13 +184,13 @@ function columnMenu(input: {
   const canvas: ColumnMenuSection = {
     key: "canvas",
     items: [
-      ...(input.renamable
+      ...(input.writable && isTitledCardId(card)
         ? [
             {
               kind: "rename",
               key: "rename",
-              label: RENAME,
-              title: "change this column's title, for everyone",
+              label: titleWords(card).label,
+              title: titleWords(card).title,
             } as const,
           ]
         : []),

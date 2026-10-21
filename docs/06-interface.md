@@ -469,13 +469,15 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   does nothing else. The status is a mark, not a button: its dot, and a
   word while something is raised for you (needs you, conflicts, ready,
   worth a read). Under the line, always, nothing behind a press: the run-end
-  reason while raised for you, else the thread's focus; the fork row; and
-  an ssh request for its owner. The column's ⋯ starts with how it reads
-  (**brief**, **story**, **everything**, the current one checked) for a
-  column with messages, then, where the agent joined below the path's first
-  message, **Go to where it started**, which brings that message into view.
-  Pinning a first card is its ⋯'s **Pin a card**; a note or media column's
-  ⋯ starts with **Rename**. A column has no details panel (ADR-0203).
+  reason while raised for you, else the thread's title, else its focus; the
+  fork row; and an ssh request for its owner. The column's ⋯ starts with
+  how it reads (**brief**, **story**, **everything**, the current one
+  checked) for a column with messages, then, where the agent joined below
+  the path's first message, **Go to where it started**, which brings that
+  message into view. Pinning a first card is its ⋯'s **Pin a card**. For
+  anyone who may write the column, its ⋯ offers **Rename** on a note or
+  media column and **Edit title** on a thread, first among what changes the
+  canvas. A column has no details panel (ADR-0203).
 - **A column's dot is its thread's status** (ADR-0198), the same value
   folded or not, and the one the sidebar and the board read: an amber dot
   when it needs you (a run's end, an ask about a conflict, an ssh
@@ -491,10 +493,19 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   run's summary is written, from the thread's asks and their headlines; it
   stays while the work goes on, and changes when the thread moves to a new
   phase. Until a thread's first run ends, the row shows its first message's
-  first line, dimmed. A chat or a column whose agent is not named yet has
-  no such row. A focus follows the digests' setting. A thread's preview
+  first line, dimmed. A focus follows the digests' setting. A thread's preview
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
+- **A thread's title stands in for its focus** (ADR-0207): a person's words
+  for it, set from its ⋯'s **Edit title** in a field where the line is.
+  While it is set, the header, the preview and the folded strip's tooltip
+  show it instead of the focus, undimmed, titled "set by" whoever set it;
+  saving the field empty clears it, and the focus shows again. The model
+  keeps writing the focus all the while. A chat, or a column whose agent is
+  not named yet, shows its title there, and nothing while it has none. A
+  copy keeps its source's title. The
+  canvas list every thread's agent reads quotes a thread's title after its
+  name.
 - **In its focus's place, what its last run needs from you** (ADR-0175,
   ADR-0203), while raised for you: the reason alone, "asks whether to drop
   the v1 table", "Bea stopped it", in its level's colour, two lines at

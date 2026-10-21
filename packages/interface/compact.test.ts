@@ -2,6 +2,7 @@ import {
   canvasIdFor,
   entryId,
   type Sha256,
+  THE_AGENT,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -30,8 +31,10 @@ import {
 import { tree } from "./fixtures.ts"
 import { foldedMark, foldedView, foldedWords } from "./folded-column-view.ts"
 import {
-  focusTitle,
+  aboutKind,
+  aboutTooltip,
   type ThreadGlance,
+  threadAbout,
   threadFocus,
   threadGlance,
 } from "./thread-glance.ts"
@@ -73,6 +76,7 @@ const threadGlanceOfT: ThreadGlance = threadGlance({
   index: tree({ "1-r": null }),
   lanes: [],
   names: new Map([[T, "amber-fox" as never]]),
+  titles: new Map(),
   focuses: new Map(),
   statuses: new Map(),
   iconFor: () => null,
@@ -239,14 +243,20 @@ describe("cardCompact", () => {
     expect(compactWords(compact, { me: ADA, nameOf: new Map() }).badge).toBe(
       "stopped",
     )
-    const focused = {
-      ...glance,
-      focus: { kind: "model", text: "Fixing" } as const,
-    }
+    const second = (about: ThreadGlance["about"]) =>
+      cardCompact(threadCard, {
+        ...facts,
+        threads: new Map([[T, { ...glance, about }]]),
+      }).second
     expect(
-      cardCompact(threadCard, { ...facts, threads: new Map([[T, focused]]) })
-        .second,
+      second({ kind: "focus", focus: { kind: "model", text: "Fixing" } }),
     ).toBe("Fixing")
+    expect(
+      second({ kind: "title", title: { title: "Sync, again", by: ADA } }),
+    ).toBe("Sync, again")
+    expect(
+      second({ kind: "focus", focus: { kind: "opening", text: "Hi there" } }),
+    ).toBe("done")
     expect(
       cardCompact(threadCard, { ...facts, threads: new Map() }),
     ).toMatchObject({ lead: { kind: "text", text: "a thread" }, second: null })
@@ -315,6 +325,7 @@ test("a thread's glance carries its icon, a chat's with no lane included", () =>
     index: tree({ "1-r": null }),
     lanes: [],
     names,
+    titles: new Map(),
     focuses: new Map(),
     statuses: new Map(),
     iconFor: thread =>
@@ -355,6 +366,15 @@ test("a media column's compact is its title and how many images it holds; an ima
     detail: "no images",
     hint: null,
   })
+})
+
+test("a folded thread's strip hints at its title", () => {
+  expect(
+    foldedWords({
+      ...threadGlanceOfT,
+      about: { kind: "title", title: { title: "The rail", by: ADA } },
+    }).hint,
+  ).toBe("The rail")
 })
 
 describe("foldedMark", () => {
@@ -427,8 +447,64 @@ describe("threadFocus", () => {
     expect(
       threadFocus({ focuses: new Map(), index: tree({}), thread: F }),
     ).toBeNull()
-    expect(focusTitle({ kind: "model", text: "Fixing" })).toBe(
-      "Fixing\nwritten by a model",
-    )
+  })
+})
+
+describe("threadAbout", () => {
+  const index = tree({ "1-r": null })
+  const F = threadOfEntry("1-r")
+  const focuses = new Map([
+    [F, { thread: F, focus: "Fixing the rail", ask: entryId("1-r"), at: 1 }],
+  ])
+  const titles = new Map([
+    [F, { card: F, title: "The rail, for good", by: ADA, at: 1 }],
+  ])
+  test("a thread's title, while it has one, before its focus", () => {
+    expect(threadAbout({ titles, focuses, index, thread: F })).toEqual({
+      kind: "title",
+      title: { title: "The rail, for good", by: ADA },
+    })
+    expect(
+      threadAbout({ titles: new Map(), focuses, index, thread: F }),
+    ).toEqual({
+      kind: "focus",
+      focus: { kind: "model", text: "Fixing the rail" },
+    })
+  })
+  test("its kind is a title's, a model's focus's or the opening's", () => {
+    expect(
+      [
+        { kind: "title", title: { title: "The rail", by: ADA } } as const,
+        { kind: "focus", focus: { kind: "model", text: "Fixing" } } as const,
+        { kind: "focus", focus: { kind: "opening", text: "Hi" } } as const,
+      ].map(aboutKind),
+    ).toEqual(["title", "model", "opening"])
+  })
+  test("its tooltip says who set a title, and that a model wrote a focus", () => {
+    const nameOf = new Map([[ADA, "Ada"]])
+    expect(
+      aboutTooltip(
+        { kind: "title", title: { title: "The rail", by: ADA } },
+        nameOf,
+      ),
+    ).toBe("The rail\nset by Ada")
+    expect(
+      aboutTooltip(
+        { kind: "title", title: { title: "The rail", by: THE_AGENT } },
+        nameOf,
+      ),
+    ).toBe("The rail\nset by the agent")
+    expect(
+      aboutTooltip(
+        { kind: "focus", focus: { kind: "model", text: "Fixing" } },
+        nameOf,
+      ),
+    ).toBe("Fixing\nwritten by a model")
+    expect(
+      aboutTooltip(
+        { kind: "focus", focus: { kind: "opening", text: "Hi" } },
+        nameOf,
+      ),
+    ).toBe("Hi")
   })
 })

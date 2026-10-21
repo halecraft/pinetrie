@@ -11,6 +11,7 @@ const K1 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000001")
 const K2 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000002")
 const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-000000000003")
 const I1 = cardIdOfKind("image", "01a0ffd2-0000-7000-8000-000000000004")
+const T1 = cardIdOfKind("thread", "01a0ffd2-0000-7000-8000-000000000005")
 
 const mark = (title: string): MarkRecord => ({
   canvas: K1,
@@ -35,7 +36,7 @@ const plan = (
     now: 5,
     canvases: new Set([K1, K2]),
     marks: new Map(),
-    titled: new Set([N1, I1]),
+    titled: new Set([N1, I1, T1]),
     cardTitles: new Map(),
     ...over,
   })
@@ -136,6 +137,34 @@ describe("planMark", () => {
   test("a card in no titled place is refused", () => {
     expect(
       plan({ of: { kind: "card", card: N1 }, titled: new Set() }),
+    ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
+  })
+  test("a person titles a thread, and clears its title", () => {
+    const of = { kind: "card", card: T1 } as const
+    expect(plan({ of, title: "Fix the sync bug" })).toEqual({
+      kind: "writes",
+      writes: [
+        setRecord(CARD_TITLE, {
+          card: T1,
+          title: "Fix the sync bug",
+          by: ADA,
+          at: 5,
+        }),
+      ],
+    })
+    expect(
+      plan({
+        of,
+        title: null,
+        cardTitles: new Map([
+          [T1, { card: T1, title: "Fix the sync bug", by: BEA, at: 1 }],
+        ]),
+      }),
+    ).toEqual({ kind: "writes", writes: [deleteRecord(CARD_TITLE, T1)] })
+  })
+  test("the agent never titles a thread", () => {
+    expect(
+      plan({ of: { kind: "card", card: T1 }, by: THE_AGENT }),
     ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   })
   test("the agent titles an image, never a note column", () => {

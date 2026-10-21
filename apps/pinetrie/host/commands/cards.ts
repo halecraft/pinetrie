@@ -34,6 +34,7 @@ import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   readCanvases,
   readCardHistories,
+  readCardTitles,
   readLaneRecords,
   readLanes,
   readPlaces,
@@ -698,6 +699,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         ...cardFacts(writer, canvases),
         copy,
         threads,
+        titles: readCardTitles(session),
         index: root === undefined ? null : readTreeIndex(await docs.root(root)),
       })
       return moved(plan, writer, copyRefusal)

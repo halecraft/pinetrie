@@ -26,7 +26,7 @@ export const CANVAS_TYPE = "pinetrie.canvas"
  * Constant, so the system prompt stays the same between runs.
  */
 export const CANVAS_RULE =
-  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given; `read_card` reads an image, a media column or a note column by the id the list gives. A card marked \"box ticked\" has its box ticked by a person: their own mark, which may mean done, or handled for now."
+  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given; `read_card` reads an image, a media column or a note column by the id the list gives. A thread's quoted words after its name are a title a person gave it. A card marked \"box ticked\" has its box ticked by a person: their own mark, which may mean done, or handled for now."
 
 /** How many cards the list names; the rest are counted. */
 export const CANVAS_CAP = 50
@@ -74,8 +74,9 @@ const STATE_WORDS: Readonly<Record<AgentWork, string>> = {
 /** How many images a media column's line names; the rest are counted. */
 export const MEDIA_LINE_CAP = 12
 
-/** What the list says of a column: its title, and its notes' count or its images. */
+/** What the list says of a column: its title, and its notes' count or its images; a thread's title, null while untitled. */
 type ColumnGlance =
+  | { readonly kind: "thread"; readonly title: string | null }
   | {
       readonly kind: "note-column"
       readonly title: string
@@ -108,7 +109,12 @@ export function columnGlances(input: {
 }): ReadonlyMap<CardId, ColumnGlance> {
   const glances = new Map<CardId, ColumnGlance>()
   for (const c of input.onCanvas)
-    if (c.kind === "note-column")
+    if (c.kind === "thread")
+      glances.set(c.id, {
+        kind: "thread",
+        title: input.titles.get(c.id)?.title ?? null,
+      })
+    else if (c.kind === "note-column")
       glances.set(c.id, {
         kind: "note-column",
         title: input.titles.get(c.id)?.title ?? NEW_NOTES_TITLE,
@@ -138,15 +144,21 @@ const imagesLine = (images: readonly ImageGlance[]): string =>
   )
 
 /**
- * One card's line. A thread is named by its two words, else by "a thread";
- * the reading thread says so, and no state, which is always its own run. A
+ * One card's line. A thread is named by its two words, else by "a thread",
+ * then its title, quoted, while it has one; the reading thread says so, and
+ * no state, which is always its own run. A
  * ticked column says so last (`CANVAS_RULE` says what that means).
  */
 function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
   const by = `put by ${f.nameOf(c.placer)}${c.content.ticked ? ", box ticked" : ""}`
   switch (c.kind) {
     case "thread": {
-      const name = f.names.get(c.id) ?? "a thread"
+      const named = f.names.get(c.id) ?? "a thread"
+      const g = f.glances.get(c.id)
+      const name =
+        g?.kind === "thread" && g.title !== null
+          ? `${named} "${g.title}"`
+          : named
       if (c.id === f.reading) return `thread ${name} (this thread), ${by}`
       const work = f.work.get(c.id)
       return `thread ${name}, ${work === undefined ? "idle" : STATE_WORDS[work]}, ${by}`

@@ -595,9 +595,13 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   the dot and, while raised, the word (`.head-status-word`, `statusWord`):
   a mark, no button. Under the line, `headLine`'s value: a raised run-end
   status's reason (`.head-status[data-role="reason"]`, a press bringing the
-  run's last entry into view), else the focus
-  (`.head-focus[data-role="focus"]`), each two lines at most; then the fork
-  row (`Origin`, `data-role="origin"`) and an ssh ask (`AccessRowView`).
+  run's last entry into view), else what the thread is about
+  (`.head-focus[data-role="focus"]`, its `data-kind` `title`, `model` or
+  `opening`, the opening alone dimmed), each two lines at most; then the
+  fork row (`Origin`, `data-role="origin"`) and an ssh ask
+  (`AccessRowView`). Edit title in the ⋯ puts a `CardTitleField`
+  (`.open-title-input`) in the line's place until it is saved or
+  cancelled (ADR-0207).
   The handle's title is `handleTitle`'s. Density is three checked items in
   the column's ⋯ (`.column-density-<density>`), which `Column`'s
   `chooseDensity` handles: the `density` act, then `PLACED`, one function
@@ -1354,8 +1358,8 @@ the session sends moves and draws them until its copy holds them
   ADR-0116), drawn in `#strip` at their card's rank on the canvas
   (`strip.tsx`), a `.note-column` with its id as `data-column` and
   `data-card`: its title
-  (`.note-column-title`, a button that opens `TitleField`
-  (`title-field.tsx`), the sidebar's rename field, and sends `rename` with a `MarkTarget`), its notes one under
+  (`.note-column-title`, a button that opens `CardTitleField`
+  (`title-field.tsx`), which sends `rename` with a `card` `MarkTarget`), its notes one under
   another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
   and Alt+↑/↓ reorder it), folded to one line until it holds the focus, as
   a queued card in the dock is, and under them the box a new note is
@@ -1364,8 +1368,16 @@ the session sends moves and draws them until its copy holds them
   the note column's card, so its refusals are said there.
 - **A list column's header is one component** (`list-column-head.tsx`,
   `ListColumnHead`): a note column's and a media column's, its kind's icon,
-  its title (renamed through `TitleField` with a `card` `MarkTarget`), its
-  count (`countWords`), its ⋯ and its fold, and the drag handle.
+  its title (renamed through `CardTitleField`), its count (`countWords`),
+  its ⋯ and its fold, and the drag handle.
+- **A titled card's title is edited in one field** (`CardTitleField`,
+  `title-field.tsx`): a thread's under its header, a list column's in its
+  head, an image's in its bar. It wraps `TitleField`, the field a canvas's
+  title is edited in too (Enter and leaving save, Escape cancels, one
+  finish), with the card's `titleWords` for its name, and asks `rename`
+  for its card itself, so no caller builds the intent. `ColumnMenu`'s
+  `onRename` is required: every column's ⋯ offers the title's row to a
+  reader who may write.
 - **A media column** (`media-column.tsx`, `MediaColumn`, ADR-0182) draws
   its images at its width, two to a row when two wide, each its newest
   version's fitted copy at its stored size, linking to its original. Each

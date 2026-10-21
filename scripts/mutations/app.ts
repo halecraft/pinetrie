@@ -270,10 +270,20 @@ export const mutations: readonly Mutation[] = [
     expect: "a press on a column's name, its handle, opens nothing",
   },
   {
+    name: "a card's title field saves nothing",
+    file: "packages/web/title-field.tsx",
+    from: '        onIntent({ kind: "rename", of: { kind: "card", card }, title })\n',
+    to: "        void title\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Edit title in a thread's ⋯ shows its title under the line, and clearing it brings back the focus",
+  },
+  {
     name: "under a column's line, its focus is never drawn",
     file: "packages/web/column.tsx",
-    from: '    case "focus":\n      return (',
-    to: '    case "focus":\n      return null\n      return (',
+    from: '    case "about": {\n      const { about } = line\n',
+    to: '    case "about": {\n      return null\n      const { about } = line\n',
     suite: "browser",
     scenario: "page",
     expect: "under a column's line, with no press, is what its thread is doing",
@@ -3066,8 +3076,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column's rename sends nothing",
     file: "packages/web/list-column-head.tsx",
-    from: '                p.onIntent({\n                  kind: "rename",',
-    to: '                void ({\n                  kind: "rename",',
+    from: "              onIntent={p.onIntent}\n              placeholder={p.title}\n",
+    to: "              onIntent={() => {}}\n              placeholder={p.title}\n",
     suite: "browser",
     scenario: "page",
     expect: "a note column is renamed from its header, for everyone",

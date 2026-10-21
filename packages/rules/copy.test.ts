@@ -10,6 +10,7 @@ import {
   INVENTORY_SLOTS,
   indexTree,
   type ThreadRecord,
+  type TitledCardId,
   UNTICKED,
 } from "@pinetrie/threads"
 import {
@@ -18,8 +19,10 @@ import {
   threadOfEntry,
 } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
+import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { type CopyThread, planCopy } from "./copy.ts"
 import { landedThreadCard } from "./fixtures.ts"
+import { setRecord } from "./records.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -57,7 +60,9 @@ const plan = (
   over: Partial<CopyThread> = {},
   cards: readonly CardRecord[] = [onCanvas],
   sender = ADA,
-) => planCopy({ copy: copy(over), sender, cards, threads, index, now: 7 })
+  titles: ReadonlyMap<TitledCardId, CardTitleRecord> = new Map(),
+) =>
+  planCopy({ copy: copy(over), sender, cards, threads, titles, index, now: 7 })
 
 describe("planCopy", () => {
   test("a copy is a new thread forked at the end its copier saw, its card where it was dropped, and no entry", () => {
@@ -99,6 +104,27 @@ describe("planCopy", () => {
         },
       }),
     ).toMatchObject({ kind: "copy" })
+  })
+
+  test("a titled source's copy has its title, naming who set it; an untitled one's has none", () => {
+    const titles = new Map<TitledCardId, CardTitleRecord>([
+      [SOURCE, { card: SOURCE, title: "The parser", by: BEA, at: 1 }],
+    ])
+    const planned = plan({}, [onCanvas], ADA, titles)
+    expect(planned.kind === "copy" ? planned.records.at(-1) : null).toEqual(
+      setRecord(CARD_TITLE, {
+        card: COPY,
+        title: "The parser",
+        by: BEA,
+        at: 7,
+      }),
+    )
+    const untitled = plan()
+    expect(
+      untitled.kind === "copy"
+        ? untitled.records.some(r => r.namespace === CARD_TITLE.namespace)
+        : null,
+    ).toBe(false)
   })
 
   test("refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory", () => {

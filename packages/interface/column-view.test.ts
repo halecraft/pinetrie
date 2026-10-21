@@ -71,7 +71,7 @@ import {
   TEST_ROOT,
   toolResultMessage,
 } from "./fixtures.ts"
-import type { ThreadFocus } from "./thread-glance.ts"
+import type { ThreadAbout } from "./thread-glance.ts"
 import { builtInIconUrl } from "./thread-icon.ts"
 import { threadLink } from "./thread-link.ts"
 
@@ -191,6 +191,7 @@ const PROJECT: ProjectRecord = { root: "/p", kind: "jj", owner: null }
 const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   project: PROJECT,
   focuses: new Map(),
+  titles: new Map(),
   commands: [],
   lanes: new Map(),
   revisions: new Map(),
@@ -332,8 +333,51 @@ describe("columnView: the header", () => {
       }),
     )
     expect(shows.head.line).toEqual({
-      kind: "focus",
-      focus: { kind: "model", text: "Planning the billing page" },
+      kind: "about",
+      about: {
+        kind: "focus",
+        focus: { kind: "model", text: "Planning the billing page" },
+      },
+    })
+  })
+  test("a thread's title shows in its header instead of its focus", () => {
+    const focuses = new Map([
+      [
+        B,
+        {
+          thread: B,
+          focus: "Planning the billing page",
+          ask: entryId("b1"),
+          at: 1,
+        },
+      ],
+    ])
+    const titles = new Map([
+      [B, { card: B, title: "Billing, take two", by: ADA, at: 1 }],
+    ])
+    const shows = columnView(
+      facts(1, {
+        lane: onLane(laneView(B, "b2")),
+        work: work({ revisions: OWNERS, names: NAMES, focuses, titles }),
+      }),
+    )
+    expect(shows.head.line).toEqual({
+      kind: "about",
+      about: { kind: "title", title: { title: "Billing, take two", by: ADA } },
+    })
+  })
+  test("a chat's header shows its title, and nothing while it has none", () => {
+    const titles = new Map([
+      [B, { card: B, title: "Lunch plans", by: ADA, at: 1 }],
+    ])
+    expect(
+      columnView(facts(1, { thread: B, work: work({ titles }) })).head.line,
+    ).toEqual({
+      kind: "about",
+      about: { kind: "title", title: { title: "Lunch plans", by: ADA } },
+    })
+    expect(columnView(facts(1, { thread: B })).head.line).toEqual({
+      kind: "none",
     })
   })
   test("a thread whose last run needs you says so in its header", () => {
@@ -647,15 +691,18 @@ describe("headLine: what shows under a column's line", () => {
     reason: "asks why",
     end: entryId("e"),
   })
-  const focus: ThreadFocus = { kind: "model", text: "Fixing the sync bug" }
+  const focus: ThreadAbout = {
+    kind: "focus",
+    focus: { kind: "model", text: "Fixing the sync bug" },
+  }
   test("a raised status, else the focus; never a quiet status, which leaves the focus shown", () => {
     expect(headLine(status(false), focus)).toEqual({
       kind: "status",
       status: status(false),
     })
     expect(headLine(status(true), focus)).toEqual({
-      kind: "focus",
-      focus,
+      kind: "about",
+      about: focus,
     })
     expect(headLine(null, null)).toEqual({ kind: "none" })
   })

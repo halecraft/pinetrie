@@ -24,6 +24,7 @@ import {
   type BannerRecord,
   type BaseRecord,
   baseMovedOn,
+  type CardTitleRecord,
   type CommandSummary,
   type ConflictAskRecord,
   displayName,
@@ -68,6 +69,7 @@ import {
   type TextPlace,
   type ThreadFork,
   type ThreadLane,
+  type TitledCardId,
   type TreeIndex,
 } from "@pinetrie/threads"
 import { type AccessView, accessView } from "./access-view.ts"
@@ -80,7 +82,12 @@ import { ago, count } from "./counts.ts"
 import { personWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
-import { type ThreadFocus, threadFocus } from "./thread-glance.ts"
+import {
+  type ThreadAbout,
+  type ThreadTitle,
+  threadAbout,
+  threadTitle,
+} from "./thread-glance.ts"
 import { type ThreadIcon, threadIcon } from "./thread-icon.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
 
@@ -113,6 +120,8 @@ export interface WorkFacts {
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** Each thread's focus, a model's (`pinetrie.focus`). */
   readonly focuses: ReadonlyMap<ThreadId, FocusRecord>
+  /** Each titled card's title (`pinetrie.card-title`): a thread's among them. */
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
   /** Where icons come from; null before a host published it. */
   readonly icons: IconsRecord | null
@@ -227,27 +236,36 @@ interface ThreadFacts {
 
 /**
  * What shows under a column's line, always: the reason of a run-end status
- * raised for you, else the thread's focus; nothing for neither. A quiet
- * status is the dot's title alone, so the focus is not hidden by a report
- * already read.
+ * raised for you, else what the thread is about; nothing for neither. A
+ * quiet status is the dot's title alone, so what it is about is not hidden
+ * by a report already read.
  */
 export type HeadLine =
   | { readonly kind: "status"; readonly status: ColumnStatus }
-  | { readonly kind: "focus"; readonly focus: ThreadFocus }
+  | { readonly kind: "about"; readonly about: ThreadAbout }
   | { readonly kind: "none" }
 
 /**
  * The line under a named thread's header (`HeadLine`), from what its last
- * run needs from you (`columnStatus`) and what it is doing now
- * (`threadFocus`).
+ * run needs from you (`columnStatus`) and what it is about
+ * (`threadAbout`).
  */
 export function headLine(
   status: ColumnStatus | null,
-  focus: ThreadFocus | null,
+  about: ThreadAbout | null,
 ): HeadLine {
   if (status !== null && !status.quiet) return { kind: "status", status }
-  return focus === null ? { kind: "none" } : { kind: "focus", focus }
+  return about === null ? { kind: "none" } : { kind: "about", about }
 }
+
+/**
+ * The line under a chat's or a pending lane's header: its title alone. It
+ * takes no focus, so an untitled chat's header stays one line.
+ */
+const chatLine = (title: ThreadTitle | null): HeadLine =>
+  title === null
+    ? { kind: "none" }
+    : { kind: "about", about: { kind: "title", title } }
 
 /**
  * The thread's icon in a column's header. `fade`: an icon that arrives while
@@ -449,16 +467,22 @@ export function columnView(f: ColumnFacts): ColumnShows {
   const identity = identityOf(head, f.createsLane, work.names, thread =>
     shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
   )
-  // Only a named thread's header says what it is doing or needs.
+  // Only a named thread's header says what it is doing or needs; any
+  // thread's says its title.
   const line: HeadLine =
-    identity.kind !== "agent" || head === null
-      ? { kind: "none" }
-      : headLine(
+    identity.kind === "agent" && head !== null
+      ? headLine(
           columnStatus(f.runEnds.get(head), w =>
             displayName(w, f.nameOf.get(w)),
           ),
-          threadFocus({ focuses: work.focuses, index, thread: head }),
+          threadAbout({
+            titles: work.titles,
+            focuses: work.focuses,
+            index,
+            thread: head,
+          }),
         )
+      : chatLine(f.thread === null ? null : threadTitle(work.titles, f.thread))
   const strip = workStrip(f, parent)
   return {
     head: {

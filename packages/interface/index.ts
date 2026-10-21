@@ -176,6 +176,7 @@ export {
   SAVE_TITLE,
   TRASH_CARD_TITLE,
   TRASH_SELECTED,
+  titleWords,
   tokenSizeWords,
   traceWords,
   writtenWords,
@@ -674,7 +675,9 @@ export {
   threadCardHeads,
 } from "./thread-card.ts"
 export {
-  focusTitle,
+  aboutKind,
+  aboutText,
+  aboutTooltip,
   type ThreadGlance,
   type ThreadPreview,
   threadGlance,

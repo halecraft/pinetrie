@@ -4096,7 +4096,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent titles a note column",
     file: "packages/rules/mark.ts",
-    from: '      if (!input.titled.has(card) || (isAgent(by) && only === "person"))',
+    from: '      if (!input.titled.has(card) || (isAgentId(by) && only === "person"))',
     to: "      if (!input.titled.has(card))",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "the agent titles an image, never a note column",
@@ -4306,6 +4306,14 @@ export const mutations: readonly Mutation[] = [
     expect: "one line per card in the canvas's order",
   },
   {
+    name: "a thread's line leaves out its title",
+    file: "packages/rules/canvas.ts",
+    from: '          ? `${named} "${g.title}"`\n',
+    to: "          ? named\n",
+    command: unit,
+    expect: "a titled thread's line quotes its title after its name",
+  },
+  {
     name: "the canvas list names every card",
     file: "packages/rules/canvas.ts",
     from: "    lines: lines.slice(0, CANVAS_CAP),",
@@ -4460,6 +4468,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost",
+  },
+  {
+    name: "a copy leaves its source's title behind",
+    file: "packages/rules/copy.ts",
+    from: "  const title = input.titles.get(copy.source)\n",
+    to: "  const title = undefined\n",
+    command: unit,
+    expect: "a titled source's copy has its title, naming who set it",
   },
   {
     name: "a copy forks at an end in another thread",

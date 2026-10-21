@@ -51,7 +51,6 @@ export function FoldedColumn(p: {
     density: null,
     start: null,
     pin: false,
-    renamable: false,
   })
   return (
     <section

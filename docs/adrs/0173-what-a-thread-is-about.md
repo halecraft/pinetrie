@@ -20,6 +20,8 @@
 - **Amended by:**
   - ADR-0198: the focus row moves into the details; a strip's tooltip keeps
     it.
+  - ADR-0207: a person's own words for a thread are its title, beside the
+    focus, which the model keeps writing and never replaces it.
 
 **Context.** Coming back to a column costs a reader too much. Nothing says
 what the thread is about: its header names its agent and where it forked.

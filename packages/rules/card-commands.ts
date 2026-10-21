@@ -40,6 +40,7 @@ import {
   type SentCard,
   type TextCardId,
   type ThreadRecord,
+  type TitledCardId,
   TRASH_PLACE,
   type TreeIndex,
   threadOfSend,
@@ -51,7 +52,7 @@ import {
   canvasOfTarget,
 } from "./canvas-index.ts"
 import type { CardHistoryRecord } from "./card-history.ts"
-import { CARD_TITLE } from "./card-title.ts"
+import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { type MintContainer, mintWith } from "./containers.ts"
 import { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 import {
@@ -639,6 +640,7 @@ export function planThreadCopy(
   facts: CardFacts & {
     readonly copy: CopyThread
     readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
+    readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
     /** The source's root's tree; null when it has none. */
     readonly index: TreeIndex | null
   },
@@ -649,6 +651,7 @@ export function planThreadCopy(
     sender: facts.sender,
     cards: facts.cards,
     threads: facts.threads,
+    titles: facts.titles,
     index: facts.index,
     now: facts.now,
   })

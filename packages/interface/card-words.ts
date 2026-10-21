@@ -18,12 +18,15 @@ import {
   type Verb,
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
-import type {
-  CanvasView,
-  Card,
-  CardCommand,
-  GetLatestCommand,
-  ListKey,
+import {
+  type CanvasView,
+  type Card,
+  type CardCommand,
+  type GetLatestCommand,
+  type ListKey,
+  type TitledCardId,
+  type TitledKind,
+  titledKindOfCard,
 } from "@pinetrie/threads"
 import type { CardTone } from "./card-frame.ts"
 import type { PinnedMarker } from "./column-view.ts"
@@ -241,6 +244,42 @@ export const NEW_PIN = "+ pin"
 export const PIN_A_CARD = "Pin a card"
 /** What a ⋯'s rename says, a canvas's in the sidebar and a list column's alike. */
 export const RENAME = "Rename"
+
+/** What titling a card says: the control that opens its field, that control's title, and the field's name. */
+interface TitleWords {
+  readonly label: string
+  readonly title: string
+  readonly field: string
+}
+
+/** Each titled kind's title words; a kind made titled does not compile until it has its own. */
+const TITLE_WORDS: Readonly<Record<TitledKind, TitleWords>> = {
+  thread: {
+    label: "Edit title",
+    title:
+      "give this thread a title, shown under its name instead of its focus, for everyone",
+    field: "title for this thread",
+  },
+  "note-column": {
+    label: RENAME,
+    title: "change this column's title, for everyone",
+    field: "title for this note column",
+  },
+  media: {
+    label: RENAME,
+    title: "change this column's title, for everyone",
+    field: "title for this media column",
+  },
+  image: {
+    label: RENAME,
+    title: "rename this image",
+    field: "title for this image",
+  },
+}
+
+/** What titling `card` says. */
+export const titleWords = (card: TitledCardId): TitleWords =>
+  TITLE_WORDS[titledKindOfCard(card)]
 export const NEW_PIN_TITLE =
   "write a new card pinned to the top of the column: the agent reads it on every run"
 

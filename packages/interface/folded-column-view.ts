@@ -10,7 +10,7 @@ import type { HeadIcon } from "./column-view.ts"
 import { countWords, type ListKind } from "./count-words.ts"
 import type { MediaColumnView } from "./media-column-view.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
-import type { ThreadGlance } from "./thread-glance.ts"
+import { aboutText, type ThreadGlance } from "./thread-glance.ts"
 
 /** A list column at a glance: a note column or a media column, its title, and how many it holds. */
 interface ListGlance {
@@ -96,7 +96,7 @@ export const foldedWords = (glance: FoldedGlance): FoldedWords =>
     ? {
         title: glance.name ?? UNNAMED_THREAD,
         detail: null,
-        hint: glance.focus?.text ?? null,
+        hint: glance.about === null ? null : aboutText(glance.about),
       }
     : {
         title: glance.title,

@@ -1,5 +1,5 @@
 // copy — a thread copied: a new thread forked at the source's end, put as its
-// own card where it was dropped.
+// own card where it was dropped, with the source's title.
 
 import type { ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import {
@@ -8,11 +8,14 @@ import {
   type Intent,
   type MoveRefusal,
   type ThreadRecord,
+  type TitledCardId,
   type TreeIndex,
 } from "@pinetrie/threads"
 import { planThreadOpen } from "./canvas-index.ts"
+import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { threadCardHolding } from "./held.ts"
 import type { PlaceStep } from "./place-steps.ts"
+import { setRecord } from "./records.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
 export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">
@@ -20,7 +23,7 @@ export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">
 export type CopyPlan =
   | {
       readonly kind: "copy"
-      /** The copy's record: its root and fork are its source's end's. */
+      /** The copy's record, its root and fork its source's end's; then the source's title, if it has one. */
       readonly records: readonly ValueWrite<"session">[]
       /** The cards re-ranked to make room, then the copy's card. */
       readonly steps: readonly PlaceStep[]
@@ -42,12 +45,15 @@ export type CopyPlan =
  * inventory. An archived source copies: archiving freezes a thread's end,
  * not its history. Its card lands where it was dropped, ranked as a move's
  * is (`planMoveTargets`), or in the sender's inventory while it has room.
+ * A titled source's copy has its title, still naming who set it.
  */
 export function planCopy(input: {
   readonly copy: CopyThread
   readonly sender: WriterId
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
+  /** Every titled card's title: the source's is the copy's. */
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** The source's root's tree. */
   readonly index: TreeIndex
   readonly now: number
@@ -84,7 +90,22 @@ export function planCopy(input: {
     opens: null,
     cards,
   })
-  return opened.kind === "refused"
-    ? { kind: "refused", why: opened.code }
-    : { kind: "copy", records: opened.records, steps: opened.steps }
+  if (opened.kind === "refused") return { kind: "refused", why: opened.code }
+  const title = input.titles.get(copy.source)
+  return {
+    kind: "copy",
+    records:
+      title === undefined
+        ? opened.records
+        : [
+            ...opened.records,
+            setRecord(CARD_TITLE, {
+              card: move.card,
+              title: title.title,
+              by: title.by,
+              at: input.now,
+            }),
+          ],
+    steps: opened.steps,
+  }
 }

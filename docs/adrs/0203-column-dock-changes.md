@@ -15,6 +15,9 @@
     fork row, always; nothing is closed behind a press.
   - ADR-0200: the status is a mark, not a button; a strip unfolds from ⇥
     alone; density is in the column's ⋯.
+- **Amended by:**
+  - ADR-0207: under the line is the raised reason, else the thread's title,
+    else its focus; a chat's is its title alone.
 
 **Context.**
 
