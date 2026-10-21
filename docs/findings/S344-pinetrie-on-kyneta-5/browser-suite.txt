@@ -1,0 +1,2 @@
+=== e2e:browser ===
+=== e2e:browser: pass=222 fail=0 skip=0 ===

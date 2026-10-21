@@ -1,0 +1,66 @@
+--- /workspace/packages/session/connect.ts	2026-10-25 04:19:32.177005102 +0000
++++ packages/session/connect.ts	2026-10-25 04:52:20.219006040 +0000
+@@ -5,6 +5,7 @@
+   createUndoStack,
+   Exchange,
+   sync,
++  whenHydrated,
+   whenPeer,
+   whenSettled,
+ } from "@kyneta/exchange"
+@@ -112,6 +113,9 @@
+    * Kyneta issues the seat.
+    */
+   readonly principal: string
++  /** Probe only: a store, and whether to reconnect. */
++  readonly store?: import("@kyneta/exchange").Store
++  readonly reconnect?: boolean
+ }
+ 
+ export async function connectSession(
+@@ -130,9 +134,13 @@
+         ? options.url
+         : `${options.url}?key=${encodeURIComponent(options.key)}`,
+     WebSocket: options.WebSocket,
+-    reconnect: { enabled: false },
++    reconnect: { enabled: options.reconnect === true, baseDelay: 300, maxDelay: 1000, maxAttempts: 1000 },
++  })
++  const exchange = new Exchange({
++    principal,
++    transports: [transport],
++    ...(options.store === undefined ? {} : { store: options.store }),
+   })
+-  const exchange = new Exchange({ principal, transports: [transport] })
+   // Who may write what is declared on every peer: this client's own write to
+   // the places, or to someone else's inventory, throws before it is made.
+   exchange.register(writersPolicy)
+@@ -149,6 +157,8 @@
+   const roots = rootDocs(exchange)
+   // Never written here: `cards` is how the page reads it.
+   const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
++  ;(globalThis as any).__probePlaces = places
++  ;(globalThis as any).__probeSync = sync
+   const texts = cardTexts(
+     exchange,
+     host.peerId,
+@@ -226,13 +236,19 @@
+     texts.sweep()
+     open.repair()
+   })
++  void whenHydrated(places).then(() => {
++      ;(globalThis as any).__probeEvents?.push(`places hydrated: ${readPlaces(places).length} cards`)
++      step({ kind: "records", records: readPlaces(places), rev: readPlacesRev(places) })
++      open.repair()
++    })
+   // A client does not reconnect: once the host has gone, nothing this tab
+   // sent or sends will be answered. The moves the host accepted are dropped
+   // too (`host-left`): no copy of the places will reach their `rev`.
+   const unsubscribePeers = exchange.peers.subscribe(() => {
++    ;(globalThis as any).__probeEvents?.push(`peers: host ${exchange.peers.current.has(host.peerId)} seat ${host.peerId} peers ${[...exchange.peers.current.values()].map(p => p.principal + ":" + p.peerId).join(",")}`)
+     if (exchange.peers.current.has(host.peerId)) return
+     step({ kind: "host-left" })
+-    line.close("the host left")
++    ;(globalThis as any).__probeEvents?.push("line closed: the host left"); line.close("the host left")
+   })
+ 
+   const send = (intent: Intent): Promise<Outcome> =>

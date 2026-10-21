@@ -1,0 +1,3 @@
+ Test Files  574 passed | 1 skipped (575)
+      Tests  6011 passed | 55 skipped (6066)
+(the second run's one failure was the probe's own comment naming a spike, removed)

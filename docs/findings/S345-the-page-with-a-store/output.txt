@@ -1,0 +1,36 @@
+[exchange] peer '2fa6ae141d519d8fc94c4806e9a47696' asked for unloaded doc 'root:r-01a1716a-828d-776d-86a0-64afaa02f71a' — loading it again
+up: my drafts: [{"id":"01a1716a-9028-7fb2-bccd-56810867243e","text":"draft one"}]
+up: the host holds the draft's text: "draft one"
+[exchange] peer '2fa6ae141d519d8fc94c4806e9a47696' asked for unloaded doc 'root:r-01a1716a-828d-776d-86a0-64afaa02f71a' — loading it again
+1 reload: same seat: true
+page console: warning [exchange] peer '97368957ae0b7bb38b3da9b4047c25d9' refused our operations on doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': it is sent none of the document's content until it reconnects
+1 reload: places: {"cards":3,"rev":5,"peers":[["pinetrie-host","synced"]],"ready":true}
+1 reload: columns shown: ["0"]
+1 reload: what the page holds: {"canvases":["k-01a1716a-828d-7599-94bb-e1f5e5ed08c0"],"cards":3,"docs":["pinetrie:presence:interpret","card:01a1716a-9028-7fb2-bccd-56810867243e:interpret","pinetrie:session:interpret","pinetrie:live:interpret","pinetrie:card-places:interpret","inventory:w-ada@s345.test:interpret","attention:w-ada@s345.test:interpret","open:w-ada@s345.test:interpret","undo:2fa6ae141d519d8fc94c4806e9a47696:interpret","root:r-01a1716a-828d-776d-86a0-64afaa02f71a:interpret"],"layout":["pinetrie-columns:pinetrie:session"]}
+1 reload: console: null
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvnculufb47860a1514f8500' vs remote '0mvncuxo91ae5e56e38713ca4' — asking for the remote lineage's whole document, which supersedes ours
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvnculufb47860a1514f8500' vs remote '0mvncuxo91ae5e56e38713ca4' — asking for the remote lineage's whole document, which supersedes ours
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvnculufb47860a1514f8500' vs remote '0mvncuxo91ae5e56e38713ca4' — adopting the remote lineage, which supersedes ours
+1 reload: a request is answered: {"kind":"named"}
+1 reload: composers shown: ["draft one"]
+2 down: the page's events: ["places hydrated: 3 cards","peers: host false seat 97368957ae0b7bb38b3da9b4047c25d9 peers ","line closed: the host left"]
+2 down: the composer shows: "draft one and more"
+2 down: the draft's text in the page: "draft one and more"
+type failed TimeoutError: page.focus: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('.column[data-position="0"] .composer .input')
+2 down: an empty composer, typed in, shows: null
+5 host restarted: same seat: "not readable"
+[exchange] peer '2fa6ae141d519d8fc94c4806e9a47696' asked for unloaded doc 'root:r-01a1716a-828d-776d-86a0-64afaa02f71a' — loading it again
+page console: warning [exchange] peer '97368957ae0b7bb38b3da9b4047c25d9' refused our operations on doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': it is sent none of the document's content until it reconnects
+3 back: the page's events: ["peers: host false seat 97368957ae0b7bb38b3da9b4047c25d9 peers ","line closed: the host left","peers: host true seat 97368957ae0b7bb38b3da9b4047c25d9 peers pinetrie-host:97368957ae0b7bb38b3da9b4047c25d9"]
+3 back: the host holds the draft's text: "draft one and more"
+3 back: a request from the page is answered: {"kind":"failed","message":"the host left"}
+[exchange] peer '2fa6ae141d519d8fc94c4806e9a47696' asked for unloaded doc 'root:r-01a1716a-828d-776d-86a0-64afaa02f71a' — loading it again
+page console: warning [exchange] peer '97368957ae0b7bb38b3da9b4047c25d9' refused our operations on doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': it is sent none of the document's content until it reconnects
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvncuxo91ae5e56e38713ca4' vs remote '0mvncwjz895c938da62a9d239' — asking for the remote lineage's whole document, which supersedes ours
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvncuxo91ae5e56e38713ca4' vs remote '0mvncwjz895c938da62a9d239' — asking for the remote lineage's whole document, which supersedes ours
+page console: error [exchange] lineage collision for doc 'line:pinetrie.control:97368957ae0b7bb38b3da9b4047c25d9→2fa6ae141d519d8fc94c4806e9a47696': local '0mvncuxo91ae5e56e38713ca4' vs remote '0mvncwjz895c938da62a9d239' — adopting the remote lineage, which supersedes ours
+3b reload, host back: a request is answered: {"kind":"named"}
+3b reload, host back: the composer shows: "draft one and more"
+4 reload, host down: {"error":"Error: page.reload: net::ERR_CONNECTION_REFUSED"}

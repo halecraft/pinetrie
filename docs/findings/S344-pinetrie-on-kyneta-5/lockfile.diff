@@ -1,0 +1,378 @@
+--- /tmp/lock-before.yaml	2026-10-25 04:20:54.469005141 +0000
++++ pnpm-lock.yaml	2026-10-25 04:33:10.480005492 +0000
+@@ -48,17 +48,20 @@
+   apps/pinetrie:
+     dependencies:
+       '@kyneta/exchange':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
++      '@kyneta/sql-store-core':
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)
+       '@kyneta/sqlite-store':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)(@kyneta/sql-store-core@4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0))
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)(@kyneta/sql-store-core@5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0))
+       '@kyneta/websocket-transport':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/machine@4.0.0)(@kyneta/transport@4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0))
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/machine@5.0.0)(@kyneta/transport@5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0))
+       '@parcel/watcher':
+         specifier: 2.6.0
+         version: 2.6.0
+@@ -287,8 +290,8 @@
+         specifier: 3.4.3
+         version: 3.4.3(@earendil-works/pi-ai@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.22.0)(zod@4.6.7))(@earendil-works/pi-coding-agent@0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0)(zod@4.6.7))
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
+       '@pinetrie/channel':
+         specifier: workspace:*
+         version: link:../channel
+@@ -314,11 +317,11 @@
+   packages/protocol:
+     dependencies:
+       '@kyneta/exchange':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
+       '@pinetrie/core':
+         specifier: workspace:*
+         version: link:../core
+@@ -368,11 +371,11 @@
+   packages/schema:
+     dependencies:
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
+       '@kyneta/yjs-schema':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)(yjs@13.6.33)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)(yjs@13.6.33)
+       '@pinetrie/core':
+         specifier: workspace:*
+         version: link:../core
+@@ -383,14 +386,14 @@
+   packages/session:
+     dependencies:
+       '@kyneta/exchange':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
+       '@kyneta/websocket-transport':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/machine@4.0.0)(@kyneta/transport@4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0))
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/machine@5.0.0)(@kyneta/transport@5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0))
+       '@pinetrie/core':
+         specifier: workspace:*
+         version: link:../core
+@@ -433,14 +436,20 @@
+   packages/web:
+     dependencies:
+       '@kyneta/exchange':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/indexeddb-store':
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)
+       '@kyneta/react':
+-        specifier: 4.0.0
+-        version: 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/reactive@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)(react@19.2.9)
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/reactive@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)(react@19.2.9)
++      '@kyneta/reactive':
++        specifier: 5.0.0
++        version: 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
+       '@kyneta/schema':
+-        specifier: 4.0.0
+-        version: 4.0.0
++        specifier: 5.0.0
++        version: 5.0.0
+       '@pinetrie/core':
+         specifier: workspace:*
+         version: link:../core
+@@ -1026,85 +1035,92 @@
+   '@jridgewell/trace-mapping@0.3.31':
+     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+ 
+-  '@kyneta/changefeed@4.0.0':
+-    resolution: {integrity: sha512-eW8sR68sFuaKd9Pjgw4/xZdMAThhCcBKJ+xvY/G62mR9xNVgXGmDrSKagPOGpg8mRMQNQV3wb+8bp1FciKkTng==}
++  '@kyneta/changefeed@5.0.0':
++    resolution: {integrity: sha512-0bthSdNn1NSvTO03a/7ktqSGkSuaf+mc9GbUQmwk4Ey4J3/K0rZVMYUnb2SSGIRmBQUkSPD6jjEBxEskpmzMMg==}
+     engines: {node: '>=18.0.0'}
+ 
+-  '@kyneta/exchange@4.0.0':
+-    resolution: {integrity: sha512-dFblagQQaNWm7BaYMFXe6Yt8OtU04h/lff+/C+tCTNVFAKZBlBGHswYFrfw0o0YSV40GiO6E/pcuqjNzz6s7kw==}
++  '@kyneta/exchange@5.0.0':
++    resolution: {integrity: sha512-pSkxd3TJHRE1vLLqyHvyyyR2kAQHAU2lL6e+rZ8soYicBmoCdtDhImA47zzRPRop+FcWsAgmqUEMCfbuP6DsQg==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/changefeed': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/changefeed': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+ 
+-  '@kyneta/machine@4.0.0':
+-    resolution: {integrity: sha512-2h5lpkVYvQ6wcHjTqrXtDLgjfUz0ePbAotXpCxMC3BRpe7JlUvf0bhyUcDaS4M1jsOcsS4K1aaxks+/M2UbWsg==}
++  '@kyneta/indexeddb-store@5.0.0':
++    resolution: {integrity: sha512-5MUB5LFF3MKVEHqWNK3O+bAx0NQM+587XugA5DEElg7FTBYJiH1Ss6va36/0znsPNcxV7xk4Jym8qaM89HBF4A==}
++    engines: {node: '>=18.0.0'}
++    peerDependencies:
++      '@kyneta/exchange': ^5.0.0
++      '@kyneta/schema': ^5.0.0
++
++  '@kyneta/machine@5.0.0':
++    resolution: {integrity: sha512-2UQ58remtqqss6473EHIX1/6q5/tOTCO5UEAvtwLuLq2NucBU3+WZEmW2xNYCF178OU/JQiuFQAPzbNXh4rahQ==}
+     engines: {node: '>=18.0.0'}
+ 
+-  '@kyneta/random@4.0.0':
+-    resolution: {integrity: sha512-gVxi9Ju14JtSqZ0gdnbyaViAqL9kJgHxDSCuOQj2xFjfjxI3xqwAshUFI1R9Ajm895xO4C7vg6H4O1ekAlCRWw==}
++  '@kyneta/random@5.0.0':
++    resolution: {integrity: sha512-U8NTr/HWa5Ml/Qn8BESM1sHKsReuhEblaHseoNBUjFobIFsj6VOvhWbuO8sFpTUrKfRBAy1qaz+Upa0BTg6xSg==}
+     engines: {node: '>=18.0.0'}
+ 
+-  '@kyneta/react@4.0.0':
+-    resolution: {integrity: sha512-7GD1haWDKbDjHmWzsezuBBni2Zou1bg79/prMzw2MoJK+r9hBYvieExEjjZxLBPfDqrVhoHDVj9aqksjxEwolg==}
++  '@kyneta/react@5.0.0':
++    resolution: {integrity: sha512-He3NCpzYRmdEDuUH94R/fC1nT/fvHUBe7D7VvshvAzdsMuLPrbcIg9esKyLF+q+7AjMuRFBi9y/zNFQ77Ej6Ug==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/changefeed': ^4.0.0
+-      '@kyneta/exchange': ^4.0.0
+-      '@kyneta/reactive': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/changefeed': ^5.0.0
++      '@kyneta/exchange': ^5.0.0
++      '@kyneta/reactive': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+       react: '>=18'
+ 
+-  '@kyneta/reactive@4.0.0':
+-    resolution: {integrity: sha512-QKCaDCqrnlcYwuIwXWymeqvT47cEEBJNjbV2ebr1mDAav5uOn1WstIEX+TTOeID+07NkbYZioxWYnpfpZUZvnA==}
++  '@kyneta/reactive@5.0.0':
++    resolution: {integrity: sha512-fhtnZM7i5+OyllL4FSRT3cnJ/W4ADcimx59hnqcSIsiq5P+UfyAq/rJUh/5nSMR3BVwoHtdjBetHOC1pUJTnBw==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/changefeed': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/changefeed': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+ 
+-  '@kyneta/schema@4.0.0':
+-    resolution: {integrity: sha512-EVASwm3R8vO23k+g/xH6PhHSrN87gogtxHzrd6e4m7oip5d2WWXx8mTsFe1PnhDELQRx9r3I1zwVeTcIZwikcA==}
++  '@kyneta/schema@5.0.0':
++    resolution: {integrity: sha512-qbCoUOYlXRIwvINp2YoLCSM6ABESrEHbIArFsBRapsOxdXVKrW2lwsSMywjijlfSYqitgh7RYdKD6HPVB8+BmQ==}
+     engines: {node: '>=18.0.0'}
+ 
+-  '@kyneta/sql-store-core@4.0.0':
+-    resolution: {integrity: sha512-/00fqkJU7PEI8SC/iZS61fhkurpukh9L8cAPJZ/BIz1l6nfpRr4HE2OClpYqBdY0csUGLOwyBmvtXEMS0rbSeg==}
++  '@kyneta/sql-store-core@5.0.0':
++    resolution: {integrity: sha512-/lCrfH/LM7ZaETBHcKInpUPsY2gYNdJ8fht9BzS7B2MfUwpUIBRGMoYjIt6czgFVHK5YJ3EEVbjsS+XGlJ0YtQ==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/exchange': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/exchange': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+ 
+-  '@kyneta/sqlite-store@4.0.0':
+-    resolution: {integrity: sha512-20ipcV0R0vdA/C95J3qESTlOWDgXls4vBD72pAe1zx5Y+HQeedjDuywcOGE5IgBOWE6WRmAEJSGClFhpkwDo3Q==}
++  '@kyneta/sqlite-store@5.0.0':
++    resolution: {integrity: sha512-JparJZZMh6+XB3PfWIHZOQ5vRlfSt3m0C5mLeEC/0RFfBgaoP3nuDg4fPht7x/PYA7SgyCUSisu/VzalRjCb3w==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/exchange': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
+-      '@kyneta/sql-store-core': ^4.0.0
++      '@kyneta/exchange': ^5.0.0
++      '@kyneta/schema': ^5.0.0
++      '@kyneta/sql-store-core': ^5.0.0
+ 
+-  '@kyneta/transport@4.0.0':
+-    resolution: {integrity: sha512-cviPQQm/yBs9paeBaPpnXcwgUqS8j4yNUqOj4Xoa+zoRrKHfMTYVEnNdyxb0nvaFHALPDAe4m/c9HqQAbFw0/g==}
++  '@kyneta/transport@5.0.0':
++    resolution: {integrity: sha512-l8DzQUJ9bxCyx1JnmInfiy5t9yijPa7ZlKQsiawkbVTv+6kCshzxZQEdG8B1rUeOmzs5yhpqmY5S6CjhduKZ1A==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/machine': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/machine': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+ 
+-  '@kyneta/websocket-transport@4.0.0':
+-    resolution: {integrity: sha512-B1MzYsUNhOBB5o+2xCTpPLavY9a74Go3FRAQKPgOaTikfnYf8WnichNmbCFJlvmvtKfT1pVY4XAHwHbG5ePEtQ==}
++  '@kyneta/websocket-transport@5.0.0':
++    resolution: {integrity: sha512-iG+DohV7OIS5i5NcGEltmWvQDqwV6p2qBthbxX5ynYFRjss7rUK7RKdfD2x6RFdbn5odroqFNzGO2ylTCN7WGw==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/machine': ^4.0.0
+-      '@kyneta/transport': ^4.0.0
++      '@kyneta/machine': ^5.0.0
++      '@kyneta/transport': ^5.0.0
+ 
+-  '@kyneta/wire@4.0.0':
+-    resolution: {integrity: sha512-iTjq9urSkxyaAtUGRM2B4Uz9XHVTCHVCTqknVk3c0W+suZQOesyqQ8lY3TwaNQeYNDTF21BFFN6o87UmWG5iAA==}
++  '@kyneta/wire@5.0.0':
++    resolution: {integrity: sha512-415Ylx6Cylyd02bjToqV6U6cTjHgj1NpRC7LR1GM5VJ5C52lMpAbjjG0QXcJyv51hpsKBrZ+uLdnL8J/yQcbcw==}
+     engines: {node: '>=18.0.0'}
+ 
+-  '@kyneta/yjs-schema@4.0.0':
+-    resolution: {integrity: sha512-YFtHyonHiOA5nMDVi3b/a/8WoPIvXU2Rt1EM9dIXzzor7usx20kC6dFqigwcT9Jnbd/4gWpMd7TLSeHpF6VLIA==}
++  '@kyneta/yjs-schema@5.0.0':
++    resolution: {integrity: sha512-3kbfOgeROC8h7zkS0R/s3PPfev1LXUT20rU/mZfB3Pzn0soUseWQpx9J/7cbg4acH2n7jXW/DPytKNuRic4Bfg==}
+     engines: {node: '>=18.0.0'}
+     peerDependencies:
+-      '@kyneta/changefeed': ^4.0.0
+-      '@kyneta/schema': ^4.0.0
++      '@kyneta/changefeed': ^5.0.0
++      '@kyneta/schema': ^5.0.0
+       yjs: '>=13.6.0'
+ 
+   '@oxc-parser/binding-android-arm-eabi@0.154.0':
+@@ -3193,71 +3209,76 @@
+       '@jridgewell/resolve-uri': 3.1.2
+       '@jridgewell/sourcemap-codec': 1.6.0
+ 
+-  '@kyneta/changefeed@4.0.0': {}
++  '@kyneta/changefeed@5.0.0': {}
++
++  '@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)':
++    dependencies:
++      '@kyneta/changefeed': 5.0.0
++      '@kyneta/machine': 5.0.0
++      '@kyneta/random': 5.0.0
++      '@kyneta/schema': 5.0.0
++      '@kyneta/transport': 5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0)
+ 
+-  '@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)':
++  '@kyneta/indexeddb-store@5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)':
+     dependencies:
+-      '@kyneta/changefeed': 4.0.0
+-      '@kyneta/machine': 4.0.0
+-      '@kyneta/random': 4.0.0
+-      '@kyneta/schema': 4.0.0
+-      '@kyneta/transport': 4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0)
++      '@kyneta/exchange': 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/schema': 5.0.0
+ 
+-  '@kyneta/machine@4.0.0': {}
++  '@kyneta/machine@5.0.0': {}
+ 
+-  '@kyneta/random@4.0.0': {}
++  '@kyneta/random@5.0.0': {}
+ 
+-  '@kyneta/react@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/reactive@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)(react@19.2.9)':
++  '@kyneta/react@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/reactive@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)(react@19.2.9)':
+     dependencies:
+-      '@kyneta/changefeed': 4.0.0
+-      '@kyneta/exchange': 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
+-      '@kyneta/reactive': 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
+-      '@kyneta/schema': 4.0.0
++      '@kyneta/changefeed': 5.0.0
++      '@kyneta/exchange': 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/reactive': 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/schema': 5.0.0
+       react: 19.2.9
+ 
+-  '@kyneta/reactive@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)':
++  '@kyneta/reactive@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)':
+     dependencies:
+-      '@kyneta/changefeed': 4.0.0
+-      '@kyneta/schema': 4.0.0
++      '@kyneta/changefeed': 5.0.0
++      '@kyneta/schema': 5.0.0
+ 
+-  '@kyneta/schema@4.0.0':
++  '@kyneta/schema@5.0.0':
+     dependencies:
+-      '@kyneta/changefeed': 4.0.0
+-      '@kyneta/machine': 4.0.0
+-      '@kyneta/random': 4.0.0
++      '@kyneta/changefeed': 5.0.0
++      '@kyneta/machine': 5.0.0
++      '@kyneta/random': 5.0.0
+       '@sindresorhus/fnv1a': 3.1.0
+ 
+-  '@kyneta/sql-store-core@4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)':
++  '@kyneta/sql-store-core@5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)':
+     dependencies:
+-      '@kyneta/exchange': 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
+-      '@kyneta/schema': 4.0.0
++      '@kyneta/exchange': 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/schema': 5.0.0
+ 
+-  '@kyneta/sqlite-store@4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)(@kyneta/sql-store-core@4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0))':
++  '@kyneta/sqlite-store@5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)(@kyneta/sql-store-core@5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0))':
+     dependencies:
+-      '@kyneta/exchange': 4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)
+-      '@kyneta/schema': 4.0.0
+-      '@kyneta/sql-store-core': 4.0.0(@kyneta/exchange@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0))(@kyneta/schema@4.0.0)
++      '@kyneta/exchange': 5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)
++      '@kyneta/schema': 5.0.0
++      '@kyneta/sql-store-core': 5.0.0(@kyneta/exchange@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0))(@kyneta/schema@5.0.0)
+ 
+-  '@kyneta/transport@4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0)':
++  '@kyneta/transport@5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0)':
+     dependencies:
+-      '@kyneta/machine': 4.0.0
+-      '@kyneta/random': 4.0.0
+-      '@kyneta/schema': 4.0.0
+-      '@kyneta/wire': 4.0.0
++      '@kyneta/machine': 5.0.0
++      '@kyneta/random': 5.0.0
++      '@kyneta/schema': 5.0.0
++      '@kyneta/wire': 5.0.0
+ 
+-  '@kyneta/websocket-transport@4.0.0(@kyneta/machine@4.0.0)(@kyneta/transport@4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0))':
++  '@kyneta/websocket-transport@5.0.0(@kyneta/machine@5.0.0)(@kyneta/transport@5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0))':
+     dependencies:
+-      '@kyneta/machine': 4.0.0
+-      '@kyneta/transport': 4.0.0(@kyneta/machine@4.0.0)(@kyneta/schema@4.0.0)
++      '@kyneta/machine': 5.0.0
++      '@kyneta/transport': 5.0.0(@kyneta/machine@5.0.0)(@kyneta/schema@5.0.0)
+ 
+-  '@kyneta/wire@4.0.0':
++  '@kyneta/wire@5.0.0':
+     dependencies:
+-      '@kyneta/schema': 4.0.0
++      '@kyneta/schema': 5.0.0
+ 
+-  '@kyneta/yjs-schema@4.0.0(@kyneta/changefeed@4.0.0)(@kyneta/schema@4.0.0)(yjs@13.6.33)':
++  '@kyneta/yjs-schema@5.0.0(@kyneta/changefeed@5.0.0)(@kyneta/schema@5.0.0)(yjs@13.6.33)':
+     dependencies:
+-      '@kyneta/changefeed': 4.0.0
+-      '@kyneta/schema': 4.0.0
++      '@kyneta/changefeed': 5.0.0
++      '@kyneta/schema': 5.0.0
+       yjs: 13.6.33
+ 
+   '@oxc-parser/binding-android-arm-eabi@0.154.0':

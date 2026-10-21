@@ -475,12 +475,15 @@ A client holds the session, `live`, the places and only the roots of the
 canvases it shows; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).
 
-ADR-0202, proposed, would give every document an owner, an audience and,
-only where a rule must hold, one authority, decided from its id alike on
-every peer: a canvas and its places its members', what is yours yours, a
-browser store on every page, and the agent's record written only by the
-machine its lane is tethered to. Until it is accepted, a client keeps no
-store and the host writes every place, as above.
+ADR-0202 gives every document an owner, an audience and, only where a
+rule must hold, one authority, decided from its id alike on every peer.
+Two of its parts are accepted and not yet built: every page keeps a
+browser store and reconnects (part a), and your message at each thread is
+named in a document of yours, `drafts:<writer>`, with no record in the
+places until a hand-off creates one (part b). Until they are built, a
+client keeps no store and the host writes every place, as above. Its
+other parts (a canvas's places its members', one audience policy, the
+intent log and the agent's tether) are proposed.
 
 ### Document shape (entries: settled by S7; rest sketch)
 

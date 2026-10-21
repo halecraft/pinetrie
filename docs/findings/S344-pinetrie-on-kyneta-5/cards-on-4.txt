@@ -1,0 +1,2 @@
+=== e2e ===
+=== e2e: pass=28 fail=0 skip=0 ===

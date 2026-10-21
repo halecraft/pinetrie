@@ -1,0 +1,28 @@
+--- /workspace/packages/web/main.tsx	2026-10-21 00:35:11.067006027 +0000
++++ packages/web/main.tsx	2026-10-25 04:45:53.223000523 +0000
+@@ -12,6 +12,7 @@
+ } from "@pinetrie/interface"
+ import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
+ import { connectSession } from "@pinetrie/session/connect"
++import { createIndexedDBStore } from "@kyneta/indexeddb-store"
+ import {
+   type Dock,
+   dockCodec,
+@@ -101,12 +102,17 @@
+ stores.identity.subscribe(next => {
+   if (next?.email !== identity.email) location.reload()
+ })
++;(globalThis as any).__probeEvents = []
++const probeStore = localStorage.getItem("probe-no-store") === null ? await createIndexedDBStore(`pinetrie-probe`) : undefined
+ const session = await connectSession({
+   url: wsUrl,
+   WebSocket,
+   fetch: (url, init) => fetch(url, init),
+   principal: identity.email,
++  ...(probeStore === undefined ? {} : { store: probeStore }),
++  reconnect: true,
+ })
++;(globalThis as any).__session = session
+ createRoot(root).render(
+   <StrictMode>
+     <ExchangeProvider exchange={session.exchange}>

@@ -2,11 +2,11 @@
 
 Numbered 0196 until 2026-10-20, when two files held that number.
 
-- **Status:** Proposed
+- **Status:** Proposed (Duane, 2026-10-25: parts a and b accepted)
 - **Area:** `docs/01-architecture.md`, `packages/protocol/TECHNICAL.md`,
   `packages/schema/TECHNICAL.md`, `packages/session/TECHNICAL.md`
 - **Evidence:** S3, S19, S21, S28, S75, S264, S289, S290, S291, S292, S293,
-  S294, S295, S296, S297, S299
+  S294, S295, S296, S297, S299, S343, S344, S345
 - **Amends:**
   - ADR-0037: a page keeps a Kyneta store in the browser and reconnects; a
     tab's seat lasts across reloads; a client's work and requests outlast the
@@ -78,6 +78,22 @@ the tree's guarantee against cycles is not needed (S289).
 
 **Decision.**
 
+Its parts can each be accepted or rejected alone. Parts a and b are
+accepted; c to e are proposed.
+
+- **a. A page keeps a store and reconnects** (*A page keeps a store and
+  reconnects*, below; amends ADR-0037).
+- **b. Your drafts are yours** (*Your drafts are yours*, below; amends
+  ADR-0059).
+- **c. One audience policy** (*One policy*, *A change of membership*;
+  amends ADR-0048).
+- **d. A canvas's places are its members'** (*A canvas belongs to its
+  members*, *A thread's own data*; amends ADR-0059 and ADR-0066).
+- **e. The intent log and the tether** (*What an authority acts on*, *An
+  agent is tethered*, *An intent's author*, *A message written against an
+  older tip*, *A request is an intent*, *An intent names what it saw*;
+  amends ADR-0119).
+
 *Every document answers three questions*, and its id, or one record its
 policy reads, answers them, so every peer decides alike:
 
@@ -105,23 +121,26 @@ gate falls open (S292). Its cost does not matter: 1,000 documents and 50
 peers made 221,317 calls on connecting, 57 ms in all, and a write 50
 (S292).
 
-*A change of membership is told by pine·trie, not by Kyneta.* Kyneta
-evaluates `canShare` only when it sends something, so a peer added to a
-document's audience while connected is not sent it, and one removed stops
-receiving changes but keeps its copy and is told nothing (S292; the first
-is reported to Kyneta's authors as a bug). So:
+*A change of membership reaches connected peers through Kyneta 5.* Under
+4.0.0, `canShare` was evaluated only when something was sent, so a peer
+added while connected was not sent the document, and one removed was told
+nothing (S292). Kyneta 5.0.0 adds `Policy.subscribe`: the audience policy
+subscribes to the membership records, and each change re-derives what
+every connected peer may see (S343). So:
 
-- **An added member asks again.** Its page, reading the membership
-  record, suspends and resumes its copy of each document it may now
-  read, which asks the host for it. The host does not suspend and resume
-  a document to re-announce it: every other peer would get a `dismiss`,
-  which pine·trie's client reads as a spent card (`hostLetGo`).
-- **A removed member is told by pine·trie**, and its page stops offering
-  writes there: Kyneta drops its later writes without a `refuse`, so as
-  not to reveal that the document exists. Removal stops what a member
-  gets from then on, not what it already holds.
+- **An added member is sent what it may now read**, with no reconnect and
+  no request, once its page interprets what it is sent (S343).
+- **A removed member is sent `dismiss`, and nothing more.** It keeps what
+  it already held: removal stops what a member gets from then on. Its
+  page stops offering writes there. pine·trie's client reads the host
+  leaving a card's text while connected as the card being spent
+  (`hostLetGo`), so what a removed member's page keeps of a card's text
+  is a rule pine·trie states.
 - **A refused request reveals nothing**: it is answered `vacant`, as for
   an id that does not exist (S292).
+- **The policy is registered once.** Registering the same object again
+  by name removes it and opens the gate, in 5.0.0 as in 4.0.0 (S292,
+  S343).
 
 *A canvas belongs to its members.* Each card's place is one value under
 its own key in the canvas's document, and a field that changes on its
@@ -148,8 +167,45 @@ own documents and your browser's store. Sharing adds readers. A pasted
 image is kept by its hash in the browser's store until it is uploaded;
 an upload is idempotent.
 
+*Your drafts are yours* (part b). Your message at each thread is named in
+a document of yours, `drafts:<writer>` (a kind of `PERSON_DOC_KINDS`),
+thread to card, written only by your tabs; its text is its card's
+document, as now. The host holds no record of it (S264):
+
+- **Typing needs no host.** The first keystroke worth keeping names the
+  card in your drafts and writes its text, with nobody asked.
+- **A hand-off is a creation.** A send, a queueing, a move to a note,
+  your inventory or a pin, and a trash each create the card's record
+  where it goes, from nothing, and your tab takes the draft's entry out
+  once the host accepts. A creation from a draft is recorded in its
+  thread's canvas's history of moves, so its undo works as a move's did.
+  A send to an agent is not undone, as now.
+- **Nothing goes back into a composer.** An undo of a hand-off, a restore
+  from the trash, and a trash then undo put the card in its owner's
+  inventory: the host never writes your drafts, and the composer holds
+  only what you type.
+- **The host's sweeps keep what a drafts document names**: a card's text,
+  the images its text holds, and the seats of its writers (S264).
+
 *A page keeps a store and reconnects.* It writes whatever it may with no
-one connected, and its writes reach the others when it is. *A seat lasts
+one connected, and its writes reach the others when it is. Measured on
+pine·trie's own page and host (S345): the open page takes typing in a card
+with the host down, reconnects by itself when the host returns on its
+store, and the text reaches the host. Three things go with it:
+
+- **The session reads a document once it has loaded**, not as it
+  connects: a stored copy loads later, and loading it is no change a
+  subscription hears, so a page reading the places as it connected drew
+  nothing after a reload (S345).
+- **A client's `Line` outlives the host's absence, and the host keeps a
+  seat's `Line`**: with `HostLine.close` on the host leaving, the
+  reconnected page could not send until it reloaded, and a reloaded seat
+  meets a `Line` the host deleted, with a lineage collision each time
+  (S345). Requests as intents remove the `Line`, and this with it.
+- **A reload while the host is down loads nothing**, since the host serves
+  the page (S345). What outlasts an outage is the open tab, until the page
+  comes from somewhere else: a service worker that keeps its files, or
+  pine·trie on the person's own device (S299). *A seat lasts
 on a secure origin, and is new on each load elsewhere.* The store holds
 a seat with Web Locks, which only a secure context has. On `localhost` a
 device's seats stay at the most tabs it had open at once, and a crashed
@@ -169,7 +225,11 @@ reaches a subscriber as its net change: a write added and removed, or
 overwritten, while partitioned is gone from it (S291). A list that is
 only ever appended to loses nothing, so whatever an authority must act on
 is a record appended to a log, never edited or deleted in place, in one
-batch with the state it changes. Each record describes itself: its kind,
+batch with the state it changes. The log is a `Schema.list.unrecorded`
+(Kyneta 5.0.0), a root field undo never records, so undoing a gesture
+that wrote state and intent together takes back the state and keeps the
+intent, and an undo records itself in the log through the stack's
+`annotate` (S343). Each record describes itself: its kind,
 its author, a per-author sequence number, its parent (what the writer
 had seen). An edit or a retraction is a new record naming the one it
 changes; it does not carry the text it replaces, which is already in the
@@ -307,6 +367,15 @@ grant it again), and a command set on a card.
 
 **Consequences.**
 
+- **pine·trie moves to Kyneta 5.0.0** first: the audience policy and the
+  intent log rest on it. On 5.0.0 the unit tests and the browser suite
+  pass, and the upgrade takes three changes: the host's
+  `handleConnection` result is `?.start()`; `@kyneta/reactive` and
+  `@kyneta/sql-store-core` are named at 5.0.0; and the host suite's
+  `lateFor` keeps one socket's frames in order, which 4.0.0 forgave and
+  5.0.0 does not (S344). A lockfile changed only in Kyneta's pure
+  JavaScript packages can be written in a lane: it kept every macOS
+  package (S344).
 - Typing, placing and starting things need no host. Only what the agent
   or your repo does waits for it.
 - The host's special cases for its absence go: `HostLine.close`

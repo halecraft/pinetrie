@@ -1,0 +1,7 @@
+PROBE waitFor wants []
+PROBE waitFor wants []
+PROBE waitFor wants [{"id":"01a1714e-7841-795e-a05f-7466f52a3684","seen":"AqmmypPA2MkOEQAB"}]
+PROBE waitFor done after 0 aborted false
+PROBE waitFor wants [{"id":"01a1714e-7841-795e-a05f-7466f52a3684","seen":"AQAB"},{"id":"01a1714e-78cb-7b4c-a806-3cc904ab62bd","seen":"AtmQ9qf/gtAGGgAB"}]
+PROBE waitFor done after 2000 aborted true
+PROBE then held after 20001 aborted true

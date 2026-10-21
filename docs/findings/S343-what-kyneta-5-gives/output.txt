@@ -1,0 +1,10 @@
+ada, a member, receives it: true
+bea, not yet a member, holds it unasked: false
+1 bea added: sent the document, unasked: true
+1 canShare calls the change made: 11
+2 bea removed: her copy now reads: "Plan"
+2 bea's peer states after removal: ["[]"]
+2 bea still holds a copy: true
+3 same policy object registered twice: cal (no member) was sent it: true
+4 after undo, the title: "Plan v2"
+4 after undo, the intents: ["edit","undo"]
