@@ -269,10 +269,38 @@ export interface ObserverHello {
     | { readonly kind: "failed"; readonly why: string }
   /**
    * Whether the loader's attribution hooks all attached (`planAttribution`).
-   * Required, so whatever serves a hello, a relay included, says it.
+   * Required, so whatever serves a hello, a relay included, says it. A
+   * hello from a role of another version may hold none, or one this host
+   * cannot read: a reader takes `helloAttribution`, never this field.
    */
   readonly attribution: Attribution
 }
+
+/**
+ * The attribution a hello holds, checked as the wire's value: one this host
+ * cannot read (a role of another version's) is `other-version`.
+ */
+export function helloAttribution(hello: ObserverHello): Attribution {
+  const a: unknown = hello.attribution
+  if (typeof a !== "object" || a === null) return otherVersion(hello)
+  if ("on" in a && a.on === true) return { on: true }
+  if (
+    "on" in a &&
+    a.on === false &&
+    "why" in a &&
+    a.why === "missing-hook" &&
+    "hook" in a &&
+    typeof a.hook === "string"
+  )
+    return { on: false, why: "missing-hook", hook: a.hook }
+  return otherVersion(hello)
+}
+
+const otherVersion = (hello: ObserverHello): Attribution => ({
+  on: false,
+  why: "other-version",
+  version: typeof hello.version === "string" ? hello.version : "",
+})
 
 /** A run's event, for the host that registered its lane. */
 export interface ObserverNotice {

@@ -626,6 +626,16 @@ export const mutations: readonly Mutation[] = [
     expect: "a lane on Alpine, with musl and no Node, runs pi's four tools",
   },
   {
+    name: "a bash call runs in the image's sh",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "        shell: RUNTIME_SHELL_PATH,\n",
+    to: '        shell: "/bin/sh",\n',
+    suite: "lanes",
+    scenario: "images",
+    expect:
+      "on Alpine, a bash call runs in pine·trie's own bash, of its pinned version",
+  },
+  {
     name: "the lane's ignore file leaves out the shared directories",
     file: "packages/lanes/shape.ts",
     from: "    ...shared.map(p => `/${p}/`),\n",

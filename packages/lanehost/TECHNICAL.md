@@ -259,7 +259,10 @@ host, whatever their projects.
     load is left out, so file tracking loads whatever attribution's fate.
     `planAttribution` turns the lines into the hello's required
     `attribution`: on only when every one of `ATTRIBUTION_HOOKS` attached.
-    A test checks each `attr_*` program's kprobe is on that list. It drains
+    The client reads it through `helloAttribution`, never as the field
+    came: a host inside a lane is relayed its outer host's role, often of
+    an older version, whose hello holds none, and that reads as off
+    (`other-version`, naming the role's version). A test checks each `attr_*` program's kprobe is on that list. It drains
     every ring of `RINGS` before a flush's `flushed`, and writes consecutive
     output of one pipe and statement as one `out` line.
   - **The role sends output only to its lane's owner, by

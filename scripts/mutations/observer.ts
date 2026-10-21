@@ -590,6 +590,32 @@ export const mutations: readonly Mutation[] = [
     expect: "it is off, naming the hook, when any one is missing",
   },
   {
+    name: "a lane's attribution is the hello's field as it came",
+    file: client,
+    from: "      attribution = helloAttribution(hello)\n",
+    to: "      attribution = hello.attribution\n",
+    command: gathering,
+    expect: "behind a role whose hello holds no attribution, a lane's is off",
+  },
+  {
+    name: "a hello's attribution is trusted without its shape",
+    file: policy,
+    from: '  if (typeof a !== "object" || a === null) return otherVersion(hello)\n',
+    to: '  if (typeof a !== "object" || a === null) return a as Attribution\n',
+    command: unit,
+    expect:
+      "a hello without an attribution this host reads is off, naming the role's version",
+  },
+  {
+    name: "a hello's off attribution is trusted without its reason",
+    file: policy,
+    from: '    a.why === "missing-hook" &&\n',
+    to: "",
+    command: unit,
+    expect:
+      "a hello without an attribution this host reads is off, naming the role's version",
+  },
+  {
     name: "the role sends no output",
     file: "packages/lanehost/observer-server.ts",
     from: '  if (r.kind === "send") connections.get(r.to)?.output?.(output)\n',

@@ -1,8 +1,9 @@
 // e2e/lanes/images — project images with no Node, and with no git, and the
 // default image's browser and python3.
 
-import { ROOT } from "@pinetrie/core"
+import { ROOT, RUNTIME_BASH } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/install"
+import { RUNTIME_SHELL_PATH } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import { HostRefused } from "../../host/host-refused.ts"
 import type { Checks } from "../checks.ts"
@@ -19,7 +20,8 @@ export const scenario: Scenario = {
 // ── 9. Any image with sh and git: pinetrie brings Node and its programs ────
 // Alpine has musl, no Node and no rg, fd or sd; the helper runs on the lane
 // runtime's Node, through its own loader, the search tools on the
-// runtime's static rg and fd, and every command is a run, attributed.
+// runtime's static rg and fd, a bash call on its own bash, and every
+// command is a run, attributed.
 // An image with no git refuses the host's start.
 
 async function imagesSection(
@@ -51,7 +53,7 @@ async function imagesSection(
         tool: "bash",
         args: {
           command:
-            "rg --version | head -1; fd --version; sd --version; cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl; mkdir -p built && cat notes.txt > built/copy.txt",
+            'echo "shell $BASH $BASH_VERSION"; rg --version | head -1; fd --version; sd --version; cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl; mkdir -p built && cat notes.txt > built/copy.txt',
         },
       },
       { text: "done" },
@@ -65,6 +67,13 @@ async function imagesSection(
         ran.at(-1)?.includes("no node") === true &&
         ran.at(-1)?.includes("musl") === true,
       `${JSON.stringify(ran.at(-1))}`,
+    )
+    // The image has no bash: only the runtime's can say this.
+    const bash = `shell ${RUNTIME_SHELL_PATH} ${RUNTIME_BASH.version}.${RUNTIME_BASH.patches}(1)-release`
+    check(
+      "on Alpine, a bash call runs in pine·trie's own bash, of its pinned version",
+      ran.at(-1)?.split("\n").includes(bash) === true,
+      `${JSON.stringify(ran.at(-1)?.split("\n")[0])}`,
     )
     check(
       "on Alpine, pinetrie's rg, fd and sd run, and grep and find find the files",

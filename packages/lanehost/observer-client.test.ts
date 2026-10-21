@@ -31,7 +31,16 @@ interface FakeRole {
   readonly open: () => Promise<ObserverChannel>
 }
 
-function fakeRole(): FakeRole {
+/** A role whose hello holds no attribution, as one older than attribution sends. */
+const OLDER_HELLO = { version: "v0", loader: { kind: "ready" } } as const
+
+function fakeRole(
+  hello: Awaited<ObserverChannel["ready"]> = {
+    version: "v1",
+    loader: { kind: "ready" },
+    attribution: { on: true },
+  },
+): FakeRole {
   let subscriber: ((n: ObserverUpdate) => void) | null = null
   let outputs: ((n: ObserverUpdate) => void) | null = null
   let held: readonly RunNotice[] = []
@@ -49,11 +58,7 @@ function fakeRole(): FakeRole {
         close = resolve
       })
       return {
-        ready: Promise.resolve({
-          version: "v1",
-          loader: { kind: "ready" },
-          attribution: { on: true },
-        }),
+        ready: Promise.resolve(hello),
         call: async (call, _signal, onUpdate) => {
           if (call.kind === "subscribe") {
             subscriber = onUpdate ?? null
@@ -311,4 +316,15 @@ test("settle answers after the role's flush", async () => {
 test("a lane's attribution is the role's hello's", async () => {
   const lane = await observed(fakeRole())
   expect(lane.attribution).toEqual({ on: true })
+})
+
+test("behind a role whose hello holds no attribution, a lane's is off", async () => {
+  const lane = await observed(
+    fakeRole(OLDER_HELLO as unknown as Awaited<ObserverChannel["ready"]>),
+  )
+  expect(lane.attribution).toEqual({
+    on: false,
+    why: "other-version",
+    version: "v0",
+  })
 })

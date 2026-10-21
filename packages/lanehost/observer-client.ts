@@ -43,6 +43,7 @@ import {
   newGathered,
 } from "./gathered.ts"
 import {
+  helloAttribution,
   type LaneNamespace,
   loaderRefusal,
   type ObserverCall,
@@ -212,7 +213,7 @@ export function observerClient(input: {
         c.close()
         throw new Error(refused)
       }
-      attribution = hello.attribution
+      attribution = helloAttribution(hello)
       void c.closed.then(() => {
         if (channel === opening) channel = null
       })

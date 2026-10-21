@@ -18,6 +18,8 @@ import {
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { PRODUCT_NAME, ROOT } from "@pinetrie/core"
+import { laneMachine, planStartSteps } from "../../host/start-checklist.ts"
+import { startStepWords } from "../../host/startup-lines.ts"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
 import { committedProject, join, START_AGENT, waitFor } from "../harness.ts"
@@ -82,6 +84,9 @@ async function packageSection(
           process.env.DOCKER_CONFIG ?? path.join(homedir(), ".docker"),
         SSH_AUTH_SOCK: "",
         PINETRIE_PORT: "0",
+        // `serve` reads its folder from `INIT_CWD`, which pnpm set to the
+        // repo for this suite; npm and pnpm set it to where a person ran it.
+        INIT_CWD: project,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -140,20 +145,16 @@ async function packageSection(
     check("a person joins the installed pinetrie", person !== null)
     await person?.close()
 
-    await waitFor(
-      () =>
-        exited ||
-        lines.some(
-          l =>
-            l.includes("lanes of their own are ready") ||
-            l.includes("lanes of their own cannot start"),
-        ),
-      600_000,
-    )
+    // A host listens only once its lanes work, each step ended in order.
+    const machine = laneMachine(process.platform)
+    const ends = lines.filter(l => l.startsWith("[host] ✓ "))
     check(
       "the installed pinetrie gets lanes of their own ready",
-      lines.some(l => l.includes("lanes of their own are ready")),
-      lines.filter(l => l.includes("cannot")).join(" | "),
+      !exited &&
+        planStartSteps({ tools: true }).every((step, i) =>
+          ends[i]?.startsWith(`[host] ✓ ${startStepWords(step, machine)}`),
+        ),
+      ends.join(" | "),
     )
   } finally {
     serving.kill("SIGTERM")

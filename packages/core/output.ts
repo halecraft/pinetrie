@@ -116,11 +116,20 @@ export function decodeOutputEvent(line: string): OutputEvent | null {
 /**
  * Whether the observer can attribute a `bash` call's output to its
  * statements on this machine, as its machine role found when its loader
- * started: every hook it needs attached, or the first that did not.
+ * started: every hook it needs attached, or the first that did not. A role
+ * of another version, whose hello holds no attribution this host reads, is
+ * `other-version`: a host inside a lane is often newer than the role its
+ * outer host relays.
  */
 export type Attribution =
   | { readonly on: true }
   | { readonly on: false; readonly why: "missing-hook"; readonly hook: string }
+  | {
+      readonly on: false
+      readonly why: "other-version"
+      /** The role's, from its hello. */
+      readonly version: string
+    }
 
 declare const settledBrand: unique symbol
 /**

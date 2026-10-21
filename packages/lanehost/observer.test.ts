@@ -12,6 +12,7 @@ import {
   encodeLoaderCommand,
   HELD_PER_LANE,
   heldNotices,
+  helloAttribution,
   IDLE_MS,
   isRaced,
   isStrictDescendant,
@@ -434,6 +435,36 @@ describe("attribution", () => {
         hook,
       })
     }
+  })
+  test("a hello's attribution is read as it was sent", () => {
+    const hello = (attribution: unknown) =>
+      ({
+        version: "v1",
+        loader: { kind: "ready" },
+        attribution,
+      }) as ObserverHello
+    expect(helloAttribution(hello({ on: true }))).toEqual({ on: true })
+    const missing = { on: false, why: "missing-hook", hook: "pipe_unlock" }
+    expect(helloAttribution(hello(missing))).toEqual(missing)
+  })
+  test("a hello without an attribution this host reads is off, naming the role's version", () => {
+    const off = { on: false, why: "other-version", version: "b387fa49da13" }
+    for (const attribution of [
+      undefined,
+      null,
+      true,
+      { on: "yes" },
+      { on: false, why: "no-pipes" },
+      { on: false, why: "no-pipes", hook: "pipe_unlock" },
+      { on: false, why: "missing-hook" },
+    ])
+      expect(
+        helloAttribution({
+          version: "b387fa49da13",
+          loader: { kind: "ready" },
+          attribution,
+        } as ObserverHello),
+      ).toEqual(off)
   })
 })
 
