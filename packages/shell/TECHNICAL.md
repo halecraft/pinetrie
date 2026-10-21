@@ -2,8 +2,8 @@
 
 Shell source as structure (ADR-0114, S138): a command's text in runs by role
 (command, option, string, variable, operator, redirect, keyword, comment,
-plain), a one-line command laid out to a width, and the lines its
-top-level statements begin on. It knows nothing of
+plain), a one-line command laid out to a width, and its top-level
+statements: where each lies, and the lines a reader sees each begin on. It knows nothing of
 tool calls: `@pinetrie/interface` decides which call reads as shell, and
 `@pinetrie/web` colours the roles. It declares only `unbash`, and only
 interface, `@pinetrie/pi` (whose `bash` tool counts a call's statements)
@@ -36,18 +36,42 @@ from the parse the layout's check already made.
   one-line command, a comment can only be the last thing on the line, so the
   layout keeps it after the last statement.
 
-## Where statements begin (`statements.ts`)
+## A command's statements (`statements.ts`, ADR-0204)
 
-A reader tells a call's commands apart by its top-level statements, so
-`statementLines` names the lines that begin one, past the first, in the
-source or the layout alike; `@pinetrie/web` sets them apart.
+`statementSpans` is the one definition of a top-level statement: a leaf of
+the command's `;`, `&` and newline connections, so an `&&`, `||` or `|`
+chain is one, and a backgrounded one keeps its `&`. pine·trie's bash
+numbers the same statements, in the same order, as it starts each (the patch,
+`packages/lanes/image/bash/apply.py`, marks them), and
+unbash agrees with it on every kind of statement in the observer's command
+(`fixtures.ts`, `@pinetrie/shell/fixtures`, which the observer suite runs
+and `statements.test.ts` checks). Where they could disagree, the join
+leaves the call undivided, never wrongly split
+(`packages/rules/TECHNICAL.md`).
+
+- **A span's lines count from 1, as bash counts a `-c` string's**, so a
+  signal's line compares to them unchanged. `ShellText.statements` gives
+  them from 0, in the text shown, laid out or not: a layout keeps every
+  statement, in order.
+- **A span ends past its heredocs' terminators.** unbash keeps a heredoc's
+  closing line outside every node's range, and its body may follow other
+  statements on its line (`cat <<EOF; echo x`), so the end is the furthest
+  any node of the statement reaches, a heredoc's closing included. A
+  heredoc with no terminator spans the rest of the command, as bash reads
+  it.
+- **`parseStatements`** is the entry `packages/pi` uses: none for a
+  command that does not parse, whose statements bash would count in a way
+  unbash cannot tell.
+
+`statementLines` is derived from the spans: the lines that begin a
+statement past the first, which `@pinetrie/web` sets apart.
 
 - **Only a statement that starts its line begins one.** `a; b` stays one
   line's worth; a chain's later parts are the same statement.
 - **The comment lines directly above a statement are its own**, so the gap
   goes above them. The walk up stops at the statement before's last line,
-  which can start with `#` inside a string; a heredoc's body, past that
-  line, ends in its terminator, which no walk passes.
+  which can start with `#` inside a string, or be its heredoc's
+  terminator: between two statements lie only comments and blank lines.
 - **A statement after a blank line begins none:** the agent already set it
   apart.
 - **It never changes the text**, only names its lines: a command with lines
@@ -68,7 +92,7 @@ substitution) are operators.
 - **unbash computes some children on first read**, as getters on its node
   classes (`parts`, `script`, `elements`, `index`, `value`, `expression`,
   `initialize`, `test`, `update`), which `Object.values` does not list. The
-  walk reads them by name (`LAZY`). A new unbash version may add one, as 6
+  walk reads them by name (`LAZY`, `nodes.ts`, which every walk shares). A new unbash version may add one, as 6
   did `script`: a role then goes missing, and `spans.test.ts`'s role table
   fails.
 - **Nested scripts' offsets are into the outer source**, so a `$(…)` is

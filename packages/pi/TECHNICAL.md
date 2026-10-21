@@ -268,7 +268,7 @@ operation open, and the lane is `LaneBusy` until resumed (below).
 ### Streaming, in pine·trie's words (ADR-0107)
 
 `createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
-declared in `@pinetrie/core`, so pi's events never leave this package. Every pi
+declared in `@pinetrie/threads`, so pi's events never leave this package. Every pi
 `HarnessEvent` carries `lane`, so concurrent threads stay apart. The mapping
 is `harnessStreamEvent` (`stream.ts`), which drops an event on a lane that is
 not a thread's.
@@ -278,6 +278,10 @@ not a thread's.
 | `message_update` (a `text_delta`) | `text` |
 | `tool_start` | `tool-start`: its lane and call, no label (its row takes the committed call's) |
 | `tool_update` (the first text part of `partialResult`) | `tool-output`, a whole snapshot |
+
+A `bash` call's statement streams are not pi's events: its tool sends a
+`tool-output` naming a statement, and `tool-undivided`, through the tools'
+`stream` sink, which is `onStream` too (below, pine·trie's `bash` tool).
 
 `message_end` and `tool_end` are not mapped. The entry pi commits after each
 is what ends its stream on screen (ADR-0044), and an end event comes before
@@ -502,8 +506,8 @@ Loading runs every listed package's factory, so its side effects happen
 (`pi-subagents` logs a warning). Every choice loads the listed packages,
 skills and prompts; with none listed, a scripted or named model loads
 nothing of pi's, and only pine·trie's own skills are commands. With tools
-(`CreateAgentOptions.tools`), pi-agent-core's `read`, `write`, `edit` and
-`bash`, and pine·trie's `grep` and `find`, run in each lane's own directory
+(`CreateAgentOptions.tools`), pi-agent-core's `read`, `write` and `edit`,
+and pine·trie's `bash`, `grep` and `find`, run in each lane's own directory
 (below). `bash`, `edit` and `write` take a required `intent` (ADR-0173,
 `intent.ts`): `requireIntent` puts it first in the tool's schema, written as
 plain JSON Schema so pi's optional parameters stay optional, and drops it
@@ -911,6 +915,83 @@ item 18, and in `lanes.test.ts` against the harness.
   `PiSetup.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
+
+### pine·trie's `bash` tool (`bash-tool.ts`, ADR-0204, S304)
+
+`TOOLS[BASH_TOOL]` is pine·trie's, not pi's, so a call's every raw chunk is
+in hand: pi's `exec` mixes and trims its output before anything leaves it.
+pi's `exec` keeps serving `grep`, `find` and the file tools.
+
+- **It is pi's tool to the model:** pi's name, parameters (`command`, an
+  optional `timeout`, checked as pi checks it) and description, worded with
+  pi's exported limits (`BASH_LIMITS`, `shell-capture.ts`).
+  `bash-tool.test.ts` holds them equal to `createBashTool`'s, and the result
+  text equal to pi's tool's over `NodeExecutionEnv` on 17 commands,
+  timeout and abort among them, so a pi upgrade that changes its own shows
+  there, for us to decide. Its updates are pi's: the view at most every
+  100 ms, and a `checkpoint` every 2 s, so a running call's output so far
+  survives in `pi.pending.tool_output`. `bashResult` words the result as
+  pi does: the tail, then "Showing lines … Full output: <file>" when cut,
+  and a failure's status, thrown as pi's tool throws it.
+- **One capture, `shell-capture.ts`**, makes what the model reads, from the
+  chunks in the order the lane read them, both pipes through one decoder,
+  built on pi's exported `truncateTail`, `sanitizeBinaryOutput` and
+  `utf8ByteLength`. Each statement's view is the same capture, over that
+  statement's bytes. `BASH_LIMITS` is the one value for when output is cut:
+  the capture, the spill's counts and the stored split all take it.
+- **The command runs through `ToolContext.shell`** (`laneShell`,
+  `lane-env.ts`), the lane's own capability, as the search tools find their
+  programs: pine·trie's bash at `RUNTIME_SHELL_PATH`, once the lane's gate
+  opens. The gate gives the lane's channel and its observation from one
+  link (`OpenedLane`), so a call never pairs one link's channel with
+  another's events.
+- **The `shell` call** (`lane-protocol.ts`, `lane-shell.ts`) is the
+  helper's side:
+  - its run starts in `startRun`, as an `exec`'s does: numbered, recorded
+    with its command for the next drain, and launched with `PINETRIE_RUN`,
+    so recipes still see `bash` commands;
+  - the shell is spawned detached with `-c`, stdin closed, in the call's
+    directory; a timeout or an abort (the channel's `{ abort }`) kills its
+    process group;
+  - each read is one update, `{ fd, bytes }`, never split or joined: one
+    message per read keeps the count low, as the channel carries bytes as
+    base64 in JSON;
+  - past `OUTPUT_CAP` (8 MiB, a value chosen, not measured) one `over-cap`
+    update and no more chunks, while the helper keeps reading for the
+    spill;
+  - once the bytes or lines read pass the limits it is given, every byte
+    from the start goes to a `pi-output-*.log` file too, named in the
+    answer;
+  - it ends at the shell's exit and both pipes' ends, or once the pipes are
+    quiet for `QUIET_AFTER_EXIT_MS` (100 ms) after the exit, so a
+    background job holding them does not hold the call. The answer is the
+    exit code, or 128 and the signal, and the spill's file.
+- **`ShellRun`** is one handle, so the tool and its join cannot start
+  without what they need: the run's number once the lane names it, the
+  lane's `attribution`, one `events` stream (chunks, `over-cap`, and the
+  observer's notices of the run's output, claimed as soon as the run is
+  named), how the call ended, and `settled`. The stream ends only after
+  the observer's flush after the call has answered, and the run's output
+  is let go then, so every event of the call is in it.
+- **The join's shell** (`statement-join.ts`) splits the same chunks by
+  statement, for the call's row, never for the model; the fold it drives
+  is `@pinetrie/rules`' (`statement-output.ts`):
+  - it holds only bytes the observer has not yet attributed: each range
+    the fold attributes goes into its statement's capture and is dropped;
+  - a statement's capture is made when it first gets bytes, so one that
+    prints nothing has none;
+  - while the verdict is a split, each changed statement's view goes out
+    at most every 100 ms as a `tool-output` naming the statement, through
+    the tools' `stream` sink (`ToolsInput`, the agent's `onStream`); a
+    split that stops verifying sends `tool-undivided` once, and the call
+    is shown whole;
+  - when the call has returned and `settled` has resolved, it folds `done`;
+    a settled split's record goes to `LaneHooks.storeOutputSplit`, and the
+    host writes it into the lane's root. A store that fails leaves the row
+    its whole output. No view is published at `done`: the record replaces
+    the live streams.
+  - the command's statements are `parseStatements`' (`@pinetrie/shell`),
+    none for a command that does not parse, so any signal leaves it whole.
 
 ### The search tools (`search.ts`, ADR-0064, S88)
 

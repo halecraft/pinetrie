@@ -353,17 +353,50 @@ paths are its diff." would compare a function with itself.
   names for Node copied to one name whatever the architecture. The
   runtime is copied out of pine·trie's default image into
   `runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
-  glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
-  (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
-  without Node (S44), and every lane has those programs (ADR-0064). Only
-  `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`, after the image's own;
-  pine·trie's Node needs its loader.
+  glibc's loader, in `bin/` static builds of core's `RUNTIME_PROGRAMS`
+  (jj, rg, fd, sd), and in `shell/bash` pine·trie's bash. Core's
+  `RUNTIME_ENTRIES` is the one list of them: `RUNTIME_PROGRAMS`, `EXTRACT`
+  and `runtimeComplete` all follow it. So the helper runs on any image,
+  musl or glibc, with or without Node (S44), and every lane has those
+  programs (ADR-0064). Only `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`,
+  after the image's own; pine·trie's Node needs its loader, and the shell
+  is the `bash` tool's alone.
 - **The runtime's programs are static release builds**, pinned by `ARG`
   defaults in the default Containerfile (S88). Debian's rg and fd link glibc,
   and would not run on a musl image. `EXTRACT` copies each program in the
   list and fails naming one the image lacks, so the host stops at startup.
   `ensureRuntime` keeps a runtime only when its `bin/` holds every program
   (`runtimeComplete`), not only jj. sd 1.1.0 reports itself as 1.0.0.
+- **pine·trie's bash is the shell of every `bash` call (ADR-0204)**, on
+  every image, at `RUNTIME_SHELL_PATH` (`spec.ts`), off the `PATH`: a
+  command's own `bash`, a script's `#!/bin/bash` and a nested shell stay the
+  image's. It is GNU bash `RUNTIME_BASH` (core, `lane-env.ts`: a release and
+  how many of GNU's official patches), the one place the version is named:
+  `prepareImages` passes it to the default Containerfile's `bash` stage as
+  `BASH_VERSION` and `BASH_PATCHES`. That stage downloads the release and
+  its patches, checks each against `image/bash/SHA256SUMS`, applies them,
+  then applies pine·trie's patch, `image/bash/apply.py`, which makes `bash
+  -c` signal each top-level statement to the observer
+  (`packages/lanehost/TECHNICAL.md`, The machine role). The patch is edits
+  at anchors, not a diff: each anchor must match exactly once, so a
+  release that moved one fails the image's build, naming it, rather than
+  building a shell that never signals. The build is static against
+  glibc, without bash's own allocator, and the image keeps it at
+  `IMAGE_SHELL`, which `EXTRACT` copies to `shell/bash`. A new version is
+  a deliberate bump of `RUNTIME_BASH` and `SHA256SUMS` together.
+- **pine·trie's bash, gotchas:**
+  - It is glibc's, static, so it reads the image's own locale data: on a
+    glibc image it reads text as the image's bash does. On a project's musl
+    image, with no glibc locale data, it reads text as bytes in every
+    locale and warns of an `LC_ALL` the image lacks (S300).
+  - A musl build was rejected for speed: up to 2.7 times slower than a
+    glibc image's bash at appending to a string, and bash's own allocator
+    does not work on it (S300).
+  - A bash before 5.3 needs `-std=gnu17` under gcc 15 (S298); 5.3 needs
+    nothing.
+  - Static, it cannot load a builtin: `enable -f` reports that dynamic
+    loading is not available, with status 2 (S298). That also closes the
+    one way a command could load code into the shell and forge a signal.
 - **Every tool call's command is a run (ADR-0135).** The helper launches
   it with its number in `PINETRIE_RUN` (`packages/pi/TECHNICAL.md`); the
   host's own `run` calls never are runs. The machine's observer, outside
@@ -374,8 +407,9 @@ paths are its diff." would compare a function with itself.
   written file's last release, to the host, never through the lane. A
   lane's shape carries nothing for it but `SHARED_ENV`, by which the helper
   stamps its tools' shared accesses.
-- **A project image must still supply** a POSIX `sh` (pi's `bash` falls back
-  to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
+- **A project image must still supply** a POSIX `sh` (pi's `exec`, which
+  serves `grep`, `find` and the file tools, falls back to `sh -c`) and git
+  2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
   image without them, naming what it lacks.
 - **pine·trie's default image carries python3**, and **Chromium's headless
@@ -629,7 +663,8 @@ paths are its diff." would compare a function with itself.
     later, BTF, kprobes; a lane is a PID namespace to it), and the disk
     model rests on it (ADR-0135): a host that cannot observe refuses lanes;
   - the lane runtime is Linux ELF for the machine's architecture: Node, its
-    libraries and glibc's loader, and musl builds of `RUNTIME_PROGRAMS`;
+    libraries and glibc's loader, musl builds of `RUNTIME_PROGRAMS`, and a
+    static glibc bash;
   - disks are btrfs subvolumes (`packages/lanehost/btrfs.ts`);
   - a lane is an OCI container under Linux's isolation: seccomp,
     `no-new-privileges`, `--init`, and a nested lane's rootless Docker;
@@ -639,7 +674,8 @@ paths are its diff." would compare a function with itself.
   runtime, shared directories and the host's ssh socket, each mapped to
   where Docker's machine sees it (`DockerTarget.pathOf`). A remote machine
   with no view of them needs the files carried, not mapped.
-- **Values:** the programs every lane carries (`RUNTIME_PROGRAMS`), where a
+- **Values:** the programs every lane carries (`RUNTIME_PROGRAMS`), its
+  `bash` calls' shell (`RUNTIME_BASH`), where a
   lane sees things (`WORKSPACE_ROOT`, `HOST_WORKING_COPY`, `HOST_MOUNT`,
   `RUNTIME_MOUNT`, `STATES_MOUNT`, `LANE_HOME`), the image (a project's
   Containerfile replaces the default; `checkImage` asks a POSIX `sh` and

@@ -67,8 +67,9 @@ interface ToolsInput {
 /**
  * Each tool, made, by its id: a tool with no factory fails to
  * compile, and `tools.test.ts` checks each is named its id, which catches a
- * pi upgrade renaming one of its own. pi-agent-core makes `read`, `write`,
- * `edit` and `bash`; pine·trie makes the rest.
+ * pi upgrade renaming one of its own. pi-agent-core makes `read`, `write`
+ * and `edit`; pine·trie makes the rest, `bash` in pi's shape
+ * (`bash-tool.ts`).
  */
 export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
   // `read` fits an image and stores it before pi writes the result, so the
@@ -164,7 +165,7 @@ function noteConfigWrites<T extends Executes>(
 }
 
 /**
- * The file tools: pi-agent-core's `read`, `write`, `edit` and `bash`, and our
+ * The file tools: pi-agent-core's `read`, `write` and `edit`, and our `bash`,
  * `grep` and `find`. Each lane uses them in its own directory
  * (`laneToolContext`, in `lanes.ts`). They are also pi's `selectedTools`, and
  * naming `grep` or `find` there drops pi's rule to search with bash.

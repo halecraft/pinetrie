@@ -7,6 +7,9 @@
 // - pi's own `NodeExecutionEnv`, so pi's tools run in the lane unchanged.
 //   Every `exec` is a run, launched with its number in its environment
 //   (`observer.ts`); its events reach the host from the machine's observer;
+// - `shell`, a `bash` call's command in pine·trie's bash (`lane-shell.ts`):
+//   a run as an `exec` is, each chunk of its output streamed back with its
+//   pipe as it is read;
 // - `run` calls, the host's own jj and git, with no shell (`runCommand`),
 //   never runs: they are pine·trie's, not a tool call's;
 // - `runs`, what this helper knows of its runs since the last drain: each

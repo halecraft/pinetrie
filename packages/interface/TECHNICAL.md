@@ -1170,6 +1170,25 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   (`startsStatement`), from `RowSummary.starts`, which `@pinetrie/shell`
   reads for a shell command and is empty for any other. The summary's
   lines are the command's first, so a line keeps its index cut or whole.
+- **A `bash` call's detail shows each statement's output under it**
+  (ADR-0204), from a `RowSplit`, which only what the host wrote of a
+  verified split makes: `storedRowSplit` from the call's `OutputSplitRecord`
+  once it has a result, `liveRowSplit` from its statement streams while it
+  runs (null before a statement has printed, or for an ordinal the command
+  lacks). Each `CommandLine` carries the outputs of the statements that end
+  on it (`RowSummary.statements`, `@pinetrie/shell`'s lines in the text
+  shown, laid out or not), so `a; b` shows both under its one line; a
+  statement that printed nothing shows none, and one whose start was cut
+  is headed `EARLIER_LINES`. The body then shows no whole output. A split
+  of another count of statements than the command's is not drawn, and the
+  summary is the same with a split or without, so a row keeps its height.
+  No reason a call is undivided reaches the page: only a verified split is
+  stored, and the live streams carry no verdict.
+- **`liveWork` takes a call's own stream, of its whole output**, never a
+  statement's (`tools`), and keeps a call's statement streams apart, by
+  ordinal (`statements`); `callStatementStreams` and `callSplits` give a
+  message its own calls', as plain data. The facts carry the roots' stored
+  splits (`outputSplits`, `readOutputSplits` in `@pinetrie/reads`).
 - **`callPurpose` says what a call is for in one line:** its intent, else
   `callLabel`'s cut words. Outline's live line and a turn's revision title
   use it; a message's copy keeps `callLabel`, since pasting wants the

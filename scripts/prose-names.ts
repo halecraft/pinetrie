@@ -136,6 +136,7 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "ERR_MODULE_NOT_FOUND",
   "F_FULLFSYNC",
   "FMODE_CREATED",
+  "LC_ALL",
   // OpenSSH
   "AGENT_MAX_LEN",
   "LoginGraceTime",

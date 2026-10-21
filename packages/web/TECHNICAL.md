@@ -916,6 +916,18 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   of the summary's 5 lines. A line too long for the row wraps with its
   rest hanging 2ch in, so the rest never reads as a statement of its own;
   an empty line keeps its height (`.tool-line:empty`).
+- **A `bash` call split by statement shows each statement's output under
+  its lines**, in its detail alone (ADR-0204). `ToolRow` gives `rowView` a
+  split: its statement streams' texts while it runs (`statementStreams`,
+  read in one `useSelector` as one string, so the value compares equal
+  while no text changes), its stored record once it has a result
+  (`splits`); `MessageList` hands each message its own calls'
+  (`callStatementStreams`, `callSplits`), from the facts' `outputSplits`
+  and `LiveWork.statements`. A line's `outputs` are each a
+  `pre.tool-output.tool-statement-output` inside its `.tool-line`, which
+  undoes the line's hanging indent, so the next statement's gap still
+  comes after it, and the row's own `.tool-output` is then empty, not
+  drawn.
 - **A row is its summary or its detail** (`RowMemory.open`, `data-open`).
   The summary shows the command's first 5 lines and the output's last 5
   (`headLines`, `tailLines`), as written: the command is cut after its

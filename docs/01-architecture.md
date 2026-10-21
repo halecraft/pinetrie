@@ -305,10 +305,17 @@ every lane, reports each file its processes name, daemons included, and
 stops none of their calls. A lane is its first process's PID namespace;
 a host inside a lane is served the observer through that lane's helper,
 relayed by the host outside, and registers only lanes below its own.
-ADR-0204, accepted and not yet built, has the observer also attribute
-each byte of a tool call's output to the top-level statement of its
-command that wrote it, told by pine·trie's own bash, one pinned version
-that every lane's runtime carries.
+Under ADR-0204, every `bash` call runs in pine·trie's own bash, one pinned
+GNU release static against glibc that every lane's runtime carries, off
+the `PATH`, and pine·trie makes the `bash` tool in pi's shape. That bash
+tells the kernel as each top-level statement of its command starts, and
+only it may: the observer tags each task with the statement it was started
+in and attributes each byte entering the call's output pipes to its
+writer's statement, on a route of its own apart from the disk's events. The
+host joins those attributions to the bytes the lane read, and shows a
+call's output under each statement only when every byte verifies; otherwise
+whole, as before. A host inside a lane is relayed its outer host's
+observer, and one that predates attribution leaves every call whole.
 From those runs and `.gitignore`, each path is source, derived or local. A
 recipe is a recorded run, and a disk made for a new state (an update's
 merge, a container on another image) loses the outputs whose recipe no

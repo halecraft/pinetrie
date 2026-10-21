@@ -179,5 +179,13 @@ tests import as `@pinetrie/threads/fixtures`.
   replaced whole, so it is a value, not a text.
 - A stream is written as edits to a text, not whole values: a live tool
   stream appended 4.35 MB as values and 96 KB as edits (S22).
+- **A `tool` stream with no `statement` is its call's whole output**; one
+  with a `statement` is that top-level statement's output alone, of a
+  `bash` call whose split verifies (ADR-0204). Every reader that finds a
+  call's stream must take the one without, or it would read one
+  statement's output as the call's. `tool-output` names the statement it
+  snapshots, and `tool-undivided` closes a call's statement streams when
+  its split stops verifying. A statement's ordinal is core's
+  `StatementIndex`, from 1.
 - A run's earlier thinking is dropped when its lane's tools or prompt
   change (S85).

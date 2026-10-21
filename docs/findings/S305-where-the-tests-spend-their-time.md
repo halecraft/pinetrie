@@ -1,7 +1,7 @@
 # S305 — where the tests spend their time, and what each lever would save
 
 - **Status:** Answered
-- **Led to:** ADR-0207
+- **Led to:** ADR-0207, ADR-0207
 
 **Question.** `pnpm run verify` and a mutation batch have grown slow. S94
 measured the suites when they became scenarios; nothing has measured them

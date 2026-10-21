@@ -1129,6 +1129,15 @@ The rail is E; the column is T. Seeing both at once is the product.
   +335 lines of output", and shows it all; in the detail it says "less". A
   row that leaves nothing out has no button. The row spans the column, as
   far from its right edge as from its left.
+- **A command's detail shows each statement's own output under it**
+  (ADR-0204): what `cd x && make` printed under that line, and what the
+  next statement printed under its own, failed redirections, subshells and
+  a background job's lines written before the call returned included. A
+  statement that printed nothing shows nothing, and one whose output was
+  cut says "… earlier lines left out". The summary is the same as any
+  row's. Where pine·trie cannot vouch for every byte (no observer, an
+  older one, a call over its cap), the detail shows the output whole, as
+  before; nothing it shows is ever split wrongly.
 - **In story, a row says what its call is for** (ADR-0173): `shell`, `edit`
   and `write` calls carry an intent, the model's few plain words ("Run the
   unit tests"), and a story row leads with it where the command would be,

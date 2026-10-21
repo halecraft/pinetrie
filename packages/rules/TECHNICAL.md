@@ -62,7 +62,11 @@ exported only where another package decides with it on its own
   (`packages/schema/TECHNICAL.md`, Streams; ADR-0014, ADR-0107). A stream
   stays until its entry is written, which is before the next reply's request
   and by the run's end (S55); a reply's own entry moves its lane's tip in the
-  commit that writes it (S35).
+  commit that writes it (S35). A `bash` call's statement streams are
+  opened, edited and closed here too (below, A `bash` call's output by
+  statement).
+- `statement-output.ts`: a `bash` call's output joined to its top-level
+  statements, the verdict on it, and its stored split (ADR-0204).
 - `card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `in-place.ts`,
   `move-history.ts`: a card's record, where it is and the sweep; note
   columns and where a card leaving a thread goes; the queue's pops and
@@ -1467,6 +1471,57 @@ How a thread's last run ended, for the people who follow it.
   refused line, never written over the next run's; the digest as
   `digestToWrite` decides a final one, none for a failed request.
 - **`pendingRunEndReport`** is what a run's end writes before it closes the run.
+
+# A `bash` call's output by statement (`statement-output.ts`, `live.ts`, ADR-0204)
+
+The fold of a call's join: the lane's chunks, as bytes per pipe in read
+order, and the observer's events, as bytes per pipe by statement in the
+pipe's own order. Counts only, never bytes: `packages/pi`'s join shell
+(`statement-join.ts`) holds the bytes and makes the text, since only
+`packages/pi` may import pi's truncation.
+
+- **Incremental:** `joinStep` folds one event and returns the ranges newly
+  attributed (`attributed`), each a pipe's byte range and its statement.
+  The shell moves those bytes into the statement's capture and drops them,
+  so the effect is a value. A pipe's attributions ahead of its bytes wait
+  in order, and its bytes ahead of their attributions are held by the
+  shell, never shown.
+- **`joinVerdict` alone makes a `VerifiedSplit`**, and the record, the live
+  statement streams and the page take nothing else. A split while the call
+  runs has `settled` null; only one folded with `done`, which carries the
+  observer's flush token (`Settled`, made only by the lane observation's
+  `settle`), narrows to a `SettledSplit` (`settledSplit`). The verdict is
+  `pending` until a byte is attributed.
+- **Undivided, and why** (`UndividedWhy`): attribution off on the lane
+  (`no-observer`, `missing-hook`, `other-version`, from the start, as
+  `joinStart` is given it); `over-cap`; `output-lost`; `unknown-statement`
+  (a writer or signal naming no statement of the command, the kernel's
+  statement 0 among them); `line-outside-statement` (a signal's line not
+  within its statement's lines); `count-mismatch` (at `done`, a pipe's
+  attributed bytes are not exactly its read ones). Over the cap and lost
+  output outrank any reason found before them; otherwise the first stands,
+  and once undivided a call takes no more checks. So a disagreement between
+  the patch's count of statements and `statementSpans`' can only leave a
+  call undivided, never wrongly split.
+- **`planVerdictChange`**: a split that turns undivided closes the call's
+  statement streams (`tool-undivided`), so its row shows the whole output;
+  no other change closes anything.
+- **Live, in `live.ts`:** a `tool-output` naming a statement finds its
+  stream by call and statement, opening it on its first text, so a
+  statement that prints nothing has none; one naming none is the call's own
+  stream, as before. `tool-undivided` closes the call's statement streams
+  and keeps its own. `planEndRun` and `planClear` close them with the rest.
+- **Stored** (`OUTPUT_SPLIT`, `pinetrie.output-split`, in the root, keyed by
+  tool call id): an `OutputSplitRecord` is branded, made only from a
+  `SettledSplit` (`outputSplitRecord`) or by its decoder. It asks for the
+  view of each statement that printed, and `storedSplit` cuts them so the
+  whole record keeps within the limits it is given, pi's, as a call's
+  result does: every statement first keeps its last `STATEMENT_FLOOR_LINES`
+  (3) lines, from the last statement backwards while they fit, then each
+  grows backwards from the last; a line counts its UTF-8 bytes and its
+  newline, and a last line too long for what is left keeps its tail, never
+  splitting a character. A statement cut here or by its capture is stored
+  `truncated`.
 
 # A model setting (`config.ts`)
 

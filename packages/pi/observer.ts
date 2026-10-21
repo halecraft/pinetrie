@@ -23,7 +23,8 @@ export const RUN_ENV = "PINETRIE_RUN"
 /**
  * pi `exec`'s options for run `run`: pi spawns the command's shell with
  * `{ ...process.env, ...shellEnv, ...options.env }`, so the variable is
- * the run's whatever the caller gave.
+ * the run's whatever the caller gave. pi's `exec` serves `grep`, `find`
+ * and the file tools; a `bash` call's `shell` sets the variable itself.
  */
 export const launchOptions = (
   run: string,
