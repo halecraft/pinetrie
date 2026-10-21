@@ -1,0 +1,14 @@
+A one tab, 21 loads: distinct seats: 1
+B one tab, closed and opened 20 times: distinct seats: 1
+C three at once: distinct within each round: [3,3,3,3,3,3,3,3,3,3]
+C three at once, ten rounds: distinct seats: 3
+D ten at once: distinct seats: 10
+D then one tab: one of the ten: true
+A-D all seats this origin's store issued: 10
+F another profile: a seat not seen before: true
+G no Web Locks, ten opens: distinct seats: 10
+H a LAN origin: secure context with Web Locks: false
+H a LAN origin, five opens: distinct seats: 5
+H the store warned: ["[indexeddb-store] Web Locks are unavailable, so every open is a new peer. Serve the page from a secure context to keep one across reloads."]
+E after chrome://crash, the next tab takes the crashed tab's seat: true
+E seats: crashed, still open, next: [false,false]

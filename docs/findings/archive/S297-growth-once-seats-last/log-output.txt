@@ -1,0 +1,14 @@
+log: intents: 11000
+log: edits among them: 1000
+log: the text it holds, bytes (edits with what they replace): 3664840
+log: Yjs update, bytes: 5434062
+log: Yjs update v2, bytes: 5378719
+log: overhead per intent beyond its text, bytes: 161
+log: Kyneta's entirety payload, bytes: 5434062
+log: load into a fresh document (Kyneta merge), ms median of 5: 111
+log: load and read every intent, ms median of 5: 110
+log: Y.applyUpdate alone, ms median of 5: 24
+record: rows: 10000
+record: compacted (entirety), bytes: 6973933
+record: its op log before a compaction, bytes: 7773850
+record: load into a fresh document, ms median of 5: 91

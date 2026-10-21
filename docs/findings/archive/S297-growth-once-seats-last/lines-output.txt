@@ -1,0 +1,15 @@
+1 message each, 50 seats: Line documents kept per seat: 2
+1 message each, 50 seats: records kept per seat: 6
+1 message each, 50 seats: bytes kept per seat (records and their meta): 2412
+20 messages each, 20 seats: Line documents kept per seat: 2
+20 messages each, 20 seats: records kept per seat: 44
+20 messages each, 20 seats: bytes kept per seat (records and their meta): 26486
+200 messages each, 5 seats: Line documents kept per seat: 2
+200 messages each, 5 seats: records kept per seat: 404
+200 messages each, 5 seats: bytes kept per seat (records and their meta): 255981
+hub peers still known after every seat left: 0
+compacting every Line on the hub: {"compacted":150,"refused":0,"firstError":""}
+Line bytes before and after compacting: [1897375,57240]
+the largest Line documents after compacting: [{"doc_id":"line:cmd:69831dee27a309c795e12207a869d4ba→79461d45c886f85a6f1017ed46d6390a","n":2,"b":388},{"doc_id":"line:cmd:69831dee27a309c795e12207a869d4ba→8d57ba65c3e7687cc396aed8015a9bc9","n":2,"b":388},{"doc_id":"line:cmd:69831dee27a309c795e12207a869d4ba→93a7ff5db3b4edd1c08436a53a24a05c","n":2,"b":388},{"doc_id":"line:cmd:69831dee27a309c795e12207a869d4ba→abf5d90635cebfb9adcb522c28821b63","n":2,"b":388}]
+the file after VACUUM, bytes: 147456
+stored by kind: [{"prefix":"line","docs":150,"records":300,"bytes":57240}]
