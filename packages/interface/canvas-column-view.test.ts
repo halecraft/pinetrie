@@ -6,6 +6,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { Workflow } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { type CardRecord, cardIdOfKind, UNTICKED } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
@@ -36,13 +37,13 @@ const [B, D, X] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
 ]
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: B, name: "Backlog" },
     { id: D, name: "Doing" },
   ],
-  archive: { id: X, name: "Done" },
-}
+  { id: X, name: "Done" },
+)
 const head = threadCardHead(K, {
   workflow: WORKFLOW,
   stateOf: new Map([[K, D]]),

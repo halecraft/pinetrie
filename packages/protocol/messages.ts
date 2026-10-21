@@ -75,7 +75,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     command `targetId`.
  *   - `spin-off` makes a card a thread: `moves` is its one move,
  *     to gone, spun into the new root it names; `state` is the workflow
- *     state the root lands in, `""` for the first open state.
+ *     state the root lands in, `""` for Topics.
  *   - `reorder` moves the card `cardId` among its neighbours in its queue,
  *     among the pinned cards, in its note column or on its canvas: `moves`
  *     is `{ at, after, before }`, the key of where it is and the cards it
@@ -238,7 +238,7 @@ export interface Command {
   readonly base: string
   /**
    * `chat` and `spin-off`: the workflow state a canvas it starts lands in,
-   * or `""` for the first open state.
+   * or `""` for Topics.
    */
   readonly state: string
 }

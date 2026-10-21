@@ -372,7 +372,7 @@ describe("writesIn: the canvases a command writes in", () => {
       "a change to the workflow",
       {
         kind: "workflow",
-        edit: { action: "add", state: null, name: "Review", before: null },
+        edit: { action: "add", name: "Review", before: null },
       },
       [],
     ],

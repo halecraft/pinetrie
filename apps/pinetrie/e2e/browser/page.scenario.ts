@@ -2347,9 +2347,21 @@ async function run(check: Checks["check"]): Promise<void> {
         // 4d. The board: a root dragged to another state moves
         // there for everyone, and the other window's board shows it.
         {
+          // Its scripted run may have moved it to Active already: it goes
+          // to whichever of Topics and Active it is not in.
           const workflow = readWorkflow(host.session)
-          const doing = workflow?.open[1]?.id ?? ""
-          const column = `#board .board-column[data-state="${doing}"]`
+          const now =
+            firstRoot === ""
+              ? undefined
+              : taskBoardState(
+                  readPlaces(host.places),
+                  canvasHolding(host, firstRoot),
+                )
+          const target =
+            (now === workflow?.topics.id
+              ? workflow?.active?.id
+              : workflow?.topics.id) ?? ""
+          const column = `#board .board-column[data-state="${target}"]`
           await openBoard(page)
           await openBoard(tb)
           await page
@@ -2372,7 +2384,7 @@ async function run(check: Checks["check"]): Promise<void> {
             "dragging a thread card to another state moves it for the other window",
             theirs &&
               id !== undefined &&
-              taskBoardState(readPlaces(host.places), id) === doing,
+              taskBoardState(readPlaces(host.places), id) === target,
             `${theirs}`,
           )
           await page.click("#bottom .board-toggle")

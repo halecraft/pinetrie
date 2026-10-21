@@ -5,6 +5,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { Workflow } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { boardView } from "./board-view.ts"
@@ -25,13 +26,13 @@ const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
 ]
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  archive: { id: DONE, name: "Done" },
-}
+  { id: DONE, name: "Done" },
+)
 const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   workflow: WORKFLOW,
   stateOf: new Map([[K1, DOING]]),

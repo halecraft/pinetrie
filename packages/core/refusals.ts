@@ -30,12 +30,15 @@ export const ERR = {
   UNKNOWN_STATE: "unknown-state",
   /** Removing a workflow state that still holds a canvas. */
   STATE_NOT_EMPTY: "state-not-empty",
-  /** Moving or removing the archive. */
+  /** Moving, removing or marking the archive. */
   STATE_ARCHIVE: "state-archive",
+  /**
+   * Removing the state marked Topics, where a new canvas starts, or marking a
+   * state that holds the other mark.
+   */
+  STATE_MARKED: "state-marked",
   /** A workflow state named with nothing but spaces. */
   EMPTY_NAME: "empty-name",
-  /** Removing the only open workflow state: a new canvas needs one to land in. */
-  LAST_STATE: "last-state",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: a host without tools made it. */

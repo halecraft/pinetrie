@@ -300,12 +300,24 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Every canvas on the board is in one workflow state.** Each open state
   is a column of the board, in order; the archive is last. A new session
   has **Topics**, **Active** and **Archive** (ADR-0158).
-- **Where a canvas is says what it is** (ADR-0158): in the first open state
-  a **topic**, there so teammates find it; in any later open state a
-  **task**, its work tracked; in the archive, archived. Nothing is stored:
-  Topics is the first state by convention, so a team that reorders its
-  states changes which canvases are topics. The canvas column says it
-  ("a topic, in Topics"), and so does a sidebar item's hover.
+- **Two open states are marked** (ADR-0206): one is marked Topics, where a
+  new canvas from the sidebar's ＋ starts and Restore puts an archived one;
+  at most one is marked Active. The mark is the state's: renaming or
+  reordering the state keeps it, so a team that moves Topics to the right
+  still starts canvases there. A new session marks Topics and Active.
+- **Where a canvas is says what it is** (ADR-0158, ADR-0206): in the state
+  marked Topics a **topic**, there so teammates find it; in any other open
+  state a **task**, its work tracked; in the archive, archived. Nothing is
+  stored. A canvas whose state is gone is drawn at the end of Topics. The
+  canvas column says it ("a topic, in Topics"), and so does a sidebar
+  item's hover.
+- **An agent's first work moves a topic to Active** (ADR-0206): when an
+  agent's run starts in one of its threads, a canvas in Topics whose state
+  has never changed goes to the end of Active, as the host's own move, in
+  nobody's undo. A run resumed as the host starts does not count. Any move
+  between states, a person's or this one, means the host never moves that
+  canvas again: put back in Topics by hand, it stays there until someone
+  moves it out. An undone move never happened, so it does not count.
 - **A canvas card** (ADR-0111, ADR-0126) is a canvas, on the board and in the
   sidebar alike: its header, the same in both, shows its label, its status
   (with the agent's ring in any canvas, opened in this browser tab or not), a
@@ -347,7 +359,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   shows a count and its most recent canvases, or every canvas the search keeps,
   newest first. An archived canvas opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
-  the first open state; it leaves the sidebar when you switch away unless you
+  Topics; it leaves the sidebar when you switch away unless you
   restore it.
 - **A thread whose lane keeps a history of another kind is read-only**
   (ADR-0150): made when the project had no jj repo, or the reverse, it
@@ -360,12 +372,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
   moves it left or right, adds a state left or right of it (a name field
   stands where it will go), or removes it, which is refused, with the
-  reason, while it holds a canvas or is the only open state. Adding a state is
-  rare, so it takes no room on the board. The archive can be renamed, never moved or
-  removed.
+  reason, while it holds a canvas or is marked Topics. Its last items are the
+  marks, checked where they are: **New canvases start here** moves the
+  Topics mark to it, and **Agent work moves canvases here** moves the Active
+  mark to it, or, checked, unmarks Active, so nothing moves on its own. A
+  state takes one mark, so the other's item there says why it is off.
+  Adding a state is rare, so it takes no room on the board. The archive can
+  be renamed, never moved, removed or marked.
 - **A topic is often a chat**: an idea not started is a canvas in Topics
   whose thread no agent works in (ADR-0021, ADR-0158); people discuss it
-  below its first message, and asking `@agent` in it starts the work.
+  below its first message, and asking `@agent` in it starts the work, which
+  moves it to Active.
 - **A text card becomes a thread** (ADR-0111): dropped on an open state, in
   the board's column or the footer's strip, or among the sidebar's canvases,
   it starts a canvas there with a chat whose first message is its text, by
@@ -1034,7 +1051,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   shows it.
 - **A new canvas is one from the moment it opens** (ADR-0126): its thread,
   not yet started, is a card on its canvas, and the canvas is in your sidebar
-  at once, placed at the end of the first open state from your list's ＋,
+  at once, placed at the end of Topics from your list's ＋,
   of its own state from a board column's (ADR-0122). Its first send makes
   the root, and the board shows it from then: others find it there.
   Trashing it unsent with its bin sends the canvas to your trash with its thread,

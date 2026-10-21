@@ -34,6 +34,7 @@ import {
   THREAD,
   WORKFLOW,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import {
   NOBODY,
@@ -457,10 +458,13 @@ describe("sendMessage", () => {
     const doing = workflowStateIdFor("d")
     putValue(
       b,
-      setRecord(WORKFLOW, {
-        open: [{ id: doing, name: "Doing" }],
-        archive: { id: workflowStateIdFor("x"), name: "Done" },
-      }),
+      setRecord(
+        WORKFLOW,
+        testWorkflow([{ id: doing, name: "Doing" }], {
+          id: workflowStateIdFor("x"),
+          name: "Done",
+        }),
+      ),
     )
     await sendCleared(deps, ALICE, "s-1", {
       ...said("a new canvas"),

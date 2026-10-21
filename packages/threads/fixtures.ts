@@ -15,7 +15,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { type TextCardId, textCardId } from "./card-ids.ts"
-import { type CanvasCard, makeCard, NO_CONTENT } from "./cards.ts"
+import { type CanvasCard, makeCard, STATE_UNCHANGED } from "./cards.ts"
 import type {
   AgentMessageLike,
   EntryLike,
@@ -52,7 +52,13 @@ export const canvasCard = (
   state: WorkflowStateId = FIXTURE_STATE,
   by: WriterId = writerId("ada@x.io"),
 ): CanvasCard =>
-  makeCard("canvas", canvas, { kind: "board", state, order }, NO_CONTENT, by)
+  makeCard(
+    "canvas",
+    canvas,
+    { kind: "board", state, order },
+    STATE_UNCHANGED,
+    by,
+  )
 
 /**
  * A person's message as the reads decode one: by `author` ("ada" unless

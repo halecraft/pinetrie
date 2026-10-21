@@ -8,6 +8,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { orderKeys, taskBoard, type Workflow } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import type { AgentWork, CardRecord } from "@pinetrie/threads"
 import { canvasCard } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
@@ -26,6 +27,7 @@ import {
   filterTitle,
   filterWords,
   keptWords,
+  markAction,
   nameStateIntent,
   parseSearch,
   readyWords,
@@ -45,13 +47,13 @@ const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
 ]
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  archive: { id: DONE, name: "Done" },
-}
+  { id: DONE, name: "Done" },
+)
 /** Canvas `n`, holding canvas `n`'s threads. */
 const ID = (n: number) =>
   canvasIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
@@ -267,19 +269,53 @@ describe("boardView", () => {
     expect(backlog?.left).toBeNull()
     expect(backlog?.right).toEqual({
       kind: "edit-workflow",
-      edit: { action: "move", state: BACKLOG, name: "", before: null },
+      edit: { action: "move", state: BACKLOG, before: null },
     })
     expect(doing?.left).toEqual({
       kind: "edit-workflow",
-      edit: { action: "move", state: DOING, name: "", before: BACKLOG },
+      edit: { action: "move", state: DOING, before: BACKLOG },
     })
     expect(doing?.right).toBeNull()
     expect(backlog?.addBefore).toEqual({ left: BACKLOG, right: DOING })
     expect(doing?.addBefore).toEqual({ left: DOING, right: null })
-    expect(backlog?.remove.why).toBe("holds a canvas: move it first")
-    expect(removeWords(0, 1)).toBe("the board needs one open state")
-    expect(removeWords(0, 2)).toBeNull()
-    expect(removeWords(3, 2)).toBe("holds 3 canvases: move them first")
+    expect(doing?.remove.why).toBe("holds 2 canvases: move them first")
+    expect(removeWords(0, false)).toBeNull()
+    expect(removeWords(3, false)).toBe("holds 3 canvases: move them first")
+  })
+})
+
+test("the Topics column's Remove says why", () => {
+  const [backlog] = boardView(input()).open
+  expect(backlog?.remove.why).toBe(
+    "new canvases start here: mark another state first",
+  )
+})
+
+test("a column offers both marks, checked where they are", () => {
+  const [backlog, doing] = boardView(input()).open
+  expect(backlog?.marks.topics).toEqual({
+    checked: true,
+    intent: null,
+    why: null,
+  })
+  expect(backlog?.marks.active).toEqual({
+    checked: false,
+    intent: null,
+    why: "new canvases start here: a state takes one mark",
+  })
+  expect(doing?.marks.active).toEqual({
+    checked: true,
+    why: null,
+    intent: { kind: "edit-workflow", edit: { action: "unmark-active" } },
+  })
+  const later = markAction(WORKFLOW, workflowStateIdFor("later"), "topics")
+  expect(later.intent).toEqual({
+    kind: "edit-workflow",
+    edit: {
+      action: "mark",
+      state: workflowStateIdFor("later"),
+      mark: "topics",
+    },
   })
 })
 
@@ -357,7 +393,7 @@ describe("the board's search", () => {
     expect(doing?.count).toEqual({ kind: "kept", kept: 1, total: 2 })
     expect(doing?.signals).toEqual({ working: 1, ready: 0, canvases: [E(1)] })
     expect(doing?.mark).toBe("needs-you")
-    expect(doing?.remove.why).not.toBeNull()
+    expect(doing?.remove.why).toBe("holds 2 canvases: move them first")
     expect(view.open[0]?.items).toEqual([])
     expect(view.open[0]?.remove.why).not.toBeNull()
     expect(view.archive.count).toEqual({ kind: "kept", kept: 0, total: 2 })
@@ -498,15 +534,15 @@ describe("board words", () => {
 test("nameStateIntent renames a state; addStateIntent adds one where it was asked for", () => {
   expect(nameStateIntent(DOING, "Now")).toEqual({
     kind: "edit-workflow",
-    edit: { action: "rename", state: DOING, name: "Now", before: null },
+    edit: { action: "rename", state: DOING, name: "Now" },
   })
   expect(addStateIntent(DOING, "Review")).toEqual({
     kind: "edit-workflow",
-    edit: { action: "add", state: null, name: "Review", before: DOING },
+    edit: { action: "add", name: "Review", before: DOING },
   })
   expect(addStateIntent(null, "Review")).toEqual({
     kind: "edit-workflow",
-    edit: { action: "add", state: null, name: "Review", before: null },
+    edit: { action: "add", name: "Review", before: null },
   })
 })
 

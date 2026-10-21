@@ -4,7 +4,7 @@
 // together, whatever roots they are in. Neutral: never in the thread's colour.
 
 import type { CanvasId, WorkflowStateId } from "@pinetrie/core"
-import type { Workflow } from "@pinetrie/rules"
+import { boardStates, type Workflow } from "@pinetrie/rules"
 import type { AgentWork } from "@pinetrie/threads"
 import type { Status } from "./attention.ts"
 import type { Intent } from "./intent.ts"
@@ -76,19 +76,19 @@ export function threadCardHead(
     ready: facts.ready.get(canvas) ?? [],
     pip: facts.pips.has(canvas),
     state,
-    moves: movesOf(canvas, state, facts),
+    moves: stateMoves(canvas, state, facts),
   }
 }
 
 /** "Move to ▸" each state but `from`. */
-function movesOf(
+function stateMoves(
   canvas: CanvasId,
   from: WorkflowStateId | null,
   facts: ThreadCardFacts,
 ): readonly ThreadMove[] {
   const { workflow } = facts
   if (workflow === null || from === null) return []
-  return [...workflow.open, workflow.archive].flatMap(to => {
+  return boardStates(workflow).flatMap(to => {
     if (to.id === from) return []
     const closes = to.id === workflow.archive.id
     return [

@@ -1839,14 +1839,23 @@ export const mutations: readonly Mutation[] = [
       "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
   },
   {
-    name: "a new canvas lands in the first open state whatever its chat names",
+    name: "a new canvas lands in Topics whatever its chat names",
     file: "packages/rules/canvas-index.ts",
     from: "      boardEnd(workflow, cards, state),\n",
     to: "      boardEnd(workflow, cards, null),\n",
     suite: "host",
     scenario: "board",
+    expect: "a new root lands in the state its chat names, else Topics",
+  },
+  {
+    name: "a run's start moves no canvas",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '      if (start.kind === "prompt") deps.started(lane)\n',
+    to: "",
+    suite: "host",
+    scenario: "board",
     expect:
-      "a new root lands in the state its chat names, else the first open one",
+      "an agent's first run moves its canvas from Topics to Active, and a person's move back keeps it there",
   },
   {
     name: "a root moved out of Done keeps its place there",

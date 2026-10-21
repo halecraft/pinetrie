@@ -2,6 +2,7 @@ import {
   type CanvasId,
   canvasIdFor,
   ERR,
+  threadIdFor,
   type WorkflowStateId,
   workflowStateIdFor,
   writerId,
@@ -12,6 +13,8 @@ import {
   type CardRecord,
   cardIdOfKind,
   livePlace,
+  makeCard,
+  UNTICKED,
   type WorkflowEdit,
 } from "@pinetrie/threads"
 import { canvasCard } from "@pinetrie/threads/fixtures"
@@ -20,8 +23,10 @@ import {
   boardCanvases,
   boardEnd,
   canvasRole,
+  checkedWorkflow,
   defaultWorkflow,
   planBoardMove,
+  planMoveToActive,
   planWorkflowChange,
   planWorkflowEdit,
   planWorkflowSeed,
@@ -32,6 +37,7 @@ import {
   type Workflow,
 } from "./board.ts"
 import type { CardHistoryRecord } from "./card-history.ts"
+import { testWorkflow } from "./fixtures.ts"
 import { orderKey } from "./order.ts"
 import { setRecord } from "./records.ts"
 
@@ -44,13 +50,13 @@ const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   WorkflowStateId,
   WorkflowStateId,
 ]
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  archive: { id: DONE, name: "Done" },
-}
+  { id: DONE, name: "Done" },
+)
 /** A canvas's card in `state` at rank `rank`, placed by `by`. */
 const card = (
   canvas: CanvasId,
@@ -67,7 +73,7 @@ const columns = (board: ReturnType<typeof taskBoard>) =>
   )
 
 describe("taskBoard", () => {
-  test("each canvas's card by rank, then id; one in a state gone at the end of the first open state", () => {
+  test("each canvas's card by rank, then id; one in a state gone at the end of Topics", () => {
     const cards = [
       card(R(1), DOING, 20),
       card(R(2), DOING, 10),
@@ -211,13 +217,22 @@ describe("planBoardMove", () => {
     expect(move({ to: DOING, before: R(2) })).toEqual({ kind: "unchanged" })
     expect(move({ canvas: R(2), to: DOING })).toEqual({ kind: "unchanged" })
   })
-  test("a card in a state gone, drawn in the first open state, is moved there, its state written", () => {
+  test("a card in a state gone, drawn in Topics, is moved there, its state written and its flag kept", () => {
     const stale = [card(R(1), workflowStateIdFor("gone"), 1)]
     const plan = move({ from: BACKLOG, to: BACKLOG, cards: stale })
     expect(plan.kind).toBe("move")
     expect(written(plan)).toMatchObject([
-      { place: { kind: "board", state: BACKLOG } },
+      {
+        place: { kind: "board", state: BACKLOG },
+        content: { stateChanged: false },
+      },
     ])
+  })
+  test("a move between states sets its stateChanged; a reorder does not", () => {
+    expect(written(move({}))[0]?.content).toEqual({ stateChanged: true })
+    expect(
+      written(move({ canvas: R(2), to: DOING, before: R(1) }))[0]?.content,
+    ).toEqual({ stateChanged: false })
   })
   test("no room between its neighbours: the fewest renumbered, each keeping who put it there", () => {
     const tight = [
@@ -250,75 +265,126 @@ describe("boardEnd", () => {
     expect(p.state).toBe(DOING)
     expect(p.order > orderKey(10)).toBe(true)
   })
-  test("in the first open state when it names none, one gone, or the archive", () => {
-    for (const s of [null, workflowStateIdFor("gone"), DONE])
+  test("a new canvas with no state goes to the end of Topics, wherever it stands", () => {
+    const later = testWorkflow(
+      [
+        { id: BACKLOG, name: "Backlog" },
+        { id: DOING, name: "Doing", mark: "topics" },
+      ],
+      { id: DONE, name: "Done" },
+    )
+    for (const s of [null, workflowStateIdFor("gone"), DONE]) {
       expect(boardEnd(WORKFLOW, cards, s).state).toBe(BACKLOG)
+      expect(boardEnd(later, cards, s)).toMatchObject({ state: DOING })
+    }
+    expect(boardEnd(later, cards, null).order > orderKey(10)).toBe(true)
   })
 })
 
 describe("planWorkflowEdit", () => {
-  const board = taskBoard(WORKFLOW, [card(R(1), DOING, 1)])
-  const edit = (e: Partial<WorkflowEdit>) =>
-    planWorkflowEdit(
-      WORKFLOW,
-      board,
-      { action: "add", state: null, name: "", before: null, ...e },
-      () => "new",
-    )
+  const LATER = workflowStateIdFor("l")
+  const w = testWorkflow(
+    [
+      { id: BACKLOG, name: "Backlog", mark: "topics" },
+      { id: DOING, name: "Doing", mark: "active" },
+      { id: LATER, name: "Later" },
+    ],
+    { id: DONE, name: "Done" },
+  )
+  const board = taskBoard(w, [card(R(1), DOING, 1)])
+  const edit = (e: WorkflowEdit, on = board) =>
+    planWorkflowEdit(w, on, e, () => "new")
+  /** Each state's name, with its mark after a colon. */
   const names = (plan: ReturnType<typeof edit>) =>
     plan.kind === "write"
-      ? [...plan.workflow.open.map(s => s.name), plan.workflow.archive.name]
+      ? [
+          ...plan.workflow.open.map(s =>
+            s.mark === null ? s.name : `${s.name}:${s.mark}`,
+          ),
+          plan.workflow.archive.name,
+        ]
       : plan.kind
   test.each([
     [
       "add, at the end",
-      { name: " Review " },
-      ["Backlog", "Doing", "Review", "Done"],
+      { action: "add", name: " Review ", before: null },
+      ["Backlog:topics", "Doing:active", "Later", "Review", "Done"],
     ],
     [
       "add, before a state",
-      { name: "Ideas", before: BACKLOG },
-      ["Ideas", "Backlog", "Doing", "Done"],
+      { action: "add", name: "Ideas", before: BACKLOG },
+      ["Ideas", "Backlog:topics", "Doing:active", "Later", "Done"],
     ],
     [
       "rename",
       { action: "rename", state: DOING, name: "Now" },
-      ["Backlog", "Now", "Done"],
+      ["Backlog:topics", "Now:active", "Later", "Done"],
     ],
     [
       "rename the archive",
       { action: "rename", state: DONE, name: "Shipped" },
-      ["Backlog", "Doing", "Shipped"],
+      ["Backlog:topics", "Doing:active", "Later", "Shipped"],
     ],
     [
-      "move",
+      "move, its mark with it",
       { action: "move", state: DOING, before: BACKLOG },
-      ["Doing", "Backlog", "Done"],
+      ["Doing:active", "Backlog:topics", "Later", "Done"],
     ],
     [
       "remove an empty state",
-      { action: "remove", state: BACKLOG },
-      ["Doing", "Done"],
+      { action: "remove", state: LATER },
+      ["Backlog:topics", "Doing:active", "Done"],
     ],
     [
       "rename to its own name",
       { action: "rename", state: DOING, name: "Doing" },
       "unchanged",
     ],
+    [
+      "mark Topics where it is",
+      { action: "mark", state: BACKLOG, mark: "topics" },
+      "unchanged",
+    ],
+    [
+      "unmark Active",
+      { action: "unmark-active" },
+      ["Backlog:topics", "Doing", "Later", "Done"],
+    ],
   ] as const)("%s", (_, e, want) => {
-    expect(names(edit(e as Partial<WorkflowEdit>))).toEqual(want)
+    expect(names(edit(e))).toEqual(want)
+  })
+  test("a mark moves from the state that held it", () => {
+    expect(
+      names(edit({ action: "mark", state: LATER, mark: "topics" })),
+    ).toEqual(["Backlog", "Doing:active", "Later:topics", "Done"])
+    expect(
+      names(edit({ action: "mark", state: LATER, mark: "active" })),
+    ).toEqual(["Backlog:topics", "Doing", "Later:active", "Done"])
   })
   test.each([
-    ["an empty name", { name: "  " }, ERR.EMPTY_NAME],
+    [
+      "an empty name",
+      { action: "add", name: "  ", before: null },
+      ERR.EMPTY_NAME,
+    ],
     [
       "an unknown state",
       { action: "rename", state: workflowStateIdFor("gone"), name: "x" },
       ERR.UNKNOWN_STATE,
     ],
-    ["moving the archive", { action: "move", state: DONE }, ERR.STATE_ARCHIVE],
+    [
+      "moving the archive",
+      { action: "move", state: DONE, before: null },
+      ERR.STATE_ARCHIVE,
+    ],
     [
       "removing the archive",
       { action: "remove", state: DONE },
+      ERR.STATE_ARCHIVE,
+    ],
+    [
+      "marking the archive",
+      { action: "mark", state: DONE, mark: "active" },
       ERR.STATE_ARCHIVE,
     ],
     [
@@ -327,51 +393,100 @@ describe("planWorkflowEdit", () => {
       ERR.STATE_NOT_EMPTY,
     ],
   ] as const)("refuses %s", (_, e, code) => {
-    expect(edit(e as Partial<WorkflowEdit>)).toMatchObject({
-      kind: "refused",
-      code,
-    })
+    expect(edit(e)).toMatchObject({ kind: "refused", code })
   })
-  test("refuses removing the only open state", () => {
-    const one: Workflow = {
-      open: [WORKFLOW.open[0] ?? { id: BACKLOG, name: "" }],
-      archive: WORKFLOW.archive,
-    }
+  test("the Topics state is not removed", () => {
+    for (const cards of [[], [card(R(2), BACKLOG, 1)]])
+      expect(
+        edit({ action: "remove", state: BACKLOG }, taskBoard(w, cards)),
+      ).toMatchObject({ kind: "refused", code: ERR.STATE_MARKED })
+  })
+  test("a mark is refused on the state holding the other mark", () => {
     expect(
-      planWorkflowEdit(
-        one,
-        taskBoard(one, []),
-        { action: "remove", state: BACKLOG, name: "", before: null },
-        () => "x",
-      ),
-    ).toMatchObject({ code: ERR.LAST_STATE })
+      edit({ action: "mark", state: DOING, mark: "topics" }),
+    ).toMatchObject({ kind: "refused", code: ERR.STATE_MARKED })
+    expect(
+      edit({ action: "mark", state: BACKLOG, mark: "active" }),
+    ).toMatchObject({ kind: "refused", code: ERR.STATE_MARKED })
+  })
+  test("removing the empty Active state unmarks it", () => {
+    const plan = edit({ action: "remove", state: DOING }, taskBoard(w, []))
+    expect(names(plan)).toEqual(["Backlog:topics", "Later", "Done"])
+    expect(plan.kind === "write" && plan.workflow.active).toBe(null)
   })
 })
 
-test("a new session's states are Topics, Active and Archive", () => {
+test("a new session marks Topics and Active", () => {
   let n = 0
   const w = defaultWorkflow(() => `${n++}`)
-  expect(w.open.map(s => s.name)).toEqual(["Topics", "Active"])
+  expect(w.open.map(s => [s.name, s.mark])).toEqual([
+    ["Topics", "topics"],
+    ["Active", "active"],
+  ])
   expect(w.archive.name).toBe("Archive")
+  expect([w.topics.name, w.active?.name]).toEqual(["Topics", "Active"])
   expect(new Set([...w.open.map(s => s.id), w.archive.id]).size).toBe(3)
 })
 
+describe("checkedWorkflow", () => {
+  const archive = { id: DONE, name: "Done" }
+  const state = (id: WorkflowStateId, mark: "topics" | "active" | null) => ({
+    id,
+    name: id,
+    mark,
+  })
+  test("a workflow without exactly one Topics is not made", () => {
+    for (const open of [
+      [state(BACKLOG, null), state(DOING, "active")],
+      [state(BACKLOG, "topics"), state(DOING, "topics")],
+      [
+        state(BACKLOG, "topics"),
+        state(DOING, "active"),
+        state(R(1) as unknown as WorkflowStateId, "active"),
+      ],
+      [state(BACKLOG, "topics"), state(DONE, null)],
+    ])
+      expect(checkedWorkflow(open, archive)).toBeUndefined()
+    const made = checkedWorkflow(
+      [state(BACKLOG, null), state(DOING, "topics")],
+      archive,
+    )
+    expect(made?.topics).toBe(made?.open[1])
+    expect(made?.active).toBe(null)
+  })
+  test("a stored workflow with no Topics does not decode", () => {
+    expect(
+      WORKFLOW_SPEC.decode(
+        { open: [{ id: BACKLOG, name: "Backlog" }], archive },
+        "workflow",
+      ),
+    ).toBeUndefined()
+    expect(
+      WORKFLOW_SPEC.decode(WORKFLOW_SPEC.encode(WORKFLOW), "workflow"),
+    ).toEqual(WORKFLOW)
+  })
+})
+
 describe("canvasRole", () => {
-  test("the first open state's canvases are topics, a later state's tasks, the archive's archived", () => {
+  test("a canvas in the state marked Topics is a topic, wherever it stands", () => {
     const review = workflowStateIdFor("r")
-    const w = {
-      ...WORKFLOW,
-      open: [...WORKFLOW.open, { id: review, name: "Review" }],
-    }
+    const w = testWorkflow(
+      [
+        { id: BACKLOG, name: "Backlog" },
+        { id: DOING, name: "Doing", mark: "topics" },
+        { id: review, name: "Review" },
+      ],
+      { id: DONE, name: "Done" },
+    )
     expect([BACKLOG, DOING, review, DONE].map(s => canvasRole(w, s))).toEqual([
-      "topic",
       "task",
+      "topic",
       "task",
       "archived",
     ])
   })
 
-  test("a state the workflow lacks reads as the first: a topic", () => {
+  test("a state the workflow lacks reads as Topics: a topic", () => {
     expect(canvasRole(WORKFLOW, workflowStateIdFor("gone"))).toBe("topic")
   })
 })
@@ -387,12 +502,7 @@ test("planWorkflowSeed: a store with no workflow gets the default one, and one w
 
 describe("planWorkflowChange", () => {
   test("refused before the host wrote a workflow; an edit is the workflow's write", () => {
-    const edit = {
-      action: "rename",
-      state: BACKLOG,
-      name: "Ideas",
-      before: null,
-    } as const
+    const edit = { action: "rename", state: BACKLOG, name: "Ideas" } as const
     expect(
       planWorkflowChange({ workflow: null, cards: [], edit, newId: () => "x" }),
     ).toMatchObject({ code: ERR.UNKNOWN_STATE })
@@ -405,13 +515,87 @@ describe("planWorkflowChange", () => {
     expect(planned).toEqual({
       kind: "write",
       writes: [
-        setRecord(WORKFLOW_SPEC, {
-          ...WORKFLOW,
-          open: WORKFLOW.open.map(s =>
-            s.id === BACKLOG ? { ...s, name: "Ideas" } : s,
+        setRecord(
+          WORKFLOW_SPEC,
+          testWorkflow(
+            WORKFLOW.open.map(s =>
+              s.id === BACKLOG ? { ...s, name: "Ideas" } : s,
+            ),
+            WORKFLOW.archive,
           ),
-        }),
+        ),
       ],
     })
+  })
+})
+
+describe("planMoveToActive", () => {
+  const THREAD = threadIdFor("0123456789abcdef")
+  const onCanvas = (canvas: CanvasId): CardRecord =>
+    makeCard(
+      "thread",
+      THREAD,
+      { kind: "canvas", canvas, order: "a", width: 1 },
+      UNTICKED,
+      ADA,
+    )
+  const plan = (cards: readonly CardRecord[], workflow: Workflow = WORKFLOW) =>
+    planMoveToActive({ workflow, cards, thread: THREAD })
+  test("an agent's run moves a topic whose state never changed to the end of Active, its placer kept", () => {
+    const steps = plan([
+      card(R(1), BACKLOG, 5),
+      card(R(2), DOING, 10),
+      onCanvas(R(1)),
+    ])
+    const [moved] = steps.flatMap(s => (s.kind === "write" ? [s.record] : []))
+    expect(moved).toMatchObject({
+      id: R(1),
+      placer: BEA,
+      place: { kind: "board", state: DOING },
+      content: { stateChanged: true },
+    })
+    expect(
+      moved?.place.kind === "board" && moved.place.order > orderKey(10),
+    ).toBe(true)
+  })
+  test("an agent's run moves no canvas whose state has changed", () => {
+    const changed: CanvasCard = {
+      ...card(R(1), BACKLOG, 5),
+      content: { stateChanged: true },
+    }
+    expect(plan([changed, onCanvas(R(1))])).toEqual([])
+  })
+  test("an agent's run moves no canvas outside Topics", () => {
+    const later = workflowStateIdFor("l")
+    const three = testWorkflow(
+      [
+        { id: BACKLOG, name: "Backlog" },
+        { id: DOING, name: "Doing" },
+        { id: later, name: "Later" },
+      ],
+      { id: DONE, name: "Done" },
+    )
+    for (const state of [DOING, later])
+      expect(plan([card(R(1), state, 5), onCanvas(R(1))], three)).toEqual([])
+  })
+  test("an agent's run moves nothing with Active unmarked", () => {
+    const unmarked = testWorkflow(
+      [
+        { id: BACKLOG, name: "Backlog", mark: "topics" },
+        { id: DOING, name: "Doing" },
+      ],
+      { id: DONE, name: "Done" },
+    )
+    expect(plan([card(R(1), BACKLOG, 5), onCanvas(R(1))], unmarked)).toEqual([])
+  })
+  test("an agent's run moves nothing for a thread in an inventory", () => {
+    const held = makeCard(
+      "thread",
+      THREAD,
+      { kind: "inventory", holder: ADA },
+      UNTICKED,
+      ADA,
+    )
+    expect(plan([card(R(1), BACKLOG, 5), held])).toEqual([])
   })
 })

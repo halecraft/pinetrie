@@ -10,7 +10,6 @@ import {
   type CardRecord,
   cardIdOfKind,
   makeCard,
-  NO_CONTENT,
   type PlacedKind,
   type RelayDetails,
 } from "@pinetrie/threads"
@@ -73,7 +72,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     "canvas",
     canvas,
     { kind: "board", state: workflowStateIdFor("todo"), order: "m" },
-    NO_CONTENT,
+    { stateChanged: true },
     ada,
   ),
   "note-column": makeCard(
@@ -146,6 +145,17 @@ describe("a card's content as stored (CARD_CODEC)", () => {
     }
   })
 
+  test("a canvas's stateChanged round-trips, and a row without it reads unchanged", () => {
+    const changed = EACH.canvas
+    expect(decodeCard(changed.id, encodeCard(changed))).toEqual(changed)
+    const { stateChanged: _, ...before } = encodeCard(changed)
+    expect(decodeCard(changed.id, before)?.content).toEqual({
+      stateChanged: false,
+    })
+    expect(
+      decodeCard(changed.id, { ...before, stateChanged: "yes" }),
+    ).toBeUndefined()
+  })
   test("a tick that is neither 1 nor empty is refused", () => {
     expect(
       decodeCard(EACH.thread.id, { ...encodeCard(EACH.thread), ticked: "yes" }),

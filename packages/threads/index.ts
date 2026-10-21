@@ -39,8 +39,10 @@ export {
 export {
   type ArchivedCanvas,
   WORKFLOW_ACTIONS,
+  WORKFLOW_MARKS,
   type WorkflowAction,
   type WorkflowEdit,
+  type WorkflowMark,
 } from "./board.ts"
 export {
   type AskCardId,
@@ -84,13 +86,13 @@ export {
   isTextCard,
   type MediaCard,
   makeCard,
-  NO_CONTENT,
   type NoteColumnCard,
   type PlacedKind,
   type ProposedChangesFact,
   type QueuedFact,
   type ReferenceCard,
   type ResolvedFact,
+  STATE_UNCHANGED,
   shownVersion,
   type TextCard,
   type TextSource,

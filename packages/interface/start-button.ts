@@ -108,7 +108,7 @@ const item = (make: NewColumn, intent: Intent): StartItem => ({
 
 /**
  * Where ＋ that makes a canvas is: the sidebar's foot, whose canvas lands at
- * the end of the first open state (null before the board has arrived), or a
+ * the end of Topics (null before the board has arrived), or a
  * board column, whose canvas lands at the end of its state.
  */
 type CanvasStart =

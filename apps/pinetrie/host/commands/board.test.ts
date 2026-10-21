@@ -14,6 +14,7 @@ import {
   WORKFLOW,
   type Workflow,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -37,10 +38,10 @@ import { type CardCommands, settled } from "./cards.ts"
 const THREAD_1 = threadIdFor("0123456789abcdef")
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
-const WORKFLOW_NOW: Workflow = {
-  open: [{ id: DOING, name: "Doing" }],
-  archive: { id: DONE, name: "Done" },
-}
+const WORKFLOW_NOW: Workflow = testWorkflow([{ id: DOING, name: "Doing" }], {
+  id: DONE,
+  name: "Done",
+})
 const ADA = writerId("ada@example.com")
 
 /** A canvas of one root with one message, in Doing, on a board with Doing and Done. */
@@ -132,10 +133,13 @@ test("archiving lets go of the canvas's stacks of moves, after its teardown; a m
   const review = workflowStateIdFor("r")
   putValue(
     open.b,
-    setRecord(WORKFLOW, {
-      ...WORKFLOW_NOW,
-      open: [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
-    }),
+    setRecord(
+      WORKFLOW,
+      testWorkflow(
+        [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
+        WORKFLOW_NOW.archive,
+      ),
+    ),
   )
   await handleCanvasMove(open.deps, ADA, { ...toDone, to: review })
   expect(open.histories.calls).toEqual([])
@@ -167,10 +171,13 @@ test("a move within open states writes only its card, and opens no root", async 
   const review = workflowStateIdFor("r")
   putValue(
     b,
-    setRecord(WORKFLOW, {
-      ...WORKFLOW_NOW,
-      open: [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
-    }),
+    setRecord(
+      WORKFLOW,
+      testWorkflow(
+        [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
+        WORKFLOW_NOW.archive,
+      ),
+    ),
   )
   const out = await handleCanvasMove(deps, ADA, { ...toDone, to: review })
   expect(out.outcome).toEqual({ kind: "moved" })
@@ -184,14 +191,14 @@ test("a workflow edit writes the workflow; a refusal writes nothing", async () =
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
-      edit: { action: "remove", state: DOING, name: "", before: null },
+      edit: { action: "remove", state: DOING },
     }),
-  ).toMatchObject({ kind: "refused", code: ERR.STATE_NOT_EMPTY })
+  ).toMatchObject({ kind: "refused", code: ERR.STATE_MARKED })
   expect(records.calls).toEqual([])
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
-      edit: { action: "rename", state: DONE, name: "Shipped", before: null },
+      edit: { action: "rename", state: DONE, name: "Shipped" },
     }),
   ).toEqual({ kind: "workflow-changed" })
   expect(writtenValues(records.calls)).toMatchObject([

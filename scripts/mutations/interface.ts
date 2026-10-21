@@ -1491,8 +1491,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a state added is always added last",
     file: "packages/interface/board-view.ts",
-    from: '  edit: { action: "add", state: null, name, before },',
-    to: '  edit: { action: "add", state: null, name, before: null },',
+    from: '  edit: { action: "add", name, before },',
+    to: '  edit: { action: "add", name, before: null },',
     command: unit,
     expect:
       "nameStateIntent renames a state; addStateIntent adds one where it was asked for",
@@ -1556,8 +1556,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Remove counts only the shown canvases",
     file: "packages/interface/board-view.ts",
-    from: "        why: removeWords(all.length, board.open.length),",
-    to: "        why: removeWords(cards.length, board.open.length),",
+    from: "        why: removeWords(all.length, state.id === workflow.topics.id),",
+    to: "        why: removeWords(cards.length, state.id === workflow.topics.id),",
     command: unit,
     expect: "a filtered head counts what it shows",
   },
@@ -4888,5 +4888,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a queue with a command queues the card with it, in the same request",
+  },
+  // ── a column's marks ──
+  {
+    name: "the Topics column's Remove says nothing",
+    file: "packages/interface/board-view.ts",
+    from: "        why: removeWords(all.length, state.id === workflow.topics.id),",
+    to: "        why: removeWords(all.length, false),",
+    command: unit,
+    expect: "the Topics column's Remove says why",
+  },
+  {
+    name: "no mark is checked",
+    file: "packages/interface/board-view.ts",
+    from: "  if (markedState(w, mark) === state)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "a column offers both marks, checked where they are",
   },
 ]

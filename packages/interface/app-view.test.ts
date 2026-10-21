@@ -9,6 +9,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { Workflow } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import {
   type ArchivedCanvas,
   indexTree,
@@ -41,13 +42,13 @@ const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
 const K = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const archived: ArchivedCanvas = { canvas: K, by: ADA, at: 1 }
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: workflowStateIdFor("b"), name: "Backlog" },
     { id: workflowStateIdFor("d"), name: "Doing" },
   ],
-  archive: { id: workflowStateIdFor("x"), name: "Done" },
-}
+  { id: workflowStateIdFor("x"), name: "Done" },
+)
 const columns = (...keys: string[]): Column[] =>
   keys.map(key => ({
     key,
@@ -93,7 +94,7 @@ describe("appView's stage", () => {
     ])
   })
 
-  test("an archived canvas is read-only, with Restore to the first open state; one not archived is not", () => {
+  test("an archived canvas is read-only, with Restore to Topics; one not archived is not", () => {
     const here = stage({ archived: new Map([[K, archived]]) })
     expect(here.kind === "canvas" && here.readOnly).toEqual({
       label: "archived by Ada",
@@ -103,7 +104,7 @@ describe("appView's stage", () => {
           kind: "move-canvas",
           canvas: K,
           from: WORKFLOW.archive.id,
-          to: WORKFLOW.open[0]?.id,
+          to: WORKFLOW.topics.id,
           before: null,
           closes: false,
         },

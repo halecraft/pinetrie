@@ -91,7 +91,10 @@ import {
   targetOfFields,
   typedMove,
   WORKFLOW_ACTIONS,
+  WORKFLOW_MARKS,
   type WorkflowAction,
+  type WorkflowEdit,
+  type WorkflowMark,
   wireKeyFields,
 } from "@pinetrie/threads"
 import { type Command, command, type Reply, reply } from "./messages.ts"
@@ -654,17 +657,15 @@ export function decodeCommand(
       (before !== "" && !isWorkflowStateId(before))
     )
       return refused(ERR.UNKNOWN_STATE, "not a workflow state")
-    if (action !== "add" && state === "")
-      return refused(ERR.UNKNOWN_STATE, `a ${action} names its state`)
-    return {
-      kind: "workflow",
-      edit: {
-        action,
-        state: state === "" ? null : (state as WorkflowStateId),
-        name: text(wire?.text),
-        before: before === "" ? null : (before as WorkflowStateId),
-      },
-    }
+    const edit = workflowEditFromWire(
+      action,
+      state === "" ? null : (state as WorkflowStateId),
+      text(wire?.text),
+      before === "" ? null : (before as WorkflowStateId),
+    )
+    return edit.kind === "refused"
+      ? edit
+      : { kind: "workflow", edit: edit.edit }
   }
   if (kind === "mark") {
     const canvas = text(wire?.canvas)
@@ -1136,6 +1137,63 @@ const isProposedChangesAction = (a: string): a is ProposedChangesAction =>
 const isWorkflowAction = (a: string): a is WorkflowAction =>
   (WORKFLOW_ACTIONS as readonly string[]).includes(a)
 
+const isWorkflowMark = (m: string): m is WorkflowMark =>
+  (WORKFLOW_MARKS as readonly string[]).includes(m)
+
+/**
+ * A workflow edit from the wire's flat fields: its state in `targetId`, a
+ * name or a mark in `text`, `before` in `parentId`. Refused for an action
+ * that names no state it needs, or a mark this build does not know.
+ */
+function workflowEditFromWire(
+  action: WorkflowAction,
+  state: WorkflowStateId | null,
+  words: string,
+  before: WorkflowStateId | null,
+): { readonly kind: "edit"; readonly edit: WorkflowEdit } | Refusal {
+  const edit = (e: WorkflowEdit) => ({ kind: "edit", edit: e }) as const
+  if (action === "add") return edit({ action, name: words, before })
+  if (action === "unmark-active") return edit({ action })
+  if (state === null)
+    return refused(ERR.UNKNOWN_STATE, `a ${action} names its state`)
+  switch (action) {
+    case "rename":
+      return edit({ action, state, name: words })
+    case "move":
+      return edit({ action, state, before })
+    case "remove":
+      return edit({ action, state })
+    case "mark":
+      return isWorkflowMark(words)
+        ? edit({ action, state, mark: words })
+        : refused(ERR.UNKNOWN_KIND, `unknown workflow mark: ${words}`)
+  }
+}
+
+/** A workflow edit as the wire's flat fields: the client's half of `workflowEditFromWire`. */
+function workflowEditWire(edit: WorkflowEdit): {
+  readonly mode: WorkflowAction
+  readonly targetId: string
+  readonly text: string
+  readonly parentId: string
+} {
+  const flat = { mode: edit.action, targetId: "", text: "", parentId: "" }
+  switch (edit.action) {
+    case "add":
+      return { ...flat, text: edit.name, parentId: edit.before ?? "" }
+    case "rename":
+      return { ...flat, targetId: edit.state, text: edit.name }
+    case "move":
+      return { ...flat, targetId: edit.state, parentId: edit.before ?? "" }
+    case "remove":
+      return { ...flat, targetId: edit.state }
+    case "mark":
+      return { ...flat, targetId: edit.state, text: edit.mark }
+    case "unmark-active":
+      return flat
+  }
+}
+
 /**
  * A move on the board's states, as the wire carries it in `text`: JSON
  * `{ from, to, before }`, `before` a root or null. Null when malformed.
@@ -1216,14 +1274,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         }),
       })
     case "workflow":
-      return command({
-        id,
-        kind: "workflow",
-        mode: intent.edit.action,
-        targetId: intent.edit.state ?? "",
-        text: intent.edit.name,
-        parentId: intent.edit.before ?? "",
-      })
+      return command({ id, kind: "workflow", ...workflowEditWire(intent.edit) })
     case "mark":
       return command({
         id,

@@ -1191,17 +1191,29 @@ ADR-0126), its id its `CanvasId`, placed `{ kind: "board", state, order }`
 where it is, and its card's history of who moved it there and when. The
 board is the team's: everyone in the session shares it.
 
+- **A mark is an open state's own** (`OpenState.mark`, ADR-0206): Topics,
+  Active, or none, stored on the state, absent for none. So the archive,
+  whose type has no mark, is never marked; a state holds one mark at most;
+  and a rename, a move or a removal carries the mark with its state.
+- **`checkedWorkflow` is the one maker of a `Workflow`**, which is branded:
+  it refuses one without exactly one Topics, with two Active, or with two
+  states of one id, and names the marked states (`Workflow.topics`,
+  `Workflow.active`, the same objects as in `open`). `WORKFLOW.decode`,
+  `defaultWorkflow`, every `planWorkflowEdit` result and the test fixture
+  (`testWorkflow`) go through it. A spread of a workflow
+  (`{ ...w, open }`) keeps the brand unchecked, as a spread of a cleared
+  command does: a workflow is never spread into another.
 - **What a canvas on the board is, is its state** (`canvasRole`,
-  ADR-0158): a topic in the first open state, a task in a later one,
-  archived in the archive; a state the workflow lacks is read as the first,
-  as `taskBoard` places its canvases there. Never stored, so reordering the
-  states changes the role and nothing else.
+  ADR-0158, ADR-0206): a topic in the state marked Topics, wherever it
+  stands; a task in any other open state; archived in the archive; a state
+  the workflow lacks is read as Topics, as `taskBoard` places its canvases
+  there. Never stored, so reordering the states changes no role.
 - **The canvases the session holds are the cards on the board**
   (`boardCanvases`): a canvas's card in a trash (a new canvas closed unsent) is on
   no board and in no list until the undo key brings it back.
 - **The board is total** (`taskBoard`): every canvas's card on it, in its
   state, by rank, then by id; one in a state the workflow no longer holds
-  at the end of the first open state, so a stale place never hides a canvas.
+  at the end of Topics, so a stale place never hides a canvas.
 - **Archived is derived, never stored** (`tasksInArchive`): the canvases whose
   card is in the archive, with who moved them there and when
   (`ArchivedCanvas`), read from the newest event of each card's history that
@@ -1218,21 +1230,36 @@ board is the team's: everyone in the session shares it.
   (`rankAfter`), each keeping who put it there. The host carries it as any
   card's write (`placeCanvas`), a move in its mover's history outside any
   canvas.
+- **Only `planBoardMove` changes a canvas's state, so only it sets the
+  flag** (`CanvasContent.stateChanged`, ADR-0206): a move whose state, as
+  read, changes writes `stateChanged` true; a reorder, or a card in a gone
+  state written into Topics where it was drawn, keeps it. An undo restores
+  the card whole, flag and all.
+- **`planMoveToActive`**: as an agent's run starts on a thread, the writes
+  that move its canvas to the end of Active, or none. None unless the
+  thread's card is on a canvas whose flag is false and Active is marked; it
+  is `planBoardMove` from Topics, which refuses a canvas elsewhere, with
+  the canvas's own placer as its sender, so the placer stays. The flag the
+  move sets means the host moves a canvas once, and never one a person
+  moved between states.
 - **No undo crosses the archive's edge** (`crossesArchive`,
   `move-history.ts`): an undo or a redo of a step whose canvas's card last
   went into or out of the archive is refused `archived`; the board
   gathers what crossing it needs.
 - **`stateTransition` says whether a move crosses the archive's edge**:
-  `within`, `close` or `reopen`. The host gathers the canvas's roots'
+  `within`, `archive` or `restore`. The host gathers the canvas's roots'
   documents only to cross it (`apps/pinetrie/host/commands/board.ts`).
 - **`planWorkflowEdit`** (through `planWorkflowChange`, which reads the
-  board from the cards and returns the workflow's write): add (before a state, or after every open one),
-  rename (trimmed; names may repeat), move, remove. The archive is
-  renamed only; a state holding a canvas is not removed, nor the only open
-  state.
+  board from the cards and returns the workflow's write), over a
+  `WorkflowEdit` of one shape per action: add (before a state, or after
+  every open one), rename (trimmed; names may repeat), move, remove, mark,
+  unmark Active. The archive is renamed only. The state marked Topics is
+  not removed (`state-marked`, checked before `state-not-empty` so its
+  reason names the mark), so an open state is always left; a state holding
+  a canvas is not removed. A mark moves to its state from the one that held
+  it, and is refused `state-marked` on a state holding the other.
 - **`boardEnd`** places a new canvas's card at the end of the state its
-  chat names, or of the first open state when it names none, one gone, or
-  the closed one.
+  chat names, or of Topics when it names none, one gone, or the closed one.
 - **Order keys are `order.ts`'s**, shared with cards' queues and pins:
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.

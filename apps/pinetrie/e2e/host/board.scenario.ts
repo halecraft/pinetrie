@@ -1,5 +1,6 @@
-// e2e/host/board — moving a root on the board, archiving it in the archive, and
-// titling one, through the command Line. What each decides is unit-tested
+// e2e/host/board — moving a root on the board, archiving it in the archive,
+// titling one, and an agent's first run moving its canvas to Active, through
+// the command Line. What each decides is unit-tested
 // (`@pinetrie/rules`' `board.test.ts`, `archive.test.ts` and `mark.test.ts`,
 // the host's `commands/*.test.ts`); this proves the dispatcher routes each
 // command to it, a new root lands where its chat says, and the records reach
@@ -10,17 +11,22 @@ import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
+  readCardHistories,
   readMarks,
   readPlaces,
   readWorkflow,
 } from "@pinetrie/reads"
 import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session/connect"
-import { TRASH_PLACE } from "@pinetrie/threads"
+import { TRASH_PLACE, threadEnd } from "@pinetrie/threads"
 import type { Checks } from "../checks.ts"
 import {
   archivedFor,
+  at,
   canvasHolding,
+  heldTree,
+  idleNow,
   join,
+  START_AGENT,
   START_CHAT,
   taskBoardState,
   waitFor,
@@ -66,7 +72,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const cards = readPlaces(host.places)
       const states = [taskBoardState(cards, id1), taskBoardState(cards, id2)]
       check(
-        "a new root lands in the state its chat names, else the first open one",
+        "a new root lands in the state its chat names, else Topics",
         states[0] === doing.id && states[1] === backlog.id,
         JSON.stringify(states),
       )
@@ -147,6 +153,51 @@ async function run(check: Checks["check"]): Promise<void> {
           back.kind === "undone" &&
           taskBoardState(readPlaces(host.places), id2) === backlog.id,
         `${forward.kind} ${back.kind}`,
+      )
+
+      // An agent's first run moves its new canvas from Topics to Active, as
+      // the host's own move; moved back by a person, it stays.
+      const canvasesNow = () =>
+        new Set(
+          readPlaces(host.places).flatMap(c =>
+            c.kind === "canvas" ? [c.id] : [],
+          ),
+        )
+      const idle = () => waitFor(() => idleNow(host), 60_000)
+      const before = canvasesNow()
+      await ada.send("@agent start the work", ROOT, START_AGENT)
+      await idle()
+      const worked = [...canvasesNow()].find(c => !before.has(c))
+      const [thread] = readPlaces(host.places).flatMap(c =>
+        c.kind === "thread" &&
+        c.place.kind === "canvas" &&
+        c.place.canvas === worked
+          ? [c.id]
+          : [],
+      )
+      if (worked === undefined || thread === undefined)
+        throw new Error("an agent's first send opens a canvas")
+      const firstState = taskBoardState(readPlaces(host.places), worked)
+      const byHost =
+        readCardHistories(host.session).get(worked)?.events.at(-1)?.by === null
+      const putBack = await ada.request({
+        kind: "move-canvas",
+        canvas: worked,
+        from: doing.id,
+        to: backlog.id,
+        before: null,
+      })
+      await ada.send("@agent go on", at(threadEnd(heldTree(host), thread)), {
+        thread,
+      })
+      await idle()
+      check(
+        "an agent's first run moves its canvas from Topics to Active, and a person's move back keeps it there",
+        firstState === doing.id &&
+          byHost &&
+          putBack.kind === "moved" &&
+          taskBoardState(readPlaces(host.places), worked) === backlog.id,
+        `${firstState} ${byHost} ${putBack.kind}`,
       )
 
       // A new tab closed unsent goes to its closer's trash with its canvas,

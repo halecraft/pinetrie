@@ -283,6 +283,11 @@ would refuse each whole undo of a move (S82).
 - **A canvas row** (`canvas`, ADR-0116) names its canvas, its rank in
   `order` and its width (`"1"` or `"2"`): a thread's card on its canvas's
   canvas: a thread not yet started's too (ADR-0126).
+- **A canvas's own card holds `stateChanged`** (ADR-0206): `"1"` once its
+  workflow state changed, "" not. A row stored before the field reads "",
+  unchanged, so its migration moved no data. It changes only with a move
+  between states, which changes the row's `state` anyway, so it refuses no
+  whole undo a move would not.
 - **A pinned row carries `lane` and `order`**, as a queued one does, and
   no `by` or `seen`. A card's place among others is a rank in its own
   `order`, not a place in a list (S69).

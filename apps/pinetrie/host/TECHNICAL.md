@@ -35,7 +35,8 @@ knows of.
 | `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): the port (`seen`, `sweep`, `onChanged`, `onTaken`), and the hooks a change's close reads and calls, which only `createPlaces` takes |
 | `facts.ts` | `queueFact`: a fact of the host's queued as a card on its lane, in a change of the host's, then the lane's drain; a refused card is logged. The one way every module queues a fact |
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
-| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
+| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered; a prompt's start is announced (`started`) |
+| `first-work.ts` | a canvas moved from Topics to Active as an agent's run starts in it, once (`moveCanvasToActive`, ADR-0206) |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5, S92): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
 | `canvas.ts` | what a run is told of its thread's canvas (ADR-0116): `readCanvasContext`, the canvas list and the cards pinned to the canvas (`planCanvasContext`), each written only when it differs from the newest of its kind on the lane's path, so an unchanged canvas keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
@@ -196,6 +197,18 @@ knows of.
   split again. They carry no `seen`, so their window is as short as
   before. A carry-on's start cannot be cancelled either, for the same
   reason: a Stop in its window reaches nothing.
+- **A prompt's run moves its canvas to Active as it begins**
+  (`first-work.ts`, ADR-0206): `Runs.start` calls its `started` port in
+  the step that starts the run, after `begin` and only for a prompt (a
+  resume goes on with work begun before). `moveCanvasToActive` plans
+  (`planMoveToActive`, `@pinetrie/rules`) from the places as that step
+  left them and, only when there is a move, writes it as the host's own
+  change, which runs its body at once, so nothing comes between the plan
+  and the write; it leaves no trace and enters nobody's stack of moves.
+  `startHost` tracks it on the keeper, so shutdown waits for it.
+- **Gotcha: a canvas moves before its run reaches pi.** A run stopped in
+  its pinned cards' wait, or one pi refuses, leaves its canvas in Active,
+  and moved once, it stays.
 - **A run that wrote its lane's prompt anew is logged** (ADR-0176): its
   outcome names the sections of pi's prompt it changed (`promptChanged`,
   `packages/pi/TECHNICAL.md`), and `promptChangedLine` words them:
@@ -540,6 +553,17 @@ reading the store once, planning once, then acting:
   - `0026-card-ticked` registers the places document's new hash: its card
     record gains `ticked`, a column's box, which a stored record without it
     reads as "", unticked (ADR-0198). It moves no data.
+  - `0027-canvas-state-changed` registers the places document's new hash:
+    its card record gains `stateChanged`, which a stored record without it
+    reads as "", so every canvas starts as one an agent's first run moves
+    to Active (ADR-0206). It moves no data.
+  - `0028-workflow-marks` (ADR-0206) marks the stored workflow's states:
+    Topics on the open state named Topics, else the first; Active on the
+    open state named Active, if it is another (`workflowMarksNow`), read
+    raw, since a workflow with no Topics no longer decodes. A workflow with
+    any mark is left alone. It must run before `recover`: an undecodable
+    workflow reads as none, and `planWorkflowSeed` would write a new
+    default whose state ids no canvas is in.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
@@ -976,7 +1000,7 @@ rejects `shutdown()`.
   await, plans its opening (`planThreadOpen`): the thread's record, its card just after the thread
   it forks from on its canvas, and for a new canvas its card on the
   board (ADR-0126), at the end of the state the chat names
-  (`Command.state`, a board column's ＋), else of the first open state.
+  (`Command.state`, a board column's ＋), else of Topics.
   `executeSend` writes that before the message and reads nothing for it.
 - **A move on the board** (`commands/board.ts`): `planBoardMove` over the
   workflow and the places; a move within open states writes the canvas's

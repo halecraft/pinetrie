@@ -24,6 +24,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { ALLOWANCE } from "./allowance.ts"
 import type { BaseRecord } from "./base.ts"
+import { testWorkflow } from "./fixtures.ts"
 import {
   ACCEPTED,
   ACCESS,
@@ -136,10 +137,10 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "workflow",
     WORKFLOW,
-    {
-      open: [{ id: workflowStateIdFor("1"), name: "Doing" }],
-      archive: { id: workflowStateIdFor("2"), name: "Done" },
-    },
+    testWorkflow([{ id: workflowStateIdFor("1"), name: "Doing" }], {
+      id: workflowStateIdFor("2"),
+      name: "Done",
+    }),
     null,
   ),
   sample(

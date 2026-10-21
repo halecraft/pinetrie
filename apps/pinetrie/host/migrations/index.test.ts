@@ -14,6 +14,7 @@ import { lineDocPrefix } from "../lines.ts"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { openStore } from "../store.ts"
 import { CARD_TICKED } from "./0026-card-ticked.ts"
+import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
 import {
   MIGRATIONS,
   type Migration,
@@ -74,7 +75,7 @@ describe("the stored schemas", () => {
     expect(now).toEqual({
       session: "0223893f102c08dc9c7b6f976f712a842a",
       live: "028e3f891b8953894c3667be8ca55a5946",
-      places: "02d75eb7709972026cd9702fe1d99a668a",
+      places: "02a4a2f075902fd4683994469a5a3e06cd",
       root: "02065b897f9f33229f2318be54d33c6e76",
       scratch: "0273580c3e061af065151eb6b6f081aeb0",
       text: "02cd0629243854b7d6f39abbc4ace6f345",
@@ -100,6 +101,24 @@ describe("0026-card-ticked", () => {
       unknown: [],
     })
     expect(CARD_TICKED.run).toBeUndefined()
+  })
+})
+
+describe("0027-canvas-state-changed", () => {
+  test("a places document stored before the canvas's flag opens through it, moving no data", () => {
+    expect(
+      planOpen({
+        stored: new Map([[PLACES_DOC_ID, CANVAS_STATE_CHANGED.from]]),
+        kindOf: storedKind,
+        hashOf: kind => SCHEMA_OF[kind].schemaHash,
+        migrations: MIGRATIONS,
+      }),
+    ).toEqual({
+      kind: "open",
+      run: [{ migration: CANVAS_STATE_CHANGED, docIds: [PLACES_DOC_ID] }],
+      unknown: [],
+    })
+    expect(CANVAS_STATE_CHANGED.run).toBeUndefined()
   })
 })
 

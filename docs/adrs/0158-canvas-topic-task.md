@@ -26,6 +26,10 @@
     `apps/pinetrie/host/TECHNICAL.md`, where the migrations are.
 - **Amended by:**
   - ADR-0164: a new canvas and ＋'s agent thread start the same way.
+  - ADR-0206: a topic is a canvas in the state the workflow marks Topics,
+    wherever that state stands; a task is a canvas in any other open state.
+    Topics is no longer first by convention, and a topic now behaves
+    differently: the host moves it to Active when an agent first works in it.
 
 **Context.**
 

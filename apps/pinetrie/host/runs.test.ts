@@ -3,6 +3,7 @@ import {
   ERR,
   entryId,
   pointId,
+  type ThreadId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -116,6 +117,8 @@ function setUp(
   // Whether the lane was still running when its end report was made pending.
   const pending: { prompt: string; running: boolean }[] = []
   const runDocs = createRunDocs()
+  // Each lane a run announced as it began.
+  const started: ThreadId[] = []
   const runs = createRuns({
     basics: b,
     runDocs,
@@ -127,6 +130,7 @@ function setUp(
     pending: async (l, prompt) => {
       pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
     },
+    started: l => void started.push(l),
   })
   const ended = deferred<{
     running: boolean
@@ -148,6 +152,7 @@ function setUp(
     runs: { ...runs, start: runs.start.bind(null, b.roots) },
     runDocs,
     pending,
+    started,
     ended: ended.promise,
   }
 }
@@ -399,6 +404,23 @@ describe("a run's pinned cards", () => {
     expect(asked).toEqual([])
   })
 
+  test("a prompt's run is announced as it begins; a resume's is not", async () => {
+    const prompted = setUp()
+    prompted.runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    expect(prompted.started).toEqual([LANE])
+    prompted.lane.finish(RAN)
+    await prompted.ended
+    const resumed = setUp()
+    resumed.runs.start(runnableFor(LANE), { kind: "resume" })
+    resumed.lane.finish(RAN)
+    await resumed.ended
+    expect(resumed.started).toEqual([])
+  })
+
   test("a resume reads no pinned cards", async () => {
     let read = 0
     const { lane, runs, ended } = setUp(fakeLane(LANE), undefined, async () => {
@@ -578,6 +600,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
       runEnded: l => order.push(`news ${l}`),
     },
     pending: async () => {},
+    started: () => {},
   })
   const ended = deferred<void>()
   runs.onEnded(l => {
@@ -616,6 +639,7 @@ test("a run holds its lane's root from its start until its end's last step, thro
     pending: async () => {
       throw new Error("run-end report lost")
     },
+    started: () => {},
   })
   runs.onEnded(() => loadedAtEnded.resolve(roots.loaded().includes(ROOT_ID)))
   await keeper.run(async step =>

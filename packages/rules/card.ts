@@ -21,7 +21,6 @@ import {
   type ImageVersion,
   isTextCard,
   kindedId,
-  NO_CONTENT,
   type OrderedPlace,
   type PlacedKind,
   parseAddress,
@@ -30,6 +29,7 @@ import {
   placeOfFields,
   placeOfKind,
   printAddress,
+  STATE_UNCHANGED,
   type TextCard,
   type TreeIndex,
   threadEnd,
@@ -77,6 +77,8 @@ const StoredCard = Type.Object({
   versions: Type.Optional(Type.String()),
   /** A column's box: "1" ticked, "" not; absent before ticks. */
   ticked: Type.Optional(Type.String()),
+  /** A canvas's card: "1" once its state changed, "" not; absent before the flag. */
+  stateChanged: Type.Optional(Type.String()),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -103,6 +105,7 @@ interface StoredCardFields {
   readonly origin: string
   readonly versions: string
   readonly ticked: string
+  readonly stateChanged: string
 }
 
 const isCommand = (s: string): s is CardCommand =>
@@ -120,6 +123,7 @@ type ContentFields = Pick<
   | "origin"
   | "versions"
   | "ticked"
+  | "stateChanged"
 >
 
 type ContentColumn = keyof ContentFields
@@ -134,6 +138,7 @@ const NO_CONTENT_FIELDS: ContentFields = {
   origin: "",
   versions: "",
   ticked: "",
+  stateChanged: "",
 }
 
 /** How one kind's content is stored: the columns it holds, and their codec. */
@@ -194,7 +199,17 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
     },
   },
   thread: COLUMN_CODEC,
-  canvas: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  /** A canvas's card: "1" once its state changed; a row stored before the flag reads "", unchanged. */
+  canvas: {
+    columns: ["stateChanged"],
+    encode: c => ({ stateChanged: c.stateChanged ? "1" : "" }),
+    decode: f =>
+      f.stateChanged === "1"
+        ? { stateChanged: true }
+        : f.stateChanged === ""
+          ? STATE_UNCHANGED
+          : undefined,
+  },
   "note-column": COLUMN_CODEC,
   fact: {
     columns: ["fact"],
@@ -337,6 +352,7 @@ export const decodeCard = (
       origin: c.origin ?? "",
       versions: c.versions ?? "",
       ticked: c.ticked ?? "",
+      stateChanged: c.stateChanged ?? "",
     }
     const of = kindedId(card)
     switch (of.kind) {

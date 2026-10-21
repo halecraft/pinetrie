@@ -106,7 +106,7 @@ export const planMode = (at: SendAt): PlanMode =>
 /**
  * How an opened thread starts. A branch at `at` in its root, its card just
  * after the thread `at` is in. A new canvas's: a new root's first thread in a
- * new canvas, which lands in `state` (the first open state for null). A new
+ * new canvas, which lands in `state` (Topics for null). A new
  * root's first thread in a canvas the session holds, its card just after
  * `after` (first for null; at the end when `after` has left the canvas).
  */
@@ -157,7 +157,7 @@ export type Intent =
       readonly base: string | null
       /**
        * The workflow state a root this message starts lands in, at its end;
-       * null for the first open state. Read only when it starts one.
+       * null for Topics. Read only when it starts one.
        */
       readonly state: WorkflowStateId | null
     }
@@ -204,7 +204,7 @@ export type Intent =
   /**
    * Make a text card a thread: a new chat's root, `root`, its thread
    * `thread`, whose first message is the card's text, in a new canvas, `canvas`, in
-   * `state`, or the first open state for null; the card goes to the trash, in
+   * `state`, or Topics for null; the card goes to the trash, in
    * the history `here` names when it leaves no canvas.
    */
   | {

@@ -1,4 +1,5 @@
-// rules/fixtures — test support: a thread's card as its opening makes it.
+// rules/fixtures — test support: a thread's card as its opening makes it, and
+// a workflow checked whole.
 // Production code never imports it.
 
 import {
@@ -11,8 +12,39 @@ import {
   type CardRecord,
   ROOT_ORIGIN,
   type ThreadCard,
+  type WorkflowMark,
 } from "@pinetrie/threads"
+import { checkedWorkflow, type Workflow, type WorkflowState } from "./board.ts"
 import { planThreadOpen } from "./canvas-index.ts"
+
+/**
+ * A workflow of `open` and `archive` (`checkedWorkflow`). With no mark given
+ * on any state, the first is marked Topics and the second Active, as a new
+ * session's are. Throws for one `checkedWorkflow` refuses.
+ */
+export function testWorkflow(
+  open: readonly (WorkflowState & { readonly mark?: WorkflowMark | null })[],
+  archive: WorkflowState,
+): Workflow {
+  const marked = open.some(s => s.mark !== undefined)
+  const made = checkedWorkflow(
+    open.map((s, i) => ({
+      id: s.id,
+      name: s.name,
+      mark: marked
+        ? (s.mark ?? null)
+        : i === 0
+          ? "topics"
+          : i === 1
+            ? "active"
+            : null,
+    })),
+    archive,
+  )
+  if (made === undefined)
+    throw new Error("not a workflow checkedWorkflow makes")
+  return made
+}
 
 /** A thread's card as it first lands on `canvas`'s canvas: at its end. */
 export function landedThreadCard(input: {

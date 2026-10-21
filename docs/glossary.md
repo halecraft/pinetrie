@@ -150,9 +150,10 @@ a value is stored.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **canvas** | The card the board, the sidebar and ＋ hold, and its surface: threads and note columns in an order everyone shares, each one or two columns wide, drawn as the strip when it opens (ADR-0116, ADR-0126, ADR-0158). On the board in a workflow state, at its rank there; who moved it there and when is its card's history. | `CanvasId`, `CanvasCard`, `KINDS.canvas`, `CanvasIndex`, `BoardCard`, `planBoardMove`, `boardCanvases`; `canvas` (a `CardPlace`), `CardOnCanvas`, `cardsOnCanvas`, `canvasColumns`, `Strip` (the view) | task (as the card), task card; the root as what the board holds; "the root you are on"; the board place, the task's record (`pinetrie.board`, `pinetrie.task`) |
-| **topic** | A canvas in the board's first open state, there so teammates find it. A word for where a canvas is, never stored (ADR-0158). | `CanvasRole` `"topic"`, `canvasRole` | backlog item |
-| **task** | A canvas in any open state after the first: work the board tracks. A word for where a canvas is, never stored (ADR-0158). | `CanvasRole` `"task"`, `canvasRole` | task (as the board's card) |
-| **workflow state** | A column of the board: Topics, Active, or any a team makes. Every canvas on the board is in one. Topics is the first open state by convention, not a kind of state (ADR-0158). | `WorkflowState`, `Workflow`, `taskBoard`, `defaultWorkflow` | Backlog, Doing (as defaults) |
+| **topic** | A canvas in the state the workflow marks Topics, wherever that state stands, there so teammates find it. A word for where a canvas is, never stored (ADR-0158, ADR-0206). | `CanvasRole` `"topic"`, `canvasRole` | backlog item |
+| **task** | A canvas in any other open state: work the board tracks. A word for where a canvas is, never stored (ADR-0158, ADR-0206). | `CanvasRole` `"task"`, `canvasRole` | task (as the board's card) |
+| **workflow state** | A column of the board: Topics, Active, or any a team makes. Every canvas on the board is in one. An open state may carry a **mark** (ADR-0206). | `WorkflowState`, `OpenState`, `Workflow`, `taskBoard`, `defaultWorkflow`, `checkedWorkflow` | Backlog, Doing (as defaults); the first open state, as where canvases start |
+| **mark** (a state's) | What an open state is for, kept as it is renamed or moved: **Topics**, where a new canvas starts (exactly one state), or **Active**, where an agent's first work moves a topic (at most one) (ADR-0206). Not a canvas's title, which is also a mark. | `WorkflowMark`, `OpenState.mark`, `Workflow.topics`, `Workflow.active`, the workflow edit `mark` | |
 | **team** | The people who share a board, its canvases and, later, its sources and runners: today, everyone in the session (ADR-0126). | the session | the host's session, as the board's owner |
 | **the archive** | The board's last workflow state, always there, named Archive in a new session and renamed as any state is (ADR-0158). | `Workflow.archive` | the closed state, the Archive tab; Done (as its default name) |
 | **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' proposed changes withdrawn, until moved out (**restore**). | `tasksInArchive`, `archivedIn`, `planArchive`, `readArchived` | closed |
@@ -222,8 +223,9 @@ code word alone.)
   never the past. What is in a thread is entries (ADR-0126).
 - **row**: how a column draws entries (a tool row, a fork row), a places
   row, an SQL row. Never a kind of thing a person reads about.
-- **mark**: a canvas's title (ADR-0045). The pips that show your unsent
-  text are a signal (ADR-0126).
+- **mark**: a canvas's title (ADR-0045), and what an open state is for,
+  Topics or Active (ADR-0206). The pips that show your unsent text are a
+  signal (ADR-0126).
 - **copy**: a thread's copy, a new thread at its end (ADR-0117); a copy to
   the clipboard, Cmd+C, which moves and makes nothing (ADR-0132); and a
   card a paste makes from what was copied. Every card made from a copy

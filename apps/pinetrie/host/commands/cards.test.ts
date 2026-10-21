@@ -39,6 +39,7 @@ import {
   type UndoResult,
   WORKFLOW,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { readingKey, seatKey } from "@pinetrie/schema"
 import {
   beginRun,
@@ -431,10 +432,13 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     const [doing, done] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     putValue(
       b,
-      setRecord(WORKFLOW, {
-        open: [{ id: doing, name: "Doing" }],
-        archive: { id: done, name: "Done" },
-      }),
+      setRecord(
+        WORKFLOW,
+        testWorkflow([{ id: doing, name: "Doing" }], {
+          id: done,
+          name: "Done",
+        }),
+      ),
     )
     putValue(
       b,
@@ -1158,10 +1162,13 @@ describe("a card made a thread, and lifted back", () => {
   const board = (b: ReturnType<typeof setUp>["b"]) =>
     putValue(
       b,
-      setRecord(WORKFLOW, {
-        open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-        archive: { id: workflowStateIdFor("x"), name: "Done" },
-      }),
+      setRecord(
+        WORKFLOW,
+        testWorkflow([{ id: workflowStateIdFor("d"), name: "Doing" }], {
+          id: workflowStateIdFor("x"),
+          name: "Done",
+        }),
+      ),
     )
   const spinOff = {
     move: spinMove,

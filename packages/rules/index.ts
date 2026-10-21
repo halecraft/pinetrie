@@ -115,10 +115,12 @@ export {
 export {
   type BoardMove,
   boardCanvases,
+  boardStates,
   type CanvasRole,
   canvasRole,
   isBoardCard,
   planBoardMove,
+  planMoveToActive,
   planWorkflowChange,
   planWorkflowSeed,
   taskBoard,
@@ -127,6 +129,7 @@ export {
   WORKFLOW_KEY,
   type Workflow,
   type WorkflowState,
+  workflowState,
 } from "./board.ts"
 export {
   CANVAS_CAP,

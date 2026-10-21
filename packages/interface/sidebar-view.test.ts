@@ -16,6 +16,7 @@ import type {
   MarkRecord,
   Workflow,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
@@ -78,13 +79,13 @@ const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
 ]
-const WORKFLOW: Workflow = {
-  open: [
+const WORKFLOW: Workflow = testWorkflow(
+  [
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  archive: { id: DONE, name: "Done" },
-}
+  { id: DONE, name: "Done" },
+)
 /** What the sidebar's items are read from, its thread cards' facts among them. */
 type Facts = Omit<SidebarViewInput, "heads"> &
   Omit<ThreadCardFacts, "pips"> & {
@@ -321,7 +322,7 @@ describe("sidebarView", () => {
   })
 })
 
-test("＋ makes a canvas at the end of the first open state, with no menu", () => {
+test("＋ makes a canvas at the end of Topics, with no menu", () => {
   const { add } = sidebarView(input())
   expect(add.main.intent).toEqual({ kind: "new-canvas" })
   expect(add.main.title).toContain("at the end of Backlog")

@@ -48,6 +48,7 @@ import {
   setRecord,
   WORKFLOW,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import {
   applyRecordWrites,
   type LiveDocHandle,
@@ -71,11 +72,11 @@ import {
   type CardRecord,
   indexTree,
   makeCard,
-  NO_CONTENT,
   NOBODY,
   type NoteColumnId,
   ROOT_ORIGIN,
   type Send,
+  STATE_UNCHANGED,
   UNTICKED,
 } from "@pinetrie/threads"
 import type { Basics, HostKey } from "./basics.ts"
@@ -479,7 +480,7 @@ function canvasCardStep(
             state,
             order: orderAfter(cards.filter(isBoardCard)),
           },
-          NO_CONTENT,
+          STATE_UNCHANGED,
           by,
         ),
       },
@@ -541,10 +542,13 @@ export function archiveCanvas(
   if (readWorkflow(b.session) === null)
     putValue(
       b,
-      setRecord(WORKFLOW, {
-        open: [{ id: CANVAS_STATE, name: "Doing" }],
-        archive: { id: ARCHIVE_STATE, name: "Done" },
-      }),
+      setRecord(
+        WORKFLOW,
+        testWorkflow([{ id: CANVAS_STATE, name: "Doing" }], {
+          id: ARCHIVE_STATE,
+          name: "Done",
+        }),
+      ),
     )
   placeCanvas(b, canvas, ARCHIVE_STATE, by, 2)
 }

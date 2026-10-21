@@ -11,6 +11,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { NAME, PARTICIPANT, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Allowances } from "./allowances.ts"
 import {
@@ -47,10 +48,10 @@ function setUp() {
   putCanvas(b, OWL, GONE_CANVAS, OTHER_ROOT)
   putValue(
     b,
-    setRecord(WORKFLOW, {
-      open: [{ id: DOING, name: "Doing" }],
-      archive: { id: DONE, name: "Done" },
-    }),
+    setRecord(
+      WORKFLOW,
+      testWorkflow([{ id: DOING, name: "Doing" }], { id: DONE, name: "Done" }),
+    ),
   )
   for (const [canvas, state] of [
     [CANVAS_ID, DOING],

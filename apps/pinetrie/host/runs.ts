@@ -1,8 +1,10 @@
 // host/runs — a run on a thread's lane, from its start to its end.
 //
-// The one way a run starts. It announces its end and knows nothing of what
-// follows: `startHost` wires the drain and hot reload to `onEnded`, which is
-// what keeps the queue's pops and the commands out of this module. What a run
+// The one way a run starts. It announces a prompt's start (`started`) and its
+// end, and knows nothing of what follows: `startHost` wires the move of a
+// canvas to Active to `started`, and the drain and hot reload to `onEnded`,
+// which is what keeps the board, the queue's pops and the commands out of
+// this module. What a run
 // reads of its pinned cards is `readPinned`'s (`pinned.ts`); what it is told of
 // its base's new work, `baseNews`' (`base-news.ts`).
 
@@ -100,7 +102,8 @@ export function createRunDocs(): RunDocs & {
 export interface Runs {
   /**
    * Start one turn on a thread's lane, streaming into the document. A
-   * prompt's run reads its pinned cards first, which may wait for their text.
+   * prompt's run is announced as it begins (`started`), then reads its pinned
+   * cards, which may wait for their text.
    * Only a lane proven runnable (`LaneWork.runnable`) starts one, so none
    * starts on a lane of another kind, whatever path asks. Only a step starts
    * one: the run leases its lane's root from `roots`, and lets it go once its
@@ -224,6 +227,11 @@ export function createRuns(deps: {
   readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
   /** Write `lane`'s run's end report as pending (`Digests.pending`). */
   readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
+  /**
+   * Called as a prompt's run begins on `lane`, in the step that starts it; a
+   * resume's run, which goes on with work begun before, does not call it.
+   */
+  readonly started: (lane: ThreadId) => void
 }): Runs {
   const { basics, agent, work, readPinned, readCanvasContext, baseNews } = deps
   const { live, log, docs } = basics
@@ -287,6 +295,7 @@ export function createRuns(deps: {
       runDocs.hold(lane, lease)
       const id = runId(basics.newId())
       applyLiveOps(live, [{ kind: "begin", lane, run: id }])
+      if (start.kind === "prompt") deps.started(lane)
       const handle = agent.lane(lane)
       const name = () => readThreadName(basics.session, lane)
       // A chat's message, which is kept if its run never happens.

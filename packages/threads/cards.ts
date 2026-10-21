@@ -148,6 +148,15 @@ export interface ColumnContent {
   readonly ticked: boolean
 }
 
+/**
+ * A canvas's card's content: whether its workflow state has changed since it
+ * was made, by anyone. While it has not, an agent's first run in it moves it
+ * from Topics to Active.
+ */
+interface CanvasContent {
+  readonly stateChanged: boolean
+}
+
 export interface ContentOf {
   readonly text: {
     readonly command: CardCommand | null
@@ -162,7 +171,7 @@ export interface ContentOf {
     readonly quote: Sha256
   }
   readonly thread: ColumnContent
-  readonly canvas: Readonly<Record<string, never>>
+  readonly canvas: CanvasContent
   readonly "note-column": ColumnContent
   readonly fact: { readonly fact: QueuedFact }
   readonly ask: { readonly relay: RelayDetails }
@@ -247,8 +256,8 @@ export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 export const isTextCard = (card: CardRecord): card is TextCard =>
   card.kind === "text"
 
-/** A canvas's card's content: nothing. */
-export const NO_CONTENT: Readonly<Record<string, never>> = {}
+/** A canvas's card as it is made: its state not changed yet. */
+export const STATE_UNCHANGED: CanvasContent = { stateChanged: false }
 
 /** A thread's, a note column's or a media column's card as it is made, a copy's too: its box not ticked. */
 export const UNTICKED: ColumnContent = { ticked: false }

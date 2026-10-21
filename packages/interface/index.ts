@@ -95,6 +95,8 @@ export {
   filterTitle,
   filterWords,
   keptWords,
+  type MarkAction,
+  markWords,
   nameStateIntent,
   parseSearch,
   readyWords,

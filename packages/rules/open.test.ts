@@ -19,7 +19,7 @@ import {
 } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { unstartedThreads } from "./canvas-index.ts"
-import { landedThreadCard } from "./fixtures.ts"
+import { landedThreadCard, testWorkflow } from "./fixtures.ts"
 import { planOpenThread } from "./open.ts"
 import { emptiedCanvases, planCanvasesTrashed } from "./root.ts"
 
@@ -46,10 +46,10 @@ const onCanvas = landedThreadCard({
   cards: [],
 })
 const STATE = workflowStateIdFor("d")
-const WORKFLOW = {
-  open: [{ id: STATE, name: "Doing" }],
-  archive: { id: workflowStateIdFor("x"), name: "Done" },
-}
+const WORKFLOW = testWorkflow([{ id: STATE, name: "Doing" }], {
+  id: workflowStateIdFor("x"),
+  name: "Done",
+})
 const BRANCH = { kind: "branch", at: entryId("b"), index } as const
 const plan = (
   open: Partial<Parameters<typeof planOpenThread>[0]["open"]> = {},

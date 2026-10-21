@@ -13,6 +13,7 @@ import {
   setRecord,
   WORKFLOW,
 } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import type { QueuedFact } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import {
@@ -43,10 +44,10 @@ function setUp() {
   putCanvas(b, AWAY, SHUT)
   putValue(
     b,
-    setRecord(WORKFLOW, {
-      open: [{ id: DOING, name: "Doing" }],
-      archive: { id: DONE, name: "Done" },
-    }),
+    setRecord(
+      WORKFLOW,
+      testWorkflow([{ id: DOING, name: "Doing" }], { id: DONE, name: "Done" }),
+    ),
   )
   placeCanvas(b, CANVAS_ID, DOING, ADA)
   placeCanvas(b, SHUT, DONE, ADA)

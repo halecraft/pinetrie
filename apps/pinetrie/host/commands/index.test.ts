@@ -10,6 +10,7 @@ import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { foreignLaneWords, LANE, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { testWorkflow } from "@pinetrie/rules/fixtures"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { type Intent, textCardId } from "@pinetrie/threads"
 import { cardIdFor } from "@pinetrie/threads/fixtures"
@@ -50,10 +51,10 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
   putCanvas(b, THREAD, CANVAS_ID, undefined, state)
   putValue(
     b,
-    setRecord(WORKFLOW, {
-      open: [{ id: DOING, name: "Doing" }],
-      archive: { id: DONE, name: "Done" },
-    }),
+    setRecord(
+      WORKFLOW,
+      testWorkflow([{ id: DOING, name: "Doing" }], { id: DONE, name: "Done" }),
+    ),
   )
   placeCanvas(b, CANVAS_ID, state, ALICE)
 }

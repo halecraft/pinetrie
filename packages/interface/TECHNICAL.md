@@ -391,7 +391,14 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   shown cards are always cut from the state's order), so the keyboard
   reaches every move a drag makes. Its words are worded beside it, one
   function each (`removeWords`, `canvasesWords`, `keptWords`, `searchWords`,
-  `stateWords`, `filterWords`, `filterTitle`).
+  `stateWords`, `filterWords`, `filterTitle`, `markWords`).
+- **A column's ⋯ actions are values of one shape** (`BoardAction`: what
+  choosing it asks, or why it cannot). Remove is one; each mark's item
+  (`markAction`, ADR-0206) is one more, checked where the mark is. There
+  Topics asks nothing, since some state always holds it, and Active asks
+  to unmark it; elsewhere each asks to move its mark here, unless this
+  state holds the other mark, which says why. Remove on the state marked
+  Topics says why too, before any count of its canvases.
 - **One search filters every state in place** (ADR-0109, ADR-0115). What
   was typed and "mine" are parsed once (`parseSearch`) into a
   `BoardSearch`, or null for none: the one place an empty search is

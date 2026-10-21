@@ -2145,8 +2145,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a places document stored before ticks is refused",
     file: "apps/pinetrie/host/migrations/index.ts",
-    from: "[IMAGE_VERSIONS, CARD_TICKED]",
-    to: "[IMAGE_VERSIONS]",
+    from: "  CARD_TICKED,\n  CANVAS_STATE_CHANGED,\n",
+    to: "  CANVAS_STATE_CHANGED,\n",
     command: unit,
     expect:
       "a places document stored before ticks opens through it, moving no data",
@@ -3394,5 +3394,64 @@ export const mutations: readonly Mutation[] = [
     to: '    : { kind: "run", command: "serve", args }',
     command,
     expect: "an unknown command is refused, by its name",
+  },
+  // ── the move to Active, and its migrations ──
+  {
+    name: "a places document stored before the canvas's flag is refused",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "  CARD_TICKED,\n  CANVAS_STATE_CHANGED,\n",
+    to: "  CARD_TICKED,\n",
+    command: unit,
+    expect:
+      "a places document stored before the canvas's flag opens through it, moving no data",
+  },
+  {
+    name: "the migration marks no Active",
+    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
+    from: '  const active = named("Active")',
+    to: "  const active = -1",
+    command: unit,
+    expect: "marks the states named Topics and Active",
+  },
+  {
+    name: "the migration marks the first state Topics",
+    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
+    from: '  const topics = Math.max(named("Topics"), 0)',
+    to: "  const topics = 0",
+    command: unit,
+    expect: "marks the states named Topics and Active",
+  },
+  {
+    name: "the migration marks a marked workflow again",
+    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
+    from: '  if (states.some(s => "mark" in s)) return null\n',
+    to: "",
+    command: unit,
+    expect: "a marked workflow is left alone",
+  },
+  {
+    name: "the migration's fallback marks nothing",
+    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
+    from: '  const topics = Math.max(named("Topics"), 0)',
+    to: '  const topics = named("Topics")',
+    command: unit,
+    expect: "falls back to the first open state and no Active",
+  },
+  {
+    name: "a resume's run is announced as a prompt's",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '      if (start.kind === "prompt") deps.started(lane)',
+    to: "      deps.started(lane)",
+    command: unit,
+    expect: "a prompt's run is announced as it begins; a resume's is not",
+  },
+  {
+    name: "the host's move to Active reads no places",
+    file: "apps/pinetrie/host/first-work.ts",
+    from: "    cards: readPlaces(deps.basics.places),",
+    to: "    cards: [],",
+    command: unit,
+    expect:
+      "a run's start moves its canvas as the host's own write, with no one's name",
   },
 ]

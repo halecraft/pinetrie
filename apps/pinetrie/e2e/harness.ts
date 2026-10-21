@@ -665,8 +665,8 @@ function drawnCard(
 
 /**
  * Move the canvas holding the thread `entry` is in to the archive, or out of
- * it to the first open one, as the board does: archive or
- * restore it. The state it is in is read from `client`'s copy of the board.
+ * it to Topics, as the board does: archive or restore it. The state it is in
+ * is read from `client`'s copy of the board.
  */
 export function moveCanvasOnBoard(
   client: Pick<
@@ -678,15 +678,15 @@ export function moveCanvasOnBoard(
 ): Promise<Outcome> {
   const workflow = readWorkflow(client.session)
   const canvas = entryCanvas(client, entry)
-  const first = workflow?.open[0]
-  if (workflow === null || canvas === undefined || first === undefined)
+  if (workflow === null || canvas === undefined)
     throw new Error(`no board place for ${entry}`)
-  const from = taskBoardState(client.cards.current(), canvas) ?? first.id
+  const topics = workflow.topics.id
+  const from = taskBoardState(client.cards.current(), canvas) ?? topics
   return client.request({
     kind: "move-canvas",
     canvas,
     from,
-    to: to === "archive" ? workflow.archive.id : first.id,
+    to: to === "archive" ? workflow.archive.id : topics,
     before: null,
   })
 }

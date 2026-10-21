@@ -3,7 +3,7 @@
 
 import type { CanvasId, WorkflowStateId, WriterId } from "@pinetrie/core"
 import { taskBoard, type Workflow, type WorkflowState } from "@pinetrie/rules"
-import type { CardRecord } from "@pinetrie/threads"
+import type { CardRecord, WorkflowMark } from "@pinetrie/threads"
 import { type Level, markLevel } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
@@ -50,6 +50,17 @@ export interface StateSignals {
 /** The archive's: it shows none. */
 const NO_SIGNALS: StateSignals = { working: 0, ready: 0, canvases: [] }
 
+/** A column's ⋯ action: what choosing it asks, null for nothing; why it cannot be chosen, null when it can. */
+interface BoardAction {
+  readonly intent: Intent | null
+  readonly why: string | null
+}
+
+/** A mark's item in a column's ⋯: whether this state holds the mark, and what choosing it does. */
+export interface MarkAction extends BoardAction {
+  readonly checked: boolean
+}
+
 /** An open state's column. */
 interface BoardColumnView {
   readonly state: WorkflowState
@@ -71,7 +82,9 @@ interface BoardColumnView {
     readonly right: WorkflowStateId | null
   }
   /** Remove it, or why it cannot be removed (`removeWords`): every root counts. */
-  readonly remove: { readonly intent: Intent; readonly why: string | null }
+  readonly remove: BoardAction
+  /** Mark it Topics or Active, or unmark Active (`markAction`). */
+  readonly marks: { readonly [M in WorkflowMark]: MarkAction }
 }
 
 /** The archive: collapsed to its count and its rows. */
@@ -235,7 +248,7 @@ export function boardView(input: BoardViewInput): BoardView {
     const { state } = column
     const before = (to: WorkflowStateId | null): Intent => ({
       kind: "edit-workflow",
-      edit: { action: "move", state: state.id, name: "", before: to },
+      edit: { action: "move", state: state.id, before: to },
     })
     const next = board.open[i + 1]
     const afterNext = board.open[i + 2]
@@ -254,9 +267,13 @@ export function boardView(input: BoardViewInput): BoardView {
       remove: {
         intent: {
           kind: "edit-workflow",
-          edit: { action: "remove", state: state.id, name: "", before: null },
+          edit: { action: "remove", state: state.id },
         },
-        why: removeWords(all.length, board.open.length),
+        why: removeWords(all.length, state.id === workflow.topics.id),
+      },
+      marks: {
+        topics: markAction(workflow, state.id, "topics"),
+        active: markAction(workflow, state.id, "active"),
       },
     }
     const strip: StripState = {
@@ -395,15 +412,73 @@ export function boardKeyAct(
   return null
 }
 
-/** Why an open state cannot be removed, or null when it can. */
-export function removeWords(
-  canvases: number,
-  openStates: number,
-): string | null {
+/** Why an open state cannot be removed, or null when it can: the state marked Topics never is. */
+export function removeWords(canvases: number, topics: boolean): string | null {
+  if (topics) return `${markWords("topics").held}: mark another state first`
   if (canvases > 0)
     return `holds ${canvases === 1 ? "a canvas" : `${canvases} canvases`}: move ${canvases === 1 ? "it" : "them"} first`
-  if (openStates === 1) return "the board needs one open state"
   return null
+}
+
+/** The state `w` marks `mark`, or null. */
+const markedState = (
+  w: Workflow,
+  mark: WorkflowMark,
+): WorkflowStateId | null =>
+  mark === "topics" ? w.topics.id : (w.active?.id ?? null)
+
+/**
+ * `mark`'s item in `state`'s ⋯. Checked where the mark is: there, Topics asks
+ * nothing (a state is always marked Topics) and Active asks to unmark it.
+ * Elsewhere it asks to move the mark here, unless this state holds the other
+ * mark, which says why.
+ */
+export function markAction(
+  w: Workflow,
+  state: WorkflowStateId,
+  mark: WorkflowMark,
+): MarkAction {
+  const other: WorkflowMark = mark === "topics" ? "active" : "topics"
+  if (markedState(w, mark) === state)
+    return {
+      checked: true,
+      why: null,
+      intent:
+        mark === "active"
+          ? { kind: "edit-workflow", edit: { action: "unmark-active" } }
+          : null,
+    }
+  if (markedState(w, other) === state)
+    return {
+      checked: false,
+      intent: null,
+      why: `${markWords(other).held}: a state takes one mark`,
+    }
+  return {
+    checked: false,
+    why: null,
+    intent: { kind: "edit-workflow", edit: { action: "mark", state, mark } },
+  }
+}
+
+/** What a mark's item in a column's ⋯ says, and what a state holding it is. */
+export function markWords(mark: WorkflowMark): {
+  readonly label: string
+  readonly title: string
+  readonly held: string
+} {
+  return mark === "topics"
+    ? {
+        label: "New canvases start here",
+        title: "new canvases start in this state, for everyone",
+        held: "new canvases start here",
+      }
+    : {
+        label: "Agent work moves canvases here",
+        title:
+          "a canvas in Topics moves to this state when an agent first works in it, for everyone",
+        held: "agent work moves canvases here",
+      }
 }
 
 /** Where a press or a click lands, as the open board sees it. */
@@ -426,7 +501,7 @@ export const nameStateIntent = (
   name: string,
 ): Intent => ({
   kind: "edit-workflow",
-  edit: { action: "rename", state, name, before: null },
+  edit: { action: "rename", state, name },
 })
 
 /** A state added before `before`, or after the open states if null: a new state's name field sends this. */
@@ -435,7 +510,7 @@ export const addStateIntent = (
   name: string,
 ): Intent => ({
   kind: "edit-workflow",
-  edit: { action: "add", state: null, name, before },
+  edit: { action: "add", name, before },
 })
 
 /** A state's ◌ and ⇡, as their titles say them, in the strip and in a column's head. */

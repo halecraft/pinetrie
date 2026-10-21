@@ -66,6 +66,8 @@ const StoredCard = Schema.struct.json({
   versions: Schema.string(),
   /** A thread's, a note column's or a media column's box: `1` ticked, "" not. */
   ticked: Schema.string(),
+  /** A canvas's card: `1` once its workflow state changed, "" not. */
+  stateChanged: Schema.string(),
 })
 
 const placesSchema = Schema.struct({

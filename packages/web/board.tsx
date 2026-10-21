@@ -42,7 +42,9 @@ import {
   type Intent,
   keptWords,
   type Level,
+  type MarkAction,
   type MessageCount,
+  markWords,
   messageCountTitle,
   moveTitle,
   nameStateIntent,
@@ -58,6 +60,7 @@ import {
   type ThreadCard,
 } from "@pinetrie/interface"
 import type { CardNotice } from "@pinetrie/session"
+import type { WorkflowMark } from "@pinetrie/threads"
 import { dragProps } from "@pinetrie/web-core"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { AddButton } from "./add-button.tsx"
@@ -487,8 +490,18 @@ export function Board({
                             )}
                           </>
                         ),
-                        onChoose: () => onIntent(column.remove.intent),
+                        onChoose: () => {
+                          if (column.remove.intent !== null)
+                            onIntent(column.remove.intent)
+                        },
                       },
+                    ],
+                  },
+                  {
+                    key: "marks",
+                    items: [
+                      markItem("topics", column.marks.topics, onIntent),
+                      markItem("active", column.marks.active, onIntent),
                     ],
                   },
                 ]}
@@ -559,6 +572,31 @@ const moveItem = (
   label: side === "left" ? "Move left" : "Move right",
   onChoose: () => onIntent(intent),
 })
+
+/** A mark's item in a column's ⋯: checked where the mark is, with why when it cannot move here. */
+const markItem = (
+  mark: WorkflowMark,
+  action: MarkAction,
+  onIntent: (intent: Intent) => void,
+): MenuItem => {
+  const words = markWords(mark)
+  return {
+    key: `mark-${mark}`,
+    className: `mark-${mark}`,
+    title: words.title,
+    checked: action.checked,
+    disabled: action.why !== null,
+    label: (
+      <>
+        {words.label}
+        {action.why !== null && <span className="why"> · {action.why}</span>}
+      </>
+    ),
+    onChoose: () => {
+      if (action.intent !== null) onIntent(action.intent)
+    },
+  }
+}
 
 const addItem = (
   side: "left" | "right",

@@ -71,7 +71,7 @@ import {
 import { sourceWords } from "./card-words.ts"
 import type { Container, ContainerKind, MintContainer } from "./containers.ts"
 import { factLine } from "./fact.ts"
-import { landedThreadCard } from "./fixtures.ts"
+import { landedThreadCard, testWorkflow } from "./fixtures.ts"
 import {
   planReorder,
   planSetCommand,
@@ -2487,13 +2487,13 @@ test("crossesArchive: a step whose canvas card last crossed the archive's edge i
     WorkflowStateId,
     WorkflowStateId,
   ]
-  const workflow = {
-    open: [
+  const workflow = testWorkflow(
+    [
       { id: open, name: "Open" },
       { id: other, name: "Other" },
     ],
-    archive: { id: done, name: "Done" },
-  }
+    { id: done, name: "Done" },
+  )
   const moved = (from: WorkflowStateId, to: WorkflowStateId) =>
     new Map([
       [
@@ -2816,10 +2816,10 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
 
   test("a new canvas: its card at the end of the board's first state, first on its canvas, in one step", () => {
     const NEW = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
-    const workflow = {
-      open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-      archive: { id: workflowStateIdFor("x"), name: "Done" },
-    }
+    const workflow = testWorkflow(
+      [{ id: workflowStateIdFor("d"), name: "Doing" }],
+      { id: workflowStateIdFor("x"), name: "Done" },
+    )
     const plan = (wf: typeof workflow | null) =>
       planMoveRequest(
         [columnCard],

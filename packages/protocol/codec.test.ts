@@ -261,17 +261,21 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     {
       kind: "workflow",
-      edit: { action: "add", state: null, name: "Review", before: null },
+      edit: { action: "add", name: "Review", before: null },
     },
     {
       kind: "workflow",
       edit: {
         action: "move",
         state: workflowStateIdFor("a"),
-        name: "",
         before: workflowStateIdFor("b"),
       },
     },
+    {
+      kind: "workflow",
+      edit: { action: "mark", state: workflowStateIdFor("a"), mark: "active" },
+    },
+    { kind: "workflow", edit: { action: "unmark-active" } },
     {
       kind: "mark",
       of: { kind: "canvas", canvas: TEST_CANVAS },

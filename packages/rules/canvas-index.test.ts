@@ -22,6 +22,7 @@ import {
   planThreadOpen,
   type ThreadPlacement,
 } from "./canvas-index.ts"
+import { testWorkflow } from "./fixtures.ts"
 import { orderKey } from "./order.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
 import { THREAD } from "./thread.ts"
@@ -168,10 +169,10 @@ describe("where a thread's card lands as it opens", () => {
       placement: { kind: "after", canvas: canvasIdFor("new"), parent: null },
       opens: {
         state: DOING,
-        workflow: {
-          open: [{ id: DOING, name: "Doing" }],
-          archive: { id: workflowStateIdFor("x"), name: "Done" },
-        },
+        workflow: testWorkflow([{ id: DOING, name: "Doing" }], {
+          id: workflowStateIdFor("x"),
+          name: "Done",
+        }),
       },
       cards: [],
     })

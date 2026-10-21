@@ -564,4 +564,12 @@ export const mutations: readonly Mutation[] = [
     to: "export type RunnableLane = ThreadId",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
+  {
+    name: "a workflow mark is lost on the wire",
+    file: "packages/protocol/codec.ts",
+    from: "      return { ...flat, targetId: edit.state, text: edit.mark }",
+    to: "      return { ...flat, targetId: edit.state }",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "encodeIntent -> decodeCommand round-trips every intent",
+  },
 ]

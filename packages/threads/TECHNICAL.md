@@ -75,6 +75,10 @@ tests import as `@pinetrie/threads/fixtures`.
 - A paste makes a card from a copy, or moves a cut one out of its cutter's
   trash (ADR-0132), after trashing the card on the slot it fills
   (ADR-0133).
+- A canvas's card holds one flag, whether its workflow state has changed
+  since it was made (`CanvasContent.stateChanged`, ADR-0206): made false
+  (`STATE_UNCHANGED`), set by any move between states. While it is false,
+  an agent's first run in the canvas moves it from Topics to Active.
 - Your inventory is one grid, its cells addressed in reading order
   (ADR-0048).
 - A margin names what it is on by address (`MarginOn`: an entry's, or an
@@ -150,7 +154,11 @@ tests import as `@pinetrie/threads/fixtures`.
   where its writes go, are core's (`refusals.ts`, `writes.ts`), since
   packages that send no command name them too.
 - An edit to the board's workflow states and a canvas in the archive
-  (ADR-0122, ADR-0029); a canvas's typed title (ADR-0045, ADR-0116). The
+  (ADR-0122, ADR-0029); a canvas's typed title (ADR-0045, ADR-0116). A
+  `WorkflowEdit` has one shape per action, so an edit carries only what
+  its action reads; the wire stays flat, and `@pinetrie/protocol` maps
+  between the two. A state's marks (`WorkflowMark`, ADR-0206) are here,
+  since the wire carries them. The
   records of the workflow, a title and one a model gives (ADR-0074), a
   person's picture (ADR-0098), a column's banner (ADR-0050), the host's
   icon source (ADR-0143) and the commands a pi skill or prompt makes

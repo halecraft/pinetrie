@@ -24,6 +24,7 @@ import {
   trashDeadline,
   trashedTime,
   type Workflow,
+  workflowState,
 } from "@pinetrie/rules"
 import type {
   CardId,
@@ -53,7 +54,7 @@ export function placeOnBoard(
   const found =
     state === null || workflow === null
       ? undefined
-      : [...workflow.open, workflow.archive].find(s => s.id === state)
+      : workflowState(workflow, state)
   return found === undefined || workflow === null
     ? null
     : { name: found.name, role: canvasRole(workflow, found.id) }

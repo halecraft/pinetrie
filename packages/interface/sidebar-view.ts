@@ -118,7 +118,7 @@ export interface SidebarViewInput {
   readonly arrivals: Moments
   /** Each canvas's icon (`canvasIcons`). */
   readonly icons: ReadonlyMap<CanvasId, ThreadIcon>
-  /** The board's states, where ＋ lands a new canvas; null before they arrive. */
+  /** The board's states: ＋ lands a new canvas in Topics; null before they arrive. */
   readonly workflow: Workflow | null
 }
 
@@ -130,7 +130,7 @@ export function sidebarView(input: SidebarViewInput): SidebarView {
     selected: items.find(t => t.selected) ?? null,
     add: newCanvasButton({
       from: "sidebar",
-      landsIn: input.workflow?.open[0] ?? null,
+      landsIn: input.workflow?.topics ?? null,
     }),
   }
 }

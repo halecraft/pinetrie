@@ -17,7 +17,7 @@ import { canvasCard, cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CanvasIndex, NO_CANVAS_INDEX } from "./canvas-index.ts"
 import type { CardHistoryRecord } from "./card-history.ts"
-import { landedThreadCard } from "./fixtures.ts"
+import { landedThreadCard, testWorkflow } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
 
@@ -31,10 +31,10 @@ const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const C1 = cardIdFor("c1")
 const canvasKey = { kind: "canvas", canvas: NEW_CANVAS } as const
-const SPIN_WORKFLOW = {
-  open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-  archive: { id: workflowStateIdFor("x"), name: "Done" },
-}
+const SPIN_WORKFLOW = testWorkflow(
+  [{ id: workflowStateIdFor("d"), name: "Doing" }],
+  { id: workflowStateIdFor("x"), name: "Done" },
+)
 /** Your message at the thread: a card at a thread, in its canvas. */
 const note = {
   kind: "composing",

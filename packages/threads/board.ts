@@ -4,22 +4,48 @@
 import type { CanvasId, WorkflowStateId, WriterId } from "@pinetrie/core"
 
 /**
- * A change to the workflow. `state` names the state acted on (null to add
- * one); `name` is the new name (add, rename); `before` is where a moved or
- * added open state goes, null for after every open state.
+ * What an open state may be marked: Topics, where a canvas starts, or
+ * Active, where an agent's first work moves a topic.
  */
-export interface WorkflowEdit {
-  readonly action: WorkflowAction
-  readonly state: WorkflowStateId | null
-  readonly name: string
-  readonly before: WorkflowStateId | null
-}
-export type WorkflowAction = "add" | "rename" | "move" | "remove"
+export type WorkflowMark = "topics" | "active"
+export const WORKFLOW_MARKS: readonly WorkflowMark[] = ["topics", "active"]
+
+/**
+ * A change to the workflow. `before` is where a moved or added open state
+ * goes, null for after every open state; `mark` moves that mark to `state`
+ * from the state that held it.
+ */
+export type WorkflowEdit =
+  | {
+      readonly action: "add"
+      readonly name: string
+      readonly before: WorkflowStateId | null
+    }
+  | {
+      readonly action: "rename"
+      readonly state: WorkflowStateId
+      readonly name: string
+    }
+  | {
+      readonly action: "move"
+      readonly state: WorkflowStateId
+      readonly before: WorkflowStateId | null
+    }
+  | { readonly action: "remove"; readonly state: WorkflowStateId }
+  | {
+      readonly action: "mark"
+      readonly state: WorkflowStateId
+      readonly mark: WorkflowMark
+    }
+  | { readonly action: "unmark-active" }
+export type WorkflowAction = WorkflowEdit["action"]
 export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
   "add",
   "rename",
   "move",
   "remove",
+  "mark",
+  "unmark-active",
 ]
 
 /**

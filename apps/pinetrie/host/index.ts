@@ -105,6 +105,7 @@ import {
   rootsOfLanes,
   rootsOpenedWords,
 } from "./docs.ts"
+import { moveCanvasToActive } from "./first-work.ts"
 import { createFocuses } from "./focuses.ts"
 import { forward } from "./forward.ts"
 import { HostRefused } from "./host-refused.ts"
@@ -849,6 +850,10 @@ async function openHost(
     readCanvasContext,
     baseNews,
     pending: writePendingRunEndReport({ runs: runDocs, records }),
+    started: lane =>
+      void keeper
+        .track(moveCanvasToActive({ basics, places: placesWriter }, lane))
+        .catch(failed(basics, "moving a canvas to Active", lane)),
   })
   const relays = createRelays({
     basics,

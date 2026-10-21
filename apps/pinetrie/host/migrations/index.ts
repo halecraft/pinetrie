@@ -59,6 +59,8 @@ import {
 } from "./0024-trashed-rows.ts"
 import { runEndReportMigration } from "./0025-run-end-report.ts"
 import { CARD_TICKED } from "./0026-card-ticked.ts"
+import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
+import { workflowMarks } from "./0028-workflow-marks.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -93,7 +95,11 @@ export interface Migration {
  * deleted; restore one from the revision that deleted it for a store still
  * on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [IMAGE_VERSIONS, CARD_TICKED]
+export const MIGRATIONS: readonly Migration[] = [
+  IMAGE_VERSIONS,
+  CARD_TICKED,
+  CANVAS_STATE_CHANGED,
+]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -145,6 +151,7 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   trashedHistories,
   trashedTraces,
   runEndReportMigration,
+  workflowMarks,
 ]
 
 /**

@@ -325,14 +325,14 @@ const shiftOf = (seed: number, own: number): number =>
 
 /**
  * What an archived canvas's column says and offers: who moved it to
- * the archive, and Restore, which moves it to the first open state.
+ * the archive, and Restore, which moves it to Topics.
  */
 export function readOnlyWords(
   archived: ArchivedCanvas,
   workflow: Workflow | null,
   nameOf: ReadonlyMap<WriterId, string>,
 ): ReadOnly {
-  const to = workflow?.open[0]
+  const to = workflow?.topics
   return {
     label: `archived by ${displayName(archived.by, nameOf.get(archived.by))}`,
     action:
