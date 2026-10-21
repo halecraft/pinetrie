@@ -35,6 +35,9 @@
   - ADR-0077: the inventory is one of a person's documents (`personDocId`),
     which share one policy.
   - ADR-0117: a thread card's place is the host's, in a task or an inventory.
+  - ADR-0202: a canvas's places are its members' to write, each card's place
+    one value under its own key; your drafts are yours; the host owns no
+    place.
 
 For ADR-0048's step 4, and it changes how step 3's queue and unqueue are
 written.

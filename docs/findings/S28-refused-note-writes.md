@@ -1,7 +1,7 @@
 # S28 — can a client recover from a refused note write, and can the host hear editing stop?
 
 - **Status:** Answered
-- **Led to:** ADR-0026, ADR-0028, ADR-0029, ADR-0048, ADR-0059
+- **Led to:** ADR-0026, ADR-0028, ADR-0029, ADR-0048, ADR-0059, ADR-0202
 
 **Answers.**
 1. **No: a refused write cannot be recovered from, and the host should never

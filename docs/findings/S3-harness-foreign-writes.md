@@ -1,7 +1,7 @@
 # S3 — Does `pi-agent-core` tolerate storage it did not write?
 
 - **Status:** Answered
-- **Led to:** ADR-0009, ADR-0011, ADR-0013
+- **Led to:** ADR-0009, ADR-0011, ADR-0013, ADR-0202
 
 ## Brief
 

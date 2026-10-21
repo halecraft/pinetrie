@@ -13,6 +13,8 @@
   - ADR-0168: a lane's record naming its host, the runner, and the check that
     a lane rebuilt from its revisions runs are shelved. One host holds a lane
     at a time and alone writes its thread's end, as built.
+  - ADR-0202: a lane's record names the machine it is tethered to, by
+    principal; that machine alone writes the agent's record.
 
 **Context.**
 

@@ -1,7 +1,7 @@
 # S19 — can the host append a chat message to a lane without a run?
 
 - **Status:** Answered
-- **Led to:** ADR-0018, ADR-0020, ADR-0048, ADR-0120
+- **Led to:** ADR-0018, ADR-0020, ADR-0048, ADR-0120, ADR-0202
 
 **Answer: yes, through the lane. And chat is best a pi `CustomMessage`, not a
 custom entry,** because then a message that compels the agent can BE the

@@ -1,0 +1,34 @@
+Linux lane, Node 24. With the start sweep as it is:
+
+1 host holds the text: true
+1 places name it: false
+2 bea holds it unasked: true
+2 ada2 holds it unasked: true
+2 bea, asking by id, reads it: true
+2 drafts documents ready: [true,true]
+2 ada2 finds the draft in the drafts document: true
+2 ada2 reads its text by that id: true
+2 bea can open ada's drafts document: false
+3 ada1's copy is still held: true
+3 ada1 sees ada2's typing: true
+4 races converged: "20/20"
+4 ada1 won: "0/20"
+4 the loser reads another card named: "20/20"
+host log: [host] swept 0 empty card(s), 1 unused text(s), 3 seat(s)
+1 after a restart, the host holds the text: ""
+1 after a restart, the drafts document names it: true
+1 after a restart, a new tab reads: ""
+5 a write with the host gone threw: null
+5 the tab's copy holds it: " offline"
+5 a new card's text, written offline: "new while offline"
+
+With `cards.destroyDocs(swept.docs)` in `apps/pinetrie/host/startup.ts`
+switched off for one run:
+
+host log: [host] swept 0 empty card(s), 1 unused text(s), 3 seat(s)
+1 after a restart, the host holds the text: ""
+1 after a restart, the drafts document names it: true
+1 after a restart, a new tab reads: "draft one and two"
+
+(The host's own `cardText` reads "" after a restart because a fresh host
+opens a card's document only when a client asks for it.)

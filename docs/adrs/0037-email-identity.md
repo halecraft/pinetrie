@@ -15,6 +15,9 @@
     as it connects, so a text's writers can be named after they leave.
   - ADR-0098: you rename yourself on your profile page; your avatar opens a
     menu, not a dialog.
+  - ADR-0202: a page keeps a Kyneta store in the browser and reconnects; a
+    tab's seat lasts across reloads; a client's work and requests outlast the
+    host's absence.
 
 **Context.** pine·trie chose each client's Kyneta peer id and made its writer
 from it: a browser tab took one from Kyneta's `persistentPeerId`, a Node

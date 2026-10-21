@@ -1,0 +1,6 @@
+1 changesets delivered: 1
+1 delivered: [{"replay":true,"changes":[{"at":"msgs","change":{"type":"map","set":{"y":{"parent":"e1","text":"edited"}}}}]}]
+1 b holds: {"y":{"parent":"e1","text":"edited"}}
+2 changesets delivered: 1
+2 delivered: [{"replay":true,"changes":[{"at":"msgs","change":{"type":"map","set":{"y":{"parent":"e1","text":"edited"}}}},{"at":"intents","change":{"type":"sequence","instructions":[{"insert":[{"kind":"create","key":"x","author":"bea","seq":1},{"kind":"retract","key":"x","author":"bea","seq":2},{"kind":"create","key":"y","author":"bea","seq":3},{"kind":"edit","key":"y","author":"bea","seq":4}]}]}}]}]
+2 b's intents: [{"kind":"create","key":"x","author":"bea","seq":1},{"kind":"retract","key":"x","author":"bea","seq":2},{"kind":"create","key":"y","author":"bea","seq":3},{"kind":"edit","key":"y","author":"bea","seq":4}]

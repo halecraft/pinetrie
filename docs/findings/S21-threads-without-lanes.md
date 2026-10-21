@@ -1,7 +1,8 @@
 # S21 — conversation threads with no lane, and a lane that is running
 
 - **Status:** Answered
-- **Led to:** ADR-0020, ADR-0026, ADR-0056, ADR-0080, ADR-0106, ADR-0120
+- **Led to:** ADR-0020, ADR-0026, ADR-0056, ADR-0080, ADR-0106, ADR-0120,
+  ADR-0202
 
 **Answers.**
 1. **A message appended with no lane is a full member of the tree.** Another

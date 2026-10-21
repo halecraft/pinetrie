@@ -1,0 +1,9 @@
+1 paired over a data channel: true
+1 laptop to desk: true
+1 desk to laptop: true
+1 laptop's seat after its reload is the same: true
+1 laptop, reloaded, has from its store: {"seat":"9c53cf31a1043ce8487d2273335cfa78","slots":{"t1":"k1","t2":"k2"},"text":"from laptop, and desk","channelOpen":false,"peers":0}
+1 paired again: true
+1 laptop, reloaded, catches up the desk's write: true
+1 desk gets the laptop's write after the reload: true
+1 both read: {"desk":{"seat":"4c2bc25226ecf76a65bebd28f477d941","slots":{"t1":"k1","t2":"k2","t3":"k3","t4":"k4"},"text":"from laptop, and desk (while the laptop reloaded) +laptop","channelOpen":true,"peers":1},"laptop":{"seat":"9c53cf31a1043ce8487d2273335cfa78","slots":{"t1":"k1","t2":"k2","t3":"k3","t4":"k4"},"text":"from laptop, and desk (while the laptop reloaded) +laptop","channelOpen":true,"peers":1}}

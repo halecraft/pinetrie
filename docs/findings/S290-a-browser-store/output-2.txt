@@ -1,0 +1,19 @@
+hub seat at first start: "52b3f35bcb1487028de12f30fae1a248"
+tab seat: "66f4bbdb4f44ae7ffcfa742174237308"
+online: hub holds the draft and text: true
+online: m1 answered: true
+hub down: tab's transport: "reconnecting"
+hub down: connectivity: "connecting"
+hub down: writes and a request threw: null
+hub down: the tab reads: {"seat":"66f4bbdb4f44ae7ffcfa742174237308","slots":{"t1":"k1","t2":"k2"},"text":"hello offline","replies":["echo m1"],"status":"reconnecting","line":true,"connectivity":"connecting"}
+reload, hub down: same seat: true
+reload, hub down: the tab reads: {"seat":"66f4bbdb4f44ae7ffcfa742174237308","slots":{"t1":"k1","t2":"k2"},"text":"hello offline","replies":[],"status":"reconnecting","line":true,"connectivity":"connecting"}
+second tab: another seat: true
+second tab, hub down: reads: {"seat":"40977f041af197e962df731f8b5a5206","slots":{"t1":"k1","t2":"k2"},"text":"hello offline","replies":[],"status":"reconnecting","line":true,"connectivity":"connecting"}
+hub restarted: same seat: true
+hub back: holds the offline draft and text: true
+hub back: its text and slots: ["hello offline",{"t1":"k1","t2":"k2"}]
+hub back: m2 and m3 answered: true
+hub received, in order: ["m1","m2","m3"]
+tab's replies: ["echo m2","echo m3"]
+second tab reads, after: {"seat":"40977f041af197e962df731f8b5a5206","slots":{"t1":"k1","t2":"k2"},"text":"hello offline","replies":[],"status":"ready","line":true,"connectivity":"online"}

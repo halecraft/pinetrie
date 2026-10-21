@@ -1,0 +1,33 @@
+Linux lane, Node 24. Two runs; a third (not kept) matched the second.
+
+Run 1 (the first full run; its sections 3 and 5 had not yet the torn and new-card lines):
+1 connected races ada won: "20/20"
+1 after rejoin, k20 / k21 / k22: ["ada","ada","bea"]
+
+Run 2:
+setup reached everyone: true
+1 connected races converged: "20/20"
+1 connected races ada won: "0/20"
+1 the loser reads the other place: "20/20"
+1 partitioned: ada sees k20 in: "ada"
+1 partitioned: bea sees k20 in: "bea"
+1 after rejoin, all converged: true
+1 after rejoin, k20 / k21 / k22: ["bea","ada","bea"]
+1 cards whose place differs between peers: 0
+2 the later move wins (bea after ada, ada after bea): [true,true]
+3 separate keys: both the move and the command stood: "20/20"
+3 one value: both stood: "0/20"
+3 one value: torn (neither writer's whole value): "0/20"
+4 undo of a move: result: "undone"
+4 undo of a move: back in, everywhere: ["a","a","30"]
+4 undo after another moved it: result: {"kind":"none","stale":null}
+4 undo after another moved it: k31 is: ["bea","bea",{"column":"bea","order":"2"}]
+4 whole undo after another moved it: result: "refused"
+4 whole undo after another moved it: k32 is: {"column":"bea","order":"2"}
+5 bytes for 1000 moves of 40 cards: 12047
+5 bytes per move: 12
+5 the whole document, bytes: 16249
+5 bytes for 1000 new cards placed: 32780
+6 after rejoin, the titles: ["Our Canvas by Ada","Our Canvas by Ada","Our Canvas by Ada"]
+6 converged: true
+6 ada's seat is unchanged: "ae4b40ebe21718b754a76679c485bf08"

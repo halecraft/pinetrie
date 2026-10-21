@@ -1,7 +1,7 @@
 # S75 — where an inventory card's place lives, and undoing moves
 
 - **Status:** Answered
-- **Led to:** ADR-0048, ADR-0059, ADR-0083
+- **Led to:** ADR-0048, ADR-0059, ADR-0083, ADR-0202
 
 Measured in a lane (Linux, Node 24), for ADR-0048's step 4, the inventory.
 It answers the ADR's probe 1 (places as a CRDT) and the rest of probe 4

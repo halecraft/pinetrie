@@ -89,6 +89,8 @@
   - ADR-0171: the inventory is a 2 × 6 grid of 12 slots, not 3 × 6. A take
     while it is closed peeks, and the panel closes by ×, Escape and its
     toggle, opening and closing in motion.
+  - ADR-0202: a card's text is shared with its canvas's members only, not with
+    every client.
 
 Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
 Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,

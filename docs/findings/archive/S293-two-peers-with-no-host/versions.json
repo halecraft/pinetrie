@@ -1,0 +1,20 @@
+{
+  "name": "s293",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kyneta/bridge-transport": "^4.0.0",
+    "@kyneta/exchange": "^4.0.0",
+    "@kyneta/indexeddb-store": "^4.0.0",
+    "@kyneta/schema": "^4.0.0",
+    "@kyneta/sqlite-store": "^4.0.0",
+    "@kyneta/webrtc-transport": "^4.0.0",
+    "@kyneta/websocket-transport": "^4.0.0",
+    "@kyneta/yjs-schema": "^4.0.0",
+    "better-sqlite3": "^13.0.3",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.1",
+    "ws": "^8.22.0",
+    "yjs": "^13.6.33"
+  }
+}

@@ -1,0 +1,37 @@
+1 laptop to desk: true
+1 desk to laptop: true
+1 laptop's seat after its restart is the same: true
+1 laptop, restarted, has its drafts from its store: {"t1":"k1","t2":"k2"}
+1 laptop, restarted, catches up the desk's write: true
+1 desk's seat after its restart is the same: true
+1 desk, restarted, has its text from its store: "from laptop, and desk (while the laptop was off)"
+1 desk, restarted, gets the laptop's offline draft: true
+2 desk's own write to the places throws: "NotAWriterError"
+2 laptop's own write to the places throws: "NotAWriterError"
+[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects
+2 desk's places after the rogue's offer: {}
+2 laptop's places after the rogue's offer: {}
+2 a card's text, which anyone may write, from the rogue reached the laptop: true
+2 diagnostics: ["[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects"]
+3 bea holds ada's drafts unasked: false
+3 bea holds the card's text unasked: true
+3 bea, asking for ada's drafts by id, reads: {}
+3 bea, asking for ada's prefs by id, reads: {"theme":""}
+3 bea's write to ada's drafts throws: "NotAWriterError"
+3 bea's write to the card reaches the laptop through the desk: true
+4 the host has ada's drafts, the card and her prefs: true
+[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects
+4 the host's places reach the desk and bea through the laptop: false
+4 the laptop, connected to the host, has its places: {"k1":"column-a"}
+4 the desk, through the laptop, has its places: {}
+[exchange] peer 'c81503b28a6b5f481effc1ebb075b87a' refused our operations on doc 'places': it is sent none of the document's content until it reconnects
+4 the desk, connected to the host as well, gets its places: true
+4 bea, connected to the desk only, gets them then: false
+4 everyone's text: {"host":"from laptop, and desk (while the laptop was off)[rogue]  +bea","desk":"from laptop, and desk (while the laptop was off)[rogue]  +bea","laptop":"from laptop, and desk (while the laptop was off)[rogue]  +bea","bea":"from laptop, and desk (while the laptop was off)[rogue]  +bea"}
+4 everyone's drafts: {"host":{"t2":"k2","t3":"k3","t1":"k1"},"desk":{"t1":"k1","t2":"k2","t3":"k3"},"laptop":{"t1":"k1","t2":"k2","t3":"k3"}}
+4 everyone's prefs: {"host":{"theme":"dark"},"desk":{"theme":"dark"},"laptop":{"theme":"dark"}}
+4 bea holds ada's drafts, now through two peers: {}
+4 diagnostics: ["[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects","[exchange] peer 'c81503b28a6b5f481effc1ebb075b87a' refused our operations on doc 'places': it is sent none of the document's content until it reconnects"]
+4 the text's Yjs state, by client: 5
+seats: {"desk":"919920bd58bc78d172480a1839223645","laptop":"386f8e8250e6450cb6930fa66ef5d248","bea":"c81503b28a6b5f481effc1ebb075b87a"}
+all diagnostics: ["[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects","[exchange] peer '919920bd58bc78d172480a1839223645' refused our operations on doc 'places': it is sent none of the document's content until it reconnects","[exchange] peer 'c81503b28a6b5f481effc1ebb075b87a' refused our operations on doc 'places': it is sent none of the document's content until it reconnects"]
