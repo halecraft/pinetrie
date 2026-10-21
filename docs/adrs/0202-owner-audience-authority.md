@@ -44,7 +44,8 @@ What Kyneta 4.0 offers, read from its source and measured:
 - **Policies are pure functions of a document's id and a peer's
   principal**, registered alike on every peer. `canWrite` is judged
   against your own writes (they throw) and against every offer's sender,
-  so no peer, relay or host passes on a write the rule refuses.
+  so a write the rule refuses is taken in by no peer, relay or host,
+  and goes no further than its writer.
   `canShare` gates every way a document reaches a peer, a request by id
   included, and a refusal answers `vacant`, as for an id that does not
   exist.
