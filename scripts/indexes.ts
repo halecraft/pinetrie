@@ -2,8 +2,11 @@
 // imported through it: one `export { … } from "./m.ts"` per module that
 // declares a name some file imports by the package's name, or through
 // `./index.ts`, and nothing else. The index's leading comment is kept as it
-// is written. `node scripts/indexes.ts` (`pnpm run indexes`) writes the plan;
-// `scripts/indexes.test.ts` fails while it would write anything or refuses.
+// is written. It also finds each export of a module that no other file
+// imports, by the index, by another entry of the package, or by path.
+// `node scripts/indexes.ts` (`pnpm run indexes`) writes the plan and lists
+// those; `scripts/indexes.test.ts` fails while it would write anything,
+// refuses, or finds one.
 // Gather, plan, execute: everything above `gatherIndexes` is pure.
 
 import { readFileSync, writeFileSync } from "node:fs"
@@ -21,10 +24,12 @@ export const INDEXED: readonly string[] = [
   "web-core",
 ]
 
-/** An indexed package: its name, as imported, and its directory. */
+/** An indexed package: its name, as imported, its directory, and its other entries. */
 export interface IndexedPackage {
   readonly name: string
   readonly dir: string
+  /** Each entry but the index, by the specifier that imports it: `@pinetrie/rules/ignores` -> `packages/rules/ignores.ts`. */
+  readonly entries: ReadonlyMap<string, string>
 }
 
 export interface IndexInput {
@@ -62,10 +67,17 @@ export type IndexRefusal =
       readonly module: string
     }
 
+/** A name a module exports that no other file imports: its `export` can go. */
+export interface UnusedExport {
+  readonly module: string
+  readonly name: string
+}
+
 export interface IndexPlan {
   /** Each index whose text is not what it should be, with what it should be. */
   readonly writes: readonly { readonly file: string; readonly text: string }[]
   readonly refusals: readonly IndexRefusal[]
+  readonly unusedExports: readonly UnusedExport[]
 }
 
 const LINE_WIDTH = 80
@@ -132,6 +144,7 @@ const isModuleOf = (pkg: IndexedPackage, file: string): boolean =>
 export function planIndexes(input: IndexInput): IndexPlan {
   const writes: { file: string; text: string }[] = []
   const refusals: IndexRefusal[] = []
+  const unusedExports: UnusedExport[] = []
   // Each file read once, whichever packages it imports.
   const takenBy = input.sources.map(s => ({
     file: s.file,
@@ -143,10 +156,15 @@ export function planIndexes(input: IndexInput): IndexPlan {
     if (index === undefined) continue
     // Which module exports each name.
     const exporters = new Map<string, string[]>()
+    const exportsOf = new Map<string, readonly string[]>()
     for (const s of input.sources) {
       if (!isModuleOf(pkg, s.file)) continue
       const module = `./${path.posix.basename(s.file)}`
       const { names, whole } = exportedNames(s.file, s.text)
+      exportsOf.set(
+        s.file,
+        names.map(n => n.name),
+      )
       if (whole.length > 0)
         refusals.push({ kind: "export-all", package: pkg.name, module: s.file })
       // An overloaded function is declared once per signature: one module still.
@@ -182,6 +200,35 @@ export function planIndexes(input: IndexInput): IndexPlan {
         }
       }
     }
+    // Which names each module gives some other file: through the index, an
+    // entry of its own, or a path.
+    const given = new Map<string, Set<string>>()
+    const give = (file: string, name: string) =>
+      given.set(file, (given.get(file) ?? new Set()).add(name))
+    for (const s of takenBy) {
+      if (s.file === indexFile) continue
+      for (const t of s.taken) {
+        if (t.kind !== "names") continue
+        const viaIndex = isIndexSpecifier(pkg, s.file, t.specifier)
+        const entry = pkg.entries.get(t.specifier)
+        const byPath = t.specifier.startsWith(".")
+          ? path.posix.normalize(
+              path.posix.join(path.posix.dirname(s.file), t.specifier),
+            )
+          : null
+        for (const n of t.names) {
+          const module = viaIndex
+            ? (exporters.get(n.name) ?? [])
+                .slice(0, 1)
+                .map(m => path.posix.join(pkg.dir, m))[0]
+            : (entry ?? byPath)
+          if (module !== undefined && module !== null) give(module, n.name)
+        }
+      }
+    }
+    for (const [module, names] of exportsOf)
+      for (const name of new Set(names))
+        if (!given.get(module)?.has(name)) unusedExports.push({ module, name })
     const byModule = new Map<string, { name: string; typeOnly: boolean }[]>()
     for (const [name, typeOnly] of taken) {
       const modules = exporters.get(name) ?? []
@@ -206,7 +253,7 @@ export function planIndexes(input: IndexInput): IndexPlan {
     const text = `${head}${head === "" ? "" : "\n\n"}${statements.join("\n")}\n`
     if (text !== index.text) writes.push({ file: indexFile, text })
   }
-  return { writes, refusals }
+  return { writes, refusals, unusedExports }
 }
 
 /** The packages in `INDEXED` with their names, and every source, tests among them. */
@@ -215,8 +262,19 @@ export function gatherIndexes(root: string): IndexInput {
     packages: INDEXED.map(dir => {
       const manifest = JSON.parse(
         readFileSync(path.join(root, "packages", dir, "package.json"), "utf8"),
-      ) as { readonly name: string }
-      return { name: manifest.name, dir: `packages/${dir}` }
+      ) as {
+        readonly name: string
+        readonly exports?: Readonly<Record<string, string>>
+      }
+      const entries = new Map(
+        Object.entries(manifest.exports ?? {})
+          .filter(([sub, file]) => sub !== "." && file.endsWith(".ts"))
+          .map(([sub, file]) => [
+            `${manifest.name}${sub.slice(1)}`,
+            path.posix.join("packages", dir, file),
+          ]),
+      )
+      return { name: manifest.name, dir: `packages/${dir}`, entries }
     }),
     sources: [
       ...readSources(root, { tests: true }),
@@ -238,4 +296,9 @@ if (import.meta.main) {
   }
   for (const w of plan.writes) writeFileSync(path.join(root, w.file), w.text)
   console.log(`indexes: ${plan.writes.length} written`)
+  for (const u of plan.unusedExports)
+    console.log(
+      `${u.module}: ${u.name} is exported, and no other file imports it`,
+    )
+  if (plan.unusedExports.length > 0) process.exitCode = 1
 }

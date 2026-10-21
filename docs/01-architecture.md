@@ -234,7 +234,8 @@ The indexes of core, threads, rules, interface and web-core are written by
 record's header: each holds exactly the names some file imports through it,
 from the module that declares each, and `scripts/indexes.test.ts` fails while
 one differs. A name only its module and its tests use is not in the index,
-and a module exports nothing no other module imports.
+and a module exports nothing no other file imports, which the same test
+holds (`unusedExports`).
 
 
 ### Pure code names only the globals it may

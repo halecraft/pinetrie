@@ -2,7 +2,7 @@
 
 Numbered 0199 until 2026-10-20, when two files held that number.
 
-- **Status:** Proposed
+- **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `packages/core/TECHNICAL.md`, `packages/threads/TECHNICAL.md`,
   `packages/rules/TECHNICAL.md`, `packages/interface/TECHNICAL.md`,
   `ARCHITECTURE.md`, `docs/01-architecture.md`

@@ -11,25 +11,8 @@ modules decide, and the host writes.
 The package was `@pinetrie/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pinetrie/core`, `@pinetrie/threads` and `@pinetrie/jj` state it too:
-
-> A type lives in the highest package that all its users can import
-> (ADR-0180). Core is the kernel every package shares: ids, refusals,
-> writes, and what a lane, its disk and its history are. `@pinetrie/threads`
-> holds threads, their entries and messages, the commands a client
-> sends, and the cards placed beside them; no lane package declares it
-> (ADR-0201). A stored shape's type is `@pinetrie/rules`', beside its spec,
-> with the types only it uses. A type a package below rules must read,
-> write or name (one that declares core and not rules) lives in core
-> when core's own code or a lane package (`lanes`, `jj`, `folder`
-> among them) names it, and in threads otherwise. What a stored shape
-> says, and how the host changes it, is `@pinetrie/rules`', whoever reads it.
-> One client's own in-flight state (its moves, held roots, slot repair,
-> commands out) is `@pinetrie/session`'s. What a person sees and can do,
-> and its words, is `@pinetrie/interface`'s, for any client; how the page
-> draws it is `@pinetrie/web`'s (ADR-0093).
-
-So `planStop` is here beside `STOP`, and `agentByDefault` beside
+Where a type lives is the rule `packages/core/TECHNICAL.md` states ("Where
+a type lives", ADR-0180). So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressMessage`; `address`, `parseMentions` and `cardMove`, which know no
 record, are threads'; the trailer format and the proposed changes' facts and decisions
 are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.

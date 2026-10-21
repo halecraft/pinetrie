@@ -98,6 +98,15 @@ const scenarios = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a module exports a name no other file imports",
+    file: "packages/interface/column-menu.ts",
+    from: "\ninterface HeadBox {\n",
+    to: "\nexport interface HeadBox {\n",
+    command: ["pnpm", "exec", "vitest", "run", "scripts/indexes.test.ts"],
+    expect:
+      "no module of an indexed package exports what no other file imports",
+  },
+  {
     name: "rules' index exports a name no package imports",
     file: "packages/rules/index.ts",
     from: "  planAccessOutside,\n",

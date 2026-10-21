@@ -4,9 +4,8 @@
 // (`withHost`), positions and starts, and their model. A host whose agent has tools, and so lanes,
 // is `lane-hosts.ts`'s.
 //
-// Deliberately not in core/ or threads/: both are pure and import nothing
-// but core.
-// A test harness is neither.
+// Deliberately not in core/ or threads/: those are pure and import no other
+// package but core, and a test harness is neither.
 
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"

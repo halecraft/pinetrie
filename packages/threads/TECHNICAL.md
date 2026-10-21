@@ -11,10 +11,10 @@ builtin, since the client loads it in the browser; `tsconfig.pure.json`
 type-checks it against only the globals `pure-globals.d.ts` declares.
 Everything here is a *plan* in gather, plan, execute.
 
-Where a type lives is the rule `packages/core/TECHNICAL.md` states (ADR-0180):
-a stored shape's type is `@pinetrie/rules`', beside its spec, and here when a
-package below rules names it and can declare threads (`protocol`, `schema`):
-`ThreadRecord`, `CardRecord`, `StreamRecord`.
+Where a type lives is the rule `packages/core/TECHNICAL.md` states ("Where a
+type lives", ADR-0180). Here that is a type a package below rules names when
+it can declare threads (`protocol`, `schema`): `ThreadRecord`, `CardRecord`,
+`StreamRecord`.
 
 `index.ts` declares nothing. It is written by `pnpm run indexes`
 (`scripts/indexes.ts`): each name some file imports through it, from the

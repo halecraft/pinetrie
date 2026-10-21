@@ -9,7 +9,11 @@ import {
 
 const ROOT = path.join(import.meta.dirname, "..")
 
-const PKG = { name: "@pinetrie/p", dir: "packages/p" }
+const PKG = {
+  name: "@pinetrie/p",
+  dir: "packages/p",
+  entries: new Map([["@pinetrie/p/extra", "packages/p/extra.ts"]]),
+}
 const HEAD = "// p — a package.\n"
 
 /** A repo of one indexed package, its modules and index, and the files outside it. */
@@ -62,7 +66,7 @@ describe("planIndexes", () => {
         index,
       ),
     )
-    expect(plan).toEqual({ writes: [], refusals: [] })
+    expect(plan).toEqual({ writes: [], refusals: [], unusedExports: [] })
   })
 
   test("a name imported as a value anywhere is exported as a value", () => {
@@ -129,6 +133,28 @@ describe("planIndexes", () => {
       'export { f, type Other } from "./again.ts"',
     )
   })
+
+  test("an export no other file imports is found; one its test, a sibling, or another entry imports is not", () => {
+    const plan = planIndexes(
+      repo(
+        {
+          "a.ts":
+            "export const byTest = 1\nexport const bySibling = 2\nexport const byNone = 3\n",
+          "b.ts":
+            'import { bySibling } from "./a.ts"\nexport const viaIndex = bySibling\n',
+          "extra.ts": "export const byEntry = 4\n",
+        },
+        {
+          "packages/p/a.test.ts": 'import { byTest } from "./a.ts"\n',
+          "packages/q/x.ts":
+            'import { viaIndex } from "@pinetrie/p"\nimport { byEntry } from "@pinetrie/p/extra"\n',
+        },
+      ),
+    )
+    expect(plan.unusedExports).toEqual([
+      { module: "packages/p/a.ts", name: "byNone" },
+    ])
+  })
 })
 
 test("exportStatement: one line within 80 columns, else one name a line, as Biome lays it out", () => {
@@ -155,8 +181,15 @@ test("exportStatement: one line within 80 columns, else one name a line, as Biom
   )
 })
 
-test("every indexed package's index is as `pnpm run indexes` writes it", () => {
+describe("the repo", () => {
   const plan = planIndexes(gatherIndexes(ROOT))
-  expect(plan.refusals).toEqual([])
-  expect(plan.writes.map(w => w.file)).toEqual([])
+
+  test("every indexed package's index is as `pnpm run indexes` writes it", () => {
+    expect(plan.refusals).toEqual([])
+    expect(plan.writes.map(w => w.file)).toEqual([])
+  })
+
+  test("no module of an indexed package exports what no other file imports", () => {
+    expect(plan.unusedExports).toEqual([])
+  })
 })

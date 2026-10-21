@@ -21,23 +21,8 @@ What proposed changes or a setup or publish means is decided in
 `@pinetrie/rules`, which this package cannot declare: it returns
 each decision as a value typed in `@pinetrie/core` (`core/proposed.ts`), this
 package reads the facts it is made from and turns it into steps, and the
-host connects the two. The rule all three packages keep:
-
-> A type lives in the highest package that all its users can import
-> (ADR-0180). Core is the kernel every package shares: ids, refusals,
-> writes, and what a lane, its disk and its history are. @pinetrie/threads
-> holds threads, their entries and messages, the commands a client
-> sends, and the cards placed beside them; no lane package declares it
-> (ADR-0201). A stored shape's type is @pinetrie/rules', beside its spec,
-> with the types only it uses. A type a package below rules must read,
-> write or name (one that declares core and not rules) lives in core
-> when core's own code or a lane package (lanes, jj, folder
-> among them) names it, and in threads otherwise. What a stored shape
-> says, and how the host changes it, is @pinetrie/rules', whoever reads it.
-> One client's own in-flight state (its moves, held roots, slot repair,
-> commands out) is @pinetrie/session's. What a person sees and can do,
-> and its words, is @pinetrie/interface's, for any client; how the page
-> draws it is @pinetrie/web's (ADR-0093).
+host connects the two. Where a type lives is the rule
+`packages/core/TECHNICAL.md` states ("Where a type lives", ADR-0180).
 
 `index.ts` names its exports of your repo: only what other packages use;
 a lane's repo (`lane/`) it exports whole. The separate

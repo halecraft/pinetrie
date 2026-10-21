@@ -18,18 +18,10 @@ which declares only core. No lane package (`lanes`, `lanehost`, `docker`,
 a kernel module cannot import a threads module: core declares nothing, so
 none resolves. That holds by resolution (S285).
 
-The rule core, `@pinetrie/threads`, `@pinetrie/rules` and `@pinetrie/jj`
-keep: a type lives in the highest package that all its users can import
-(ADR-0180). A stored shape's type is rules', beside its spec; it is core's
-only when core's own code names it, or a lane package does, and threads'
-when every package that names it can declare threads. So `LaneRecord`,
-`JjBaseRecord`, `FolderBaseRecord` (which `@pinetrie/folder`'s
-`planFolderRecords` builds) and `StateRecord` are here, `ThreadRecord` and
-`CardRecord` are threads', and `SeatRecord` and `SetupRecord` are rules'.
-What a stored shape says, and how the host changes it, is `@pinetrie/rules`',
-whoever reads it. Core also holds the few pure helpers several packages
-share (`paths.ts`, `errorText`, `firstLine`), since every package that uses
-one already depends on core.
+Core also holds the few pure helpers several packages share (`paths.ts`,
+`errorText`, `firstLine`), since every package that uses one already
+depends on core. Where a type lives is below; the other packages' notes
+point here rather than restate it.
 
 `index.ts` declares nothing. It is written by `pnpm run indexes`
 (`scripts/indexes.ts`, ADR-0201): each name some file imports through it,
@@ -43,15 +35,38 @@ fails while it differs. `fixtures.ts` is apart, which tests import as
   (`proposed.ts` and `accepted.ts`): they are erased, so such a cycle costs
   nothing at run time.
 
-- **A module exports only what another module imports.** A name only its
+- **A module exports only what another file imports.** A name only its
   own module and its tests use is exported for the tests alone; one nothing
-  outside its module names is not exported at all.
+  outside its module names is not exported at all. `scripts/indexes.test.ts`
+  fails on an export no other file imports, here and in each package
+  `INDEXED` lists.
 
 - **`collectionSteps` (`fixtures.ts`) wraps globals:** the iterators of
   `Map.prototype` and `Set.prototype`, while the function it counts runs.
   That function must be synchronous, and its test must not be
   `test.concurrent`. It counts iteration (spread, `for … of`, `forEach`,
   `new Set(iterable)`), not `get`, `has`, `set` or `delete` (S214).
+
+## Where a type lives
+
+A type lives in the highest package that all its users can import
+(ADR-0180, ADR-0201):
+
+- **Core** holds a type core's own code names, or a lane package (`lanes`,
+  `jj`, `folder`, `lanehost`, `docker`) does: `LaneRecord`, `JjBaseRecord`,
+  `FolderBaseRecord` (which `@pinetrie/folder`'s `planFolderRecords`
+  builds), `StateRecord`.
+- **`@pinetrie/threads`** holds one a package below rules names when each
+  such package can declare threads (`protocol`, `schema`): `ThreadRecord`,
+  `CardRecord`, `StreamRecord`.
+- **`@pinetrie/rules`** holds every other stored shape's type, beside its
+  spec, with the types only it uses (`SeatRecord`, `SetupRecord`). What a
+  stored shape says, and how the host changes it, is rules', whoever reads
+  it.
+- **`@pinetrie/session`** holds one client's own in-flight state (its moves,
+  held roots, slot repair, commands out). What a person sees and can do,
+  and its words, is `@pinetrie/interface`'s, for any client; how the page
+  draws it is `@pinetrie/web`'s (ADR-0093).
 
 ## Where things are
 
