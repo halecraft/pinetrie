@@ -204,24 +204,26 @@ describe.skipIf(!onBtrfs)(
     })
 
     test("a path whose stamp moved since the host read it makes no state, and is answered", async () => {
-      const [told] = await stamped(["a.txt"])
+      await mkdir(FOLDER, { recursive: true })
+      await writeFile(path.join(FOLDER, "moved.txt"), "as the host read it\n")
+      const [told] = await stamped(["moved.txt"])
       if (told === undefined) throw new Error("no stamp")
-      await writeFile(path.join(FOLDER, "a.txt"), "saved meanwhile\n")
+      await writeFile(path.join(FOLDER, "moved.txt"), "saved meanwhile\n")
       expect(
         await call({
           kind: "read-in",
           project: KEY,
-          from: "line-2",
-          state: "line-3",
+          from: null,
+          state: "line-moved",
           paths: [told],
           deleted: [],
         }),
-      ).toEqual({ kind: "moved", paths: ["a.txt"] })
+      ).toEqual({ kind: "moved", paths: ["moved.txt"] })
       expect(
         await call({
           kind: "snapshot-exists",
           project: KEY,
-          snapshot: "line-3",
+          snapshot: "line-moved",
         }),
       ).toBe(false)
       expect(await exists(disks.lane(FOLDER_LINE))).toBe(false)

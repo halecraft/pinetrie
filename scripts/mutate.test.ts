@@ -9,9 +9,13 @@ import {
   type Mutation,
   mutantEnv,
   mutationCommand,
+  narrowedCommand,
+  planMutant,
   run as runGroup,
   SUITES,
+  testsToList,
 } from "./mutate.ts"
+import type { ListedTest } from "./proofs.ts"
 
 const run = (status: number | null, output: string, timedOut = false) => ({
   status,
@@ -102,6 +106,128 @@ describe("failingChecks: the lines that name a failing check", () => {
     const out =
       "\x1b[31m   \x1b[31m×\x1b[31m planChat > a busy lane holds\x1b[39m"
     expect(failingChecks(out)).toEqual(["   × planChat > a busy lane holds"])
+  })
+})
+
+describe("narrowedCommand: a unit mutant runs its expected test", () => {
+  const vitest = (...paths: string[]) => [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    ...paths,
+  ]
+  const tests: readonly ListedTest[] = [
+    { file: "packages/jj/repo.test.ts", name: "a lane > accepts" },
+    { file: "packages/jj/repo.test.ts", name: "a lane > refreshes" },
+    { file: "packages/jj/owner.test.ts", name: "the owner accepts" },
+    { file: "packages/rules/card.test.ts", name: "a card accepts" },
+    { file: "packages/rules/a (b).test.ts", name: "a [card] (one)" },
+  ]
+  test("narrowed to the files holding the expected test, and to its name", () => {
+    expect(narrowedCommand(vitest("packages/jj"), "accepts", tests)).toEqual(
+      vitest(
+        "packages/jj/owner.test.ts",
+        "packages/jj/repo.test.ts",
+        "--testNamePattern=accepts",
+      ),
+    )
+  })
+  test("only the files under the command's paths", () => {
+    expect(
+      narrowedCommand(vitest("packages/rules/card"), "accepts", tests),
+    ).toEqual(
+      vitest("packages/rules/card.test.ts", "--testNamePattern=accepts"),
+    )
+    expect(narrowedCommand(vitest(), "a lane > refreshes", tests)).toEqual(
+      vitest(
+        "packages/jj/repo.test.ts",
+        "--testNamePattern=a lane > refreshes",
+      ),
+    )
+  })
+  test("an expect with regex characters is matched literally", () => {
+    const command = narrowedCommand(
+      vitest("packages/rules"),
+      "[card] (one)",
+      tests,
+    )
+    const pattern = command.at(-1)?.replace("--testNamePattern=", "") ?? ""
+    expect(new RegExp(pattern).test("a [card] (one)")).toBe(true)
+    expect(new RegExp(pattern).test("a c one")).toBe(false)
+  })
+  test("a command with flags, or not vitest's run, runs as written", () => {
+    const flagged = [...vitest("packages/jj"), "-t", "accepts"]
+    expect(narrowedCommand(flagged, "accepts", tests)).toBe(flagged)
+    const tsc = ["pnpm", "exec", "tsc", "--noEmit"]
+    expect(narrowedCommand(tsc, "accepts", tests)).toBe(tsc)
+  })
+  test("an expect no listed test's name holds, or none, runs the command as written", () => {
+    const command = vitest("packages/jj")
+    expect(narrowedCommand(command, "owner.test.ts", tests)).toBe(command)
+    expect(narrowedCommand(command, "nothing like it", tests)).toBe(command)
+    expect(narrowedCommand(command, undefined, tests)).toBe(command)
+  })
+})
+
+describe("testsToList: what one vitest list collects for a batch", () => {
+  const unit = (command: string[], expect?: string): Mutation => ({
+    name: "m",
+    file: "f",
+    from: "a",
+    to: "b",
+    command,
+    ...(expect === undefined ? {} : { expect }),
+  })
+  const vitest = (...paths: string[]) => [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    ...paths,
+  ]
+  test("the paths of the commands that can narrow, each once", () => {
+    expect(
+      testsToList([
+        unit(vitest("packages/jj"), "x"),
+        unit(vitest("packages/rules", "packages/jj"), "y"),
+        unit(vitest("packages/core")),
+        unit(["pnpm", "exec", "tsc"], "z"),
+      ]),
+    ).toEqual(["packages/jj", "packages/rules"])
+  })
+  test("every file for a bare run; nothing to list when none can narrow", () => {
+    expect(
+      testsToList([unit(vitest("packages/jj"), "x"), unit(vitest(), "y")]),
+    ).toEqual([])
+    expect(
+      testsToList([
+        unit(vitest("packages/core")),
+        {
+          name: "s",
+          file: "f",
+          from: "a",
+          to: "b",
+          suite: "host",
+          scenario: "boot",
+          expect: "c",
+        },
+      ]),
+    ).toBeNull()
+  })
+})
+
+describe("planMutant: a command must pass before its mutant runs", () => {
+  const command = ["pnpm", "exec", "vitest", "run", "a.test.ts"]
+  test("a command that passed with nothing mutated runs the mutant", () => {
+    expect(planMutant(command, null)).toEqual({ kind: "run", command })
+  })
+  test("a command that failed with nothing mutated runs no mutant: BASELINE", () => {
+    expect(planMutant(command, ["× a > b"])).toEqual({
+      kind: "baseline",
+      failing: ["× a > b"],
+    })
+    expect(planMutant(command, [])).toEqual({ kind: "baseline", failing: [] })
   })
 })
 

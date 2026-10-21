@@ -113,9 +113,16 @@ deliberate bug (a mutation in `scripts/mutations/`) that it catches. A
 mutation uses a suite only when its check proves what no unit test can: the
 behaviour of a container, jj, git, pi, Kyneta or the browser, or
 `startHost`'s own wiring. Anything else is a unit mutation, a second or two
-against minutes. `pnpm mutate <list> <name> --against <command>` runs a
-mutant against another command and lists the checks that catch it: use it to
-find a unit test that already proves a rule before writing one.
+against minutes. A unit mutation's `pnpm exec vitest run <paths…>` runs
+narrowed: only the files holding a test whose name contains its `expect`,
+and only those tests (one `vitest list` per batch). So a unit mutation's
+command names its package, not a file, and needs no `-t` of its own. Its
+command first runs once with nothing mutated; if it fails there, its
+mutants read BASELINE and run nothing: a test that passes only after
+another in its file fails alone, and would otherwise read KILLED.
+`pnpm mutate <list> <name> --against <command>` runs a mutant against
+another command, whole, and lists the checks that catch it: use it to find
+a unit test that already proves a rule before writing one.
 
 Each suite is a set of scenarios, one per file (`apps/pinetrie/e2e/TECHNICAL.md`),
 and `PINETRIE_SCENARIO=a,b` runs some. A suite mutation names its `suite`,

@@ -57,9 +57,12 @@ describe("the watcher on a shared directory", () => {
     await writeFile(file, "yours\n")
     const st = await stat(file, { bigint: true })
     const want = `${st.size}:${st.ctimeNs}`
-    await until(() => seen.some(s => s.path === ".plans/yours.md"))
+    // The watcher may report the file between its creation and its write,
+    // empty: the stamp that counts is the last one it reports.
+    const last = () => seen.filter(s => s.path === ".plans/yours.md").at(-1)
+    await until(() => last()?.stamp === want)
     expect(seen.find(s => s.path === ".plans/before.md")).toBeDefined()
-    expect(seen.find(s => s.path === ".plans/yours.md")?.stamp).toBe(want)
+    expect(last()?.stamp).toBe(want)
   })
 
   test("the start scans the directory whole, as the scan of its path", async () => {

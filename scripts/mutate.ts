@@ -18,20 +18,26 @@
 //     `apps/pinetrie/e2e/checks.ts`): nothing after it changes the result.
 //   - A suite mutation runs only its scenario (`PINETRIE_SCENARIO`,
 //     `apps/pinetrie/e2e/scenario.ts`), with its suite's command (`SUITES`).
+//   - A unit mutation's `vitest run` runs only the files and tests its
+//     `expect` names (`narrowedCommand`), from one `vitest list` per batch.
+//   - A unit mutation's command must pass with nothing mutated, run once per
+//     batch however many mutants share it, or its mutants read BASELINE and
+//     run nothing: a kill there would prove no bug.
 //
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
 //
-// With `--against <command…>` last, each mutant runs that command instead of
-// its own and reports which checks fail: CAUGHT with their lines, or MISSED.
+// With `--against <command…>` last, each mutant runs that command, whole,
+// instead of its own and reports which checks fail: CAUGHT with their lines, or MISSED.
 // No result, and the exit status is 0. It finds where a suite mutation's bug
 // is already caught by a faster command, as a unit test.
 
-import { spawn } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
 import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
+import type { ListedTest } from "./proofs.ts"
 
 interface MutationBase {
   /** What the mutant breaks, in words. */
@@ -87,9 +93,100 @@ export const SUITES: Readonly<
   },
 }
 
-/** The command a mutation runs. */
+/** The command a mutation names: its own, or its suite's. */
 export const mutationCommand = (m: Mutation): readonly string[] =>
   "suite" in m ? SUITES[m.suite].command : m.command
+
+const VITEST_RUN = ["pnpm", "exec", "vitest", "run"] as const
+
+/**
+ * The paths a `pnpm exec vitest run <paths…>` command runs (none: every
+ * file), or null for any other command, flags included: a command that
+ * carries its own flags was narrowed by hand.
+ */
+const vitestRunPaths = (
+  command: readonly string[],
+): readonly string[] | null => {
+  const paths = command.slice(VITEST_RUN.length)
+  return VITEST_RUN.every((word, i) => command[i] === word) &&
+    !paths.some(p => p.startsWith("-"))
+    ? paths
+    : null
+}
+
+/** `text` as a regular expression that matches it literally, as `-t` reads one. */
+const literalPattern = (text: string): string =>
+  text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")
+
+/**
+ * The command a unit mutant runs: only the files holding a test whose name
+ * contains `expect`, and only those tests (`-t` matches a test's
+ * `describe > … > title`, never its file). A kill already needs that test to
+ * fail, so the other tests could only turn ELSEWHERE into SURVIVED. Any
+ * other command, or an `expect` no listed test's name holds, is returned as
+ * it is: a filter that matched nothing would run nothing, and pass.
+ */
+export function narrowedCommand(
+  command: readonly string[],
+  expect: string | undefined,
+  tests: readonly ListedTest[],
+): readonly string[] {
+  const paths = vitestRunPaths(command)
+  if (expect === undefined || paths === null) return command
+  const files = [
+    ...new Set(
+      tests
+        .filter(
+          t =>
+            (paths.length === 0 || paths.some(p => t.file.includes(p))) &&
+            t.name.includes(expect),
+        )
+        .map(t => t.file),
+    ),
+  ].sort()
+  if (files.length === 0) return command
+  // One argument: an `expect` starting with "-" must not read as a flag.
+  return [
+    ...VITEST_RUN,
+    ...files,
+    `--testNamePattern=${literalPattern(expect)}`,
+  ]
+}
+
+/**
+ * What one `vitest list` must collect for `mutations` to be narrowed: the
+ * paths their commands run, `[]` for every file, or null when none can be.
+ */
+export function testsToList(
+  mutations: readonly Mutation[],
+): readonly string[] | null {
+  const each = mutations.flatMap(m =>
+    "suite" in m || m.expect === undefined
+      ? []
+      : [vitestRunPaths(m.command)].filter(p => p !== null),
+  )
+  if (each.length === 0) return null
+  if (each.some(paths => paths.length === 0)) return []
+  return [...new Set(each.flat())].sort()
+}
+
+export type MutantStep =
+  | { readonly kind: "run"; readonly command: readonly string[] }
+  | { readonly kind: "baseline"; readonly failing: readonly string[] }
+
+/**
+ * What a mutant does, given whether its command passed with nothing
+ * mutated (`failedWithout`: its failing lines, or null for a pass). A
+ * command that fails unmutated would read KILLED with no bug, as a test
+ * that passes only after another in its file does once narrowed to it.
+ */
+export const planMutant = (
+  command: readonly string[],
+  failedWithout: readonly string[] | null,
+): MutantStep =>
+  failedWithout === null
+    ? { kind: "run", command }
+    : { kind: "baseline", failing: failedWithout }
 
 export type MutantResult =
   | "killed"
@@ -97,6 +194,7 @@ export type MutantResult =
   | "broken"
   | "elsewhere"
   | "anchor"
+  | "baseline"
 
 /** A result as the run prints it: in capitals, so it stands out in a log. */
 export const resultWord = (result: MutantResult): string => result.toUpperCase()
@@ -204,6 +302,10 @@ export function run(
   })
 }
 
+/** Whether `from` occurs exactly once in `source`, as a mutation's anchor must. */
+const isAnchored = (source: string, from: string): boolean =>
+  source.split(from).length === 2
+
 /**
  * Run `body` with the mutant in place, and restore the file however it ends.
  * An anchor that does not occur exactly once runs nothing.
@@ -215,7 +317,7 @@ async function withMutant<T>(
 ): Promise<T | "anchor"> {
   const file = path.join(root, m.file)
   const original = readFileSync(file, "utf8")
-  if (original.split(m.from).length !== 2) return "anchor"
+  if (!isAnchored(original, m.from)) return "anchor"
   const restore = () => writeFileSync(file, original)
   process.once("SIGINT", restore)
   writeFileSync(file, original.replace(m.from, m.to))
@@ -265,29 +367,99 @@ export async function loadMutationLists(
   )
 }
 
-/** A mutant's result, and the checks that failed with it in place. */
-const apply = (
+/** The lines of `output` that name a failing check, each once, trimmed. */
+const failingOnce = (output: string): readonly string[] => [
+  ...new Set(failingChecks(output).map(l => l.trim())),
+]
+
+/**
+ * Every test that `vitest list` collects under `paths` (none: every file),
+ * by file from `root` and full name. `--staticParse=false` runs each file to
+ * collect it: a static parse, Vitest's default from 5, lists a `test.each`
+ * by its template ("%s"), not its cases.
+ */
+export function listTests(
+  root: string,
+  paths: readonly string[],
+): readonly ListedTest[] {
+  const listed = JSON.parse(
+    execFileSync(
+      "pnpm",
+      ["exec", "vitest", "list", "--json", "--staticParse=false", ...paths],
+      {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "inherit"],
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    ),
+  ) as readonly { readonly file: string; readonly name: string }[]
+  return listed.map(t => ({ file: path.relative(root, t.file), name: t.name }))
+}
+
+/**
+ * `command`'s failing lines with nothing mutated, or null when it passes:
+ * run once per batch, however many mutants share it (`known`).
+ */
+const failedWithout = (
+  root: string,
+  command: readonly string[],
+  timeoutMs: number,
+  known: Map<string, Promise<readonly string[] | null>>,
+): Promise<readonly string[] | null> => {
+  const key = JSON.stringify(command)
+  const seen = known.get(key)
+  if (seen !== undefined) return seen
+  const [cmd, ...args] = command
+  const result =
+    cmd === undefined
+      ? Promise.resolve([])
+      : run(cmd, args, root, timeoutMs).then(r =>
+          r.status === 0 && !r.timedOut ? null : failingOnce(r.output),
+        )
+  known.set(key, result)
+  return result
+}
+
+/**
+ * A mutant's result, the command it ran, and the checks that failed: with
+ * it in place, or, for BASELINE, without it. A unit mutant's command runs
+ * once unmutated first, and a suite's does not: a scenario's run is minutes.
+ */
+async function apply(
   root: string,
   m: Mutation,
+  tests: readonly ListedTest[],
+  known: Map<string, Promise<readonly string[] | null>>,
 ): Promise<{
   readonly result: MutantResult
+  readonly command: readonly string[]
   readonly failing: readonly string[]
-}> =>
-  withMutant(root, m, async () => {
-    const [cmd, ...args] = mutationCommand(m)
+}> {
+  const timeoutMs = m.timeoutMs ?? 900_000
+  const command =
+    "suite" in m
+      ? mutationCommand(m)
+      : narrowedCommand(m.command, m.expect, tests)
+  // Before the baseline: a drifted anchor runs nothing at all.
+  if (!isAnchored(readFileSync(path.join(root, m.file), "utf8"), m.from))
+    return { result: "anchor", command, failing: [] }
+  const step = planMutant(
+    command,
+    "suite" in m ? null : await failedWithout(root, command, timeoutMs, known),
+  )
+  if (step.kind === "baseline")
+    return { result: "baseline", command, failing: step.failing }
+  const ran = await withMutant(root, m, async () => {
+    const [cmd, ...args] = step.command
     if (cmd === undefined) return { result: "broken" as const, failing: [] }
-    const ran = await run(
-      cmd,
-      args,
-      root,
-      m.timeoutMs ?? 900_000,
-      mutantEnv(process.env, m),
-    )
-    return {
-      result: judge(ran, m.expect),
-      failing: [...new Set(failingChecks(ran.output).map(l => l.trim()))],
-    }
-  }).then(r => (r === "anchor" ? { result: r, failing: [] } : r))
+    const r = await run(cmd, args, root, timeoutMs, mutantEnv(process.env, m))
+    return { result: judge(r, m.expect), failing: failingOnce(r.output) }
+  })
+  return ran === "anchor"
+    ? { result: ran, command, failing: [] }
+    : { ...ran, command }
+}
 
 /** The checks `against` fails with the mutant in place, each once, trimmed. */
 const probe = (
@@ -299,7 +471,7 @@ const probe = (
     const [cmd, ...args] = against
     if (cmd === undefined) return []
     const { output } = await run(cmd, args, root, m.timeoutMs ?? 900_000)
-    return [...new Set(failingChecks(output).map(line => line.trim()))]
+    return failingOnce(output)
   })
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
@@ -335,13 +507,19 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     }
     process.exit(0)
   }
+  const listing = testsToList(chosen)
+  const tests = listing === null ? [] : listTests(root, listing)
+  const known = new Map<string, Promise<readonly string[] | null>>()
   let bad = 0
   for (const m of chosen) {
-    const { result, failing } = await apply(root, m)
+    const { result, command, failing } = await apply(root, m, tests, known)
     console.log(`  ${resultWord(result).padEnd(9)} ${m.name}`)
-    // Caught by another check: the expect has drifted from the test that
-    // catches it, which is one of these.
-    if (result === "elsewhere")
+    if (result !== "killed" && result !== "anchor")
+      console.log(`      ran: ${command.join(" ")}`)
+    // ELSEWHERE: caught by another check, so the expect has drifted from the
+    // test that catches it, which is one of these. BASELINE: what fails with
+    // nothing mutated.
+    if (result === "elsewhere" || result === "baseline")
       for (const line of failing.slice(0, 5)) console.log(`      ${line}`)
     if (result !== "killed") bad += 1
   }
