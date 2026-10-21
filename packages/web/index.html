@@ -865,6 +865,12 @@
       .tool-output { clear: both; margin: var(--space-4) 0 0; padding: var(--space-5);
         background: var(--sunk); border: 1px solid var(--edge); white-space: pre-wrap;
         overflow-wrap: anywhere; font-size: var(--font-sm); }
+      /* A statement's own output, under the line it ends on, in a detail
+         split by statement (`CommandLine.outputs`): inside its line, so it
+         undoes the line's hanging indent, and the next statement's gap
+         still comes after it. */
+      .tool-statement-output { margin: var(--space-2) 0 var(--space-4); text-indent: 0;
+        color: var(--text); }
       /* A result's images, in place of its text (`toolBody`). A tall one is a
          thumbnail in the summary, 10rem tall (THUMB_HEIGHT) through its width. */
       .tool-images { clear: both; margin: var(--space-4) 0 0; }

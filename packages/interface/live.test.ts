@@ -6,7 +6,7 @@ import {
 } from "@pinetrie/core"
 import { type AgentRun, type StreamRecord, streamId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
-import { callStreams, liveWork } from "./live.ts"
+import { callStatementStreams, callStreams, liveWork } from "./live.ts"
 
 const L = threadIdFor("l")
 const M = threadIdFor("m")
@@ -79,4 +79,34 @@ describe("callStreams", () => {
     expect(callStreams([call("c2")], tools)).toEqual({})
     expect(callStreams(undefined, tools)).toEqual({})
   })
+})
+
+test("a running call's statement streams are kept by ordinal, and a message takes its own calls'", () => {
+  const one = statementIndex(1)
+  const two = statementIndex(2)
+  if (one === null || two === null) throw new Error("no statement")
+  const statement = (
+    id: string,
+    callId: string,
+    n: typeof one,
+  ): StreamRecord => ({
+    id: streamId(id),
+    lane: L,
+    kind: "tool",
+    callId,
+    statement: n,
+  })
+  const live = liveWork(
+    [
+      statement("s1", "c1", one),
+      statement("s2", "c1", two),
+      statement("s3", "c2", one),
+    ],
+    [run(L, "p")],
+  )
+  expect(live.statements.get("c1")).toEqual({ 1: "s1", 2: "s2" })
+  expect(
+    callStatementStreams([{ id: "c1", name: "bash" }], live.statements),
+  ).toEqual({ c1: { 1: "s1", 2: "s2" } })
+  expect(liveWork([statement("s1", "c1", one)], []).statements.size).toBe(0)
 })

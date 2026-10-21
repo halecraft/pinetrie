@@ -65,6 +65,7 @@ import {
   noModelLine,
   noticeKey,
   noticeWords,
+  type OutputSplitRecord,
   opens,
   type Pending,
   type ProposalMemory,
@@ -261,6 +262,8 @@ export interface ColumnProps {
   folds: FoldMemory
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
+  /** Each `bash` call's output by statement, where its split verified, by call id. */
+  outputSplits: ReadonlyMap<string, OutputSplitRecord>
   /**
    * How far you have read each thread, on every device of yours.
    */
@@ -1206,6 +1209,7 @@ export function Column(p: ColumnProps) {
                     revisions={p.work.revisions}
                     runningAsk={runningAsk}
                     digests={p.digests}
+                    outputSplits={p.outputSplits}
                     margins={margins}
                     marginSlot={marginSlot}
                     onMargin={onMargin}
@@ -1222,6 +1226,7 @@ export function Column(p: ColumnProps) {
                     live={p.session.live}
                     shown={p.shown}
                     tools={p.live.tools}
+                    statements={p.live.statements}
                     view={view}
                     writable={writable}
                   />

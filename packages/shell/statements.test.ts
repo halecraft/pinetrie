@@ -107,3 +107,23 @@ describe("statementSpans", () => {
     ).toEqual(commandStatements())
   })
 })
+
+test("a laid-out command's statements are its source's, on its layout's lines", () => {
+  const { source, laidOut } = readShell(
+    "mkdir -p /tmp/wc && cd /tmp/wc && git init -q && git commit -m init && ls -la; echo done",
+    56,
+  )
+  expect(source.statements).toEqual([
+    { first: 0, last: 0 },
+    { first: 0, last: 0 },
+  ])
+  const lines = (laidOut?.spans ?? [])
+    .map(s => s.text)
+    .join("")
+    .split("\n")
+  expect(laidOut?.statements.map(s => lines[s.first])).toEqual([
+    lines[0],
+    "echo done",
+  ])
+  expect(laidOut?.statements[0]?.last).toBe(lines.length - 2)
+})

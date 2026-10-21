@@ -13,6 +13,7 @@ import type {
   LaneJoin,
   LiveWork,
   MessageAct,
+  OutputSplitRecord,
   ProposalFacts,
   ProposalMemory,
   RowMemory,
@@ -42,6 +43,8 @@ export interface MessageListProps {
   shown: ReadonlySet<string>
   /** Each running tool call's stream, by call id (`liveWork`). */
   tools: LiveWork["tools"]
+  /** Each running `bash` call's statement streams, by call id (`liveWork`). */
+  statements: LiveWork["statements"]
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
   nameOf: ReadonlyMap<WriterId, string>
@@ -69,6 +72,8 @@ export interface MessageListProps {
   leftBefore: EntryId | null
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
+  /** Each `bash` call's output by statement, where its split verified, by call id. */
+  outputSplits: ReadonlyMap<string, OutputSplitRecord>
   /** How many comments each entry's margin holds (`marginCounts`). */
   margins: ReadonlyMap<EntryId, number>
   /** The entry whose margin is open, drawn as `marginSlot` under it; null for none. */
@@ -112,6 +117,7 @@ const MESSAGE_LIST_PROPS = {
   forks: "identity",
   shown: "identity",
   tools: "identity",
+  statements: "identity",
   rows: "identity",
   nameOf: "identity",
   live: "identity",
@@ -125,6 +131,7 @@ const MESSAGE_LIST_PROPS = {
   folds: "identity",
   leftBefore: "value",
   digests: "value",
+  outputSplits: "value",
   margins: "value",
   openMargin: "value",
   marginSlot: "identity",

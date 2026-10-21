@@ -19,7 +19,16 @@ export interface LiveWork {
   readonly replies: ReadonlyMap<string, StreamRecord>
   /** Each running call's own stream, of its whole output, its id by its call's id. */
   readonly tools: ReadonlyMap<string, StreamId>
+  /**
+   * Each running `bash` call's statement streams, by its call's id: a
+   * statement's id by its ordinal. The host writes one only while the
+   * call's split verifies.
+   */
+  readonly statements: ReadonlyMap<string, StatementStreams>
 }
+
+/** A call's statements' streams, by ordinal: one that has printed nothing has none. */
+export type StatementStreams = Readonly<Record<number, StreamId>>
 
 export function liveWork(
   streams: readonly StreamRecord[],
@@ -28,15 +37,21 @@ export function liveWork(
   const tips = new Map(running.map(r => [r.lane as string, r.tip]))
   const replies = new Map<string, StreamRecord>()
   const tools = new Map<string, StreamId>()
+  const statements = new Map<string, Record<number, StreamId>>()
   for (const s of streams) {
     const tip = tips.get(s.lane)
     if (tip === undefined) continue
     // A statement's stream is not its call's: the call's is its whole output.
     if (s.kind === "tool") {
       if (s.statement === undefined) tools.set(s.callId, s.id)
+      else
+        statements.set(s.callId, {
+          ...statements.get(s.callId),
+          [s.statement]: s.id,
+        })
     } else if (isCurrentReply(s, tip)) replies.set(s.lane, s)
   }
-  return { replies, tools }
+  return { replies, tools, statements }
 }
 
 /**
@@ -52,6 +67,19 @@ export function callStreams(
   for (const call of calls ?? []) {
     const stream = tools.get(call.id)
     if (stream !== undefined) out[call.id] = stream
+  }
+  return out
+}
+
+/** A message's own running calls' statement streams, by call id: plain data, as `callStreams`'. */
+export function callStatementStreams(
+  calls: readonly ToolCall[] | undefined,
+  statements: LiveWork["statements"],
+): Readonly<Record<string, StatementStreams>> {
+  const out: Record<string, StatementStreams> = {}
+  for (const call of calls ?? []) {
+    const own = statements.get(call.id)
+    if (own !== undefined) out[call.id] = own
   }
   return out
 }

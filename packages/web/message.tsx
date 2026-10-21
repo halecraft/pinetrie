@@ -15,9 +15,11 @@ import {
   copyText,
   type Density,
   joinWords,
+  liveRowSplit,
   type MessageAct,
   type MessageTools,
   NO_MEMORY,
+  type OutputSplitRecord,
   opens,
   pinnedMarkerWords,
   plural,
@@ -29,8 +31,10 @@ import {
   rowSummary,
   rowView,
   runningFor,
+  type StatementStreams,
   showsText,
   speakerWords,
+  storedRowSplit,
   toolBody,
 } from "@pinetrie/interface"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
@@ -184,6 +188,8 @@ function MessageView(p: MessageProps) {
             key={call.id}
             rows={p.rows}
             stream={p.streams[call.id]}
+            statements={p.statementStreams[call.id]}
+            stored={p.splits[call.id]}
           />
         ))}
         <Tools node={node} onAct={p.onAct} tools={p.tools} />
@@ -319,18 +325,27 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
  * tree, paired here by `projectSpine`; with none yet, the call is still running
  * or was cut off, and its live output is drawn in the same element the result
  * replaces it in. A result's images are drawn in place of its text
- * (`toolBody`), which keeps to their `title`. What it decided is kept in `rows`
- * by the call's id, so a row mounted again starts where it was left.
+ * (`toolBody`), which keeps to their `title`. A `bash` call whose output
+ * verified by statement shows, in its detail, each statement's under its
+ * lines: its live statement streams while it runs, its stored record once
+ * it has a result. What it decided is kept in `rows` by the call's id, so a
+ * row mounted again starts where it was left.
  */
 function ToolRow({
   call,
   stream,
+  statements,
+  stored,
   doc,
   rows,
   density,
 }: {
   call: ToolCall
   stream: StreamId | undefined
+  /** Its statements' live streams, by ordinal, while it runs. */
+  statements: StatementStreams | undefined
+  /** Its output by statement, stored once its split verified. */
+  stored: OutputSplitRecord | undefined
   doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
   /** The column's density: in story a call leads with its intent (`rowLead`). */
@@ -350,12 +365,45 @@ function ToolRow({
     ),
   )
   const summary = useMemo(() => rowSummary(call), [call])
+  const ordinals = useMemo(
+    () =>
+      live === undefined || statements === undefined
+        ? []
+        : Object.keys(statements)
+            .map(Number)
+            .sort((a, b) => a - b),
+    [live, statements],
+  )
+  // One string, so the selector's value compares equal while no text changes.
+  const liveTexts = useSelector(
+    doc,
+    useCallback(
+      (d: LiveDocHandle) =>
+        JSON.stringify(
+          ordinals.map(n => {
+            const id = statements?.[n]
+            return id === undefined ? "" : readStreamText(d, id)
+          }),
+        ),
+      [ordinals, statements],
+    ),
+  )
+  const split = useMemo(() => {
+    if (call.result !== undefined)
+      return stored === undefined ? null : storedRowSplit(stored)
+    const texts = JSON.parse(liveTexts) as string[]
+    return liveRowSplit(
+      Object.fromEntries(ordinals.map((n, i) => [n, texts[i] ?? ""])),
+      summary.statements.length,
+    )
+  }, [call.result, stored, liveTexts, ordinals, summary])
   const view = rowView(
     summary,
     rowLead(summary, density),
     call.result?.text ?? streamed,
     toolBody(call.result),
     open,
+    split,
   )
   // Set once and never unset: it rings a call that lasts. A result within
   // REVEAL_MS clears the timer: the row was never ringed.
@@ -394,6 +442,15 @@ function ToolRow({
               key={i}
             >
               <Runs runs={line.runs} />
+              {line.outputs.map((text, j) => (
+                <pre
+                  className="tool-output tool-statement-output"
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a line's outputs are its statements', in order
+                  key={j}
+                >
+                  {text}
+                </pre>
+              ))}
             </div>
           ))}
         </div>

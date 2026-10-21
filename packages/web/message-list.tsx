@@ -6,6 +6,8 @@
 import type { EntryId } from "@pinetrie/core"
 import {
   askView,
+  callSplits,
+  callStatementStreams,
   callStreams,
   LEFT_WORDS,
   lastEndedAsk,
@@ -57,6 +59,11 @@ function MessageListView(p: MessageListProps) {
           live={p.live}
           rows={p.rows}
           streams={callStreams(transcriptCalls(node), p.tools)}
+          statementStreams={callStatementStreams(
+            transcriptCalls(node),
+            p.statements,
+          )}
+          splits={callSplits(transcriptCalls(node), p.outputSplits)}
           closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
           forkTracks={p.forks.get(node.id) ?? []}
           join={p.joins.get(node.id)}

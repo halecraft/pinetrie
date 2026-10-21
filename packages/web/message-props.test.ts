@@ -31,6 +31,8 @@ const props = (
     node,
     density: "story",
     streams: {},
+    statementStreams: {},
+    splits: {},
     live: LIVE,
     rows: ROWS,
     nameOf: NAMES,

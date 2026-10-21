@@ -64,6 +64,8 @@ import {
   MARK,
   type MarkRecord,
   NAME,
+  OUTPUT_SPLIT,
+  type OutputSplitRecord,
   PARTICIPANT,
   PICTURE,
   PROJECT,
@@ -692,6 +694,11 @@ export const readCardTitles = (
 export const readDigests = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
+
+/** Each `bash` call's output by statement, where its split verified, by call id. */
+export const readOutputSplits = (
+  doc: RootDocHandle,
+): ReadonlyMap<string, OutputSplitRecord> => readRecords(doc, OUTPUT_SPLIT)
 
 /** Every card's history (`pinetrie.card-history`), by card. */
 export const readCardHistories = (

@@ -447,6 +447,7 @@ export function App({
     workFacts,
     asks,
     digests,
+    outputSplits,
     histories,
     traces,
   } = useSelector(heldView, readSessionFacts)
@@ -1723,6 +1724,7 @@ export function App({
     spots,
     viewports,
     digests,
+    outputSplits,
     colorOf,
     cards,
     blank,

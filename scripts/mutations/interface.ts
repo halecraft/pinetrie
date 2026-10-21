@@ -5,6 +5,80 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a row's detail by statement ──
+  {
+    name: "a statement's output goes under the line it begins on",
+    file: "packages/interface/tool-row.ts",
+    from: 'return st.last === line && own !== undefined && own.text !== ""',
+    to: 'return st.first === line && own !== undefined && own.text !== ""',
+    command: unit,
+    expect: "each statement's output is under the line it ends on",
+  },
+  {
+    name: "a statement that printed nothing draws an empty output",
+    file: "packages/interface/tool-row.ts",
+    from: 'return st.last === line && own !== undefined && own.text !== ""',
+    to: "return st.last === line && own !== undefined",
+    command: unit,
+    expect: "each statement's output is under the line it ends on",
+  },
+  {
+    name: "a split of any count is drawn",
+    file: "packages/interface/tool-row.ts",
+    from: "split.length === summary.statements.length",
+    to: "true",
+    command: unit,
+    expect: "a split of another count of statements is not drawn",
+  },
+  {
+    name: "the summary shows a split",
+    file: "packages/interface/tool-row.ts",
+    from: "    open &&\n",
+    to: "",
+    command: unit,
+    expect: "the summary of a split call is as any call's",
+  },
+  {
+    name: "a split call's detail keeps its whole output too",
+    file: "packages/interface/tool-row.ts",
+    from: "text: byStatement",
+    to: "text: false",
+    command: unit,
+    expect:
+      "each statement's output is under the line it ends on, and the body has none",
+  },
+  {
+    name: "a statement's cut start goes unsaid",
+    file: "packages/interface/tool-row.ts",
+    from: "wholeOutput(o.truncated ? `${EARLIER_LINES}\\n${o.text}` : o.text)",
+    to: "wholeOutput(o.text)",
+    command: unit,
+    expect: "a statement's output whose start was left out says so above it",
+  },
+  {
+    name: "a live ordinal past the command's statements is taken",
+    file: "packages/interface/tool-row.ts",
+    from: "ordinals.some(n => !(n >= 1 && n <= count))",
+    to: "false",
+    command: unit,
+    expect: "a running call splits once a statement has printed",
+  },
+  {
+    name: "a running call with no statement printed splits",
+    file: "packages/interface/tool-row.ts",
+    from: "ordinals.length === 0 ||",
+    to: "",
+    command: unit,
+    expect: "a running call splits once a statement has printed",
+  },
+  {
+    name: "a call keeps only its last statement stream",
+    file: "packages/interface/live.ts",
+    from: "...statements.get(s.callId),",
+    to: "",
+    command: unit,
+    expect: "a running call's statement streams are kept by ordinal",
+  },
   // ── a bash call's output by statement ──
   {
     name: "a statement's stream is taken as its call's",
@@ -1363,8 +1437,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row sets no line of its command apart",
     file: "packages/interface/tool-row.ts",
-    from: "      (runs, i) => ({ runs, startsStatement: summary.starts.includes(i) }),",
-    to: "      (runs, _i) => ({ runs, startsStatement: false }),",
+    from: "startsStatement: summary.starts.includes(i),",
+    to: "startsStatement: false,",
     command: unit,
     expect: "a line beginning a top-level statement is set apart",
   },

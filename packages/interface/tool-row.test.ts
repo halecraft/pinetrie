@@ -4,17 +4,22 @@ import { describe, expect, test } from "vitest"
 import {
   type CommandLine,
   callMark,
+  callSplits,
   callStatus,
+  EARLIER_LINES,
   headLines,
   LINE_LENGTH,
+  liveRowSplit,
   moreWords,
   NO_MEMORY,
+  type RowSplit,
   type Run,
   rowLead,
   rowSummary,
   rowView,
   runningFor,
   SHOWN,
+  storedRowSplit,
   tailLines,
   toolBody,
   wholeOutput,
@@ -174,14 +179,14 @@ describe("rowView", () => {
   test("the summary shows the command's head and the output's tail; the detail both whole", () => {
     const summary = rowSummary(call(numbered(9)))
     const output = numbered(300)
-    const closed = rowView(summary, COMMAND, output, TEXT, false)
+    const closed = rowView(summary, COMMAND, output, TEXT, false, null)
     expect(lineText(closed.command)).toBe(numbered(5))
     expect(closed.body).toEqual({
       kind: "text",
       text: "line 296\nline 297\nline 298\nline 299\nline 300",
     })
     expect(closed.more).toBe("+4 lines · +295 lines of output")
-    const open = rowView(summary, COMMAND, output, TEXT, true)
+    const open = rowView(summary, COMMAND, output, TEXT, true, null)
     expect(lineText(open.command)).toBe(numbered(9))
     expect(open.body).toEqual({ kind: "text", text: output })
     expect(open.more).toBe("less")
@@ -194,6 +199,7 @@ describe("rowView", () => {
       "hi\n",
       TEXT,
       false,
+      null,
     )
     expect(lineText(view.command)).toBe("echo hi")
     expect(view.body).toEqual({ kind: "text", text: "hi" })
@@ -211,7 +217,7 @@ describe("rowView", () => {
     ].join("\n")
     const summary = rowSummary(call(command))
     const apart = (open: boolean) =>
-      rowView(summary, COMMAND, "", TEXT, open)
+      rowView(summary, COMMAND, "", TEXT, open, null)
         .command.filter(l => l.startsStatement)
         .map(l => text(l.runs))
     expect(apart(false)).toEqual(["ls packages", "pnpm test > /tmp/log 2>&1"])
@@ -225,16 +231,16 @@ describe("rowView", () => {
   test("a tall image is a thumbnail in the summary, with full size; a short one is drawn whole, with no toggle", () => {
     const summary = rowSummary({ id: "c", name: "read", subject: "a.png" })
     const tall = toolBody(result([image(400)]))
-    expect(rowView(summary, COMMAND, "", tall, false)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", tall, false, null)).toMatchObject({
       body: { kind: "images", thumb: true },
       more: "full size",
     })
-    expect(rowView(summary, COMMAND, "", tall, true)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", tall, true, null)).toMatchObject({
       body: { kind: "images", thumb: false },
       more: "less",
     })
     const short = toolBody(result([image(100)]))
-    expect(rowView(summary, COMMAND, "", short, false)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", short, false, null)).toMatchObject({
       body: { kind: "images", thumb: false },
       more: undefined,
     })
@@ -270,6 +276,7 @@ describe("rowSummary", () => {
       tag: "read",
       whole: [{ text: "a.ts", role: "plain" }],
       starts: [],
+      statements: [],
     })
   })
 
@@ -278,6 +285,7 @@ describe("rowSummary", () => {
       tag: undefined,
       whole: [{ text: "split", role: "plain" }],
       starts: [],
+      statements: [],
     })
     expect(rowSummary(call("mystery", "x")).tag).toBe("mystery")
   })
@@ -323,6 +331,7 @@ describe("rowLead", () => {
       "ok\n",
       TEXT,
       false,
+      null,
     )
     expect(view).toMatchObject({
       head: "Run the tests",
@@ -335,7 +344,7 @@ describe("rowLead", () => {
       ...call("npx vitest run"),
       intent: "Run the tests",
     })
-    const view = rowView(summary, COMMAND, "ok\n", TEXT, false)
+    const view = rowView(summary, COMMAND, "ok\n", TEXT, false, null)
     expect(view.head).toBeNull()
     expect(view.caption).toBe("Run the tests")
     expect(lineText(view.command)).toBe("npx vitest run")
@@ -343,7 +352,7 @@ describe("rowLead", () => {
   test("a call with no intent reads as before", () => {
     const summary = rowSummary(call("echo hi"))
     expect(rowLead(summary, "story")).toEqual({ kind: "command" })
-    expect(rowView(summary, COMMAND, "hi\n", TEXT, false)).toMatchObject({
+    expect(rowView(summary, COMMAND, "hi\n", TEXT, false, null)).toMatchObject({
       head: null,
       caption: null,
     })
@@ -354,12 +363,109 @@ describe("rowLead", () => {
       intent: "Run the tests",
     })
     const lead = rowLead(summary, "story")
-    expect(rowView(summary, lead, "ok\n", TEXT, false).more).toBe("command")
-    expect(rowView(summary, lead, numbered(300), TEXT, false).more).toBe(
+    expect(rowView(summary, lead, "ok\n", TEXT, false, null).more).toBe(
+      "command",
+    )
+    expect(rowView(summary, lead, numbered(300), TEXT, false, null).more).toBe(
       "command · +295 lines of output",
     )
-    const open = rowView(summary, lead, "ok\n", TEXT, true)
+    const open = rowView(summary, lead, "ok\n", TEXT, true, null)
     expect(lineText(open.command)).toBe("npx vitest run")
     expect(open.more).toBe("less")
+  })
+})
+
+describe("a row's detail by statement", () => {
+  const bash = (subject: string): ToolCall => ({
+    id: "c",
+    name: "bash",
+    subject,
+  })
+  const TEXT = { kind: "text" } as const
+  const COMMAND = { kind: "command" } as const
+  const out = (...texts: string[]): RowSplit =>
+    texts.map(text => ({ text, truncated: false }))
+  const outputs = (lines: readonly CommandLine[]) =>
+    lines.map(l => [text(l.runs), l.outputs])
+  const command = "echo a\nif true\nthen echo b\nfi\ntrue"
+
+  test("each statement's output is under the line it ends on, and the body has none", () => {
+    const view = rowView(
+      rowSummary(bash(command)),
+      COMMAND,
+      "a\nb\n",
+      TEXT,
+      true,
+      out("a\n", "b\n", ""),
+    )
+    expect(outputs(view.command)).toEqual([
+      ["echo a", ["a\n"]],
+      ["if true", []],
+      ["then echo b", []],
+      ["fi", ["b\n"]],
+      ["true", []],
+    ])
+    expect(view.body).toEqual({ kind: "text", text: "" })
+  })
+
+  test("statements sharing a line have their outputs under it, in order", () => {
+    const view = rowView(
+      rowSummary(bash("echo a; echo b")),
+      COMMAND,
+      "a\nb\n",
+      TEXT,
+      true,
+      out("a\n", "b\n"),
+    )
+    expect(view.command[0]?.outputs).toEqual(["a\n", "b\n"])
+  })
+
+  test("the summary of a split call is as any call's", () => {
+    const summary = rowSummary(bash(command))
+    expect(
+      rowView(summary, COMMAND, "a\nb\n", TEXT, false, out("a\n", "b\n", "")),
+    ).toEqual(rowView(summary, COMMAND, "a\nb\n", TEXT, false, null))
+  })
+
+  test("a split of another count of statements is not drawn", () => {
+    const summary = rowSummary(bash(command))
+    expect(rowView(summary, COMMAND, "a\n", TEXT, true, out("a\n"))).toEqual(
+      rowView(summary, COMMAND, "a\n", TEXT, true, null),
+    )
+  })
+
+  test("a statement's output whose start was left out says so above it", () => {
+    const view = rowView(
+      rowSummary(bash("echo a")),
+      COMMAND,
+      "a\n",
+      TEXT,
+      true,
+      [{ text: "a\n", truncated: true }],
+    )
+    expect(view.command[0]?.outputs).toEqual([`${EARLIER_LINES}\na\n`])
+  })
+
+  test("a running call splits once a statement has printed, for its command's statements only", () => {
+    expect(liveRowSplit({}, 3)).toBe(null)
+    expect(liveRowSplit({ 4: "x" }, 3)).toBe(null)
+    expect(liveRowSplit({ 2: "b" }, 3)).toEqual(out("", "b", ""))
+  })
+
+  test("a stored split reads its record's statements, and a message takes its own calls'", () => {
+    const record = {
+      call: "c",
+      statements: [{ text: "a", truncated: true }],
+    } as unknown as Parameters<typeof storedRowSplit>[0]
+    expect(storedRowSplit(record)).toEqual([{ text: "a", truncated: true }])
+    expect(
+      callSplits(
+        [bash("x")],
+        new Map([
+          ["c", record],
+          ["d", record],
+        ]),
+      ),
+    ).toEqual({ c: record })
   })
 })

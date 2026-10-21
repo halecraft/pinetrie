@@ -8,8 +8,10 @@ import type {
   LaneJoin,
   MessageAct,
   MessageTools,
+  OutputSplitRecord,
   PinnedMarker,
   RowMemory,
+  StatementStreams,
   ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
@@ -25,6 +27,10 @@ export interface MessageProps {
    * here.
    */
   streams: Readonly<Record<string, StreamId>>
+  /** Each of its running `bash` calls' statement streams, by call id (`liveWork`). */
+  statementStreams: Readonly<Record<string, StatementStreams>>
+  /** Each of its `bash` calls' stored output by statement, by call id. */
+  splits: Readonly<Record<string, OutputSplitRecord>>
   /** Where a running call's output is read. */
   live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */
@@ -60,6 +66,8 @@ const MESSAGE_PROPS = {
   node: "value",
   density: "value",
   streams: "value",
+  statementStreams: "value",
+  splits: "value",
   live: "identity",
   rows: "identity",
   tools: "value",

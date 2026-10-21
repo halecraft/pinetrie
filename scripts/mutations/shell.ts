@@ -8,6 +8,16 @@ const statements = "packages/shell/statements.ts"
 const nodes = "packages/shell/nodes.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── statements in a shown text ──
+  {
+    name: "a shown statement's lines are counted from 1",
+    file: "packages/shell/read.ts",
+    from: "first: s.first - 1,",
+    to: "first: s.first,",
+    command: unit,
+    expect:
+      "a laid-out command's statements are its source's, on its layout's lines",
+  },
   {
     name: "a statement sharing its line with the one before begins one",
     file: statements,

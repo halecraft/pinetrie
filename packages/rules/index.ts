@@ -577,6 +577,7 @@ export {
   joinStart,
   joinStep,
   joinVerdict,
+  OUTPUT_SPLIT,
   type OutputSplitRecord,
   outputSplitRecord,
   outputSplitWrite,

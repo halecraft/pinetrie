@@ -5,11 +5,13 @@
 // A row is its summary or its detail. The summary shows the command's first
 // SUMMARY_LINES lines and the output's last, so the live output and the result
 // that replaces it draw the same height; only the reader opens the detail,
-// which shows both whole. In story, a call with an intent leads with it
-// (`rowLead`), its command in the detail alone.
+// which shows both whole, and, for a `bash` call whose output verified by
+// statement, each statement's output under its lines. In story, a call with
+// an intent leads with it (`rowLead`), its command in the detail alone.
 
 import type { ImageRef } from "@pinetrie/core"
-import { readShell, type ShellRole } from "@pinetrie/shell"
+import type { OutputSplitRecord } from "@pinetrie/rules"
+import { readShell, type ShellRole, type ShownStatement } from "@pinetrie/shell"
 import {
   BASH_TOOL,
   knownToolId,
@@ -100,6 +102,8 @@ interface RowSummary {
   readonly whole: readonly Run[]
   /** The lines of `whole`, from 0, that begin a shell command's top-level statement other than its first. */
   readonly starts: readonly number[]
+  /** A shell command's top-level statements, each's lines of `whole`, in order; none for any other. */
+  readonly statements: readonly ShownStatement[]
   /** What the call is for, in the model's words; absent for a call that says none. */
   readonly intent: string | undefined
 }
@@ -127,12 +131,13 @@ export const rowLead = (summary: RowSummary, density: Density): RowLead =>
 const LAYOUT_WIDTH = 55
 
 /** A subject as its row reads it. */
-type Subject = Pick<RowSummary, "whole" | "starts">
+type Subject = Pick<RowSummary, "whole" | "starts" | "statements">
 
 /** A text read as itself. */
 const plainSubject = (text: string): Subject => ({
   whole: [{ text, role: "plain" }],
   starts: [],
+  statements: [],
 })
 
 /** The tools whose subject reads other than as plain text, by id; any other reads plain. */
@@ -140,7 +145,11 @@ const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Subject>>> = {
   [BASH_TOOL]: subject => {
     const { source, laidOut } = readShell(subject, LAYOUT_WIDTH)
     const shown = laidOut ?? source
-    return { whole: shown.spans, starts: shown.starts }
+    return {
+      whole: shown.spans,
+      starts: shown.starts,
+      statements: shown.statements,
+    }
   },
 }
 
@@ -270,7 +279,72 @@ export interface CommandLine {
   readonly runs: readonly Run[]
   /** It begins a top-level statement other than the command's first: the row sets it apart. */
   readonly startsStatement: boolean
+  /**
+   * The output of each statement that ends on it, in order, drawn under it:
+   * in the detail of a call split by statement alone. A statement that
+   * printed nothing has none.
+   */
+  readonly outputs: readonly string[]
 }
+
+/** A statement's output, as a split call's row reads it. */
+interface StatementOutput {
+  readonly text: string
+  /** Lines were left out of its start. */
+  readonly truncated: boolean
+}
+
+/**
+ * A `bash` call's output by statement, at its ordinal from 1 at index 0:
+ * made only from what the host wrote of a verified split, its record or its
+ * live statement streams.
+ */
+export type RowSplit = readonly StatementOutput[]
+
+/**
+ * A message's own calls' stored splits, by call id: plain data, so a message
+ * compared by value redraws only when one of its own calls' changes.
+ */
+export function callSplits(
+  calls: readonly ToolCall[] | undefined,
+  splits: ReadonlyMap<string, OutputSplitRecord>,
+): Readonly<Record<string, OutputSplitRecord>> {
+  const out: Record<string, OutputSplitRecord> = {}
+  for (const call of calls ?? []) {
+    const split = splits.get(call.id)
+    if (split !== undefined) out[call.id] = split
+  }
+  return out
+}
+
+/** A call's split as its stored record keeps it. */
+export const storedRowSplit = (record: OutputSplitRecord): RowSplit =>
+  record.statements
+
+/**
+ * A running call's split from its statements' live texts, by ordinal, for a
+ * command of `count` statements; null before any statement has printed, or
+ * for an ordinal the command does not have.
+ */
+export function liveRowSplit(
+  texts: Readonly<Record<number, string>>,
+  count: number,
+): RowSplit | null {
+  const ordinals = Object.keys(texts).map(Number)
+  if (ordinals.length === 0 || ordinals.some(n => !(n >= 1 && n <= count)))
+    return null
+  return Array.from({ length: count }, (_, i) => ({
+    text: texts[i + 1] ?? "",
+    truncated: false,
+  }))
+}
+
+/** The words above a statement's output whose start was left out. */
+export const EARLIER_LINES = "… earlier lines left out"
+
+/** A statement's output as drawn: its end, after a line saying its start was left out. */
+const statementText = (o: StatementOutput): string =>
+  wholeOutput(o.truncated ? `${EARLIER_LINES}\n${o.text}` : o.text)
 
 /** Everything a row draws but its tag and status. */
 interface RowView {
@@ -323,9 +397,10 @@ const textOf = (runs: readonly Run[]) => runs.map(r => r.text).join("")
 /**
  * What a row draws, from what its call touched (`rowSummary`), what it leads
  * with (`rowLead`), its output's text (the live stream's, or the result's),
- * its body, and whether the reader opened its detail. Led by its intent, its
- * summary shows no command, and the output's last lines still, so a row
- * draws the same height before and after its result.
+ * its body, whether the reader opened its detail, and its output by
+ * statement where it has one. Led by its intent, its summary shows no
+ * command, and the output's last lines still, so a row draws the same
+ * height before and after its result. Only the detail shows a split.
  */
 export function rowView(
   summary: RowSummary,
@@ -333,8 +408,25 @@ export function rowView(
   output: string,
   body: ToolBody,
   open: boolean,
+  split: RowSplit | null,
 ): RowView {
   const byIntent = lead.kind === "intent"
+  // A split for another count of statements is not this command's.
+  const byStatement =
+    open &&
+    body.kind === "text" &&
+    split !== null &&
+    split.length > 0 &&
+    split.length === summary.statements.length
+  const outputsOf = (line: number): readonly string[] =>
+    byStatement
+      ? summary.statements.flatMap((st, i) => {
+          const own = split[i]
+          return st.last === line && own !== undefined && own.text !== ""
+            ? [statementText(own)]
+            : []
+        })
+      : []
   const head = headLines(summary.whole)
   const tail =
     body.kind === "text"
@@ -352,14 +444,23 @@ export function rowView(
     head: byIntent ? lead.intent : null,
     caption: byIntent ? null : (summary.intent ?? null),
     command: linesOf(open ? summary.whole : byIntent ? [] : head.runs).map(
-      (runs, i) => ({ runs, startsStatement: summary.starts.includes(i) }),
+      (runs, i) => ({
+        runs,
+        startsStatement: summary.starts.includes(i),
+        outputs: outputsOf(i),
+      }),
     ),
     body:
       body.kind === "images"
         ? { ...body, thumb: !open && tall }
         : {
             kind: "text",
-            text: open ? wholeOutput(output) : textOf(tail.runs),
+            // Split by statement, the output is under its statements.
+            text: byStatement
+              ? ""
+              : open
+                ? wholeOutput(output)
+                : textOf(tail.runs),
           },
     more: moreWords(hidden, open),
   }

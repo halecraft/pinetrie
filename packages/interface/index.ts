@@ -335,6 +335,7 @@ export {
   marginCounts,
   markBlocks,
   movedBackBy,
+  type OutputSplitRecord,
   pinnedCardsAtEnd,
   type QueuedCard,
   type QueuedText,
@@ -429,7 +430,12 @@ export {
   listWidthCodec,
   shownWidth,
 } from "./list-width.ts"
-export { callStreams, type LiveWork } from "./live.ts"
+export {
+  callStatementStreams,
+  callStreams,
+  type LiveWork,
+  type StatementStreams,
+} from "./live.ts"
 export {
   addCommentWords,
   COMMENT,
@@ -694,7 +700,9 @@ export {
 } from "./thread-link.ts"
 export {
   callMark,
+  callSplits,
   callStatus,
+  liveRowSplit,
   NO_MEMORY,
   REVEAL_MS,
   type RowMemory,
@@ -703,6 +711,7 @@ export {
   rowSummary,
   rowView,
   runningFor,
+  storedRowSplit,
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, callPurpose, toolWord } from "./tool-words.ts"

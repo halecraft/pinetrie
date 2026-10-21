@@ -57,9 +57,13 @@ describe("readShell", () => {
     expect(spans.filter(s => s.role === "keyword")).toEqual([])
   })
 
-  test("a source that does not parse is one plain run, with no starts", () => {
+  test("a source that does not parse is one plain run, with no starts or statements", () => {
     expect(readShell('echo "open', 56)).toEqual({
-      source: { spans: [{ text: 'echo "open', role: "plain" }], starts: [] },
+      source: {
+        spans: [{ text: 'echo "open', role: "plain" }],
+        starts: [],
+        statements: [],
+      },
       laidOut: undefined,
     })
   })
