@@ -1,0 +1,24 @@
+seats: {"ada":"8faef2d13d96c024286330ffe43dcd61","bea":"6ecb60e8f6478ebf7efd3c71f010d391","cal":"95775d27509a4e9d7a18a4e27e8591dc","cal is among the hub's peers":false}
+1 connected: at the hub: {"id":"i1","field":"ada","wrote":"ada","matches":true}
+1 the item's clientID is yjsClientId(ada's seat): true
+2 partitioned: the hub holds it yet: false
+2 after rejoining, and Bea gone: at the hub: {"id":"i2","field":"bea","wrote":"bea","matches":true}
+3 relayed: reached the hub: true
+3 relayed: at the hub: {"id":"i3","field":"cal","wrote":"unknown","matches":false}
+3 relayed: at Ada, who saw Cal connect: {"id":"i3","field":"cal","wrote":"cal","matches":true}
+4 forged field: at Ada: {"id":"i4","field":"ada","wrote":"cal","matches":false}
+4 forged field: at the hub: {"id":"i4","field":"ada","wrote":"unknown","matches":false}
+5 forged clientID: i5 at Ada: "absent"
+5 forged clientID: i5 at the hub: "absent"
+5 then the logs: hub: ["i1","i2","i3","i4","i6"]
+5 then the logs: ada: ["i1","i2","i3","i4","i6"]
+5 then the logs: cal: ["i1","i2","i3","i4","i5"]
+[yjs] Changed the client-id because another client seems to be using it.
+5b forged clientID, alone: i7 at the hub: {"id":"i7","field":"ada","wrote":"ada","matches":true}
+5b forged clientID, alone: i7 at Ada: {"id":"i7","field":"ada","wrote":"(self)","matches":false}
+5b Ada's next write reached the hub: true
+5b Ada's next write: at the hub: {"id":"i8","field":"ada","wrote":"unknown","matches":false}
+5b Ada's clientID now is yjsClientId(her seat): false
+5b then the logs: hub: ["i1","i2","i3","i4","i6","i7","i8"]
+5b then the logs: ada: ["i1","i2","i3","i4","i6","i7","i8"]
+5b then the logs: dan: ["i1","i2","i3","i4","i6","i7","i8"]
