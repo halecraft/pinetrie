@@ -26,7 +26,7 @@ export interface Runners extends LaneRunners {
 /** The overloads' union: a list of lane steps needs no runtime. */
 type SomeRunners = LaneRunners & { readonly runtime?: LaneRuntime }
 
-export type Executed =
+type Executed =
   | { readonly ok: true }
   | { readonly ok: false; readonly step: LaneStep; readonly ran: Ran<unknown> }
 

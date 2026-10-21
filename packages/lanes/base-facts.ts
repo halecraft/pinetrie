@@ -16,7 +16,7 @@ export const BASE_FORMAT = 3
 export const BASE_FILE = "base.json"
 
 /** What the base disk is: accepted work's states, made by `format`'s steps. */
-export interface BaseFacts {
+interface BaseFacts {
   readonly points: readonly PointId[]
   readonly format: number
 }

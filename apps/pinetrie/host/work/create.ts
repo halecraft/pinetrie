@@ -261,7 +261,8 @@ export function createNewLanes(deps: {
       if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
         await setup.baseAtAccepted()
       const forked = await executeFork(steps, handle.runners)
-      deps.innerDockerDataRoots.made(lane, dataRoot)
+      if (steps.dataRoot !== null)
+        deps.innerDockerDataRoots.made(lane, steps.dataRoot)
       const start = await h.startRecords(source.start)
       await deps.records.writeValues(
         forkEnd({ fork, lost: source.lost, forked, start }),

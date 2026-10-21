@@ -68,7 +68,7 @@ export interface RoleFacts {
 }
 
 /** How a diff is made, and the role that makes it: one value, so neither is decided apart. */
-export type DiffPlan =
+type DiffPlan =
   | { readonly role: "privileged"; readonly method: "send" }
   | { readonly role: "disks"; readonly method: "walk" }
 

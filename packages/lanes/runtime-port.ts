@@ -52,7 +52,7 @@ export interface LaneDisks {
 }
 
 /** A lane's container, on its disk. Each call throws on failure, naming the command. */
-export interface LaneContainers {
+interface LaneContainers {
   /** The container's spec as the runtime makes it, without its label: pure. Its hash is its spec label. */
   runSpec(shape: ContainerShape): unknown
   /**
@@ -72,7 +72,7 @@ export interface LaneContainers {
 }
 
 /** The images lanes run. Each call throws on failure, naming the command. */
-export interface LaneImages {
+interface LaneImages {
   /**
    * The lane images a host needs: each built unless the runtime has it. The
    * runtime keeps them as needed, removes its other images of pine·trie's

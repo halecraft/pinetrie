@@ -1,7 +1,7 @@
-// S290's probe: what `run`'s `nested-disk` call (no lane to clone from)
+// S303's probe: what `run`'s `nested-disk` call (no lane to clone from)
 // changes on a nested disk that a data-root step has just made, for each
 // way that step can leave it. Runs the disks role in this process, on btrfs.
-//   node docs/findings/S290-the-run-steps-nested-disk/probe.ts <lanes dir on btrfs>
+//   node docs/findings/S303-the-run-steps-nested-disk/probe.ts <lanes dir on btrfs>
 import { execFileSync } from "node:child_process"
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"

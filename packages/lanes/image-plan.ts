@@ -32,7 +32,7 @@ export interface ImagePlan {
  * A Containerfile as read: its path, its text, and the text of each file it
  * copies in from beside it, which decide the image as much as it does.
  */
-export interface Containerfile {
+interface Containerfile {
   readonly file: string
   readonly content: string
   readonly sources: readonly string[]

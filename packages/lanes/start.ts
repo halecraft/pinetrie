@@ -5,9 +5,10 @@
 import type { SnapshotId } from "@pinetrie/core"
 import type { InnerDockerDataRootSource } from "./nested-data-root.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
-import { diskBinds, planShape, shapeSpecHash } from "./shape.ts"
+import { planShape, shapeSpecHash } from "./shape.ts"
 import type { LaneOwner, LaneSpec } from "./spec.ts"
 import {
+  dataRootMade,
   planBindSources,
   planDiskThenStart,
   planStart,
@@ -15,7 +16,7 @@ import {
 } from "./steps.ts"
 
 /** What starting a lane's container takes, from its state and label. */
-export type ContainerPlan = "create" | "recreate" | "start" | "running"
+type ContainerPlan = "create" | "recreate" | "start" | "running"
 
 /**
  * Missing: create it. Its label differs, or it has none: recreate it on the
@@ -37,7 +38,7 @@ export function planContainer(input: {
 }
 
 /** What a lane's start does (`planLaneStart`). */
-export type LaneStart =
+type LaneStart =
   | { readonly kind: "fork" }
   /** Read the fact named, add it to `LaneMade`, and decide again. */
   | { readonly kind: "gather"; readonly need: LaneFact }
@@ -51,7 +52,7 @@ export type LaneStart =
   | { readonly kind: "retired" }
 
 /** The next fact a start whose container must be made reads. */
-export type LaneFact =
+type LaneFact =
   /** Whether the lane's disk is there. */
   | { readonly kind: "disk" }
   /** Its revision records' snapshots and its history's kept one. */
@@ -172,7 +173,7 @@ export async function decideLaneStart(
  * `dataRoot` is the source its steps make a nested lane's data root from,
  * for the host's count of them; null where they make none.
  */
-export type ContainerStart =
+type ContainerStart =
   | Extract<LaneStart, { readonly kind: "fork" | "retired" }>
   | (Extract<
       LaneStart,
@@ -214,7 +215,7 @@ export async function decideContainerStart(
     want: shapeSpecHash(input.runtime, shape),
   })
   const decided = await decideLaneStart({ fork: input.fork, container }, read)
-  const made = diskBinds(shape).includes("nested") ? dataRoot : null
+  const made = dataRootMade(spec, env, dataRoot)
   switch (decided.kind) {
     case "container":
       return decided.plan === "running"

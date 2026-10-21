@@ -42,6 +42,26 @@ test("planFork: a nested lane's data root is made after the delete and before th
   ])
 })
 
+test("planFork: only a nested lane's fork says what its data root was made from", () => {
+  const clone = {
+    kind: "clone",
+    cloneFromLane: threadIdFor("2"),
+    atRunEnd: 3,
+  } as const
+  const fork = (s: LaneSpec) =>
+    planFork({
+      source: { snapshot: snapshotId("e1") },
+      spec: s,
+      env: {},
+      setup: forkSetup(null, []),
+      innerDockerDataRoot: clone,
+    })
+  expect(fork(spec).dataRoot).toBeNull()
+  expect(
+    fork({ ...spec, grants: { ...spec.grants, nested: true } }).dataRoot,
+  ).toEqual(clone)
+})
+
 test("planFork restores from the adapter's snapshot when it names one", () => {
   const { steps } = planFork({
     source: { snapshot: snapshotId("e1") },

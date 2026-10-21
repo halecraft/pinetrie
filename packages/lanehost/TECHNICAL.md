@@ -3,7 +3,7 @@
 Everything the host asks of the machine its lanes' disks are on, outside a
 lane (ADR-0129): one protocol, one server, one client, and a module per
 responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
-(`workspace.test.ts`), and knows no runtime (ADR-0202): the runtime
+(`workspace.test.ts`), and knows no runtime (ADR-0205): the runtime
 (`@pinetrie/docker`) makes each role's container, opens its channel, and
 tells its server what a nested lane's disk holds (`NestedDisk`: its owner
 and its inner runtime's data root, `serverArgs`), so lanehost holds none of
@@ -231,7 +231,7 @@ host, whatever their projects.
   `DiskStep`s, pure; `executeDiskSteps` carries them out on the store
   (`btrfs.ts`), running `btrfs` with no shell (`runCommand`). The store is
   one module of functions: another (copies, reflinks, ZFS) would be a
-  module beside it, with its own diff and clone (S264).
+  module beside it, with its own diff and clone (S301).
 - **Snapshots are read-only,** as `btrfs send` needs (S146). A restore is a
   writable snapshot of one; a delete makes one writable first.
 - **A snapshot is made at `<id>.tmp`, then moved into place,** after the
@@ -379,7 +379,7 @@ out, every call checked and planned into paths first (`planApply`,
   which role, as one value, from the machine's `rootless` (Docker's
   `docker info` `name=rootless`): the role check and the answer both read
   it.
-- **The walk trusts what a btrfs snapshot keeps** (S264): an unchanged
+- **The walk trusts what a btrfs snapshot keeps** (S301): an unchanged
   entry's inode and ctime. Measured on 20,000 files, a btrfs snapshot gave
   1 change after one write; plain and reflink copies gave 20,000, every
   inode and ctime new, and 1 by mode, size and mtime alone. A store of

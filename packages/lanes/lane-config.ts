@@ -15,7 +15,7 @@ const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
 
 /** A grant's mount as written: its source relative to the project's root. */
-export interface WrittenMount {
+interface WrittenMount {
   readonly source: string
   readonly target: string
 }

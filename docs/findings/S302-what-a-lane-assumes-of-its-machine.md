@@ -1,9 +1,10 @@
-# S289 — a lane assumes a Linux kernel in five places that are built in; its programs, paths, image and target are data
+# S302 — a lane assumes a Linux kernel in five places that are built in; its programs, paths, image and target are data
 
+Numbered S289 until 2026-10-21, when two files held that number.
 Numbered S270 until 2026-10-21, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0202
+- **Led to:** ADR-0205
 
 **Question.** A lane is a Linux container (ADR-0130). Which of pine·trie's
 assumptions about a lane's machine are data, which a setting, a constant
@@ -34,7 +35,7 @@ turns out to be a value, or a value turns out to be assumed elsewhere.
    loader as `ld.so`, and musl static builds of `RUNTIME_PROGRAMS`,
    downloaded for `aarch64` or `x86_64` (`packages/lanes/image/Containerfile`).
    The helper and every tool call run on it.
-3. **Disks are btrfs subvolumes** (S264): `packages/lanehost/disks.ts`,
+3. **Disks are btrfs subvolumes** (S301): `packages/lanehost/disks.ts`,
    `diff.ts`, `folder.ts`, and the lanes directory's check
    (`planDockerHost`, `packages/docker/plan.ts`); the VM formats its data
    disk btrfs (`packages/vm/image/init`).
@@ -82,4 +83,4 @@ So **a lane that is not Linux is not a swap behind today's ports**: items
 1, 2 and 4 are what a lane is, and the disk model rests on 1. A remote
 Linux machine keeps 1 to 5 and breaks the host-file locality. A Linux
 machine with another container runtime or another directory store keeps
-everything above but the runtime's own code (S264, S288).
+everything above but the runtime's own code (S301, S288).

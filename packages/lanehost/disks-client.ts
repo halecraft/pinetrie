@@ -20,7 +20,7 @@ import { LANE_FILES } from "./layout.ts"
 const LANE_FILE_LIMIT = 1024 * 1024
 
 /** A disks role's command whose answer is a stream, never a call (`tar-out.ts`, `file-out.ts`). */
-export type StreamCommand = "tar" | "file"
+type StreamCommand = "tar" | "file"
 
 /**
  * The disk calls of a project keyed `key`, through `call`. `out` is the

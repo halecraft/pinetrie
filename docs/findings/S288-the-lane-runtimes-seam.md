@@ -3,7 +3,7 @@
 Numbered S269 until 2026-10-21, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0202
+- **Led to:** ADR-0205
 
 **Question.** `LaneRuntime` (`packages/lanes/runtime-port.ts`) is every
 call the host makes to a runtime, and `@pinetrie/docker`'s
@@ -57,7 +57,7 @@ runtime, and the plan keeps `LaneRuntime` whole.
      (`packages/docker/plan.ts`) takes its bind sources from lanehost's
      `projectDisks` (`lane`, `nested`, `states`), and `snapshotOut` names a
      snapshot's path. That is the store's one contract with the runtime
-     (S264).
+     (S301).
 
    The kill criterion does not hold: the disks are lanehost's, reached
    through any runtime that can make a role's container and `exec -i` in

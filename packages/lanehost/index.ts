@@ -11,7 +11,7 @@ export {
   type LanehostChannel,
   lanehostClient,
 } from "./client.ts"
-export { lanehostDisks, type StreamCommand } from "./disks-client.ts"
+export { lanehostDisks } from "./disks-client.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
   FOLDER_MOUNT,

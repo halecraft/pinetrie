@@ -42,7 +42,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   or a `RuntimeOp` (a `DiskOp`, or a container made from a `PlannedStart`),
   carried out by `execute` through `Runners.runtime`. A list of lane steps
   alone needs no runtime, so `@pinetrie/jj` never has one.
-- **`LaneRuntime` is three parts** (ADR-0202): `LaneDisks` (the disks and
+- **`LaneRuntime` is three parts** (ADR-0205): `LaneDisks` (the disks and
   their snapshots), `LaneContainers` and `LaneImages`, and each caller types
   the part it uses: the folder adapter takes `LaneDisks` alone. Docker's
   disks are lanehost's client (`lanehostDisks`), which another runtime that
@@ -51,7 +51,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   bound into the lane's container by the runtime at the shape's mount
   points. A store that is not a directory (a volume per lane, cloud
   volumes) would move a disk's mount into the runtime: a different port
-  (S264).
+  (S301).
 - **What any runtime must do:**
   - a snapshot that holds what the lane wrote, after the `sync` before it
     (`planSnapshot`), and a restore from it into a new disk;
@@ -417,7 +417,7 @@ paths are its diff." would compare a function with itself.
   start makes the folders it binds (`planBindSources`); one that makes the
   container makes them and it (`planStart` on its disk, `planDiskThenStart`
   from a snapshot); a running container's runs none.
-- **A container's start is one plan** (ADR-0202, S290). The `run` step
+- **A container's start is one plan** (ADR-0205, S303). The `run` step
   carries a `PlannedStart`, which only `planStart` makes, after the steps
   that make each folder the shape binds on lanehost's disks (`DiskBind`:
   a nested lane's nested disk and data root, a folder lane's states
@@ -615,7 +615,7 @@ paths are its diff." would compare a function with itself.
   on. The owner observes the import, and the moved ref marks the lane's
   proposed changes for a refresh (`apps/pinetrie/host/jj/proposed/`).
 
-## What a lane assumes of its machine (S289)
+## What a lane assumes of its machine (S302)
 
 - **Built in,** each new code on a machine without it:
   - the machine's observer is a Linux kernel's BPF program (Linux 5.17 or

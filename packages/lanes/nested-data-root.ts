@@ -9,7 +9,7 @@ import type { ThreadId } from "@pinetrie/core"
  * ends, and which lane's run ended last: its data root is the one to clone.
  * A host's own, in memory.
  */
-export interface InnerDockerDataRoots {
+interface InnerDockerDataRoots {
   /** Nested lanes' runs ended, their containers stopped, since the host started. */
   readonly runsEnded: number
   /** The nested lane whose container stopped last after a run, and at which run end. */

@@ -1,9 +1,11 @@
-# ADR-0202 — lanehost owns lanes' disks and their client; a container's start is one plan; a runtime makes containers and images and reaches lanehost's roles
+# ADR-0205 — lanehost owns lanes' disks and their client; a container's start is one plan; a runtime makes containers and images and reaches lanehost's roles
+
+Numbered 0202 until 2026-10-21, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `packages/lanes/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
   `packages/docker/TECHNICAL.md`, `apps/pinetrie/host/TECHNICAL.md`
-- **Evidence:** S264, S288, S289, S290
+- **Evidence:** S301, S288, S302, S303
 - **Amends:**
   - ADR-0129: lanehost knows a nested lane's disk, its owner and data root
     given as values when its server starts, and no runtime; one `disk` call
@@ -18,7 +20,7 @@
 infrastructure would hold another directory store for disks, another
 container runtime, or lanes that are not Linux.
 
-- **btrfs is behind lanehost's calls already** (S264). They name lanes and
+- **btrfs is behind lanehost's calls already** (S301). They name lanes and
   snapshots, never subvolumes; btrfs is in what carries them out. Three of
   its properties reach past them: a walk's diff trusts that a snapshot keeps
   an unchanged entry's inode and ctime (a copy changed all 20,000 files'),
@@ -31,13 +33,13 @@ container runtime, or lanes that are not Linux.
   `DiskOp`. ADR-0169 had put Docker's values for a nested lane in lanehost,
   after ADR-0129 said it knew nothing of Docker. Which role diffs, and
   how, was decided twice from `rootless`.
-- **A container's start had a hole** (S290). The data root was a step the
+- **A container's start had a hole** (S303). The data root was a step the
   host ran before a start's plan, and Docker's `run` made the nested disk
   again. For a thread's lane the second call changed only a ctime; for the
   base's scratch lane, which plans no data root, it was the only thing that
   made the nested disk, and Docker refuses a container whose bind source is
   missing.
-- **A lane's Linux assumptions** (S289): five are built in (the observer's
+- **A lane's Linux assumptions** (S302): five are built in (the observer's
   BPF, the lane runtime's ELF, btrfs, OCI containers under Linux's
   isolation, iptables grants), one is a locality (the runtime's machine sees
   the host's files), the rest are values.
@@ -78,7 +80,7 @@ container runtime, or lanes that are not Linux.
   clone. A store that is not a directory (a volume per lane, cloud volumes)
   moves a disk's mount into the runtime: a different port.
 - A lane that is not Linux is not a swap behind these ports: the disk model
-  rests on the observer (S289).
+  rests on the observer (S302).
 - No suite runs a nested lane, so a nested start is held by the plan's unit
   tests.
 - `packages/lanes/plan.ts` is split by concern, and lanes' index is written
@@ -87,7 +89,7 @@ container runtime, or lanes that are not Linux.
 **Alternatives rejected.**
 
 - **Delete `run`'s nested-disk call alone.** It breaks the base's refresh
-  in every project granting `lanes.nested` (S290).
+  in every project granting `lanes.nested` (S303).
 - **A `bindSources` call on the disks' port, made by `run`.** It keeps an
   effect inside the runtime where the plan should say it.
 - **A snapshot store injected into lanehost's server.** Nothing would swap

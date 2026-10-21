@@ -159,7 +159,7 @@ export type MergedOf<P extends string> =
     }
   /** The merge cannot be made, and nothing was: why, worded for a person and the agent. */
   | { readonly kind: "refused"; readonly reason: string }
-export type Merged = MergedOf<PointId>
+type Merged = MergedOf<PointId>
 
 /** What a change to the lane is recorded as: its title and its entry. */
 export interface Edits {
@@ -197,7 +197,7 @@ export type MergeDone = Merged & { readonly follow: Follow }
  * person, only while the thread is idle (`planResolveCommand`), its
  * container perhaps stopped.
  */
-export type Resolver =
+type Resolver =
   | { readonly kind: "agent" }
   | { readonly kind: "person"; readonly by: WriterId }
 
@@ -205,7 +205,7 @@ export type Resolver =
  * What `resolve` did: the path closed, or why not: no open conflict there,
  * or a history whose conflicts are markers in the file (jj's).
  */
-export type Resolved =
+type Resolved =
   | { readonly kind: "resolved" }
   | { readonly kind: "refused"; readonly why: "no-conflict" | "markers" }
 

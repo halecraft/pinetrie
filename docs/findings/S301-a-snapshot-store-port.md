@@ -1,7 +1,9 @@
-# S264 — btrfs is already behind lanehost's calls; three of its properties leak past them: a walk's diff trusts kept inodes, a merge's take needs a reflink, and a disk is a directory the runtime binds
+# S301 — btrfs is already behind lanehost's calls; three of its properties leak past them: a walk's diff trusts kept inodes, a merge's take needs a reflink, and a disk is a directory the runtime binds
+
+Numbered S264 until 2026-10-21, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0202
+- **Led to:** ADR-0205
 
 **Question.** Lanes' disks are btrfs subvolumes (ADR-0130). Which other
 store could keep them (APFS clones, ZFS, overlayfs, plain copies, cloud

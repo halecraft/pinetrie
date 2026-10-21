@@ -5,7 +5,13 @@ import { type SnapshotId, type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
 import type { ForkSetup } from "./history-port.ts"
 import type { InnerDockerDataRootSource } from "./nested-data-root.ts"
 import { type LaneSpec, laneContainer } from "./spec.ts"
-import { laneShell, onRuntime, planDiskThenStart, type Step } from "./steps.ts"
+import {
+  dataRootMade,
+  laneShell,
+  onRuntime,
+  planDiskThenStart,
+  type Step,
+} from "./steps.ts"
 
 /**
  * pre-rename: the lane's jj config folder before b05e2252. Snapshots taken
@@ -19,6 +25,8 @@ declare const forkStepsBrand: unique symbol
 export interface ForkSteps {
   readonly lane: ThreadId
   readonly steps: readonly Step[]
+  /** What its steps make the lane's data root from; null for a lane that is not nested. */
+  readonly dataRoot: InnerDockerDataRootSource | null
   readonly [forkStepsBrand]: true
 }
 
@@ -52,5 +60,10 @@ export const planFork = (input: {
     laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
     ...input.setup.steps,
   ]
-  return { lane, steps } as unknown as ForkSteps
+  const dataRoot = dataRootMade(
+    input.spec,
+    input.env,
+    input.innerDockerDataRoot,
+  )
+  return { lane, steps, dataRoot } as unknown as ForkSteps
 }

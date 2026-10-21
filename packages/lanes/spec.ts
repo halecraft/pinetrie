@@ -20,7 +20,7 @@ declare const baseLaneBrand: unique symbol
  * The scratch lane a base is made in (`base.ts`): no thread's, so no
  * `ThreadId`, and nothing that takes a thread can be given it.
  */
-export type BaseLane = "base-scratch" & { readonly [baseLaneBrand]: true }
+type BaseLane = "base-scratch" & { readonly [baseLaneBrand]: true }
 export const BASE_LANE = "base-scratch" as BaseLane
 
 /**

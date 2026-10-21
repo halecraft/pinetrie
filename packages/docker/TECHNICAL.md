@@ -17,7 +17,7 @@ It declares `@pinetrie/core`, `@pinetrie/lanes`, `@pinetrie/lanehost`,
 `@pinetrie/channel` and `@pinetrie/install`, and only the app declares it
 (`workspace.test.ts`). It implements `LaneContainers` and `LaneImages`, and
 hosts lanehost's roles; its disks are lanehost's client, spread
-(`lanehostDisks`, ADR-0202).
+(`lanehostDisks`, ADR-0205).
 
 ## Where things are
 
@@ -239,7 +239,7 @@ never reaches the VM's Docker or the launcher's ports.
 - **Its directory and owner are docker's values** (`INNER_DOCKER_DATA_ROOT_DIR`,
   `ROOTLESS_UID`, as `NESTED_DISK`), beside `INNER_DOCKER_HOST` and the lane
   image's `--data-root`, which a test holds to them. lanehost is given them
-  in its server's arguments and holds none (ADR-0202).
+  in its server's arguments and holds none (ADR-0205).
 - **A host in a nested lane** gets `docker-host` from `planRuntime`, its
   lanes directory `/var/lib/pinetrie-lanes`. Its lanes' root is uid 1000
   outside, so a directory they write must be that user's: the suites hand

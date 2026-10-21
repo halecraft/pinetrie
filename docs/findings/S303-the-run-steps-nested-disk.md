@@ -1,7 +1,9 @@
-# S290 — `run`'s nested-disk call changes nothing after a data-root step, but the base's scratch lane has no such step, so the plan must make one for every start
+# S303 — `run`'s nested-disk call changes nothing after a data-root step, but the base's scratch lane has no such step, so the plan must make one for every start
+
+Numbered S290 until 2026-10-21, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0202
+- **Led to:** ADR-0205
 
 **Question.** Docker's `run` (`packages/docker/runtime.ts`) calls lanehost's
 `nested-disk` with no lane to clone from before it makes a nested lane's
@@ -24,7 +26,7 @@ call is not redundant and stays in the runtime.
 
 **Throw away.** The probe's disks under `/var/lib/pinetrie-lanes/s290`,
 deleted by the probe. The probe stays in
-`docs/findings/S290-the-run-steps-nested-disk/`, since the plan builds on
+`docs/findings/S303-the-run-steps-nested-disk/`, since the plan builds on
 it.
 
 ## Answers

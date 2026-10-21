@@ -15,7 +15,7 @@
     a disk first, deepest first, each made writable: btrfs refuses a subvolume
     that holds others, and `rm -rf` stops at a read-only one.
 - **Amended by:**
-  - ADR-0202: lanehost knows a nested lane's disk, its owner and data root
+  - ADR-0205: lanehost knows a nested lane's disk, its owner and data root
     given as values when its server starts, and no runtime; one `disk` call
     takes core's `DiskOp`; it exports the disks' client.
 

@@ -50,10 +50,7 @@ export type DiskStep =
   | { readonly kind: "dir"; readonly path: string }
 
 /** A disk operation planned without reading the disk: every one but a data root's. */
-export type PlainDiskOp = Exclude<
-  DiskOp,
-  { readonly kind: "inner-docker-data-root" }
->
+type PlainDiskOp = Exclude<DiskOp, { readonly kind: "inner-docker-data-root" }>
 
 const names = (call: PlainDiskOp): readonly string[] => {
   switch (call.kind) {

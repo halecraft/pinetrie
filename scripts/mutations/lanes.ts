@@ -44,6 +44,15 @@ export const mutations: readonly Mutation[] = [
     expect:
       "planStart: a folder lane makes its states directory, then its container",
   },
+  {
+    name: "a fork that is not nested counts a data root",
+    file: "packages/lanes/fork.ts",
+    from: "  const dataRoot = dataRootMade(\n",
+    to: "  const dataRoot = ((..._: unknown[]) => input.innerDockerDataRoot)(\n",
+    command: unit,
+    expect:
+      "planFork: only a nested lane's fork says what its data root was made from",
+  },
   // ── the images ──
   {
     name: "a Containerfile copies nothing in",

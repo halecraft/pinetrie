@@ -80,6 +80,18 @@ export const planBindSources = (
   )
 
 /**
+ * What `planBindSources` makes a lane's data root from, for the host's count
+ * of data roots (`InnerDockerDataRoots`); null for a lane that is not
+ * nested, which makes none.
+ */
+export const dataRootMade = (
+  spec: LaneSpec<LaneOwner>,
+  env: Readonly<Record<string, string | undefined>>,
+  dataRoot: InnerDockerDataRootSource,
+): InnerDockerDataRootSource | null =>
+  diskBinds(planShape(spec, env)).includes("nested") ? dataRoot : null
+
+/**
  * Make and start a lane's container on its existing disk: the folders it
  * binds first (`planBindSources`), then the container.
  */
