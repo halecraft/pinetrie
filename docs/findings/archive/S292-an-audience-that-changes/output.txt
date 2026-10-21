@@ -1,0 +1,37 @@
+setup: ada, a member, reads the canvas: true
+1 bea, refused, was announced the canvas: false
+1 bea holds it unasked: false
+1 added, then a hub write: bea holds it: false
+1 added: messages about it bea received: []
+1 the policy registered again by name: bea holds it: false
+1 hub suspend and resume: bea reads it: true
+1 hub suspend and resume: ada received: ["present","interest","interest","accept","accept","dismiss","present","interest","interest","accept"]
+1 hub suspend and resume: ada still reads, and is synced: ["after bea was added",["synced"]]
+1 dan asked while refused: his state, his copy: [["vacant"],{}]
+1 dan asked while refused: messages received: ["vacant"]
+1 dan added, a hub write: dan reads: null
+1 dan suspends and resumes his copy: dan reads: true
+1 eve added: holds it before reconnecting: false
+1 the hub heard eve's channel close before she came back: true
+1 eve reconnected: announced the canvas: true
+1 eve reconnected: holds it unasked: true
+1 eve: every present received: [["canvas:c1"]]
+1 the hub, as eve reconnected: ["peer-disconnected","out establish","out present","peer-reconnected","out interest","out offer","out interest","out offer"]
+1 eve reconnected, then asks: reads: true
+2 ada removed, a hub write: ada reads it: null
+2 ada removed: messages received since: []
+2 ada removed: she keeps her copy: "after dan was added"
+2 ada removed: her sync state: ["synced"]
+2 ada writes after removal: the hub holds it: null
+2 ada writes after removal: she was told (refuse): false
+3 cy, refused, asks for the canvas: received: ["vacant"]
+3 cy asks for an id that does not exist: received: ["vacant"]
+3 cy's states, canvas then none: [["vacant"],["vacant"]]
+4 a peer connecting: presents it received, docs in them: [500]
+4 50 peers connect: canShare calls: 221317
+4 50 peers connect: ms inside canShare: 56.9
+4 peers reading a document they are members of: "50/50"
+4 a membership changes: canShare calls: 0
+4 one hub write: canShare calls: 50
+4 one document suspended and resumed: canShare calls: 270
+4 the policy alone: microseconds a call: 0.26224604500002896
