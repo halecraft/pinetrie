@@ -3,7 +3,7 @@ import { expect, test } from "vitest"
 import { argvs, LANE, spec } from "./fixtures.ts"
 import type { InnerDockerDataRootSource } from "./nested-data-root.ts"
 import { planShape } from "./shape.ts"
-import { BASE_LANE, type LaneSpec } from "./spec.ts"
+import { baseLane, type LaneSpec } from "./spec.ts"
 import { planDiskThenStart, planSnapshot, planStart } from "./steps.ts"
 
 const KEEP: InnerDockerDataRootSource = { kind: "keep" }
@@ -50,6 +50,7 @@ test("planStart: a folder lane makes its states directory, then its container", 
 })
 
 test("planDiskThenStart: a nested base's scratch lane makes its own data root before its container", () => {
+  const BASE_LANE = baseLane("0123456789abcdef")
   const steps = planDiskThenStart({
     spec: { ...nested, lane: BASE_LANE },
     env: {},

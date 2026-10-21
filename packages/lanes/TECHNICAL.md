@@ -318,10 +318,17 @@ paths are its diff." would compare a function with itself.
   could snapshot it into the working copy the clone carries. jj's setup is
   `packages/jj/TECHNICAL.md`'s (A lane's repo).
 - **The base snapshot is made in a scratch lane that is no thread's**
-  (`BASE_LANE`, a `BaseLane`): a container, a disk and snapshots are named by
+  (a `BaseLane`): a container, a disk and snapshots are named by
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
   a stack take a `ThreadId` alone, so the base cannot be given one
   (ADR-0117).
+- **Each project's base lane is its own** (`baseLane`, over the project's
+  key; the runtime's `baseLane`, ADR-0207). A container's name is shared by
+  every project on its machine, and a build begins by removing whatever
+  holds its scratch lane's name, so one name for every project let a
+  second host delete a first's build. `base.ts` takes the lane from the
+  runtime alone, for the removal, the disk, the container and the
+  snapshot.
 - **The base snapshot is accepted work's state** (`refreshBase`), and
   refreshes after an acceptance or a land. The adapter reads accepted work
   with its checkout bound to that read (`AcceptedNow`): `refreshBase` uses

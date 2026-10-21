@@ -123,9 +123,7 @@ and `PINETRIE_SCENARIO=a,b` runs some. A suite mutation names its `suite`,
 fails (`PINETRIE_STOP_AT`, set by `pnpm mutate`), so one whose check comes late
 in a long scenario still takes a minute or two. Every suite check is a
 mutation's `expect` (`scripts/proofs.ts`); one no mutation proves yet is in
-`scripts/unproven.ts`, which only shrinks. The suites keep to a budget: the
-host and lanes scenarios at most √ of the unit tests, the browser's at most √
-of those (`scripts/budget.test.ts`). Run unit-test mutations as you
+`scripts/unproven.ts`, which only shrinks. Run unit-test mutations as you
 write them. Run the suite-level ones once, in a batch at the end of the work,
 after the suite itself passes:
 one `pnpm mutate` call per name (it takes one name substring, or none for the

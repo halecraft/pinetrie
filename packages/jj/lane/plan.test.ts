@@ -6,7 +6,7 @@ import {
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
-import { BASE_LANE, type LaneStep } from "@pinetrie/lanes"
+import { baseLane, type LaneStep } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import { jjLaneFor } from "../fixtures.ts"
 import { bookmarkName, FETCHED_REF } from "./names.ts"
@@ -328,5 +328,7 @@ describe("the base's checkout", () => {
 
 test("the base's scratch lane has no bookmark: a bookmark is a thread's lane's", () => {
   // @ts-expect-error: a bookmark, a remote and a stack are a thread's lane's
-  expect(bookmarkName(BASE_LANE)).toBe("pinetrie/base-scratch")
+  expect(bookmarkName(baseLane("0123456789abcdef"))).toBe(
+    "pinetrie/base-scratch-0123456789abcdef",
+  )
 })

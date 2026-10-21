@@ -205,10 +205,9 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   "Views decide, intents act"), and its suite check is deleted. To tell
   which: write the deliberate bug, and run it `--against` the unit tests
   (`AGENTS.md`, Gates).
-- **The budget** (`scripts/budget.ts`, `scripts/budget.test.ts`): the host
-  and lanes scenarios together are at most ⌊√n⌋ of the n unit tests, and
-  the browser's at most ⌊√n⌋ of those. A scenario, like a `test()`, holds
-  many checks; only scenarios count.
+- **No count of scenarios is capped.** A scenario is sized by what its
+  mutants pay: each runs it up to its check, so a long scenario makes every
+  late check's proof long. Split one whose checks share no steps.
 - **Numbered docs** (`scripts/numbering.ts`, `scripts/numbering.test.ts`): no
   two files in `docs/findings` or `docs/adrs`, their `archive/` folders
   included, share a number, and each title carries its file's number. Two

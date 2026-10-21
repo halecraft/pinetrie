@@ -16,6 +16,14 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a runtime's base lane is not its project's",
+    file: "packages/docker/runtime.ts",
+    from: "    baseLane: baseLane(key),\n",
+    to: '    baseLane: baseLane("0000000000000000"),\n',
+    command: unit("packages/docker/runtime.test.ts"),
+    expect: "a runtime builds its base in its own project's scratch lane",
+  },
+  {
     name: "a jj lane mounts a states directory",
     file: "packages/lanes/shape.ts",
     from: '  ...(shape.states ? (["states"] as const) : []),\n',

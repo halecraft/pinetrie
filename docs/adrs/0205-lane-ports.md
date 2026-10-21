@@ -15,6 +15,9 @@ Numbered 0202 until 2026-10-21, when two files held that number.
     and bound by the runtime.
   - ADR-0169: a nested lane's data root is made by its start's plan, the
     base's scratch lane included, never by the runtime's `run`.
+- **Amended by:**
+  - ADR-0207: the runtime's containers part names its project's base lane
+    (`baseLane`), from the project's key.
 
 **Context.** The coupling survey of 2026-10-19 asked whether lane
 infrastructure would hold another directory store for disks, another

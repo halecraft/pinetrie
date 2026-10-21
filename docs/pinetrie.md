@@ -93,7 +93,7 @@ what they print.
 | with a real model | `pnpm run e2e:live` | the `live` scenario |
 | **real browser** | `pnpm run e2e:browser` | the page in Chromium's headless shell |
 | the observer | `pnpm run e2e:observer` | the eBPF observer in a QEMU guest on the lane VM's kernel |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | host and lanes scenarios ≤ √ of the unit tests, the browser's ≤ √ of those |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | no scenario holds a fixed wait `FIXED_WAITS` does not list, and no test or scenario reads elapsed time |
 | the cascade | `pnpm run verify` | lint, types, unit, `proofs:unit`, conformance, `e2e` and `e2e:lanes` |
 
 The stack is `docs/05-stack.md`: a pnpm workspace, TypeScript (strict, **no

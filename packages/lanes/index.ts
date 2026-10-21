@@ -120,7 +120,7 @@ export {
   sharedCandidates,
 } from "./shared.ts"
 export {
-  BASE_LANE,
+  baseLane,
   LANE_CONFIG_DIR,
   LANE_JJ_CONFIG,
   type LaneAttached,

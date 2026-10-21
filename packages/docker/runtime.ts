@@ -31,6 +31,7 @@ import {
   serverArgs,
 } from "@pinetrie/lanehost"
 import {
+  baseLane,
   type FolderDisks,
   type ImageBuild,
   type ImagePlan,
@@ -415,6 +416,7 @@ export function dockerRuntime(input: {
   }
 
   return {
+    baseLane: baseLane(key),
     serveFrom(mounts) {
       const at = (where: string) => mounts.find(m => m.target === where)?.source
       const mounted = at(PINETRIE_MOUNT)

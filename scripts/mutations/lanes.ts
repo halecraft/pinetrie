@@ -6,6 +6,34 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 
 export const mutations: readonly Mutation[] = [
+  // ── the base's scratch lane, per project ──
+  {
+    name: "every project's base is built in one scratch lane",
+    file: "packages/lanes/spec.ts",
+    from: "  `base-scratch-${project}` as BaseLane",
+    to: "  `base-scratch-` as BaseLane",
+    command: unit,
+    expect:
+      "each project's base is made in a container of its own, named by its key",
+  },
+  {
+    name: "a base's build removes and builds a scratch lane every project shares",
+    file: "packages/lanes/base.ts",
+    from: "  const lane = runtime.baseLane\n",
+    to: '  const lane = "base-scratch" as typeof runtime.baseLane\n',
+    command: unit,
+    expect:
+      "a base is built, snapshotted and removed in its own project's scratch lane alone",
+  },
+  {
+    name: "a base is snapshotted from a scratch lane every project shares",
+    file: "packages/lanes/base.ts",
+    from: "        ...planSnapshot({ lane: runtime.baseLane, snapshot: BASE_SNAPSHOT }),\n",
+    to: '        ...planSnapshot({ lane: "base-scratch" as LaneOwner, snapshot: BASE_SNAPSHOT }),\n',
+    command: unit,
+    expect:
+      "a base is built, snapshotted and removed in its own project's scratch lane alone",
+  },
   // ── host mounts ──
   {
     name: "a project's own skills are mounted from the host",

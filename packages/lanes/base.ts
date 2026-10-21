@@ -5,7 +5,7 @@
 // refresh copies the base it replaces (a new one starts empty) and checks
 // out accepted work on it, so what a refresh leaves is what a pull would.
 // The base never runs a command, so it holds no derived file: a lane makes
-// its own. It is made in a scratch lane (`BASE_LANE`), then snapshotted as a
+// its own. It is made in its project's scratch lane (`baseLane`), then snapshotted as a
 // turn is, so a fork never reads one half-written. The base says what it
 // holds inside itself (`.pinetrie-lane/base.json`).
 
@@ -21,12 +21,7 @@ import { executeOrThrow, type Runners } from "./execute.ts"
 import type { AcceptedNow } from "./history-port.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
-import {
-  BASE_LANE,
-  type LaneOwner,
-  type LaneSpec,
-  laneContainer,
-} from "./spec.ts"
+import { type LaneOwner, type LaneSpec, laneContainer } from "./spec.ts"
 import { planDiskThenStart, planSnapshot } from "./steps.ts"
 
 /** What building in the scratch lane takes. */
@@ -45,12 +40,13 @@ async function inScratch<C, T>(
   work: (runners: Runners) => Promise<T>,
 ): Promise<T> {
   const { runtime } = scratch
-  await removeLane(runtime, BASE_LANE)
-  const handle = laneHandle(runtime, laneContainer(BASE_LANE), scratch.open)
+  const lane = runtime.baseLane
+  await removeLane(runtime, lane)
+  const handle = laneHandle(runtime, laneContainer(lane), scratch.open)
   try {
     await executeOrThrow(
       planDiskThenStart({
-        spec: { ...scratch.spec, lane: BASE_LANE },
+        spec: { ...scratch.spec, lane },
         env: scratch.env,
         from,
         // No lane's data root to clone: a nested base's is its own.
@@ -61,7 +57,7 @@ async function inScratch<C, T>(
     return await work(handle.runners)
   } finally {
     await handle.stop().catch(() => {})
-    await removeLane(runtime, BASE_LANE)
+    await removeLane(runtime, lane)
   }
 }
 
@@ -93,7 +89,7 @@ export async function refreshBase<C>(
       [
         ...checkout(from === null).steps,
         planBaseFacts(accepted.points),
-        ...planSnapshot({ lane: BASE_LANE, snapshot: BASE_SNAPSHOT }),
+        ...planSnapshot({ lane: runtime.baseLane, snapshot: BASE_SNAPSHOT }),
       ],
       runners,
     )

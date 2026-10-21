@@ -131,6 +131,12 @@ hosts lanehost's roles; its disks are lanehost's client, spread
 - **Each project's disks are under its key** (`projectKey`, a hash of its
   root), as lanehost's `layout.ts` lays them out. A project's disks go with
   it, as one directory.
+- **A container's name is the whole engine's,** so the one lane no thread
+  owns, the base's scratch lane, is named by the project's key: the
+  runtime's `baseLane` (ADR-0207). A thread's lane is named by its id,
+  unique everywhere. An older install's `pinetrie-base-scratch`, left only
+  by a host that stopped mid-build, goes with the Mac's slot sweep, or on
+  Linux with its project's sweep.
 - **No trim:** btrfs frees what a lane deletes. `stop` does nothing more.
 
 ## Networks, and the host's ports (S136)

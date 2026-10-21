@@ -46,6 +46,7 @@ import {
   tarStream,
 } from "@pinetrie/lanehost/fixtures"
 import {
+  baseLane,
   createQueue,
   type FolderDisks,
   type LaneHistory,
@@ -149,6 +150,7 @@ async function makeRig(): Promise<FolderRig> {
         : fileStream(disks.snapshot(snapshot), stdin),
   })
   const runtime: LaneRuntime = {
+    baseLane: baseLane("0123456789abcdef"),
     ...diskCalls,
     runSpec: unused("runSpec"),
     run: unused("run"),

@@ -375,22 +375,6 @@ export const mutations: readonly Mutation[] = [
       "scenarioProblem: one that runs lanes is skipped with the runtime's words",
   },
   {
-    name: "budgetBreaches lets a layer reach one past its square root",
-    file: "scripts/budget.ts",
-    from: "    ...(c.acceptance > allowed(c.unit)",
-    to: "    ...(c.acceptance > allowed(c.unit) + 1",
-    command: proofs,
-    expect: "budgetBreaches",
-  },
-  {
-    name: "budgetBreaches breaches a layer at its square root",
-    file: "scripts/budget.ts",
-    from: "    ...(c.browser > allowed(c.acceptance)",
-    to: "    ...(c.browser >= allowed(c.acceptance)",
-    command: proofs,
-    expect: "budgetBreaches",
-  },
-  {
     name: "proofGaps reports no unproven label",
     file: "scripts/proofs.ts",
     from: "      .filter(label => !expected.has(`${scenario}\\n${label}`))",

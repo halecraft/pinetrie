@@ -20,11 +20,21 @@ export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
 
 declare const baseLaneBrand: unique symbol
 /**
- * The scratch lane a base is made in (`base.ts`): no thread's, so no
- * `ThreadId`, and nothing that takes a thread can be given it.
+ * The scratch lane a project's base is made in (`base.ts`): no thread's, so
+ * no `ThreadId`, and nothing that takes a thread can be given it.
  */
-type BaseLane = "base-scratch" & { readonly [baseLaneBrand]: true }
-export const BASE_LANE = "base-scratch" as BaseLane
+export type BaseLane = `base-scratch-${string}` & {
+  readonly [baseLaneBrand]: true
+}
+
+/**
+ * The base's scratch lane of the project whose key (the runtime's) is
+ * `project`. A container's name is shared by every project on its machine,
+ * and a build starts by removing whatever holds its scratch lane's name, so
+ * a name that two projects shared let one delete the other's build.
+ */
+export const baseLane = (project: string): BaseLane =>
+  `base-scratch-${project}` as BaseLane
 
 /**
  * What a lane's container, disk and snapshots are named by: a thread, whose

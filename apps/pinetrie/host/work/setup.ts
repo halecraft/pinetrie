@@ -11,7 +11,6 @@ import { errorText, isThreadId } from "@pinetrie/core"
 import type { Install } from "@pinetrie/install"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
-  BASE_LANE,
   checkImage,
   ensureRuntime,
   gatherLinks,
@@ -402,7 +401,7 @@ function baseRefresher(laid: Laid): RefreshBase {
   /** What the scratch lane builds with. Nothing in it should see a shared directory. */
   const scratchOf = (r: Ready) => ({
     runtime: found.runtime,
-    spec: laid.specOf(BASE_LANE, r, true),
+    spec: laid.specOf(found.runtime.baseLane, r, true),
     env: process.env,
     open: laneLinkOpener(found.runtime, r.observer, found.install),
   })

@@ -5,6 +5,7 @@ import { helperCommand, laneHandle } from "./lane.ts"
 import type { Ran, Runner } from "./run.ts"
 import { RUNTIME_NODE } from "./runtime.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
+import { baseLane } from "./spec.ts"
 import type { Step } from "./steps.ts"
 
 /** A lane no observer sees: no run did anything. */
@@ -24,6 +25,7 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     throw new Error("not recorded")
   }
   return {
+    baseLane: baseLane("0123456789abcdef"),
     disk: async op => {
       seen.push(`disk: ${op.kind}`)
     },

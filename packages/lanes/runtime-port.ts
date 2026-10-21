@@ -11,7 +11,7 @@ import type {
 import type { ImagePlan } from "./image-plan.ts"
 import type { Ran } from "./run.ts"
 import type { ContainerShape } from "./shape.ts"
-import type { LaneOwner } from "./spec.ts"
+import type { BaseLane, LaneOwner } from "./spec.ts"
 import type { PlannedStart } from "./steps.ts"
 
 /** A lane's disk, as the host asks of whichever runtime keeps it (core's `DiskOp`). */
@@ -53,6 +53,8 @@ export interface LaneDisks {
 
 /** A lane's container, on its disk. Each call throws on failure, naming the command. */
 interface LaneContainers {
+  /** Its project's base's scratch lane (`baseLane`, over the project's key). */
+  readonly baseLane: BaseLane
   /** The container's spec as the runtime makes it, without its label: pure. Its hash is its spec label. */
   runSpec(shape: ContainerShape): unknown
   /**
