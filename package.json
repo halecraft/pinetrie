@@ -45,6 +45,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@google/genai",
       "esbuild"
     ],
     "ignoredBuiltDependencies": [
