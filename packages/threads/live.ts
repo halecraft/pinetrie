@@ -2,7 +2,7 @@
 // `pinetrie:live`. `@pinetrie/rules` plans the changes
 // (`packages/rules/live.ts`), and `@pinetrie/schema` writes them.
 
-import type { EntryId, RunId, ThreadId } from "@pinetrie/core"
+import type { EntryId, RunId, StatementIndex, ThreadId } from "@pinetrie/core"
 import type { TextEdit } from "./edits.ts"
 
 /**
@@ -18,12 +18,23 @@ export type StreamEvent =
       readonly lane: ThreadId
       readonly callId: string
     }
-  /** The tool's output so far: a whole snapshot, not a delta. */
+  /**
+   * The tool's output so far: a whole snapshot, not a delta. With
+   * `statement`, that statement's output alone, sent only while the call's
+   * split verifies; without, the call's whole output.
+   */
   | {
       readonly kind: "tool-output"
       readonly lane: ThreadId
       readonly callId: string
+      readonly statement?: StatementIndex
       readonly text: string
+    }
+  /** The call's split stopped verifying: its statements' streams close. */
+  | {
+      readonly kind: "tool-undivided"
+      readonly lane: ThreadId
+      readonly callId: string
     }
 
 declare const streamIdBrand: unique symbol
@@ -55,6 +66,8 @@ export type StreamRecord =
       readonly lane: ThreadId
       readonly kind: "tool"
       readonly callId: string
+      /** The statement whose output it is; absent for the call's whole output. */
+      readonly statement?: StatementIndex
     }
 
 /** A stream, with what it has written so far. */

@@ -1,7 +1,8 @@
 import { parse } from "unbash"
 import { describe, expect, test } from "vitest"
+import { commandStatements, statementsCommand } from "./fixtures.ts"
 import { readShell } from "./read.ts"
-import { statementLines } from "./statements.ts"
+import { statementLines, statementSpans } from "./statements.ts"
 
 const starts = (text: string) => statementLines(text, parse(text))
 
@@ -49,4 +50,60 @@ test("a laid-out command's starts are its layout's lines", () => {
     .join("")
     .split("\n")
   expect(laidOut?.starts.map(i => lines[i])).toEqual(["echo done"])
+})
+
+describe("statementSpans", () => {
+  const spans = (text: string) =>
+    statementSpans(text, parse(text)).map(s => ({
+      text: text.slice(s.pos, s.end),
+      lines: [s.first, s.last],
+    }))
+
+  test("each statement of a line's `;` and `&` is one", () => {
+    expect(spans("a; b")).toEqual([
+      { text: "a", lines: [1, 1] },
+      { text: "b", lines: [1, 1] },
+    ])
+  })
+
+  test("an `&&` chain is one statement, and a backgrounded one another", () => {
+    expect(spans("a && b; c &").map(s => s.text)).toEqual(["a && b", "c &"])
+  })
+
+  test("a statement's heredoc body is its own, though another statement shares its line", () => {
+    expect(spans("cat <<EOF; echo x\nbody\nEOF\necho y")).toEqual([
+      { text: "cat <<EOF; echo x\nbody\nEOF", lines: [1, 3] },
+      { text: "echo x", lines: [1, 1] },
+      { text: "echo y", lines: [4, 4] },
+    ])
+  })
+
+  test("a heredoc with no terminator spans the rest of the command, as bash reads it", () => {
+    expect(spans("cat <<EOF\nbody\nmore").map(s => s.lines)).toEqual([[1, 3]])
+  })
+
+  test("a multi-line `if` spans its lines, the comment above it none", () => {
+    expect(spans("# first\nif true\nthen\n  a\nfi\nb")).toEqual([
+      { text: "if true\nthen\n  a\nfi", lines: [2, 5] },
+      { text: "b", lines: [6, 6] },
+    ])
+  })
+
+  test("a quoted multi-line `eval` is one statement over its lines", () => {
+    expect(spans("eval 'a\nb'\nc").map(s => s.lines)).toEqual([
+      [1, 2],
+      [3, 3],
+    ])
+  })
+
+  test("on the observer's command, they are the statements bash numbers, on their lines", () => {
+    const text = statementsCommand()
+    expect(
+      statementSpans(text, parse(text)).map((s, i) => ({
+        statement: i + 1,
+        first: s.first,
+        last: s.last,
+      })),
+    ).toEqual(commandStatements())
+  })
 })

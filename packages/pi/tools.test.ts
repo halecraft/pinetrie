@@ -27,6 +27,7 @@ const unused = async (): Promise<never> => {
 const input = {
   hooks: {
     turnDone: unused,
+    storeOutputSplit: unused,
     askedAboutConflict: unused,
     configWritten: async () => null,
     getLatest: unused,
@@ -38,6 +39,7 @@ const input = {
     putImage: unused,
     readCard: unused,
   },
+  stream: () => {},
   blobs: undefined,
   bannerAsks: unused,
 }

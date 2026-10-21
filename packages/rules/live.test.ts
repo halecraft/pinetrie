@@ -2,6 +2,8 @@ import {
   type EntryId,
   entryId,
   runId,
+  type StatementIndex,
+  statementIndex,
   type ThreadId,
   threadIdFor,
 } from "@pinetrie/core"
@@ -242,6 +244,86 @@ describe("the end of a run, and a clear at start", () => {
       { kind: "close", id: "orphan" },
       { kind: "end", lane: L },
       { kind: "end", lane: M },
+    ])
+  })
+})
+
+describe("planStream: a statement's stream", () => {
+  const st = (n: number): StatementIndex => {
+    const i = statementIndex(n)
+    if (i === null) throw new Error(`no statement ${n}`)
+    return i
+  }
+  const start: StreamEvent = { kind: "tool-start", lane: L, callId: "c1" }
+  const out = (text: string, statement?: number): StreamEvent => ({
+    kind: "tool-output",
+    lane: L,
+    callId: "c1",
+    text,
+    ...(statement === undefined ? {} : { statement: st(statement) }),
+  })
+  const tools = (s: readonly Stream[] | undefined) =>
+    (s ?? []).flatMap(x =>
+      x.kind === "tool" ? [{ statement: x.statement, text: x.text }] : [],
+    )
+
+  test("opens when its statement first prints, and takes its snapshots apart from the call's", () => {
+    const seen = drive([
+      start,
+      out("a\n"),
+      out("a\n", 1),
+      out("a\nb\n"),
+      out("a\nb\n", 1),
+    ])
+    expect(tools(seen.at(-1))).toEqual([
+      { statement: undefined, text: "a\nb\n" },
+      { statement: 1, text: "a\nb\n" },
+    ])
+  })
+
+  test("a statement that has printed nothing has no stream", () => {
+    expect(tools(drive([start, out("", 2)]).at(-1))).toEqual([
+      { statement: undefined, text: "" },
+    ])
+  })
+
+  test("the call's output without a statement never opens a stream", () => {
+    expect(tools(drive([out("x")]).at(-1))).toEqual([])
+  })
+
+  test("a call turned undivided closes its statements' streams and keeps its own", () => {
+    const seen = drive([
+      start,
+      out("a", 1),
+      out("b", 2),
+      out("ab"),
+      { kind: "tool-undivided", lane: L, callId: "c1" },
+    ])
+    expect(tools(seen.at(-1))).toEqual([{ statement: undefined, text: "ab" }])
+  })
+
+  test("a run's end closes its statements' streams with the call's", () => {
+    const streams = [
+      { id: streamId("s-1"), lane: L, kind: "tool", callId: "c" },
+      {
+        id: streamId("s-2"),
+        lane: L,
+        kind: "tool",
+        callId: "c",
+        statement: st(1),
+      },
+    ] as const
+    expect(
+      planEndRun({
+        lane: L,
+        run: runId("r-1"),
+        running: runId("r-1"),
+        streams,
+      }),
+    ).toEqual([
+      { kind: "close", id: "s-1" },
+      { kind: "close", id: "s-2" },
+      { kind: "end", lane: L },
     ])
   })
 })

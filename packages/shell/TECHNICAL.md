@@ -6,7 +6,9 @@ plain), a one-line command laid out to a width, and the lines its
 top-level statements begin on. It knows nothing of
 tool calls: `@pinetrie/interface` decides which call reads as shell, and
 `@pinetrie/web` colours the roles. It declares only `unbash`, and only
-interface declares it (`workspace.test.ts`). No DOM and no Node:
+interface, `@pinetrie/pi` (whose `bash` tool counts a call's statements)
+and the app (whose observer suite runs the statements' fixture) declare it
+(`workspace.test.ts`). No DOM and no Node:
 `tsconfig.pure.json` checks it with `lib: ["ESNext"]`, no ambient types and
 only the globals `pure-globals.d.ts` declares.
 

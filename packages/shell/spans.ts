@@ -7,6 +7,7 @@
 // operators, keywords and a comment.
 
 import type { ParsedScript } from "unbash"
+import { isNode, type Node, nodeChildren } from "./nodes.ts"
 
 export type ShellRole =
   | "command"
@@ -27,20 +28,6 @@ export interface ShellSpan {
 /** The source as one run, for a source that does not parse. */
 export const plainSpans = (source: string): readonly ShellSpan[] =>
   source === "" ? [] : [{ text: source, role: "plain" }]
-
-/** A node of the parse, as the walk sees one: its type and its place. */
-interface Node {
-  readonly type: string
-  readonly pos: number
-  readonly end: number
-}
-
-const isNode = (v: unknown): v is Node =>
-  typeof v === "object" &&
-  v !== null &&
-  typeof (v as Node).type === "string" &&
-  typeof (v as Node).pos === "number" &&
-  typeof (v as Node).end === "number"
 
 /** The role a node marks over its whole range, by its type. */
 const ROLE_OF: Readonly<Record<string, ShellRole>> = {
@@ -130,31 +117,8 @@ function walk(node: unknown, mark: Mark, word: ShellRole = "plain"): void {
     node.operator.endsWith("&")
       ? "redirect"
       : "plain"
-  for (const child of childrenOf(node)) walk(child, mark, target)
+  for (const child of nodeChildren(node)) walk(child, mark, target)
 }
-
-/**
- * unbash computes some children on first read, as getters on its classes'
- * prototypes, which `Object.values` does not list (`unbash/dist/word.js`,
- * `expansion.js`, `assignment.js`, `heredoc.js`, `parser.js`). `args` and
- * `redirects` are left out: they repeat `prefix` and `suffix`.
- */
-const LAZY = [
-  "parts",
-  "script",
-  "elements",
-  "index",
-  "value",
-  "expression",
-  "initialize",
-  "test",
-  "update",
-] as const
-
-const childrenOf = (node: Node): unknown[] => [
-  ...Object.values(node),
-  ...LAZY.map(key => (node as Node & Partial<Record<string, unknown>>)[key]),
-]
 
 function walkCommand(node: Node, mark: Mark): void {
   const { name, prefix, suffix } = node as Node & {

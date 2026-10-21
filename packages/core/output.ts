@@ -8,7 +8,7 @@ export type OutputFd = "stdout" | "stderr"
 
 declare const statementIndexBrand: unique symbol
 /** A statement's ordinal among a command's top-level statements, from 1. */
-type StatementIndex = number & {
+export type StatementIndex = number & {
   readonly [statementIndexBrand]: true
 }
 

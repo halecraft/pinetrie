@@ -1,9 +1,11 @@
-// e2e/observer/statements — the command the guest runs in pine·trie's bash:
-// one of every kind of top-level statement the patch signals, each printing
-// lines that name its ordinal (`S<n>`), so every byte of such a line must be
-// attributed to statement n. A nested pine·trie bash and `work forge` signal
-// too, and must be refused. Lines of the command, each a list of statements
-// with what ends each; `{n}` is the statement's ordinal, `{next}` the next.
+// shell/fixtures — one command of every kind of top-level statement
+// pine·trie's bash signals, each printing lines that name its ordinal
+// (`S<n>`), so every byte of such a line belongs to statement n. The
+// observer suite's guest runs it, and `statementSpans`' test checks unbash
+// counts the same statements. A nested pine·trie bash (`/bin/bash-pt`) and
+// `work forge` signal too, and the guest must refuse them. Lines of the
+// command, each a list of statements with what ends each; `{n}` is the
+// statement's ordinal, `{next}` the next.
 
 const LINES: readonly (readonly (readonly [string, string])[])[] = [
   [["echo S{n}", ""]],

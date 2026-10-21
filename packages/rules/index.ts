@@ -572,6 +572,20 @@ export {
 export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
+  type Attributed,
+  type JoinEvent,
+  joinStart,
+  joinStep,
+  joinVerdict,
+  type OutputSplitRecord,
+  outputSplitRecord,
+  outputSplitWrite,
+  planVerdictChange,
+  settledSplit,
+  type Verdict,
+  type VerifiedSplit,
+} from "./statement-output.ts"
+export {
   CARRY_ON_TYPE,
   type CarryOnMessage,
   carryOnState,

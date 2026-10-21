@@ -15,6 +15,7 @@ import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { openStore } from "../store.ts"
 import { CARD_TICKED } from "./0026-card-ticked.ts"
 import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
+import { STREAM_STATEMENT } from "./0029-stream-statement.ts"
 import {
   MIGRATIONS,
   type Migration,
@@ -74,7 +75,7 @@ describe("the stored schemas", () => {
     )
     expect(now).toEqual({
       session: "0223893f102c08dc9c7b6f976f712a842a",
-      live: "028e3f891b8953894c3667be8ca55a5946",
+      live: "0230ee6b33ca5e71e69bc5dde2265bf4b8",
       places: "02a4a2f075902fd4683994469a5a3e06cd",
       root: "02065b897f9f33229f2318be54d33c6e76",
       scratch: "0273580c3e061af065151eb6b6f081aeb0",
@@ -119,6 +120,24 @@ describe("0027-canvas-state-changed", () => {
       unknown: [],
     })
     expect(CANVAS_STATE_CHANGED.run).toBeUndefined()
+  })
+})
+
+describe("0029-stream-statement", () => {
+  test("a live document stored before a stream's statement opens through it, moving no data", () => {
+    expect(
+      planOpen({
+        stored: new Map([[LIVE_DOC_ID, STREAM_STATEMENT.from]]),
+        kindOf: storedKind,
+        hashOf: kind => SCHEMA_OF[kind].schemaHash,
+        migrations: MIGRATIONS,
+      }),
+    ).toEqual({
+      kind: "open",
+      run: [{ migration: STREAM_STATEMENT, docIds: [LIVE_DOC_ID] }],
+      unknown: [],
+    })
+    expect(STREAM_STATEMENT.run).toBeUndefined()
   })
 })
 

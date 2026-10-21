@@ -16,10 +16,10 @@ import {
   type LoaderLine,
   OBSERVER_CONTAINERFILE,
 } from "@pinetrie/lanehost"
+import { statementsCommand } from "@pinetrie/shell/fixtures"
 import { pinnedKernel, readBuilderPins } from "@pinetrie/vm"
 import { command, commandBytes } from "../command.ts"
 import { cli, runtimeCli } from "../lane-runtime.ts"
-import { statementsCommand } from "./statements.ts"
 
 const QEMU = "qemu-system-aarch64"
 /** The guest's whole run, emulated: about 35 s on an M-series lane. */

@@ -17,7 +17,7 @@ import type {
 export interface LiveWork {
   /** Each running lane's current reply: at most one per lane. */
   readonly replies: ReadonlyMap<string, StreamRecord>
-  /** Each tool stream of a running lane, its id by its call's id. */
+  /** Each running call's own stream, of its whole output, its id by its call's id. */
   readonly tools: ReadonlyMap<string, StreamId>
 }
 
@@ -31,8 +31,10 @@ export function liveWork(
   for (const s of streams) {
     const tip = tips.get(s.lane)
     if (tip === undefined) continue
-    if (s.kind === "tool") tools.set(s.callId, s.id)
-    else if (isCurrentReply(s, tip)) replies.set(s.lane, s)
+    // A statement's stream is not its call's: the call's is its whole output.
+    if (s.kind === "tool") {
+      if (s.statement === undefined) tools.set(s.callId, s.id)
+    } else if (isCurrentReply(s, tip)) replies.set(s.lane, s)
   }
   return { replies, tools }
 }

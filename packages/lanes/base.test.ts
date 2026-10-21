@@ -1,4 +1,4 @@
-import { pointId, type RunSource } from "@pinetrie/core"
+import { type LaneObservation, pointId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { refreshBase } from "./base.ts"
 import { spec } from "./fixtures.ts"
@@ -6,8 +6,13 @@ import { baseCheckout } from "./history-port.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 import { baseLane, type LaneOwner, type LaneSpec } from "./spec.ts"
 
-const unobserved: RunSource = {
+const unobserved: LaneObservation = {
   drain: async drain => (await drain(new Map())).result,
+  attribution: { on: true },
+  output: () => () => {},
+  settle: () => new Promise(() => {}),
+  close: async () => {},
+  relay: () => new Promise(() => {}),
 }
 
 /** A runtime that keeps nothing: each container and disk call it is asked, by its lane's name. */

@@ -4,10 +4,14 @@
 // model meets the tool it knows. Its command runs in pine·trie's bash in the
 // lane (`ToolContext.shell`), which hands back every chunk with its pipe;
 // one capture (`shell-capture.ts`) makes what the model reads from them.
-// pi's own `exec` keeps serving the other tools.
+// Its join (`statement-join.ts`) splits the same chunks by the statement
+// that wrote them, for the call's row, never for the model. pi's own `exec`
+// keeps serving the other tools.
 
-import { formatSize } from "@earendil-works/pi-agent-core"
-import { BASH_TOOL } from "@pinetrie/threads"
+import { type Context, formatSize } from "@earendil-works/pi-agent-core"
+import type { ThreadId } from "@pinetrie/core"
+import type { OutputSplitRecord } from "@pinetrie/rules"
+import { BASH_TOOL, type StreamEvent } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ShellEnd } from "./lane-protocol.ts"
 import type { ToolContext } from "./lanes.ts"
@@ -21,6 +25,8 @@ import {
   captureStart,
   captureView,
 } from "./shell-capture.ts"
+import { statementJoin } from "./statement-join.ts"
+import { threadOfContext } from "./thread-context.ts"
 
 /** pi's ceiling on a timeout: what a `setTimeout` can wait, in seconds. */
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000
@@ -117,8 +123,16 @@ type Update = (
   options?: { checkpoint: true },
 ) => void
 
+/** Where a call's output by statement goes: never to the model. */
+export interface StatementSinks {
+  /** A statement's live output, or its call's turn to undivided. */
+  readonly stream: (event: StreamEvent) => void
+  /** Stores a call's verified split in its lane's root. */
+  readonly store: (lane: ThreadId, record: OutputSplitRecord) => Promise<void>
+}
+
 /** pi's `bash` tool, made pine·trie's: see the module's header. */
-export function bashTool() {
+export function bashTool(sinks: StatementSinks | null = null) {
   return {
     name: BASH_TOOL,
     label: BASH_TOOL,
@@ -132,12 +146,12 @@ export function bashTool() {
       ),
     }),
     async execute(
-      _toolCallId: string,
+      toolCallId: string,
       { command, timeout }: { command: string; timeout?: number },
       onUpdate: Update,
       toolContext: ToolContext,
       _invocation: unknown,
-      context: { readonly abortSignal?: AbortSignal },
+      context: Context,
     ) {
       checkedTimeout(timeout)
       onUpdate({ content: [], details: undefined })
@@ -146,16 +160,48 @@ export function bashTool() {
         { timeout: timeout ?? null, spill: BASH_LIMITS, cap: OUTPUT_CAP },
         context.abortSignal,
       )
+      const lane = threadOfContext(context)
+      const join =
+        sinks === null || lane === undefined
+          ? null
+          : statementJoin(command, await run.attribution, {
+              statement: (statement, text) =>
+                sinks.stream({
+                  kind: "tool-output",
+                  lane,
+                  callId: toolCallId,
+                  statement,
+                  text,
+                }),
+              undivided: () =>
+                sinks.stream({
+                  kind: "tool-undivided",
+                  lane,
+                  callId: toolCallId,
+                }),
+            })
       let state: CaptureState = captureStart(BASH_LIMITS)
       const publisher = published(() => captureView(state), onUpdate)
-      for await (const chunk of run.chunks) {
-        if (chunk === "over-cap") continue
-        state = captureChunk(state, chunk)
-        publisher.changed()
+      for await (const event of run.events) {
+        if (event === "over-cap") join?.overCap()
+        else if ("notice" in event) join?.notice(event.notice)
+        else {
+          state = captureChunk(state, event)
+          publisher.changed()
+          join?.chunk(event.fd, event.bytes)
+        }
       }
       const end = await run.end
       state = captureFinish(state)
       publisher.stop()
+      const settled = await run.settled
+      const record =
+        join === null || settled === null
+          ? null
+          : join.done(toolCallId, settled)
+      // A split that fails to store leaves the row its whole output.
+      if (record !== null && lane !== undefined && sinks !== null)
+        await sinks.store(lane, record).catch(() => {})
       const view = captureView(state)
       const result = bashResult(view, end, timeout)
       if (!result.ok) throw new Error(result.text)

@@ -14,9 +14,9 @@ import type {
   RunEvent,
 } from "@pinetrie/core"
 import { type LoaderLine, planAttribution } from "@pinetrie/lanehost"
+import { commandStatements, FORGED_SIGNALS } from "@pinetrie/shell/fixtures"
 import type { Checks } from "../checks.ts"
 import type { Scenario } from "../scenario.ts"
-import { commandStatements, FORGED_SIGNALS } from "./statements.ts"
 import { bootGuest, guestProblem } from "./support.ts"
 
 type Event = Extract<LoaderLine, { kind: "event" }>

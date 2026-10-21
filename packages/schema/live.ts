@@ -13,6 +13,7 @@ import {
   isThreadId,
   type RunId,
   runId,
+  statementIndex,
   type ThreadId,
 } from "@pinetrie/core"
 import {
@@ -44,6 +45,8 @@ export const LiveDoc = json.bind(
         callId: Schema.string().nullable(),
         /** The lane's tip when a reply opened; null for a tool, or a lane with none. */
         under: Schema.string().nullable(),
+        /** A tool stream's statement; null for a reply, or a call's whole output. */
+        statement: Schema.number().nullable(),
       }),
     ),
     streamText: Schema.record(Schema.text()),
@@ -59,8 +62,20 @@ type StoredStream = ReturnType<LiveDocHandle["streams"]>[string]
 
 const encodeStream = (s: StreamRecord): StoredStream =>
   s.kind === "reply"
-    ? { lane: s.lane, kind: "reply", callId: null, under: s.under }
-    : { lane: s.lane, kind: "tool", callId: s.callId, under: null }
+    ? {
+        lane: s.lane,
+        kind: "reply",
+        callId: null,
+        under: s.under,
+        statement: null,
+      }
+    : {
+        lane: s.lane,
+        kind: "tool",
+        callId: s.callId,
+        under: null,
+        statement: s.statement ?? null,
+      }
 
 /**
  * A stored row, read; undefined for one whose lane is no thread's. Only the
@@ -68,14 +83,25 @@ const encodeStream = (s: StreamRecord): StoredStream =>
  */
 function decodeStream(id: string, s: StoredStream): StreamRecord | undefined {
   if (!isThreadId(s.lane)) return undefined
-  return s.kind === "tool"
-    ? { id: streamId(id), lane: s.lane, kind: "tool", callId: s.callId ?? "" }
-    : {
-        id: streamId(id),
-        lane: s.lane,
-        kind: "reply",
-        under: s.under === null ? null : entryId(s.under),
-      }
+  if (s.kind === "tool") {
+    const record = {
+      id: streamId(id),
+      lane: s.lane,
+      kind: "tool",
+      callId: s.callId ?? "",
+    } as const
+    if (s.statement === null) return record
+    // A statement that is no ordinal is dropped, never read as the call's
+    // whole output.
+    const statement = statementIndex(s.statement)
+    return statement === null ? undefined : { ...record, statement }
+  }
+  return {
+    id: streamId(id),
+    lane: s.lane,
+    kind: "reply",
+    under: s.under === null ? null : entryId(s.under),
+  }
 }
 
 /** Apply `edits` to a Kyneta text: the one place text receives edits. */

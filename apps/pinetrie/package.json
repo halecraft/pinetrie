@@ -41,6 +41,7 @@
     "@pinetrie/rules": "workspace:*",
     "@pinetrie/schema": "workspace:*",
     "@pinetrie/session": "workspace:*",
+    "@pinetrie/shell": "workspace:*",
     "@pinetrie/ssh": "workspace:*",
     "@pinetrie/threads": "workspace:*",
     "@pinetrie/vm": "workspace:*",

@@ -5,6 +5,7 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/shell"]
 const layout = "packages/shell/layout.ts"
 const spans = "packages/shell/spans.ts"
 const statements = "packages/shell/statements.ts"
+const nodes = "packages/shell/nodes.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -32,12 +33,28 @@ export const mutations: readonly Mutation[] = [
     expect: "a line of the statement before, though it looks like a comment",
   },
   {
-    name: "the walk up passes any line",
+    name: "a heredoc's terminator is left outside its statement",
     file: statements,
-    from: "    while (line - 1 > after && isComment(lines[line - 1])) line--",
-    to: "    while (line - 1 > after) line--",
+    from: "      if (closing !== undefined) end = Math.max(end, closing.end)",
+    to: "      if (closing !== undefined) end = Math.max(end, closing.pos)",
     command: unit,
-    expect: "a heredoc's body is its statement's",
+    expect: "a statement's heredoc body is its own",
+  },
+  {
+    name: "a statement ends where its own node does",
+    file: statements,
+    from: "    end = Math.max(end, v.end)\n",
+    to: "",
+    command: unit,
+    expect: "a heredoc with no terminator spans the rest of the command",
+  },
+  {
+    name: "a statement's lines are counted from 0",
+    file: statements,
+    from: "    return lo + 1\n",
+    to: "    return lo\n",
+    command: unit,
+    expect: "on the observer's command, they are the statements bash numbers",
   },
   {
     name: "a statement after a blank line begins one too",
@@ -97,7 +114,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a command expansion is never walked",
-    file: spans,
+    file: nodes,
     from: '  "parts",\n  "script",\n',
     to: '  "parts",\n',
     command: unit,
@@ -113,7 +130,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lazy child is never walked",
-    file: spans,
+    file: nodes,
     from: "  ...LAZY.map(key => (node as Node & Partial<Record<string, unknown>>)[key]),",
     to: "",
     command: unit,

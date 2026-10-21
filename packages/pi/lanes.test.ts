@@ -103,8 +103,10 @@ test("laneToolContext: a lane of its own runs the runtime's programs by path", a
 
 test("the prompt no longer tells the model to search with bash", () => {
   const { files } = assembleTools({
+    stream: () => {},
     hooks: {
       turnDone: async () => {},
+      storeOutputSplit: async () => {},
       askedAboutConflict: async () => false,
       configWritten: async () => null,
       getLatest: async () => {
@@ -394,6 +396,7 @@ describe("lanes in a harness", () => {
           return where
         },
         hooks: {
+          storeOutputSplit: async () => {},
           async turnDone(_lane, tip) {
             turns.push(`start ${tip}`)
             await new Promise(r => setTimeout(r, 20))
@@ -468,6 +471,7 @@ describe("lanes in a harness", () => {
         access,
         hooks: {
           turnDone: async () => {},
+          storeOutputSplit: async () => {},
           askedAboutConflict: async () => false,
           configWritten: async () => null,
           getLatest: async () => {
@@ -527,7 +531,7 @@ describe("lanes in a harness", () => {
       shell: "bash",
       gate: async () => {
         await ready
-        return channel
+        return { channel, observation: null }
       },
     }
   }
@@ -601,7 +605,7 @@ describe("lanes in a harness", () => {
       hostPaths: [],
       programs: path.join(dir, "bin"),
       shell: "bash",
-      gate: async () => channel,
+      gate: async () => ({ channel, observation: null }),
     })
     script.use([
       { tool: "write", args: { path: "made.txt", content: "in the lane\n" } },
@@ -651,7 +655,7 @@ describe("lanes in a harness", () => {
       hostPaths: [],
       programs: path.join(dir, "bin"),
       shell: "bash",
-      gate: async () => channel,
+      gate: async () => ({ channel, observation: null }),
     })
     script.use([
       { tool: "grep", args: { pattern: "it's", glob: "*.txt" } },

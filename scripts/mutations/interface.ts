@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a bash call's output by statement ──
+  {
+    name: "a statement's stream is taken as its call's",
+    file: "packages/interface/live.ts",
+    from: "if (s.statement === undefined) tools.set(s.callId, s.id)",
+    to: "tools.set(s.callId, s.id)",
+    command: unit,
+    expect: "a call's stream is its whole output's, never a statement's",
+  },
   // ── a refused command's answer ──
   {
     name: "a taken thread is answered as an unknown target",
@@ -832,8 +841,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "liveWork ignores under: a written reply is still drawn",
     file: "packages/interface/live.ts",
-    from: "    else if (isCurrentReply(s, tip)) replies.set(s.lane, s)",
-    to: "    else replies.set(s.lane, s)",
+    from: "    } else if (isCurrentReply(s, tip)) replies.set(s.lane, s)",
+    to: "    } else replies.set(s.lane, s)",
     command: unit,
     expect: "not once its entry moves the tip",
   },

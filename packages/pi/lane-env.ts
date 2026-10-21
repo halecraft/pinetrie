@@ -14,7 +14,16 @@
 
 import { type ExecutionEnv, FileError } from "@earendil-works/pi-agent-core"
 import { openChannel as open, type RunResult } from "@pinetrie/channel"
-import type { FileHashes, LaneDrain, Recipe, RecipeCheck } from "@pinetrie/core"
+import type {
+  Attribution,
+  FileHashes,
+  LaneDrain,
+  LaneObservation,
+  OutputEvent,
+  Recipe,
+  RecipeCheck,
+  Settled,
+} from "@pinetrie/core"
 import {
   type EnvMethod,
   type IgnoreFacts,
@@ -242,13 +251,46 @@ export function laneRunner(channel: LaneChannel): {
 /** A chunk of a `bash` call's output, as one read in the lane gave it. */
 export type ShellChunk = Extract<ShellUpdate, { readonly fd: unknown }>
 
+/** What a `bash` call's join reads of its lane's observer. */
+export type ShellObservation = Pick<
+  LaneObservation,
+  "attribution" | "output" | "settle"
+>
+
+/** A lane let through its queue: its channel, and its observer's view of its runs. */
+export interface OpenedLane {
+  readonly channel: LaneChannel
+  /** Null where the lane has no observer: a helper run alone, in tests. */
+  readonly observation: ShellObservation | null
+}
+
+/** What a running `bash` call hands its tool, in the order it came. */
+export type ShellEvent =
+  | ShellChunk
+  /** The cap is reached: no more chunks. */
+  | "over-cap"
+  /** What the observer saw of the run's output. */
+  | { readonly notice: OutputEvent }
+
 /** A `bash` call's command, running: its run, its output as it comes, and how it ended. */
 export interface ShellRun {
   /** The run's number, once the lane has started it. */
   readonly started: Promise<string>
-  /** Each chunk, in the order the lane read them; `"over-cap"` once the cap is reached. */
-  readonly chunks: AsyncIterable<ShellChunk | "over-cap">
+  /** The lane's attribution, once its gate opens; null where it has no observer. */
+  readonly attribution: Promise<Attribution | null>
+  /**
+   * Each chunk in the order the lane read them, and the observer's events
+   * for the run among them. It ends once the call has returned and the
+   * observer's flush after it has answered, so every event of the call is
+   * in it.
+   */
+  readonly events: AsyncIterable<ShellEvent>
   readonly end: Promise<ShellEnd>
+  /**
+   * The flush's proof, once `events` ends; null where the lane has no
+   * observer, the call never started, or the flush failed.
+   */
+  readonly settled: Promise<Settled | null>
 }
 
 /** What a `bash` call asks of its lane, beyond its command. */
@@ -263,25 +305,39 @@ export type LaneShell = (
 
 /**
  * A lane's shell: pine·trie's bash at `shell`, in `cwd`, once `gate()` has
- * let the lane's queue through, as every environment call waits.
+ * let the lane's queue through, as every environment call waits. The run's
+ * output is claimed from the observer as soon as the lane names the run,
+ * and let go once the flush after the call has answered.
  */
 export function laneShell(
   shell: string,
   cwd: string,
-  gate: () => Promise<LaneChannel>,
+  gate: () => Promise<OpenedLane>,
 ): LaneShell {
   return (command, ask, signal) => {
-    const chunks = queue<ShellChunk | "over-cap">()
+    const events = queue<ShellEvent>()
     let started: (run: string) => void = () => {}
     const run = new Promise<string>(r => {
       started = r
     })
+    const opened = gate()
+    const attribution = opened.then(
+      o => o.observation?.attribution ?? null,
+      () => null,
+    )
+    // Set in the update's callback, which the compiler cannot follow.
+    const claim: { release: (() => void) | null } = { release: null }
     const end = (async () => {
-      const channel = await gate()
+      const { channel, observation } = await opened
       return channel.shell({ shell, command, cwd, ...ask }, signal, update => {
-        if ("started" in update) started(update.started)
-        else if ("overCap" in update) chunks.push("over-cap")
-        else chunks.push(update)
+        if ("started" in update) {
+          started(update.started)
+          claim.release =
+            observation?.output(update.started, notice =>
+              events.push({ notice }),
+            ) ?? null
+        } else if ("overCap" in update) events.push("over-cap")
+        else events.push(update)
       })
     })().then(
       e => e,
@@ -290,20 +346,40 @@ export function laneShell(
         message: String(error),
       }),
     )
-    void end.then(() => chunks.close())
-    return { started: run, chunks: chunks.iterable, end }
+    const settled = (async (): Promise<Settled | null> => {
+      await end
+      try {
+        if (claim.release === null) return null
+        const observation = (await opened).observation
+        return observation === null ? null : await observation.settle()
+      } catch {
+        return null
+      } finally {
+        claim.release?.()
+        events.close()
+      }
+    })()
+    return {
+      started: run,
+      attribution,
+      events: events.iterable,
+      end,
+      settled,
+    }
   }
 }
 
 /** A lane's shell for an agent with none: every call fails, saying why. */
 export function refusingShell(why: string): LaneShell {
   return () => {
-    const chunks = queue<ShellChunk | "over-cap">()
-    chunks.close()
+    const events = queue<ShellEvent>()
+    events.close()
     return {
       started: new Promise(() => {}),
-      chunks: chunks.iterable,
+      attribution: Promise.resolve(null),
+      events: events.iterable,
       end: Promise.resolve({ kind: "failed", message: why }),
+      settled: Promise.resolve(null),
     }
   }
 }

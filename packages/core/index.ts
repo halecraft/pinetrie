@@ -204,6 +204,7 @@ export {
   type OutputFd,
   type Settled,
   STATEMENT_SIGNAL,
+  type StatementIndex,
   statementIndex,
 } from "./output.ts"
 export { isWithin, pathUnder } from "./paths.ts"

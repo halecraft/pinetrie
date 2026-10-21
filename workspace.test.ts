@@ -154,11 +154,18 @@ test("shell declares only unbash: shell source as structure, nothing of pine·tr
   assert.deepEqual(allDeps(read("packages/shell")), ["unbash"])
 })
 
-test("only interface declares shell: which call reads as shell is its decision", () => {
+// Interface decides which call reads as shell; pi counts a `bash` call's
+// statements for its join; the app's observer suite runs the statements'
+// fixture.
+test("only interface, pi and the app declare shell", () => {
   const declaring = WORKSPACE.filter(dir =>
     allDeps(read(dir)).includes("@pinetrie/shell"),
   ).sort()
-  assert.deepEqual(declaring, ["packages/interface"])
+  assert.deepEqual(declaring, [
+    "apps/pinetrie",
+    "packages/interface",
+    "packages/pi",
+  ])
 })
 
 test("only the page, its core, the terminal client and the app depend on interface: nothing below it does", () => {

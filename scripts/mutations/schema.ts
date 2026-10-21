@@ -7,6 +7,23 @@ const piLayout = "packages/schema/pi-layout.ts"
 const storage = "packages/schema/storage.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a tool stream's statement ──
+  {
+    name: "a tool stream's statement is not stored",
+    file: "packages/schema/live.ts",
+    from: "statement: s.statement ?? null,",
+    to: "statement: null,",
+    command: unit,
+    expect: "a tool stream keeps its statement",
+  },
+  {
+    name: "a statement that is no ordinal reads as the call's whole output",
+    file: "packages/schema/live.ts",
+    from: "return statement === null ? undefined : { ...record, statement }",
+    to: "return statement === null ? record : { ...record, statement }",
+    command: unit,
+    expect: "a tool row whose statement is no ordinal is left out",
+  },
   {
     name: "closing a stream leaves its record",
     file: live,
@@ -26,8 +43,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stream's null tip is stored as a string",
     file: live,
-    from: '    ? { lane: s.lane, kind: "reply", callId: null, under: s.under }',
-    to: '    ? { lane: s.lane, kind: "reply", callId: null, under: s.under ?? "" }',
+    from: "        under: s.under,\n        statement: null,",
+    to: '        under: s.under ?? "",\n        statement: null,',
     command: unit,
     expect: "a reply and a tool round-trip, null fields included",
   },

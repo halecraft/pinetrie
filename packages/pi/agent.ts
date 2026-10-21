@@ -212,6 +212,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       ? { registered: [], files: [] }
       : assembleTools({
           hooks: tools.hooks,
+          stream: event => options.onStream?.(event),
           blobs: options.blobs,
           bannerAsks: tools.bannerAsks,
         })

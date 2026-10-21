@@ -9,13 +9,26 @@ import {
   BACKGROUND_CONTEXT,
   createBashTool,
 } from "@earendil-works/pi-agent-core"
+import { withAbortSignal } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
+import {
+  type OutputEvent,
+  type Settled,
+  statementIndex,
+  threadIdFor,
+} from "@pinetrie/core"
+import type { OutputSplitRecord } from "@pinetrie/rules"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { bashResult, bashTool } from "./bash-tool.ts"
-import { type LaneChannel, laneShell } from "./lane-env.ts"
+import {
+  type LaneChannel,
+  laneShell,
+  type ShellObservation,
+} from "./lane-env.ts"
 import { runShell } from "./lane-shell.ts"
 import type { ToolContext } from "./lanes.ts"
 import { BASH_LIMITS, captureStart, captureView } from "./shell-capture.ts"
+import { threadContext } from "./thread-context.ts"
 
 let dir = ""
 let env: NodeExecutionEnv
@@ -28,29 +41,27 @@ afterAll(async () => {
 })
 
 /** A lane's shell, its helper's side run in this process. */
-const localShell = () =>
-  laneShell(
-    "bash",
-    dir,
-    async () =>
-      ({
-        shell: (request, signal, onUpdate) =>
-          runShell(request, {
-            startRun: () => "1",
-            runEnv: run => ({ ...process.env, PINETRIE_RUN: run }),
-            spillFile: async () => {
-              const made = await env.createTempFile(
-                { prefix: "pi-output-", suffix: ".log" },
-                BACKGROUND_CONTEXT,
-              )
-              if (!made.ok) throw made.error
-              return made.value
-            },
-            signal: signal ?? new AbortController().signal,
-            update: onUpdate,
-          }),
-      }) as Pick<LaneChannel, "shell"> as LaneChannel,
-  )
+const localShell = (observation: ShellObservation | null = null) =>
+  laneShell("bash", dir, async () => ({
+    observation,
+    channel: {
+      shell: (request, signal, onUpdate) =>
+        runShell(request, {
+          startRun: () => "1",
+          runEnv: run => ({ ...process.env, PINETRIE_RUN: run }),
+          spillFile: async () => {
+            const made = await env.createTempFile(
+              { prefix: "pi-output-", suffix: ".log" },
+              BACKGROUND_CONTEXT,
+            )
+            if (!made.ok) throw made.error
+            return made.value
+          },
+          signal: signal ?? new AbortController().signal,
+          update: onUpdate,
+        }),
+    } as Pick<LaneChannel, "shell"> as LaneChannel,
+  }))
 
 test("the model meets pi's bash tool: its name, description and parameters", () => {
   const ours = bashTool()
@@ -67,9 +78,11 @@ async function resultOf(
   toolContext: unknown,
   params: { command: string; timeout?: number },
   abortAfterMs?: number,
+  lane?: ReturnType<typeof threadIdFor>,
 ): Promise<string> {
   const abort = new AbortController()
   if (abortAfterMs !== undefined) setTimeout(() => abort.abort(), abortAfterMs)
+  const context = withAbortSignal(abort.signal, BACKGROUND_CONTEXT)
   const execute = tool.execute as unknown as (
     ...a: unknown[]
   ) => Promise<{ content: readonly { text?: string }[] }>
@@ -80,9 +93,7 @@ async function resultOf(
       () => {},
       toolContext,
       {},
-      {
-        abortSignal: abort.signal,
-      },
+      lane === undefined ? context : threadContext(lane, context),
     )
     return r.content.map(c => c.text ?? "").join("")
   } catch (e) {
@@ -193,4 +204,48 @@ test("bashResult: a timeout, an abort and an exit code are failures, worded as p
   expect(
     bashResult(view, { kind: "exited", code: 0, spill: null }, undefined),
   ).toEqual({ ok: true, text: "(no output)", details: undefined })
+})
+
+test("a call the observer attributes is stored by statement, its output claimed and let go", async () => {
+  const at = (n: number) => {
+    const i = statementIndex(n)
+    if (i === null) throw new Error(`no statement ${n}`)
+    return i
+  }
+  const claimed: string[] = []
+  const released: string[] = []
+  const observation: ShellObservation = {
+    attribution: { on: true },
+    output: (run, onEvent) => {
+      claimed.push(run)
+      const events: OutputEvent[] = [
+        { kind: "statement", at: 0, statement: at(1), line: 1 },
+        { kind: "output", fd: "stdout", statement: at(1), bytes: 2 },
+        { kind: "statement", at: 0, statement: at(2), line: 1 },
+        { kind: "output", fd: "stderr", statement: at(2), bytes: 3 },
+      ]
+      for (const e of events) onEvent(e)
+      return () => released.push(run)
+    },
+    settle: async () => ({}) as Settled,
+  }
+  const stored: OutputSplitRecord[] = []
+  const tool = bashTool({
+    stream: () => {},
+    store: async (_lane, record) => {
+      stored.push(record)
+    },
+  })
+  const text = await resultOf(
+    tool,
+    { shell: localShell(observation) } satisfies Pick<ToolContext, "shell">,
+    { command: "echo a; echo bb >&2" },
+    undefined,
+    threadIdFor("lane"),
+  )
+  expect(text).toBe("a\nbb\n")
+  expect([claimed, released]).toEqual([["1"], ["1"]])
+  expect(stored.map(r => r.statements.map(x => x.text))).toEqual([
+    ["a\n", "bb\n"],
+  ])
 })

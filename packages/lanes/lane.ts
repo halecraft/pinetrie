@@ -14,7 +14,7 @@
 // package cannot import: the host passes an `OpenLink` that opens
 // one and wraps it as runners.
 
-import type { ProjectKind, RunSource } from "@pinetrie/core"
+import type { LaneObservation, ProjectKind } from "@pinetrie/core"
 import {
   type Install,
   inMount,
@@ -51,7 +51,7 @@ export const helperCommand = (
 interface LaneLink<C> {
   readonly channel: C
   /** Its runs, folded as the machine's observer reports them: registered as the link opened. */
-  readonly runs: RunSource
+  readonly runs: LaneObservation
   readonly run: Runner
   readonly bytes: BytesRunner
   /** Close the channel and wait for the helper to exit. */

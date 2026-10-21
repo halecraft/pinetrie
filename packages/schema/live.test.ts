@@ -1,4 +1,4 @@
-import { entryId, runId, threadIdFor } from "@pinetrie/core"
+import { entryId, runId, statementIndex, threadIdFor } from "@pinetrie/core"
 import { streamId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { newLiveDoc } from "./fixtures.ts"
@@ -89,8 +89,41 @@ describe("applyLiveOps, the one writer of pinetrie:live", () => {
       kind: "reply",
       callId: null,
       under: null,
+      statement: null,
     })
     expect(readStreamIds(live).toSorted()).toEqual(["orphan", "s-bad"])
+    expect(readStreamRecords(live)).toEqual([])
+  })
+
+  test("a tool stream keeps its statement, and one with none is the call's whole output", () => {
+    const live = newLiveDoc()
+    const statement = statementIndex(2)
+    if (statement === null) throw new Error("no statement")
+    const whole = {
+      id: streamId("s-1"),
+      lane: L,
+      kind: "tool",
+      callId: "c",
+    } as const
+    const second = { ...whole, id: streamId("s-2"), statement }
+    applyLiveOps(live, [
+      { kind: "open", stream: whole },
+      { kind: "open", stream: second },
+    ])
+    expect(
+      readStreamRecords(live).toSorted((a, b) => a.id.localeCompare(b.id)),
+    ).toEqual([whole, second])
+  })
+
+  test("a tool row whose statement is no ordinal is left out", () => {
+    const live = newLiveDoc()
+    live.streams.set("s-bad", {
+      lane: L,
+      kind: "tool",
+      callId: "c",
+      under: null,
+      statement: 0,
+    })
     expect(readStreamRecords(live)).toEqual([])
   })
 })

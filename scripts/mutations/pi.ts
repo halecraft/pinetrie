@@ -5,6 +5,56 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 const config = ["pnpm", "exec", "vitest", "run", "packages/pi/config.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a bash call's output by statement ──
+  {
+    name: "a split that stops verifying leaves its statements open",
+    file: "packages/pi/statement-join.ts",
+    from: 'if (s.kind === "close-statements") sinks.undivided()',
+    to: 'if (s.kind !== "close-statements") sinks.undivided()',
+    command: unit,
+    expect: "a split that stops verifying closes its statements once",
+  },
+  {
+    name: "a lane without an observer is joined as one with",
+    file: "packages/pi/statement-join.ts",
+    from: "let state = joinStart(parseStatements(command), attribution)",
+    to: "let state = joinStart(parseStatements(command), { on: true })",
+    command: unit,
+    expect: "a call whose lane has no observer shows nothing by statement",
+  },
+  {
+    name: "a chunk's rest is dropped once part of it is taken",
+    file: "packages/pi/statement-join.ts",
+    from: "else chunks[0] = first.subarray(part)",
+    to: "else chunks.shift()",
+    command: unit,
+    expect: "a statement's bytes split across chunks reach its output whole",
+  },
+  {
+    name: "a call's output is never let go",
+    file: "packages/pi/lane-env.ts",
+    from: "claim.release?.()",
+    to: "",
+    command: unit,
+    expect:
+      "a call the observer attributes is stored by statement, its output claimed and let go",
+  },
+  {
+    name: "a verified split is never stored",
+    file: "packages/pi/bash-tool.ts",
+    from: "await sinks.store(lane, record).catch(() => {})",
+    to: "void record",
+    command: unit,
+    expect: "a call the observer attributes is stored by statement",
+  },
+  {
+    name: "the observer's events never reach the tool",
+    file: "packages/pi/lane-env.ts",
+    from: "events.push({ notice }),",
+    to: "{},",
+    command: unit,
+    expect: "a call the observer attributes is stored by statement",
+  },
   // ── a run the last process left open ──
   {
     name: "LaneBusy is refused generically",
@@ -607,8 +657,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool is named other than its id",
     file: "packages/pi/tools.ts",
-    from: "  [BASH_TOOL]: () => bashTool(),",
-    to: '  [BASH_TOOL]: () => ({ ...bashTool(), name: "shell" }),',
+    from: "      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),\n    }),",
+    to: '      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),\n    }) && { ...bashTool(), name: "shell" },',
     command: unit,
     expect: "bash is the name of the tool made for it",
   },

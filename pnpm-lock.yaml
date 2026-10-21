@@ -104,6 +104,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@pinetrie/shell':
+        specifier: workspace:*
+        version: link:../../packages/shell
       '@pinetrie/ssh':
         specifier: workspace:*
         version: link:../../packages/ssh
@@ -272,6 +275,9 @@ importers:
       '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
+      '@pinetrie/shell':
+        specifier: workspace:*
+        version: link:../shell
       '@pinetrie/threads':
         specifier: workspace:*
         version: link:../threads

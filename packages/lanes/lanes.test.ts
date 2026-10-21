@@ -1,4 +1,4 @@
-import { type RunSource, snapshotId, threadIdFor } from "@pinetrie/core"
+import { type LaneObservation, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { execute } from "./execute.ts"
 import { helperCommand, laneHandle } from "./lane.ts"
@@ -9,8 +9,13 @@ import { baseLane } from "./spec.ts"
 import type { Step } from "./steps.ts"
 
 /** A lane no observer sees: no run did anything. */
-const unobserved: RunSource = {
+const unobserved: LaneObservation = {
   drain: async drain => (await drain(new Map())).result,
+  attribution: { on: true },
+  output: () => () => {},
+  settle: () => new Promise(() => {}),
+  close: async () => {},
+  relay: () => new Promise(() => {}),
 }
 
 // What a lane runs against jj itself, in throwaway repos, with your repo in

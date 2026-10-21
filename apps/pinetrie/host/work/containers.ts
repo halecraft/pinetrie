@@ -237,7 +237,8 @@ export function createContainers(deps: {
         shell: RUNTIME_SHELL_PATH,
         gate: async () => {
           await handle.queue.idle()
-          return (await handle.link()).channel
+          const link = await handle.link()
+          return { channel: link.channel, observation: link.runs }
         },
       }
     },

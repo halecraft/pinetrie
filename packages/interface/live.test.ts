@@ -1,4 +1,9 @@
-import { entryId, type ThreadId, threadIdFor } from "@pinetrie/core"
+import {
+  entryId,
+  statementIndex,
+  type ThreadId,
+  threadIdFor,
+} from "@pinetrie/core"
 import { type AgentRun, type StreamRecord, streamId } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
@@ -23,6 +28,19 @@ const tool = (id: string, lane: ThreadId, callId: string): StreamRecord => ({
 })
 
 describe("liveWork", () => {
+  test("a call's stream is its whole output's, never a statement's", () => {
+    const statement = statementIndex(1)
+    if (statement === null) throw new Error("no statement")
+    const live = liveWork(
+      [
+        tool("s1", L, "c1"),
+        { id: streamId("s2"), lane: L, kind: "tool", callId: "c1", statement },
+      ],
+      [run(L, "p")],
+    )
+    expect(live.tools.get("c1")).toBe("s1")
+  })
+
   test("a reply is drawn while its lane's tip is where it opened, and not once its entry moves the tip", () => {
     const streams = [reply("s1", L, "p")]
     expect(liveWork(streams, [run(L, "p")]).replies.get(L)?.id).toBe("s1")

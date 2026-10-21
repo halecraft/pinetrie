@@ -36,8 +36,11 @@ const closeStreams = (
  * no longer be drawn: a new reply closes its lane's streams, whose entries
  * are written before its request; a tool closes its lane's replies that
  * are no longer current. A tool's output arrives as whole snapshots of a view
- * that keeps only the tail, written as `tailEdit`s. An event for a lane that
- * is not running changes nothing.
+ * that keeps only the tail, written as `tailEdit`s. A `bash` call's statement
+ * has a stream of its own, opened when it first prints and closed with the
+ * call's others, or alone when the call's split stops verifying
+ * (`tool-undivided`). An event for a lane that is not running changes
+ * nothing.
  */
 export function planStream(input: {
   readonly event: StreamEvent
@@ -94,12 +97,42 @@ export function planStream(input: {
       ]
     case "tool-output": {
       const tool = mine.find(
-        s => s.kind === "tool" && s.callId === event.callId,
+        s =>
+          s.kind === "tool" &&
+          s.callId === event.callId &&
+          s.statement === event.statement,
       )
-      if (tool === undefined) return []
-      const edits = tailEdit(tool.text, event.text)
-      return edits.length === 0 ? [] : [{ kind: "edit", id: tool.id, edits }]
+      if (tool !== undefined) {
+        const edits = tailEdit(tool.text, event.text)
+        return edits.length === 0 ? [] : [{ kind: "edit", id: tool.id, edits }]
+      }
+      // The call's own stream opens at its start; a statement's when it
+      // first prints, so a statement that prints nothing has none.
+      if (event.statement === undefined || event.text === "") return []
+      const id = streamId(input.newId())
+      return [
+        {
+          kind: "open",
+          stream: {
+            id,
+            lane: event.lane,
+            kind: "tool",
+            callId: event.callId,
+            statement: event.statement,
+          },
+        },
+        { kind: "edit", id, edits: [{ at: 0, remove: 0, insert: event.text }] },
+      ]
     }
+    case "tool-undivided":
+      return closeStreams(
+        mine.filter(
+          s =>
+            s.kind === "tool" &&
+            s.callId === event.callId &&
+            s.statement !== undefined,
+        ),
+      )
   }
 }
 

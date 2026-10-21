@@ -31,6 +31,7 @@ import {
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
   SPLIT_TOOL,
+  type StreamEvent,
   TOOL_IDS,
   type ToolId,
   WRITE_TOOL,
@@ -56,6 +57,8 @@ import {
 
 interface ToolsInput {
   readonly hooks: LaneHooks
+  /** Where a tool's own stream events go: a `bash` call's statements'. */
+  readonly stream: (event: StreamEvent) => void
   readonly blobs: Pick<BlobStore, "put"> | undefined
   /** Where `set_banner` sends its asks: the host answers each. */
   readonly bannerAsks: (lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>
@@ -82,7 +85,11 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
     ),
   [EDIT_TOOL]: input =>
     noteConfigWrites(createEditTool(), lane => input.hooks.configWritten(lane)),
-  [BASH_TOOL]: () => bashTool(),
+  [BASH_TOOL]: input =>
+    bashTool({
+      stream: input.stream,
+      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),
+    }),
   [GREP_TOOL]: () => grepTool(),
   [FIND_TOOL]: () => findTool(),
   [CONFLICT_TOOL]: input =>

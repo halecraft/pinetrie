@@ -21,6 +21,7 @@ import {
 import {
   AGENTS_RULE,
   CONTEXT_RULES,
+  type OutputSplitRecord,
   type PutImageAsk,
   type ToolAnswer,
 } from "@pinetrie/rules"
@@ -34,10 +35,10 @@ import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPromptSections } from "./deep.ts"
 import {
-  type LaneChannel,
   type LaneShell,
   laneEnv,
   laneShell,
+  type OpenedLane,
   refusingEnv,
   refusingShell,
 } from "./lane-env.ts"
@@ -50,9 +51,9 @@ type Context = Parameters<typeof threadOfContext>[0]
 
 /**
  * How a lane's tools reach its files, as the host resolves it: in the lane's
- * container, through its helper. `gate` settles with the channel once the
- * lane is started and its queue has drained: tools wait for it, the model
- * does not.
+ * container, through its helper. `gate` settles with the channel, and the
+ * lane's observation, once the lane is started and its queue has drained:
+ * tools wait for it, the model does not.
  */
 export interface LaneAccess {
   readonly facts: LaneFacts
@@ -65,7 +66,7 @@ export interface LaneAccess {
   readonly programs: string
   /** Where pine·trie's bash is in the lane (`RUNTIME_SHELL_PATH`). */
   readonly shell: string
-  readonly gate: () => Promise<LaneChannel>
+  readonly gate: () => Promise<OpenedLane>
 }
 
 /**
@@ -236,6 +237,8 @@ export interface LaneHooks {
   readBlob(lane: ThreadId, blob: string): Promise<BlobAnswer>
   /** `put_image` was called, its image stored: the host's answer. */
   putImage(lane: ThreadId, ask: PutImageAsk): Promise<ToolAnswer>
+  /** A `bash` call's output split by statement: store it in the lane's root. */
+  storeOutputSplit(lane: ThreadId, record: OutputSplitRecord): Promise<void>
   /** `read_card` was called: what the card says, and an image to show. */
   readCard(
     lane: ThreadId,
@@ -290,7 +293,7 @@ export function laneToolContext(
     }
   const { facts, hostPaths, programs } = access
   return {
-    env: laneEnv(facts.dir, access.gate),
+    env: laneEnv(facts.dir, async () => (await access.gate()).channel),
     programs: async program => `${programs}/${program}`,
     shell: laneShell(access.shell, facts.dir, access.gate),
     dir: facts.dir,
