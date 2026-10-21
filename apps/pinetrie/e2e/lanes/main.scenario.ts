@@ -879,7 +879,7 @@ async function mainSection(
       },
     )
     await idle()
-    // That they start above what was accepted is `repo.test.ts`'s, on real jj.
+    // That they start above what was accepted is `repo-proposed.test.ts`'s, on real jj.
     await waitFor(
       () =>
         proposedFromRows()?.acceptedAs === null &&

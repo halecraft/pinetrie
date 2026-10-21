@@ -1,7 +1,7 @@
 // Mutations for @pinetrie/jj: your repo, as the host reads and writes it.
 // Run: pnpm mutate scripts/mutations/jj.ts
 // The plans' checks are unit tests, in seconds; the real-jj checks in
-// `repo.test.ts` take a few seconds each. The suite mutations run one
+// `repo-*.test.ts` take a few seconds each. The suite mutations run one
 // `e2e:lanes` scenario, on the suites' Docker: in a lane, or on the Mac.
 import type { Mutation } from "../mutate.ts"
 
@@ -21,7 +21,8 @@ const getLatestTest = [
   "run",
   "packages/jj/get-latest.test.ts",
 ]
-const repoTest = ["pnpm", "exec", "vitest", "run", "packages/jj/repo.test.ts"]
+/** The real-jj tests of your repo and a lane's, in four files that run at once. */
+const repoTest = ["pnpm", "exec", "vitest", "run", "packages/jj/repo-"]
 const tidyTest = ["pnpm", "exec", "vitest", "run", "packages/jj/tidy.test.ts"]
 const refreshTest = [
   "pnpm",
@@ -171,7 +172,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the preview counts no other head",
     file: "packages/jj/accepted.ts",
-    from: "    heads: await count(jj, `heads(roots(${acceptedBookmark}..@)::) ~ @`),",
+    from: '    heads: tagged(counts, "heads").length,',
     to: "    heads: 0,",
     command: repoTest,
     expect:
@@ -255,7 +256,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's record counts none of your commits conflicted",
     file: "packages/jj/accepted.ts",
-    from: "        commits: await count(jj, `(::@ ~ ::${acceptedBookmark}) & conflicts()`),",
+    from: '        commits: count("conflicted"),',
     to: "        commits: 0,",
     command: repoTest,
     expect:
@@ -276,6 +277,31 @@ export const mutations: readonly Mutation[] = [
     to: "      if (name === repoConfig.acceptedBookmark)",
     command: unit,
     expect: "the first observation is not accepted work moving",
+  },
+  {
+    name: "accepted work's facts read @'s conflicted files when @ has none",
+    file: "packages/jj/accepted.ts",
+    from: '          count("at-conflicted") === 0',
+    to: "          false",
+    command: repoTest,
+    expect: "accepted work's facts are two jj reads, whatever the WIPs",
+  },
+  {
+    name: "a WIP's behind is read as its ahead",
+    file: "packages/jj/accepted.ts",
+    from: "      behind: count(`unfinished-behind-${i}`),",
+    to: "      behind: count(`unfinished-ahead-${i}`),",
+    command: repoTest,
+    expect: "accepted work's facts are two jj reads, whatever the WIPs",
+  },
+  {
+    name: "a working copy sharing only the root with accepted work is previewed",
+    file: "packages/jj/accepted.ts",
+    from: "  if (/^0+$/.test(base.commit)) return null\n",
+    to: "",
+    command: repoTest,
+    expect:
+      "a working copy sharing only the root with accepted work has no preview, and runs no git",
   },
   {
     name: "a new thread begins at your @-",
@@ -1117,7 +1143,7 @@ export const mutations: readonly Mutation[] = [
     file: "packages/jj/lane/plan.ts",
     from: "    .filter(([old]) => has.has(old))\n",
     to: "    .filter(() => false)\n",
-    command: ["pnpm", "exec", "vitest", "run", "packages/jj/repo.test.ts"],
+    command: ["pnpm", "exec", "vitest", "run", "packages/jj/repo-lane.test.ts"],
     expect:
       "the old names on a disk: no bookmark, until planOldNamesOnDisk renames them",
   },
@@ -1572,7 +1598,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every jj argument a history runs over 64 characters is refused",
-    file: "packages/jj/repo.test.ts",
+    file: "packages/jj/repo-rigs.ts",
     from: "const MAX_JJ_ARGUMENT = 4096",
     to: "const MAX_JJ_ARGUMENT = 64",
     command: [
@@ -1580,7 +1606,7 @@ export const mutations: readonly Mutation[] = [
       "exec",
       "vitest",
       "run",
-      "packages/jj/repo.test.ts",
+      "packages/jj/repo-proposed.test.ts",
       "-t",
       "proposed changes on accepted work: built, immutable",
     ],

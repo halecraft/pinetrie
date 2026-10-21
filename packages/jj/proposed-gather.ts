@@ -1,7 +1,7 @@
 // Every read a step on proposed changes plans from, in core's types. The host
 // passes in what only the documents know (`ProposedChangesInput`). Nothing here
 // writes. A refresh of a lane on the line reads it in one `jj log`
-// (`gatherLane`), every other gather the separate reads: `repo.test.ts` holds
+// (`gatherLane`), every other gather the separate reads: the real-jj tests hold
 // them to the same values.
 
 import type {

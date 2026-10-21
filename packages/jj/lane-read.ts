@@ -1,6 +1,6 @@
 // One lane's refresh facts in one `jj log`, for a lane on the line: what
 // `laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges` and
-// `filesTouched` read separately, and the same values (`repo.test.ts` holds
+// `filesTouched` read separately, and the same values (the real-jj tests hold
 // them side by side).
 
 import {

@@ -19,7 +19,7 @@ const unobserved: LaneObservation = {
 }
 
 // What a lane runs against jj itself, in throwaway repos, with your repo in
-// it, is `@pinetrie/jj`'s `repo.test.ts`: every such test fetches into your
+// it, is `@pinetrie/jj`'s `repo-*.test.ts`: every such test fetches into your
 // repo.
 
 const LANE = threadIdFor("1")

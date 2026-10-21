@@ -2,7 +2,7 @@
 // with your repo beside them, and the host's runner standing in for a lane's
 // channel. A lane's `/workspace` and `/mnt/host-working-copy` are directories
 // here. The harness supplies the rig's test-only hooks with jj run in the
-// lane's own repo, and accepts proposed changes by the steps `repo.test.ts`
+// lane's own repo, and accepts proposed changes by the steps `repo-rigs.ts`
 // uses (`fixtures.ts`).
 
 import {

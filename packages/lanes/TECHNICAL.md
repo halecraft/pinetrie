@@ -666,7 +666,7 @@ paths are its diff." would compare a function with itself.
   program in `RUNTIME_PROGRAMS`.
 - **`lanes.test.ts`**: the executor, the helper's command, config files
   and the handle. A lane's whole life against jj and git, in throwaway
-  repos, is `packages/jj/repo.test.ts`, and the port suite against jj is
+  repos, is `packages/jj/repo-*.test.ts`, and the port suite against jj is
   `packages/jj/lane/history.test.ts`: it checks the history algebra's laws
   against jj, through hooks jj's harness supplies, and runs against any
   adapter's harness.

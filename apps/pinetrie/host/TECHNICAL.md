@@ -2086,7 +2086,7 @@ adapter's.
   when it differs from the page's, then the steps, then what comes after
   (`ProposedChangesEffects.after`). So the rules are tested as values in the two
   packages, what the host writes is tested over `record<T>()`, and
-  `packages/jj/repo.test.ts` proves the reads and steps against real jj.
+  `packages/jj/repo-*.test.ts` prove the reads and steps against real jj.
 - **What only the documents know is read here, first** (`state.ts`,
   `ProposedChangesDocs`): the thread's name, whether its root is archived (from its
   board place, `readArchived`, never from the lane's tip being missing: a tip missing

@@ -98,7 +98,8 @@ translates to.
   `base.ts` (`laneBase`), `names.ts`, `run.ts` (`laneJj`, `jjIn`) and
   `points.ts` (a lane proven jj, and the one way from a point to a commit).
 - `fixtures.ts`: what the tests share: a lane's record proven jj
-  (`jjLaneFor`).
+  (`jjLaneFor`). `repo-rigs.ts`: what the real-jj tests of your repo and a
+  lane's share (Tests).
 
 ## The owner (`owner.ts`, ADR-0065)
 
@@ -195,10 +196,19 @@ operation is read once and kept until the head moves.**
   first. A write in the same step observes, so a read after it reads a
   fresh set.
 - **Accepted work's record's facts are kept apart** (`RepoOps.acceptedFacts()`,
-  `acceptedFacts`): nine reads and six more when your `@-` is behind (its
-  configs, the bookmarks of unfinished work, the publish bookmark, your `@-` and `@`), once per
-  operation, read only when that record is written. In the shared facts,
-  every refresh at a new operation paid them, twice when it wrote (S254).
+  `acceptedFacts`), once per operation, read only when that record is
+  written. In the shared facts, every refresh at a new operation paid them,
+  twice when it wrote (S254).
+- **Accepted work's facts are two jj reads, whatever the WIPs** (S306,
+  ADR-0207): the commits (accepted work's, the publish bookmark's, each
+  WIP's with its bookmarks, and on the root's row both configs, which jj
+  prints there by `config()`), then every count as one read's rows, each
+  tagged with the revsets holding it (`acceptedCounts`, `taggedRows`).
+  `@`'s conflicted files are a third read only when `@` is conflicted, and
+  the preview's `git merge-tree` and `git diff` run only when your `@-` is
+  behind. A working copy whose fork point with accepted work is the root
+  has no preview, read from that fork point rather than by listing your
+  common history. `repo-host-version.test.ts` counts the two reads.
 - **`workingCopyEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planWorkingCopyEdits`).
@@ -227,7 +237,7 @@ operation is read once and kept until the head moves.**
   still changes files. Read from them, such proposed changes were withdrawn and built
   again on every observation, without end (S89).
 - **The budget:** unchanged proposed changes' refresh runs at most 2 jj processes,
-  and no evolog (`repo.test.ts` counts 2: the read and `filesTouched`);
+  and no evolog (`repo-proposed.test.ts` counts 2: the read and `filesTouched`);
   S89 measured 18 before, and 3 with the evolog (ADR-0154). Once accepted
   work moves past a lane's base, its refresh runs 5 (ADR-0181): the start
   read too (`readStart`), on every refresh while an accepted thread commit
@@ -253,8 +263,8 @@ operation is read once and kept until the head moves.**
     command's own arguments, so a slow command's log line still shows the
     command. A revset and its aliases travel as one value, and jj refuses a
     revset whose alias is missing.
-  - `repo.test.ts` fails any jj command a history runs with an argument
-    over 4 KB.
+  - The real-jj tests' runners (`repo-rigs.ts`) fail any jj command a
+    history runs with an argument over 4 KB.
 - **A whole refresh, as the host runs it, is counted** (the host's
   `refresh.test.ts`, every command the owner heard, `onCommand`): 2
   unchanged, 3 after any new operation (the shared facts' read), 13 for a
@@ -264,10 +274,14 @@ operation is read once and kept until the head moves.**
   most of it. S254 measured 43 and 60 before the shared facts were split
   and proposed changes read in one `jj log`; on the Mac a jj process is
   about 20 ms.
-- **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
+- **One rule decides both.** The real-jj tests hold `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges`,
-  `filesTouched`, `readGetLatest`) at every proposed changes it builds, accepts, follows, repairs and
-  stacks, and expects the same values. A lane on unfinished work reads the separate
+  `filesTouched`, `readGetLatest`) and expect the same values (`agrees`,
+  `repo-rigs.ts`), at the states each test names: once at its end where it
+  builds or accepts, and wherever a state is its own (unfinished work,
+  untraced, divergent, a conflicted start, pre-rename). Run after every
+  build and acceptance, the check was a fifth of the file's processes, and
+  no mutation needed it there (S306). A lane on unfinished work reads the separate
   way (`unfinishedFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
   Whether one read could serve every lane is S100.
@@ -310,7 +324,7 @@ update's merge will change.**
   base's exactly. Unfinished work's copy, and an untraced start, diff from the base's
   start: for unfinished work the target is the unfinished work's commit, and the copy has its
   files.
-  `repo.test.ts` holds it against `mergeUpdate`'s files on accepted work
+  The real-jj tests hold it against `mergeUpdate`'s files on accepted work
   and on unfinished work, your own acceptance, the lane editing it again, and the
   start with two heads.
 - **Read as the merge reads its files** (`changedPaths`, `@pinetrie/lanes`),
@@ -410,7 +424,7 @@ update's merge will change.**
 - **Every trailer revset also matches `Pineta-*`** (`pre-rename:`, core's
   `trailers.ts`): proposed changes accepted before the rename carry `Pineta-Source`,
   and an old lane's next proposed changes would otherwise start below them and put
-  their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
+  their files back over yours (`repo-lane.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto` reads as accepted work, as any base off the unfinished work prefix
   does (`messageBase`, ADR-0100).
 - **A source accepted below the base's source is not part of the start**
@@ -488,7 +502,7 @@ update's merge will change.**
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
   stale move fails rather than drops commits (S77 item 1). A colocated
   repo's git ref follows a host move made with `--ignore-working-copy`
-  (`repo.test.ts`, publish).
+  (`repo-host-version.test.ts`, publish).
 - **An archived lane's history is parked** (`laneRefSteps`,
   `laneParkedRef`): before its ref is deleted, `git fetch . +<tip ref>*:<park>*`
   copies it under `refs/pinetrie/archived/<lane>`, which jj does not import
@@ -540,7 +554,7 @@ update's merge will change.**
   import` abandons every commit only it held and rebases what is on them.
   Measured, it abandoned proposed changes you had deleted, your `@-` under your
   commit on it, and rebased your commit onto the root (S215 item 18;
-  `repo.test.ts`, the forget). Before a rebuild nothing is forgotten: the
+  `repo-host-version.test.ts`, the forget). Before a rebuild nothing is forgotten: the
   build's `bookmark set` then the mark brings a deleted bookmark and its
   version back together, where moving the ref alone would leave the
   bookmark conflicted.
@@ -681,7 +695,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   snapshot into the working copy the clone carries. A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
-  `repo.test.ts` (`@pinetrie/jj`) forks a lane's repo and checks that your repo has no
+  `repo-lane.test.ts` forks a lane's repo and checks that your repo has no
   `divergent()`. Its mutation drops `jj new`.
 - **A jj lane's start records nothing beyond its disk** (`startRecords`
   is empty, `keptSnapshot` null): the setup's commit, bookmark and config
@@ -885,7 +899,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   points (S83).
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
-  rewrites. A mutation shows `repo.test.ts` fails without it.
+  rewrites. A mutation shows `repo-lane.test.ts` fails without it.
 - **Conflicts** are read with `readConflictedFiles`, and a conflicted file's
   content with `jj file show`: the host cannot read a lane's disk.
 - **A file both sides hold alike is merged as it is** (`heldAlike`): jj
@@ -913,7 +927,23 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   a test that counts them makes them (`diverge`) before an owner starts, or
   after it is closed and idle. Otherwise, the count races the watch, and
   the test fails under load.
-- **`repo.test.ts`**: a lane's whole life against jj and git, in throwaway
+- **Only this package and the host's jj adapter (`apps/pinetrie/host/jj/`)
+  run jj in a test** (ADR-0207). A test that runs jj checks what jj
+  answers: a merge, a conflict, immutability, a revset or a template read
+  against a state jj made, the evolog, the op log. A decision is a pure
+  test of its planner, with its facts as values (`plan.test.ts`,
+  `proposed-steps.test.ts`, `lane/plan.test.ts`, `lane-read.test.ts`).
+  S306 found every assertion of the real-jj tests on the jj side.
+- **The real-jj tests are four files that run at once** (`repo-lane.test.ts`,
+  `repo-proposed.test.ts`, `repo-host-version.test.ts`,
+  `repo-catch-up.test.ts`), sharing `repo-rigs.ts`: the lanes' names, the
+  runners, the hooks (`useLaneRepos`) and the rigs (`laneRigs`). A rig a
+  file's tests share is set up once per file and copied for each test
+  (`copiedRig`), as a fork copies a lane: nothing in its directories names
+  their own path, and what its set-up returns is commit ids, never a
+  closure over the template. One file of them runs on one worker, so a
+  file stays near a quarter of their processes. Together they are a
+  lane's whole life against jj and git, in throwaway
   repos on the host, with no container: the lane's steps from `lanes`, its
   bundle fetched into your repo (`planBundle`, then `planImport`, whose
   operation is `pinetrie-host`'s), and every read and plan here. It covers the
@@ -954,7 +984,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **`proposed-steps.test.ts`**: each decision's steps, as the planners make
   them, each that moves proposed changes ending in one mark, and that each `after`
   carries the decision's place.
-- **`repo.test.ts`, the host's version of proposed changes**: built proposed changes are its
+- **`repo-host-version.test.ts`, the host's version of proposed changes**: built proposed changes are its
   version, tracked, read with no evolog; your change to its file reads as
   yours; a host rebase without its mark is the host's, by the evolog and,
   once the op log is cut, by the version; proposed changes from before versions
