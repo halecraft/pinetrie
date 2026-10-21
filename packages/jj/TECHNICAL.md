@@ -200,7 +200,7 @@ operation is read once and kept until the head moves.**
   written. In the shared facts, every refresh at a new operation paid them,
   twice when it wrote (S254).
 - **Accepted work's facts are two jj reads, whatever the WIPs** (S306,
-  ADR-0207): the commits (accepted work's, the publish bookmark's, each
+  ADR-0209): the commits (accepted work's, the publish bookmark's, each
   WIP's with its bookmarks, and on the root's row both configs, which jj
   prints there by `config()`), then every count as one read's rows, each
   tagged with the revsets holding it (`acceptedCounts`, `taggedRows`).
@@ -928,7 +928,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   after it is closed and idle. Otherwise, the count races the watch, and
   the test fails under load.
 - **Only this package and the host's jj adapter (`apps/pinetrie/host/jj/`)
-  run jj in a test** (ADR-0207). A test that runs jj checks what jj
+  run jj in a test** (ADR-0209). A test that runs jj checks what jj
   answers: a merge, a conflict, immutability, a revset or a template read
   against a state jj made, the evolog, the op log. A decision is a pure
   test of its planner, with its facts as values (`plan.test.ts`,

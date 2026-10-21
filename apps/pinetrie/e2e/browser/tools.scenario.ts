@@ -47,7 +47,9 @@ import {
   SUITE_CONFIG,
   setUpAccepted,
   suitePlaces,
+  untilSent,
   waitFor,
+  watchRuns,
 } from "../harness.ts"
 import { inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import { removeLane } from "../lane-runtime.ts"
@@ -326,14 +328,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           heldTree(askHost),
           readPlaces(askHost.places),
         )[0]
-        await bo.send(
-          "@agent anything new?",
-          atEntry(entryId(lane?.tip ?? "")),
-          {
-            thread: lane?.name,
-          },
+        await untilSent(
+          askHost,
+          await bo.send(
+            "@agent anything new?",
+            atEntry(entryId(lane?.tip ?? "")),
+            {
+              thread: lane?.name,
+            },
+          ),
         )
-        await idle()
         await ap.waitForSelector(msg("Back to you."), { timeout: 15_000 })
         await visibility("visible")
         const line = await ap
@@ -516,10 +520,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           heldTree(askHost),
           readPlaces(askHost.places),
         )[0]
-        await cy.send("@agent and now?", atEntry(entryId(failing?.tip ?? "")), {
-          thread: failing?.name,
-        })
-        await idle()
+        await untilSent(
+          askHost,
+          await cy.send(
+            "@agent and now?",
+            atEntry(entryId(failing?.tip ?? "")),
+            {
+              thread: failing?.name,
+            },
+          ),
+        )
         const reason = await ap
           .waitForSelector(`${col(0)} .column-head [data-role="reason"]`, {
             timeout: 15_000,
@@ -568,8 +578,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           { text: "three things" },
         ])
         await typeAfter(pp, `${col(0)} .composer .input`, "split it")
+        const proposed = watchRuns(proposeHost)
         await pp.click(`${col(0)} .composer .send`)
-        await waitFor(() => idleNow(proposeHost))
+        await proposed.over()
         const card = `${col(0)} .proposal`
         // A card never drawn fails the check below, rather than the scenario.
         const drawn = await pp
@@ -687,6 +698,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await chooseDensity(tp, 0, "raw")
         }
         const toolIdle = () => waitFor(() => idleNow(toolHost))
+        /** `text` sent, and the run it starts over. */
+        const sayToEnd = async (text: string) => {
+          const ran = watchRuns(toolHost)
+          await say(text)
+          await ran.over()
+        }
         const appears = (sel: string, timeout = 20_000) =>
           tp.waitForSelector(sel, { timeout }).then(
             () => true,
@@ -790,8 +807,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           { tool: "bash", args: { command: "echo quick" } },
           { text: "quick" },
         ])
-        await say("quick")
-        await toolIdle()
+        await sayToEnd("quick")
 
         // Nothing to accept: the changes row is not drawn, and its commands
         // are still the dock's ⋯'s.
@@ -913,8 +929,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { tool: "bash", args: { command: LONG } },
             { text: "listed" },
           ])
-          await say("list them")
-          await toolIdle()
+          await sayToEnd("list them")
           const row = tp
             .locator(`${col(0)} .tool[data-tool="bash"][data-status="ok"]`)
             .filter({ hasText: "seq 1 300" })
@@ -1421,8 +1436,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { tool: "bash", args: { command: STEPS.join(" && ") } },
             { text: "chained" },
           ])
-          await say("chain some steps")
-          await toolIdle()
+          await sayToEnd("chain some steps")
           const chained = `${col(0)} .tool[data-tool="bash"][data-status="ok"]:has-text("mkdir -p /tmp/chain")`
           await appears(chained, 10_000)
           const row = tp.locator(chained).last()
@@ -1685,8 +1699,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           },
           { text: "written" },
         ])
-        await say("write two files")
-        await toolIdle()
+        await sayToEnd("write two files")
         const acceptShown = await appears(
           `${col(0)} .dock [data-role="changes"][data-state="ready"] .work-accept`,
         )
@@ -1867,8 +1880,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           "[x](javascript:alert(1))",
         ].join("\n")
         script.use([{ text: REPLY }])
-        await say("show me markdown")
-        await toolIdle()
+        await sayToEnd("show me markdown")
         const drawn = `${col(0)} .msg[data-entry]:has(> .text strong)`
         await appears(drawn)
         const replyId =
@@ -2003,8 +2015,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await wheelColumn(-300)
         const away = await gapOf(0)
         script.use([{ text: "short" }])
-        await say("back to the end")
-        await toolIdle()
+        await sayToEnd("back to the end")
         await appears(`${col(0)} ${msg("back to the end")}`)
         await oneFrame(tp)
         const back = await gapOf(0)
@@ -2114,8 +2125,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           { tool: "read", args: { path: "missing.txt" } },
           { text: "I read it 30 times, and one file was missing." },
         ])
-        await say("read notes, again and again")
-        await toolIdle()
+        await sayToEnd("read notes, again and again")
         const loopIndex = heldTree(toolHost)
         const loopRows = projectRail(
           loopIndex,
@@ -2306,8 +2316,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { tool: "write", args: { path: "shared.txt", content: "lane\n" } },
             { text: "wrote it" },
           ])
-          await say("write shared")
-          await toolIdle()
+          await sayToEnd("write shared")
           await command("jj", ["-R", work, "new", "pinetrie-accepted"])
           writeFileSync(path.join(work, "shared.txt"), "yours\n")
           await command("jj", ["-R", work, "commit", "-m", "you write shared"])

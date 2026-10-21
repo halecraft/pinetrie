@@ -12,8 +12,9 @@ import path from "node:path"
 import { entryId, type ThreadId } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
 import { thisInstall } from "@pinetrie/install"
-import { type SessionFiles, sessionFiles } from "@pinetrie/lanes"
+import { prepareImages, type SessionFiles, sessionFiles } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { readLaneRecords, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import { ancestry, messageText } from "@pinetrie/threads"
@@ -25,6 +26,7 @@ import {
 } from "../host/index.ts"
 import { livePage } from "../host/page-build.ts"
 import { findProject } from "../host/work/runtime.ts"
+import { PLAYWRIGHT_VERSION } from "../host/work/setup.ts"
 import { CommandFailed, command } from "./command.ts"
 import {
   committedProject,
@@ -39,6 +41,7 @@ import {
   suiteDirsNow,
   suitePlaces,
   suiteSshPlaces,
+  untilSent,
   waitFor,
 } from "./harness.ts"
 import {
@@ -58,6 +61,33 @@ import {
  */
 export async function runtimeProblem(): Promise<string | null> {
   if (process.platform === "darwin") return macDockerProblem()
+  return withProbe(async found => {
+    if (found === null) return "no project"
+    if (found.kind === "refused") return found.words
+    return null
+  })
+}
+
+/**
+ * The lane images ready, as a host's start makes them, before a suite starts
+ * hosts in several processes at once: each would otherwise build an image
+ * that is missing, at the same time. Returns the tag lanes run.
+ */
+export async function prepareSuiteImages(): Promise<string> {
+  return withProbe(async (found, dir) => {
+    if (found === null) throw new Error("no project")
+    if (found.kind === "refused") throw new Error(found.words)
+    return (await prepareImages(found.runtime, dir, PLAYWRIGHT_VERSION)).lane
+  })
+}
+
+/** `body` with the runtime found for a throwaway project, closed after. */
+async function withProbe<T>(
+  body: (
+    found: Awaited<ReturnType<typeof findProject>>,
+    dir: string,
+  ) => Promise<T>,
+): Promise<T> {
   const dir = await committedProject("pinetrie-runtime-", {
     "README.md": "probe\n",
   })
@@ -71,10 +101,11 @@ export async function runtimeProblem(): Promise<string | null> {
       log: () => {},
       building: () => {},
     })
-    if (found === null) return "no project"
-    if (found.kind === "refused") return found.words
-    await found.close()
-    return null
+    try {
+      return await body(found, dir)
+    } finally {
+      if (found !== null && found.kind === "found") await found.close()
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -201,6 +232,11 @@ async function sectionHost(input: SectionInput) {
     await waitFor(() => idleNow(host), 300_000)
     await host.quiet()
   }
+  /** What `sent`, a send's outcome, set off has ended, and the host is quiet. */
+  const settle = async (sent: Outcome) => {
+    await untilSent(host, sent, 300_000)
+    await host.quiet()
+  }
   /** The lane whose thread holds the message with `text`. */
   const laneWith = (text: string) =>
     laneHolding(host, readPlaces(host.places), text)
@@ -222,7 +258,7 @@ async function sectionHost(input: SectionInput) {
     // Kept for a restart: the lanes' containers too, as a host leaves them.
     if (!keep) await cleanUp(host.session, dir)
   }
-  return { dir, script, host, user, idle, laneWith, results, close }
+  return { dir, script, host, user, idle, settle, laneWith, results, close }
 }
 
 /** Remove every container and disk of a host's lanes, then its project. */

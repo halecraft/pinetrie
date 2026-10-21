@@ -36,6 +36,7 @@ import {
   queueCard,
   START_AGENT,
   setUpAccepted,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
@@ -94,8 +95,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
       { text: "It says MANGO." },
     ])
-    await u.send("what is in notes?", ROOT, START_AGENT)
-    await tidle()
+    await untilSent(
+      th,
+      await u.send("what is in notes?", ROOT, START_AGENT),
+      60_000,
+    )
 
     // 2. Write a file, then edit it: the disk changes.
     script.use([
@@ -110,8 +114,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "done" },
     ])
     const lane = tlane()
-    await u.send("make new.txt", at(lane?.tip ?? null), { thread: lane?.name })
-    await tidle()
+    await untilSent(
+      th,
+      await u.send("make new.txt", at(lane?.tip ?? null), {
+        thread: lane?.name,
+      }),
+      60_000,
+    )
     // In its lane's own copy: the project is the person's working copy,
     // which no lane writes.
     const inItsLane =
@@ -212,8 +221,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     watched.length = 0
     const l4 = tlane()
-    await u.send("look again", at(l4?.tip ?? null), { thread: l4?.name })
-    await tidle()
+    await untilSent(
+      th,
+      await u.send("look again", at(l4?.tip ?? null), { thread: l4?.name }),
+      60_000,
+    )
 
     // 5. Stop ends a running command; a message for the busy thread is
     // answered busy, and nothing is written.
@@ -436,10 +448,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const u2 = await join(th, "uma", "tools")
     script.use([{ text: "back again" }])
     const l7 = tlane()
-    await u2.send("still there?", at(l7?.tip ?? null), {
-      thread: l7?.name,
-    })
-    await tidle()
+    await untilSent(
+      th,
+      await u2.send("still there?", at(l7?.tip ?? null), {
+        thread: l7?.name,
+      }),
+      60_000,
+    )
     unwatch()
     await u2.close()
     // The host's Exchange closes its stores when it shuts down, this one too.

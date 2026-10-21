@@ -59,6 +59,7 @@ import {
   readJjProposedByLane,
   START_AGENT,
   setUpAccepted,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
@@ -220,10 +221,14 @@ async function mainSection(
       { text: "checked" },
     ])
     const asked = `check the boundary, and ${project}/shared.txt`
-    await wu.send(asked, at(tipOf("lane one: who are you?")), {
-      thread: one?.name,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send(asked, at(tipOf("lane one: who are you?")), {
+        thread: one?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     check(
       "a person's path to your working copy is stored as the lane sees it, under /mnt/host-working-copy",
       idOf("check the boundary, and /mnt/host-working-copy/shared.txt") !==
@@ -297,14 +302,18 @@ async function mainSection(
       },
       { text: "set up" },
     ])
-    await wu.send(
-      "set up deps",
-      at(tipOf("check the boundary, and /mnt/host-working-copy/shared.txt")),
-      {
-        thread: one?.name,
-      },
+    await untilSent(
+      wh,
+      await wu.send(
+        "set up deps",
+        at(tipOf("check the boundary, and /mnt/host-working-copy/shared.txt")),
+        {
+          thread: one?.name,
+        },
+      ),
+      180_000,
     )
-    await idle()
+    await wh.quiet()
     const sums = (lane: ThreadId) =>
       inLane(
         lane,
@@ -317,19 +326,31 @@ async function mainSection(
       { tool: "bash", args: { command: "echo parent-later > shared.txt" } },
       { text: "parent moved on" },
     ])
-    await wu.send("move on", at(setUp), { thread: one?.name })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("move on", at(setUp), { thread: one?.name }),
+      180_000,
+    )
+    await wh.quiet()
     script.use([
       { tool: "bash", args: { command: "echo branch > shared.txt" } },
       { text: "branched" },
     ])
-    await wu.send("@agent branch here", at(setUp), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent branch here", at(setUp), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const branch = laneWith("@agent branch here")
     // Checked on a fresh branch of the same turn, before it writes.
     script.use([{ text: "just looking" }])
-    await wu.send("@agent look only", at(setUp), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent look only", at(setUp), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const looker = laneWith("@agent look only")
     check(
       "a branch at a turn has that turn's tracked files, node_modules and .vite cache, byte for byte",
@@ -359,10 +380,14 @@ async function mainSection(
       { tool: "bash", args: { command: "jj bookmark list" } },
       { text: "listed" },
     ])
-    await wu.send("which bookmarks?", at(looker?.tip ?? null), {
-      thread: looker?.name,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("which bookmarks?", at(looker?.tip ?? null), {
+        thread: looker?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     check(
       "a fork a host stopped after its clone is run again at the lane's next start",
       looker !== undefined &&
@@ -379,8 +404,12 @@ async function mainSection(
       { tool: "bash", args: { command: "echo deeper >> shared.txt" } },
       { text: "deeper" },
     ])
-    await wu.send("@agent go deeper", at(idOf("branched")), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent go deeper", at(idOf("branched")), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const deeper = laneWith("@agent go deeper")
     check(
       "a branch of a branch starts from its parent's turn, and leaves it alone",
@@ -420,10 +449,14 @@ async function mainSection(
       },
       { text: "tried" },
     ])
-    await wu.send("try to rewrite", at(tipOf("@agent go deeper")), {
-      thread: deeper?.name,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("try to rewrite", at(tipOf("@agent go deeper")), {
+        thread: deeper?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     const rewrite = toolResults(deeper?.name).at(-1) ?? ""
     check(
       "rewriting an inherited commit in a fork is refused",
@@ -456,8 +489,12 @@ async function mainSection(
       },
       { text: "committed it" },
     ])
-    await wu.send("commit it yourself", ROOT, START_AGENT)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("commit it yourself", ROOT, START_AGENT),
+      180_000,
+    )
+    await wh.quiet()
     const committer = laneWith("commit it yourself")
     const committerProposed =
       committer === undefined
@@ -482,8 +519,12 @@ async function mainSection(
       (await waitFor(hasMine, 30_000)) >= 0,
     )
     script.use([{ text: "just looking" }])
-    await wu.send("@agent look at mine", at(idOf("committed it")), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent look at mine", at(idOf("committed it")), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const atMine = laneWith("@agent look at mine")
     check(
       "a branch at the turn the agent committed in has its file",
@@ -508,8 +549,12 @@ async function mainSection(
     // At once, while the snapshot may still be running.
     await waitFor(() => idOf("wrote big") !== null, 60_000)
     script.use([{ text: "have a look" }])
-    await wu.send("@agent branch at once", at(idOf("wrote big")), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent branch at once", at(idOf("wrote big")), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const atOnce = laneWith("@agent branch at once")
     check(
       "a file the agent wrote is whole in a branch taken at the next turn",
@@ -564,10 +609,14 @@ async function mainSection(
       },
       { text: "edited" },
     ])
-    await wu.send("edit line two", at(tipOf("lane two: who are you?")), {
-      thread: two?.name,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("edit line two", at(tipOf("lane two: who are you?")), {
+        thread: two?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     const proposed = await waitFor(
       () => proposedFromRows()?.files.includes("shared.txt") === true,
       30_000,
@@ -871,14 +920,18 @@ async function mainSection(
       { tool: "bash", args: { command: "echo after > after.txt" } },
       { text: "more" },
     ])
-    await wu.send(
-      "one more",
-      at(two === undefined ? null : laneTip(two.name)),
-      {
-        thread: two?.name,
-      },
+    await untilSent(
+      wh,
+      await wu.send(
+        "one more",
+        at(two === undefined ? null : laneTip(two.name)),
+        {
+          thread: two?.name,
+        },
+      ),
+      180_000,
     )
-    await idle()
+    await wh.quiet()
     // That they start above what was accepted is `repo-proposed.test.ts`'s, on real jj.
     await waitFor(
       () =>
@@ -1045,8 +1098,12 @@ async function mainSection(
       },
       { text: "seen" },
     ])
-    await wu.send("read my files", ROOT, START_AGENT)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("read my files", ROOT, START_AGENT),
+      180_000,
+    )
+    await wh.quiet()
     const seenUnsaved = toolResults(laneWith("read my files")?.name)
     check(
       "a new root thread starts at accepted work: it has what you landed, and not what you have not",
@@ -1092,12 +1149,16 @@ async function mainSection(
         { tool: "bash", args: { command: `echo ${file} > ${file}` } },
         { text: "wrote" },
       ])
-      await wu.send(
-        text,
-        at(two === undefined ? null : laneTip(two.name)),
-        BRANCH,
+      await untilSent(
+        wh,
+        await wu.send(
+          text,
+          at(two === undefined ? null : laneTip(two.name)),
+          BRANCH,
+        ),
+        180_000,
       )
-      await idle()
+      await wh.quiet()
       const lane = laneWith(text)?.name
       await waitFor(
         () => proposedFor(lane)?.files.includes(file) === true,
@@ -1125,14 +1186,18 @@ async function mainSection(
       { tool: "bash", args: { command: "echo more > more.txt" } },
       { text: "more" },
     ])
-    await wu.send(
-      "still more",
-      at(lane2 === undefined ? null : laneTip(lane2)),
-      {
-        thread: lane2,
-      },
+    await untilSent(
+      wh,
+      await wu.send(
+        "still more",
+        at(lane2 === undefined ? null : laneTip(lane2)),
+        {
+          thread: lane2,
+        },
+      ),
+      180_000,
     )
-    await idle()
+    await wh.quiet()
     await waitFor(
       () => proposedFromRows()?.files.includes("more.txt") === true,
       30_000,
@@ -1255,8 +1320,14 @@ async function mainSection(
       { tool: "bash", args: { command: "cat shared.txt" } },
       { text: "back" },
     ])
-    await wu.send("still there?", at(tipOf("move on")), { thread: one?.name })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("still there?", at(tipOf("move on")), {
+        thread: one?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     check(
       "after restoring, a lane runs again on its newest snapshot",
       toolResults(one?.name).at(-1)?.trim() === "parent-later",
@@ -1275,8 +1346,14 @@ async function mainSection(
       { tool: "bash", args: { command: "echo still" } },
       { text: "retired" },
     ])
-    await wu.send("are you there?", at(two?.tip ?? null), { thread: two?.name })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("are you there?", at(two?.tip ?? null), {
+        thread: two?.name,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     check(
       "a lane with no disk and no snapshot is retired, and its tools say to branch from it",
       toolResults(two?.name)
@@ -1304,8 +1381,12 @@ async function mainSection(
       },
       { text: "changed" },
     ])
-    await wu.send("@agent change the lane config", ROOT, START_AGENT)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent change the lane config", ROOT, START_AGENT),
+      180_000,
+    )
+    await wh.quiet()
     const configured = laneWith("@agent change the lane config")?.name
     const note = toolResults(configured).at(-1) ?? ""
     script.use([
@@ -1318,12 +1399,16 @@ async function mainSection(
       },
       { text: "looked" },
     ])
-    await wu.send(
-      "@agent what are you granted now?",
-      at(tipOf("@agent change the lane config")),
-      { thread: configured },
+    await untilSent(
+      wh,
+      await wu.send(
+        "@agent what are you granted now?",
+        at(tipOf("@agent change the lane config")),
+        { thread: configured },
+      ),
+      180_000,
     )
-    await idle()
+    await wh.quiet()
     const granted = toolResults(configured).at(-1) ?? ""
     check(
       "a lane's own pinetrie.json narrows its grants from its next run, and widens none until accepted",

@@ -496,7 +496,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   first line, dimmed. A focus follows the digests' setting. A thread's preview
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
-- **A thread's title stands in for its focus** (ADR-0207): a person's words
+- **A thread's title stands in for its focus** (ADR-0208): a person's words
   for it, set from its ⋯'s **Edit title** in a field where the line is.
   While it is set, the header, the preview and the folded strip's tooltip
   show it instead of the focus, undimmed, titled "set by" whoever set it;

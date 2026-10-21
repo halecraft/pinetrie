@@ -24,11 +24,11 @@ import {
   at,
   canvasHolding,
   heldTree,
-  idleNow,
   join,
   START_AGENT,
   START_CHAT,
   taskBoardState,
+  untilSent,
   waitFor,
   withHost,
 } from "../harness.ts"
@@ -163,10 +163,12 @@ async function run(check: Checks["check"]): Promise<void> {
             c.kind === "canvas" ? [c.id] : [],
           ),
         )
-      const idle = () => waitFor(() => idleNow(host), 60_000)
       const before = canvasesNow()
-      await ada.send("@agent start the work", ROOT, START_AGENT)
-      await idle()
+      await untilSent(
+        host,
+        await ada.send("@agent start the work", ROOT, START_AGENT),
+        60_000,
+      )
       const worked = [...canvasesNow()].find(c => !before.has(c))
       const [thread] = readPlaces(host.places).flatMap(c =>
         c.kind === "thread" &&
@@ -187,10 +189,13 @@ async function run(check: Checks["check"]): Promise<void> {
         to: backlog.id,
         before: null,
       })
-      await ada.send("@agent go on", at(threadEnd(heldTree(host), thread)), {
-        thread,
-      })
-      await idle()
+      await untilSent(
+        host,
+        await ada.send("@agent go on", at(threadEnd(heldTree(host), thread)), {
+          thread,
+        }),
+        60_000,
+      )
       check(
         "an agent's first run moves its canvas from Topics to Active, and a person's move back keeps it there",
         firstState === doing.id &&

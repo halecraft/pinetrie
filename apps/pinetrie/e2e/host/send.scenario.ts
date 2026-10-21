@@ -16,11 +16,11 @@ import {
   at,
   heldLanes,
   heldTree,
-  idleNow,
   join,
   START_AGENT,
   START_CHAT,
   suiteModel,
+  untilSent,
   waitFor,
   withHost,
 } from "../harness.ts"
@@ -36,7 +36,6 @@ async function run(check: Checks["check"]): Promise<void> {
     { model: { kind: "scripted", script }, log: () => {} },
     async host => {
       const tree = () => heldTree(host)
-      const idle = () => waitFor(() => idleNow(host), 60_000)
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
       const shape = (tip: EntryId | null) =>
         projectTranscript(tree(), tip).map(m =>
@@ -51,8 +50,11 @@ async function run(check: Checks["check"]): Promise<void> {
           if (s.kind === "reply") samples.push(s.text)
       })
       const client = await join(host, "e2e-client", "send")
-      await client.send("@agent hello", ROOT, START_AGENT)
-      await idle()
+      await untilSent(
+        host,
+        await client.send("@agent hello", ROOT, START_AGENT),
+        60_000,
+      )
       unsample()
       const lane = heldLanes(host, tree(), readPlaces(host.places))[0]
       const first = shape(lane?.tip ?? null)
@@ -84,11 +86,14 @@ async function run(check: Checks["check"]): Promise<void> {
         at(plum.kind === "appended" ? plum.id : null),
       )
       script.use([{ reply: context => context.slice(0, -1).join("\n") }])
-      await bob.send(
-        "@agent who told us a secret word?",
-        at(one.kind === "appended" ? one.id : null),
+      await untilSent(
+        host,
+        await bob.send(
+          "@agent who told us a secret word?",
+          at(one.kind === "appended" ? one.id : null),
+        ),
+        60_000,
       )
-      await idle()
       const asked = heldLanes(host, tree(), readPlaces(host.places)).find(l =>
         projectTranscript(tree(), l.tip).some(m =>
           m.text.includes("who told us"),

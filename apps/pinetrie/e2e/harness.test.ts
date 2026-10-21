@@ -1,7 +1,13 @@
-import { entryId, rootIdFor, threadIdFor } from "@pinetrie/core"
+import { ERR, entryId, rootIdFor, threadIdFor } from "@pinetrie/core"
 import type { TextCard } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
-import { composeCard, rootHolding, waitForRootHolding } from "./harness.ts"
+import {
+  composeCard,
+  isWatchedRunOver,
+  rootHolding,
+  sendWait,
+  waitForRootHolding,
+} from "./harness.ts"
 
 const R1 = rootIdFor("one")
 const R2 = rootIdFor("two")
@@ -38,6 +44,41 @@ describe("waitForRootHolding", () => {
   })
   test("no entry: refused", async () => {
     await expect(waitForRootHolding(lateClient(1), null)).rejects.toThrow()
+  })
+})
+
+describe("sendWait", () => {
+  const started = { kind: "started", runId: "r-1" } as Parameters<
+    typeof sendWait
+  >[0]
+  test("a run the send started waits while the host is busy, and settles once idle", () => {
+    expect(sendWait(started, false).kind).toBe("waiting")
+    expect(sendWait(started, true).kind).toBe("settled")
+  })
+  test("a message appended, or a card queued, settles once the host is idle", () => {
+    expect(sendWait({ kind: "appended", id: E }, true).kind).toBe("settled")
+    expect(sendWait({ kind: "queued" }, false).kind).toBe("waiting")
+  })
+  test("a send that started nothing fails the wait, idle or not", () => {
+    for (const idle of [true, false]) {
+      expect(sendWait({ kind: "busy" }, idle).kind).toBe("started-nothing")
+      expect(
+        sendWait(
+          { kind: "refused", code: ERR.UNKNOWN_TARGET, message: "m" },
+          idle,
+        ).kind,
+      ).toBe("started-nothing")
+    }
+  })
+})
+
+describe("isWatchedRunOver", () => {
+  test("an idle host that no run has begun on since the watch is not over", () => {
+    expect(isWatchedRunOver(0, true)).toBe(false)
+  })
+  test("a run begun since, and the host idle again: over", () => {
+    expect(isWatchedRunOver(1, true)).toBe(true)
+    expect(isWatchedRunOver(1, false)).toBe(false)
   })
 })
 

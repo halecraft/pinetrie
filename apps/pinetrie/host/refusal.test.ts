@@ -54,6 +54,8 @@ test("a host without tools starts on a folder with no repo", async () => {
   await host.shutdown()
 })
 
+// It starts a host process, which under the unit suite's load can take
+// longer than Vitest's default 5 s to start and exit.
 test("a PINETRIE_SESSION naming another session than the folder's own exits 2 before the store opens", () => {
   const site = path.join(dir, "website")
   const blog = path.join(dir, "blog")
@@ -88,4 +90,4 @@ test("a PINETRIE_SESSION naming another session than the folder's own exits 2 be
     expect(
       existsSync(path.join(data, "pinetrie", "sessions", name, "pinetrie.db")),
     ).toBe(false)
-})
+}, 30_000)

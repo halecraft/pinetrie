@@ -19,7 +19,11 @@ import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { PRODUCT_NAME, ROOT } from "@pinetrie/core"
 import { laneMachine, planStartSteps } from "../../host/start-checklist.ts"
-import { startStepWords } from "../../host/startup-lines.ts"
+import {
+  listeningLine,
+  projectLine,
+  startStepWords,
+} from "../../host/startup-lines.ts"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
 import { committedProject, join, START_AGENT, waitFor } from "../harness.ts"
@@ -102,9 +106,11 @@ async function packageSection(
     }),
   )
   try {
+    // A host with tools listens only once its lanes are ready.
+    const listening = listeningLine("")
     await waitFor(
-      () => exited || lines.some(l => l.includes("[host] listening")),
-      60_000,
+      () => exited || lines.some(l => l.startsWith(listening)),
+      600_000,
     )
     // Its host is configured with no model, so it loads the shipped copy.
     check(
@@ -116,9 +122,9 @@ async function packageSection(
       ),
       lines.filter(l => l.includes("anthropic")).join(" | "),
     )
-    const url = /listening\s+(\S+)/.exec(
-      lines.find(l => l.includes("[host] listening")) ?? "",
-    )?.[1]
+    const url = lines
+      .find(l => l.startsWith(listening))
+      ?.slice(listening.length)
     const index = url === undefined ? null : await fetch(url)
     const html = (await index?.text()) ?? ""
     const asset = /src="\/?(assets\/[^"]+\.js)"/.exec(html)?.[1]
@@ -128,10 +134,10 @@ async function packageSection(
         : await fetch(new URL(asset, url))
     check(
       "the installed pinetrie serves the folder it starts in, its page built",
-      lines.some(l => l.includes(`[host] project     ${project}`)) &&
+      lines.includes(projectLine(project)) &&
         index?.status === 200 &&
         script?.status === 200,
-      `${index?.status} ${asset} ${script?.status}`,
+      `${lines.find(l => l.startsWith(projectLine(""))) ?? "no project line"}; ${index?.status} ${asset} ${script?.status}`,
     )
 
     const person =

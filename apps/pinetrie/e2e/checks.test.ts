@@ -1,5 +1,13 @@
 import { expect, test } from "vitest"
-import { createChecks, isStop, line, stopMessage, stopsHere } from "./checks.ts"
+import {
+  createChecks,
+  isStop,
+  line,
+  readTally,
+  stopMessage,
+  stopsHere,
+  tallyLine,
+} from "./checks.ts"
 
 test("stopsHere: a failing check whose label is stopAt stops; nothing else does", () => {
   expect(stopsHere(false, "the colour check", "the colour check")).toBe(true)
@@ -42,4 +50,12 @@ test("skip is neither a pass nor a fail, and an error fails under the scenario's
   ])
   expect(isStop(new Error(stopMessage("x")))).toBe(true)
   expect(isStop(new Error("x"))).toBe(false)
+})
+
+test("readTally reads the last tally a run of the suite printed, and none from a run that crashed", () => {
+  const tally = { pass: 3, fail: 1, skip: 2 }
+  const output = `── a\n  PASS  x\n\n${tallyLine("e2e", tally)}\n`
+  expect(readTally(output, "e2e")).toEqual(tally)
+  expect(readTally(output, "e2e:lanes")).toBeNull()
+  expect(readTally("── a\nTypeError: boom\n", "e2e")).toBeNull()
 })

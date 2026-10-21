@@ -1,7 +1,7 @@
 # S306 — the jj tests check jj's own answers; their cost is a repeated oracle and rebuilt rigs
 
 - **Status:** Answered
-- **Led to:** ADR-0207
+- **Led to:** ADR-0209
 
 **Question.** `packages/jj/repo.test.ts` runs about 4,050 jj and git
 processes, and bounds the unit suite's wall time (S305). Only

@@ -18,6 +18,7 @@ import {
   START_AGENT,
   startSuiteHost,
   suiteClock,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
@@ -92,8 +93,7 @@ async function run(check: Checks["check"]): Promise<void> {
       },
     ])
     const asked = `@agent what colour is this? ![red](/blob/${red.sha256})`
-    await iu.send(asked, ROOT, START_AGENT)
-    await iidle()
+    await untilSent(ih, await iu.send(asked, ROOT, START_AGENT), 30_000)
 
     check(
       "the model reads the message's text, then its image",
@@ -156,10 +156,13 @@ async function run(check: Checks["check"]): Promise<void> {
     clock.advance(BLOB_GRACE_MS + 1)
     const iv = await join(ih, "ivy", "images")
     script.use([{ text: "swept" }])
-    await iv.send("@agent anything", at(idOfText(ih, "a green one")), {
-      mode: "reply",
-    })
-    await iidle()
+    await untilSent(
+      ih,
+      await iv.send("@agent anything", at(idOfText(ih, "a green one")), {
+        mode: "reply",
+      }),
+      30_000,
+    )
     await ih.quiet()
     // The run's end swept, on the host's clock, a day past both uploads.
     const blueAfter = (await blobAt(blue.sha256)).status
@@ -178,10 +181,13 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await iv.send("@agent and the first one?", at(idOfText(ih, "swept")), {
-      mode: "reply",
-    })
-    await iidle()
+    await untilSent(
+      ih,
+      await iv.send("@agent and the first one?", at(idOfText(ih, "swept")), {
+        mode: "reply",
+      }),
+      30_000,
+    )
     check(
       "after a restart on the same file, an image is still served, and still reaches the model",
       (await blobAt(red.sha256)).status === 200 &&

@@ -601,7 +601,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   fork row (`Origin`, `data-role="origin"`) and an ssh ask
   (`AccessRowView`). Edit title in the ⋯ puts a `CardTitleField`
   (`.open-title-input`) in the line's place until it is saved or
-  cancelled (ADR-0207).
+  cancelled (ADR-0208).
   The handle's title is `handleTitle`'s. Density is three checked items in
   the column's ⋯ (`.column-density-<density>`), which `Column`'s
   `chooseDensity` handles: the `density` act, then `PLACED`, one function

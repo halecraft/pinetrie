@@ -56,7 +56,7 @@ tests import as `@pinetrie/threads/fixtures`.
   ever in (ADR-0116, ADR-0117, ADR-0126, ADR-0128, ADR-0182), whether it is
   reordered there, where its words are read, and who may title it
   (`titled`, `TitledKind`: a thread and a note column a person alone,
-  ADR-0207; a media column and an image a person or the agent).
+  ADR-0208; a media column and an image a person or the agent).
   `titledKindOfCard` reads a titled card's kind from its id.
 
 ## Cards and places (`cards.ts`, `places.ts`, `paste.ts`, `grid.ts`)

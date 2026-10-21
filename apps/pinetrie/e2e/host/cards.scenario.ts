@@ -49,6 +49,7 @@ import {
   threadHolding,
   tipIn,
   unqueueCard,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -119,8 +120,11 @@ async function run(check: Checks["check"]): Promise<void> {
     }
 
     script.use([{ text: "Ready." }])
-    await ada.send("@agent start", ROOT, START_AGENT)
-    await cIdle()
+    await untilSent(
+      ch,
+      await ada.send("@agent start", ROOT, START_AGENT),
+      30_000,
+    )
     const end = tipOf()
 
     // 1. Ada's card at the lane's end reaches Bea, who types in it; after two
@@ -139,8 +143,11 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     await bea.send("@Ada one", at(end), { mode: "reply" })
-    await bea.send("@Ada two", at(tipOf()), { mode: "reply" })
-    await cIdle()
+    await untilSent(
+      ch,
+      await bea.send("@Ada two", at(tipOf()), { mode: "reply" }),
+      30_000,
+    )
     const grown = tipOf()
     const idx = heldTree(ch)
     const found = yourCard(
@@ -157,8 +164,11 @@ async function run(check: Checks["check"]): Promise<void> {
     // 2. Ada sends it: at the new end, with Bea as contributor; the card is spent.
     script.use([{ text: "Tests it is." }])
     const SEND1 = crypto.randomUUID()
-    await ada.send(typed, at(grown), { id: SEND1, card: c1 })
-    await cIdle()
+    await untilSent(
+      ch,
+      await ada.send(typed, at(grown), { id: SEND1, card: c1 }),
+      30_000,
+    )
     await ch.quiet()
 
     // 2b. Undo in a card reaches only that card: A's undo passes
@@ -381,8 +391,11 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await ada.send("@agent go on", at(pinEnd), { pinned: [pin] })
-    await cIdle()
+    await untilSent(
+      ch,
+      await ada.send("@agent go on", at(pinEnd), { pinned: [pin] }),
+      30_000,
+    )
     const prompt = Object.values(heldTree(ch).entries).find(
       e => e.message?.role === "person" && e.message.content === "@agent go on",
     )
@@ -434,8 +447,13 @@ async function run(check: Checks["check"]): Promise<void> {
       },
       "typed just before the send",
     )
-    await adaLate.send("@agent and now", at(editEnd), { pinned: [pin, late] })
-    await cIdle()
+    await untilSent(
+      ch,
+      await adaLate.send("@agent and now", at(editEnd), {
+        pinned: [pin, late],
+      }),
+      30_000,
+    )
     const lastCards =
       readCards.findLast(t => t.startsWith("<pinned-cards>")) ?? ""
     check(

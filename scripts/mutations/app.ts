@@ -706,8 +706,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the browser suite runs against production React",
     file: "apps/pinetrie/e2e/browser.ts",
-    from: 'await runSuite("e2e:browser", path.join(import.meta.dirname, "browser"))',
-    to: 'process.env.NODE_ENV = "production"\nawait runSuite("e2e:browser", path.join(import.meta.dirname, "browser"))',
+    from: 'await runSuite("e2e:browser", path.join(import.meta.dirname, "browser"), JOBS)',
+    to: 'process.env.NODE_ENV = "production"\nawait runSuite("e2e:browser", path.join(import.meta.dirname, "browser"), JOBS)',
     suite: "browser",
     scenario: "page",
     expect:

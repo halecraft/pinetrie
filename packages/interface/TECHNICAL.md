@@ -547,7 +547,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   itself: the title's row for a reader who may write, since every column
   with a head is a titled card's (`isTitledCardId`), worded by
   `titleWords` (Rename for a list column, Edit title for a thread,
-  ADR-0207), and a thread's Pin a card where `newPinPlace` says `menu`
+  ADR-0208), and a thread's Pin a card where `newPinPlace` says `menu`
   (ADR-0200). `titleWords` reads one table over `TitledKind`, so a kind
   made titled does not compile until it has its words. The ⋯ ends in a
   `trash` section, Move to trash, on every column for a reader who may
@@ -1500,7 +1500,7 @@ composer*).
   `banner` on black, blended off; a `built-in` sprite on a transparent
   ground, unblended.
 - **What a thread is about is decided in `thread-glance.ts`** (ADR-0173,
-  ADR-0207), each part by its own function: `threadTitle`, a person's
+  ADR-0208), each part by its own function: `threadTitle`, a person's
   title (its `CARD_TITLE` record), else null; `threadFocus`, the thread's
   `FocusRecord`, a model's (`kind: "model"`), else the first line of how
   the thread began (`threadOpening`, `kind: "opening"`), else null; and

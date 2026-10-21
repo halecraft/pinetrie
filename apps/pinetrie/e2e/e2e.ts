@@ -16,6 +16,11 @@
 // as `e2e:lanes` does, and is skipped where it cannot run (`lanes: true`).
 
 import path from "node:path"
-import { runSuite } from "./scenario.ts"
+import { runSuite, type SuiteJobs } from "./scenario.ts"
 
-await runSuite("e2e", path.join(import.meta.dirname, "host"))
+// Scenarios at once, each in a process of its own (`planJobs`). Of those,
+// at most four with lanes: in a lane, every scenario's lanes share the
+// lane's 4 GiB, and four at once took about 3 GiB of it.
+const JOBS: SuiteJobs = { all: 8, lanes: 4 }
+
+await runSuite("e2e", path.join(import.meta.dirname, "host"), JOBS)

@@ -84,9 +84,42 @@ export function createChecks(
     },
     report(title) {
       print(
-        `\n=== ${title}: pass=${passed.length} fail=${failed.length} skip=${skipped.length} ===`,
+        `\n${tallyLine(title, {
+          pass: passed.length,
+          fail: failed.length,
+          skip: skipped.length,
+        })}`,
       )
       process.exit(failed.length > 0 ? 1 : 0)
     },
   }
+}
+
+/** How many checks passed, failed and were skipped. */
+export interface Tally {
+  readonly pass: number
+  readonly fail: number
+  readonly skip: number
+}
+
+/** A suite's last line: its title and its tally. */
+export const tallyLine = (title: string, t: Tally): string =>
+  `=== ${title}: pass=${t.pass} fail=${t.fail} skip=${t.skip} ===`
+
+/**
+ * The tally a run of `title` printed last (`tallyLine`), or null when it
+ * printed none: a run that crashed before its report.
+ */
+export function readTally(output: string, title: string): Tally | null {
+  const head = `=== ${title}: `
+  const last = output
+    .split("\n")
+    .filter(l => l.startsWith(head))
+    .at(-1)
+  const m = /^pass=(\d+) fail=(\d+) skip=(\d+) ===$/.exec(
+    last?.slice(head.length) ?? "",
+  )
+  return m === null
+    ? null
+    : { pass: Number(m[1]), fail: Number(m[2]), skip: Number(m[3]) }
 }

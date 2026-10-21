@@ -1,4 +1,6 @@
-# ADR-0207 — Only the jj adapter's tests run jj, each asking it once; accepted work's facts are two reads
+# ADR-0209 — Only the jj adapter's tests run jj, each asking it once; accepted work's facts are two reads
+
+Numbered 0207 until 2026-10-21, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `packages/jj/TECHNICAL.md`

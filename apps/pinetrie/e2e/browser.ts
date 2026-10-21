@@ -11,6 +11,9 @@
 //                       does (`scripts/mutate.ts`)
 
 import path from "node:path"
-import { runSuite } from "./scenario.ts"
+import { ONE_AT_A_TIME, runSuite } from "./scenario.ts"
 
-await runSuite("e2e:browser", path.join(import.meta.dirname, "browser"))
+// One scenario at a time until several at once are measured.
+const JOBS = ONE_AT_A_TIME
+
+await runSuite("e2e:browser", path.join(import.meta.dirname, "browser"), JOBS)

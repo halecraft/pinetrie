@@ -1,4 +1,6 @@
-# ADR-0207 — A person can give a thread a title, shown instead of its focus until they clear it
+# ADR-0208 — A person can give a thread a title, shown instead of its focus until they clear it
+
+Numbered 0207 until 2026-10-21, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `docs/06-interface.md`, `docs/glossary.md`,

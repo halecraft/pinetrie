@@ -1,14 +1,22 @@
 // e2e/scenario — a suite as a set of scenarios, one per `*.scenario.ts` file.
 //
 // A scenario is to a suite what a `test()` is to Vitest: it starts its own
-// host, depends on no other scenario, and is the unit the test budget counts
-// (`scripts/budget.ts`). `PINETRIE_SCENARIO` runs some, as a suite mutation
-// does (`scripts/mutate.ts`, `SUITES`).
+// host and depends on no other scenario, so a suite may run each in a
+// process of its own (`planJobs`). `PINETRIE_SCENARIO` runs some, as a suite
+// mutation does (`scripts/mutate.ts`, `SUITES`).
 
+import { spawn } from "node:child_process"
 import { readdirSync } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
-import { type Checks, createChecks, isStop } from "./checks.ts"
+import {
+  type Checks,
+  createChecks,
+  isStop,
+  readTally,
+  type Tally,
+  tallyLine,
+} from "./checks.ts"
 import type { LaneHosts } from "./lane-hosts.ts"
 
 /** What a scenario is given beside its checks. */
@@ -68,7 +76,7 @@ export function chooseScenarios(
   return [...all].filter(n => asked.includes(n)).sort()
 }
 
-type SuiteStep =
+export type SuiteStep =
   | { readonly name: string; readonly run: true }
   | { readonly name: string; readonly run: false; readonly why: string }
 
@@ -96,6 +104,63 @@ export function planSuite(
   }
 }
 
+/** How a suite's runnable scenarios run. */
+export type JobPlan =
+  /** In this process, one after another. */
+  | { readonly kind: "here" }
+  /**
+   * Each in a process of its own (`PINETRIE_SCENARIO`), `atOnce` at a time,
+   * of which `lanesAtOnce` at most run lanes.
+   */
+  | {
+      readonly kind: "processes"
+      readonly atOnce: number
+      readonly lanesAtOnce: number
+    }
+
+/**
+ * Where a suite's scenarios run. A stop at a check (`PINETRIE_STOP_AT`)
+ * ends the whole suite, which only one process can do, so it runs here, as
+ * does a suite with one scenario to run: every suite mutant's.
+ */
+export function planJobs(input: {
+  readonly steps: readonly SuiteStep[]
+  /** The most processes at once the suite allows. */
+  readonly jobs: SuiteJobs
+  readonly stopAt: string | undefined
+}): JobPlan {
+  const runnable = input.steps.filter(s => s.run).length
+  const { all, lanes } = input.jobs
+  return all <= 1 || input.stopAt !== undefined || runnable <= 1
+    ? { kind: "here" }
+    : {
+        kind: "processes",
+        atOnce: Math.min(all, runnable),
+        lanesAtOnce: Math.max(1, Math.min(lanes, all)),
+      }
+}
+
+/** How many scenarios a suite runs at once, and how many of those may run lanes. */
+export interface SuiteJobs {
+  readonly all: number
+  readonly lanes: number
+}
+
+/** One scenario at a time: today's suite in one process. */
+export const ONE_AT_A_TIME: SuiteJobs = { all: 1, lanes: 1 }
+
+/**
+ * What a scenario's own process printed, without the suite's title and
+ * tally around it, which the suite prints once for all of them.
+ */
+export const scenarioSection = (output: string, title: string): string =>
+  output
+    .split("\n")
+    .filter(l => l !== `=== ${title} ===` && !l.startsWith(`=== ${title}: `))
+    .join("\n")
+    .replace(/^\n+/, "")
+    .replace(/\n+$/, "")
+
 /** The scenario names in `dir`: its `*.scenario.ts` files' stems. */
 export const scenarioNames = (dir: string): readonly string[] =>
   readdirSync(dir)
@@ -109,7 +174,11 @@ export const scenarioNames = (dir: string): readonly string[] =>
  * scenario that throws fails under its name and the next one runs; a stop at
  * `PINETRIE_STOP_AT` ends the suite.
  */
-export async function runSuite(title: string, dir: string): Promise<never> {
+export async function runSuite(
+  title: string,
+  dir: string,
+  jobs: SuiteJobs = ONE_AT_A_TIME,
+): Promise<never> {
   const all = scenarioNames(dir)
   const named = process.env.PINETRIE_SCENARIO
   const chosen = chooseScenarios(all, named)
@@ -146,6 +215,18 @@ export async function runSuite(title: string, dir: string): Promise<never> {
     )
   }
   const plan = planSuite(all, named, problems)
+  if (plan.kind === "run") {
+    const jobPlan = planJobs({
+      steps: plan.steps,
+      jobs,
+      stopAt: process.env.PINETRIE_STOP_AT,
+    })
+    if (jobPlan.kind === "processes")
+      return runInProcesses(title, plan.steps, jobPlan, {
+        runsLanes: name => scenarios.get(name)?.lanes === true,
+        laneHosts,
+      })
+  }
   const checks = createChecks()
   console.log(`\n=== ${title} ===`)
   if (plan.kind === "run")
@@ -171,4 +252,132 @@ export async function runSuite(title: string, dir: string): Promise<never> {
       }
     }
   return checks.report(title)
+}
+
+/**
+ * Each runnable scenario in a process of its own, `atOnce` at a time, its
+ * output printed whole once it ends, in name order, then one tally of all.
+ * With a scenario that runs lanes, the lane images are made ready first, once.
+ */
+async function runInProcesses(
+  title: string,
+  steps: readonly SuiteStep[],
+  plan: Extract<JobPlan, { kind: "processes" }>,
+  options: {
+    readonly runsLanes: (name: string) => boolean
+    readonly laneHosts: () => Promise<typeof import("./lane-hosts.ts")>
+  },
+): Promise<never> {
+  const checks = createChecks()
+  console.log(`\n=== ${title} ===`)
+  if (steps.some(s => s.run && options.runsLanes(s.name))) {
+    console.log("\n── lane images")
+    try {
+      const tag = await (await options.laneHosts()).prepareSuiteImages()
+      console.log(`  ready  ${tag}`)
+    } catch (error) {
+      checks.error(
+        "lane images",
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+  }
+  const all = slots(plan.atOnce)
+  const lanes = slots(plan.lanesAtOnce)
+  const runs = new Map(
+    steps
+      .filter(s => s.run)
+      .map(s => {
+        const held = options.runsLanes(s.name) ? [lanes, all] : [all]
+        return [s.name, holding(held, () => scenarioProcess(s.name))] as const
+      }),
+  )
+  const total = { pass: 0, fail: 0, skip: 0 }
+  const add = (t: Tally) => {
+    total.pass += t.pass
+    total.fail += t.fail
+    total.skip += t.skip
+  }
+  for (const step of steps) {
+    const run = runs.get(step.name)
+    if (run === undefined) {
+      console.log(`\n── ${step.name}`)
+      if (!step.run) checks.skip(step.name, step.why)
+      continue
+    }
+    const { output, status } = await run
+    console.log(`\n${scenarioSection(output, title)}`)
+    const tally = readTally(output, title)
+    if (tally === null)
+      checks.error(step.name, `its process exited ${status} with no tally`)
+    else add(tally)
+  }
+  add({
+    pass: checks.passed.length,
+    fail: checks.failed.length,
+    skip: checks.skipped.length,
+  })
+  console.log(`\n${tallyLine(title, total)}`)
+  process.exit(total.fail > 0 ? 1 : 0)
+}
+
+/** A count of slots: `take` waits for one, `give` hands it back. */
+function slots(count: number): {
+  readonly take: () => Promise<void>
+  readonly give: () => void
+} {
+  let used = 0
+  const waiting: (() => void)[] = []
+  return {
+    take: async () => {
+      if (used >= count)
+        await new Promise<void>(resolve => waiting.push(resolve))
+      used++
+    },
+    give: () => {
+      used--
+      waiting.shift()?.()
+    },
+  }
+}
+
+/**
+ * `body` once a slot of each of `held` is taken, in order, given back after.
+ * Every caller takes them in the same order, so none waits on another's.
+ */
+async function holding<T>(
+  held: readonly ReturnType<typeof slots>[],
+  body: () => Promise<T>,
+): Promise<T> {
+  for (const s of held) await s.take()
+  try {
+    return await body()
+  } finally {
+    for (const s of held) s.give()
+  }
+}
+
+/** This suite's runner again, for the scenario `name` alone: its output, stdout and stderr as they came, and its exit status. */
+function scenarioProcess(
+  name: string,
+): Promise<{ readonly output: string; readonly status: number | null }> {
+  return new Promise(resolve => {
+    const runner = process.argv[1]
+    if (runner === undefined) {
+      resolve({ output: "no runner to start", status: null })
+      return
+    }
+    const child = spawn(process.execPath, [...process.execArgv, runner], {
+      env: { ...process.env, PINETRIE_SCENARIO: name },
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    let output = ""
+    child.stdout.on("data", d => {
+      output += d
+    })
+    child.stderr.on("data", d => {
+      output += d
+    })
+    child.on("close", status => resolve({ output, status }))
+  })
 }

@@ -142,8 +142,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
   const owner = await join(h.host, "owner", "ssh")
   try {
     h.script.use([{ text: "made" }])
-    await h.user.send("@agent make a lane", ROOT, START_AGENT)
-    await h.idle()
+    await h.settle(await h.user.send("@agent make a lane", ROOT, START_AGENT))
     const lane = h.laneWith("made")?.name
     if (lane === undefined) throw new Error("no lane was made")
     // A lane's container stops when its run ends: started again, its hop

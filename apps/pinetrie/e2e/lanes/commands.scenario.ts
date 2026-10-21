@@ -45,8 +45,7 @@ async function commandsSection(
         },
       },
     ])
-    await h.user.send("/fixture:skill:hello", ROOT, START_AGENT)
-    await h.idle()
+    await h.settle(await h.user.send("/fixture:skill:hello", ROOT, START_AGENT))
     const skillDir = `/mnt/host${hello}`
     check(
       "in a lane of its own, an expanded skill names its files at /mnt/host",

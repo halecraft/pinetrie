@@ -84,7 +84,11 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   `pnpm run e2e` took 58 s (54 passed, `live` skipped), `pnpm run
   e2e:lanes` 134 s (64 passed; the Mac's network checks and ssh skipped)
   and `pnpm run e2e:browser` 223 s (177 passed). `pnpm run verify` runs
-  the first two.
+  the first two. On 2026-10-21 (S305), with the image built: `pnpm run
+  e2e` 88 s one scenario at a time, 39 to 41 s as processes, four with lanes
+  at once (two runs, 76 passed), against 76 to 78 s with one. A lane's memory holds its inner Docker's containers too, whose own
+  limits its Docker does not enforce (no cgroup driver), so scenarios at
+  once are bounded by it.
 - **`lanes/package` installs what it builds:** `scripts/package.ts`, `npm
   pack`, then `npm install` of the tarball into an empty project, which
   needs the registry; most of its time is that install. Its folders are
@@ -128,6 +132,18 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
 - **`PINETRIE_SCENARIO=a,b` runs only those**, in name order. An unknown name
   exits 2. A suite mutation sets it (`scripts/mutate.ts`, `SUITES`), so a
   mutant runs one scenario, and stops at its check (`PINETRIE_STOP_AT`).
+- **A suite runs its scenarios as processes, several at once** (`planJobs`,
+  `runSuite`): each its runner again with `PINETRIE_SCENARIO` naming it,
+  its output printed whole once it ends, in name order, and one tally of
+  all (`readTally`). Each suite's limits are beside its runner (`JOBS`):
+  `e2e` 8 at once, of which four with lanes, since a lane's lanes share its
+  4 GiB and four at once took about 3 GiB of it; `e2e:lanes` and
+  `e2e:browser` one at a time. One scenario to run, or `PINETRIE_STOP_AT`
+  set, runs in the runner's own process, as a mutant does.
+- **The lane images are made once, before any scenario starts**
+  (`prepareSuiteImages`), when a suite runs processes and one of them runs
+  lanes: each would otherwise build a missing image at once. A fresh lane's
+  first run shows its build there, as its own step.
 - **A scenario that cannot run here says why, and is skipped**
   (`scenarioProblem`): for one with `lanes: true`, `runtimeProblem()` gives
   the host's own reason the suites' runtime cannot give lanes their own
@@ -335,6 +351,15 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   `requestAnimationFrame`, `performance` and `Event.timeStamp` as well as
   the timers, and the browser checks read geometry in real frames (S168).
 
+- **A wait after a send reads the send's outcome** (`untilSent`,
+  `sendWait`). A send that starts a run is answered only once the host
+  holds the run as active, so idle after `started` is that run's end; a
+  send that started nothing (refused, busy) fails the wait at once, as
+  does a deadline, rather than letting the checks after it read a run that
+  never was. A send typed into a page has no outcome to read, and may reach
+  the host after the click returns: its wait is a watch made before the
+  click (`watchRuns`), which ends once a run has begun since and the host
+  is idle again.
 - **An idle wait checks the queue as well as the runs** (`idleNow`): a
   card queued while a run goes is popped only when it ends, so "no run" alone
   can return between a run's end and the pop. A card a client has just

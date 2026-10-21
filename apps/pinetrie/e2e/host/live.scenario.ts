@@ -18,6 +18,7 @@ import {
   startSuiteHost,
   suitePlaces,
   tipIn,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { imageSize, RED_PNG } from "../images.ts"
@@ -62,8 +63,7 @@ async function run(check: Checks["check"]): Promise<void> {
     log: () => {},
   })
   const asker = await join(live, "asker", "live")
-  await asker.send(PROMPT, ROOT, START_AGENT)
-  await waitFor(() => idleNow(live), 120_000)
+  await untilSent(live, await asker.send(PROMPT, ROOT, START_AGENT), 120_000)
   const [lane] = heldLaneNames(live)
   const last = projectTranscript(
     heldTree(live),
@@ -114,12 +114,15 @@ async function run(check: Checks["check"]): Promise<void> {
     log: line => bannerLog.push(line),
   })
   const painter = await join(drawing, "painter", "live")
-  await painter.send(
-    "Name three birds of spring marshes, in one line.",
-    ROOT,
-    START_AGENT,
+  await untilSent(
+    drawing,
+    await painter.send(
+      "Name three birds of spring marshes, in one line.",
+      ROOT,
+      START_AGENT,
+    ),
+    120_000,
   )
-  await waitFor(() => idleNow(drawing), 120_000)
   await waitFor(() => readBanners(drawing.session).size > 0, 120_000)
   await drawing.quiet()
   const [banner] = readBanners(drawing.session).values()

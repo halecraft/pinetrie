@@ -11,6 +11,10 @@
 //                         does (`scripts/mutate.ts`)
 
 import path from "node:path"
-import { runSuite } from "./scenario.ts"
+import { ONE_AT_A_TIME, runSuite } from "./scenario.ts"
 
-await runSuite("e2e:lanes", path.join(import.meta.dirname, "lanes"))
+// One scenario at a time: two lane hosts on one Docker engine collide on
+// the base's scratch lane, and ten at once ran out of a lane's memory.
+const JOBS = ONE_AT_A_TIME
+
+await runSuite("e2e:lanes", path.join(import.meta.dirname, "lanes"), JOBS)

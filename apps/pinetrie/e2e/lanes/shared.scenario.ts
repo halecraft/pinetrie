@@ -71,8 +71,7 @@ async function sharedSection(
       { tool: "bash", args: { command: "echo lane > shared.txt" } },
       { text: "planned" },
     ])
-    await h.user.send("write a plan", ROOT, START_AGENT)
-    await h.idle()
+    await h.settle(await h.user.send("write a plan", ROOT, START_AGENT))
     const plan = path.join(dir, ".plans", "a.md")
     const owner = existsSync(plan) ? statSync(plan).uid : null
     check(
@@ -148,8 +147,7 @@ async function sharedSection(
       { tool: "read", args: { path: ".plans/mine.md" } },
       { text: "read it" },
     ])
-    await h.user.send("read mine", ROOT, START_AGENT)
-    await h.idle()
+    await h.settle(await h.user.send("read mine", ROOT, START_AGENT))
     writeFileSync(mine, "yours, changed\n")
     await waitFor(() => versionsOfMine().length === 2, 30_000)
     const reader = h.laneWith("read mine")
@@ -160,10 +158,11 @@ async function sharedSection(
       },
       { text: "wrote it" },
     ])
-    await h.user.send("write mine", atEntry(entryId(reader?.tip ?? "")), {
-      thread: reader?.name,
-    })
-    await h.idle()
+    await h.settle(
+      await h.user.send("write mine", atEntry(entryId(reader?.tip ?? "")), {
+        thread: reader?.name,
+      }),
+    )
     const versions = versionsOfMine()
     check(
       "your writes are versions as you make them, and a lane's write over one it never read is concurrent",

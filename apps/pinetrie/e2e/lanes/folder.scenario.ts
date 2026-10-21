@@ -44,10 +44,10 @@ import {
   heldEntries,
   heldLanes,
   heldTree,
-  idleNow,
   join,
   laneHolding,
   START_AGENT,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, type LaneHosts } from "../lane-hosts.ts"
@@ -96,10 +96,6 @@ async function folderSection(
   let wh = await start()
   let wu = await join(wh, "uma", "folder")
   const tree = () => heldTree(wh)
-  const idle = async () => {
-    await waitFor(() => idleNow(wh), 300_000)
-    await wh.quiet()
-  }
   const laneTip = (lane: ThreadId) =>
     heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
@@ -122,8 +118,12 @@ async function folderSection(
       { tool: "write", args: { path: "b.txt", content: "lane's\n" } },
       { text: "wrote" },
     ])
-    await wu.send("@agent write b", ROOT, START_AGENT)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent write b", ROOT, START_AGENT),
+      300_000,
+    )
+    await wh.quiet()
     const lane = laneWith("@agent write b")?.name
     if (lane === undefined) throw new Error("no lane")
     const proposedFromRows = () => {
@@ -180,8 +180,12 @@ async function folderSection(
       { tool: "bash", args: { command: "cat c.txt" } },
       { text: "caught up" },
     ])
-    await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane }),
+      300_000,
+    )
+    await wh.quiet()
     check(
       "a clean catch-up merges accepted work's newest state into the lane",
       toolResults(lane).at(-1)?.trim() === "yours",
@@ -193,13 +197,23 @@ async function folderSection(
       { tool: "write", args: { path: "a.txt", content: "one\nlane\nthree\n" } },
       { text: "edited" },
     ])
-    await wu.send("@agent edit a", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent edit a", at(laneTip(lane)), { thread: lane }),
+      300_000,
+    )
+    await wh.quiet()
     writeFileSync(path.join(dir, "a.txt"), "one\nyours\nthree\n")
     await waitFor(() => newestOf() !== moved, 60_000)
     script.use([{ tool: GET_LATEST_TOOL, args: {} }, { text: "conflicted" }])
-    await wu.send("@agent catch up again", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent catch up again", at(laneTip(lane)), {
+        thread: lane,
+      }),
+      300_000,
+    )
+    await wh.quiet()
     const theirs = await inLane(
       lane,
       "cat /pinetrie-states/conflicts/a.txt/theirs",
@@ -217,8 +231,12 @@ async function folderSection(
       },
       { text: "resolved" },
     ])
-    await wu.send("@agent resolve", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent resolve", at(laneTip(lane)), { thread: lane }),
+      300_000,
+    )
+    await wh.quiet()
     const resolved = toolResults(lane).at(-1) ?? ""
     check(
       "resolve_conflict writes the version chosen, and its versions go",
@@ -238,8 +256,12 @@ async function folderSection(
       { tool: "write", args: { path: "f.txt", content: "lane's f\n" } },
       { text: "wrote f" },
     ])
-    await wu.send("@agent write f", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent write f", at(laneTip(lane)), { thread: lane }),
+      300_000,
+    )
+    await wh.quiet()
     const beforeF = newestOf()
     writeFileSync(path.join(dir, "f.txt"), "yours f\n")
     await waitFor(() => newestOf() !== beforeF, 60_000)
@@ -247,10 +269,14 @@ async function folderSection(
       { tool: GET_LATEST_TOOL, args: {} },
       { text: "conflicted on f" },
     ])
-    await wu.send("@agent catch up with f", at(laneTip(lane)), {
-      thread: lane,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent catch up with f", at(laneTip(lane)), {
+        thread: lane,
+      }),
+      300_000,
+    )
+    await wh.quiet()
     const open = () =>
       readConflicts(wh.session)
         .filter(c => c.lane === lane)
@@ -373,8 +399,12 @@ async function folderSection(
       { tool: "write", args: { path: "d.txt", content: "lane's d\n" } },
       { text: "wrote d" },
     ])
-    await wu.send("@agent write d", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent write d", at(laneTip(lane)), { thread: lane }),
+      300_000,
+    )
+    await wh.quiet()
     await waitFor(() => openWith("d.txt") !== undefined, 60_000)
     writeFileSync(path.join(dir, "e.txt"), "yours, since the review\n")
     const refused = await wu.proposed(lane, "accept", "")

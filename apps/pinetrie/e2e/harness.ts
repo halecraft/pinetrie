@@ -221,6 +221,90 @@ export const noQueued = (host: Pick<RunningHost, "places">): boolean =>
 export const idleNow = (host: Pick<RunningHost, "live" | "places">): boolean =>
   Object.keys(host.live.activeRuns()).length === 0 && noQueued(host)
 
+/** Where a wait after a send stands, from the send's outcome and the host. */
+export type SendWait =
+  | { readonly kind: "waiting" }
+  | { readonly kind: "settled" }
+  | { readonly kind: "started-nothing"; readonly outcome: Outcome }
+
+/**
+ * A send that starts a run is answered only once the host holds the run as
+ * active, so idle after `started` means that run, and any it set off, has
+ * ended. Any outcome but a run, a message appended or a card queued started
+ * nothing to wait for: an idle wait after it would end at once, and the
+ * checks after it would read a run that never was.
+ */
+export const sendWait = (outcome: Outcome, idle: boolean): SendWait =>
+  outcome.kind === "started" ||
+  outcome.kind === "appended" ||
+  outcome.kind === "queued"
+    ? idle
+      ? { kind: "settled" }
+      : { kind: "waiting" }
+    : { kind: "started-nothing", outcome }
+
+/**
+ * Whether what a watch waited for is over: a run has begun since it
+ * started, and the host is idle. A send typed into a page reaches the host
+ * after the click returns, so an idle host alone may be one that has not had
+ * the message yet.
+ */
+export const isWatchedRunOver = (begun: number, idle: boolean): boolean =>
+  begun > 0 && idle
+
+/**
+ * A watch on `host`'s runs from now, made before a page sends: `over` waits
+ * until a run has begun since, and the host is idle again. A run that
+ * begins and ends between two polls is still seen, by the subscription.
+ */
+export function watchRuns(host: Pick<RunningHost, "live" | "places">): {
+  readonly over: (timeoutMs?: number) => Promise<void>
+} {
+  const begun = new Set<string>()
+  const look = () => {
+    for (const run of Object.values(host.live.activeRuns())) begun.add(run)
+  }
+  const off = subscribe(host.live, look)
+  const now = () => {
+    look()
+    return isWatchedRunOver(begun.size, idleNow(host))
+  }
+  return {
+    over: async (timeoutMs = 60_000) => {
+      try {
+        await waitFor(now, timeoutMs)
+      } finally {
+        off()
+      }
+      if (!now())
+        throw new Error(
+          begun.size === 0
+            ? `no run began within ${timeoutMs} ms of the send`
+            : `the host was still busy ${timeoutMs} ms after a send`,
+        )
+    },
+  }
+}
+
+/**
+ * Wait until what a send set off has ended and `host` is idle. Throws when
+ * the send started nothing, or when the host is still busy at the deadline,
+ * rather than letting the checks after it read a run that is not there.
+ */
+export async function untilSent(
+  host: Pick<RunningHost, "live" | "places">,
+  outcome: Outcome,
+  timeoutMs = 60_000,
+): Promise<void> {
+  const now = () => sendWait(outcome, idleNow(host))
+  await waitFor(() => now().kind !== "waiting", timeoutMs)
+  const at = now()
+  if (at.kind === "started-nothing")
+    throw new Error(`the send started nothing: ${JSON.stringify(at.outcome)}`)
+  if (at.kind === "waiting")
+    throw new Error(`the host was still busy ${timeoutMs} ms after a send`)
+}
+
 /**
  * A project for a host with tools: a jj repo, colocated with git, with
  * `files` committed. A lane starts from your committed work (`@-`), so what

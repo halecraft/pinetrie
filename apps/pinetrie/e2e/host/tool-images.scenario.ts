@@ -16,10 +16,9 @@ import {
   held,
   heldLanes,
   heldTree,
-  idleNow,
   START_AGENT,
   suiteClock,
-  waitFor,
+  untilSent,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
@@ -52,7 +51,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       })
     let section = await start()
     let th = section.host
-    const tidle = () => waitFor(() => idleNow(th), 30_000)
     const readCall = () => {
       const tree = heldTree(th)
       const spine = projectSpine(
@@ -97,8 +95,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { tool: "read", args: { path: "shot.png" } },
       { text: "a red square" },
     ])
-    await tu.send("what is in shot.png?", ROOT, START_AGENT)
-    await tidle()
+    await untilSent(
+      th,
+      await tu.send("what is in shot.png?", ROOT, START_AGENT),
+      30_000,
+    )
     const call = readCall()
     const served = await fetch(`${th.httpUrl}blob/${red}`)
     check(
@@ -130,10 +131,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const tv = section.user
     script.use([{ text: "still red" }])
     const tip = heldLanes(th, heldTree(th), readPlaces(th.places))[0]
-    await tv.send("@agent and now?", at(tip?.tip ?? null), {
-      thread: tip?.name,
-    })
-    await tidle()
+    await untilSent(
+      th,
+      await tv.send("@agent and now?", at(tip?.tip ?? null), {
+        thread: tip?.name,
+      }),
+      30_000,
+    )
     await th.quiet()
     await section.close()
   }

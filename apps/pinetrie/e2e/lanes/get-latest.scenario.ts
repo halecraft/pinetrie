@@ -17,11 +17,11 @@ import {
   heldLanes,
   heldRootRecords,
   heldTree,
-  idleNow,
   join,
   laneHolding,
   START_AGENT,
   setUpAccepted,
+  untilSent,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, type LaneHosts } from "../lane-hosts.ts"
@@ -54,10 +54,6 @@ async function getLatestSection(
   const wu = await join(wh, "uma", "get-latest")
   await wu.request({ kind: "name", name: "Uma" })
   const tree = () => heldTree(wh)
-  const idle = async () => {
-    await waitFor(() => idleNow(wh), 180_000)
-    await wh.quiet()
-  }
   const laneTip = (lane: ThreadId) =>
     heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
@@ -83,8 +79,12 @@ async function getLatestSection(
       { tool: "bash", args: { command: "echo lane > lane.txt" } },
       { text: "started" },
     ])
-    await wu.send("@agent start", ROOT, START_AGENT)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent start", ROOT, START_AGENT),
+      180_000,
+    )
+    await wh.quiet()
     const lane = laneWith("@agent start")?.name
     if (lane === undefined) throw new Error("no lane")
 
@@ -103,8 +103,12 @@ async function getLatestSection(
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "caught up" },
     ])
-    await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane }),
+      180_000,
+    )
+    await wh.quiet()
     const results = toolResults(lane)
     // The turn that called it records the merge: a branch
     // there starts with the merged file.
@@ -128,8 +132,12 @@ async function getLatestSection(
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "branched" },
     ])
-    await wu.send("@agent branch at the catch-up", at(call ?? null), BRANCH)
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent branch at the catch-up", at(call ?? null), BRANCH),
+      180_000,
+    )
+    await wh.quiet()
     const branched = laneWith("@agent branch at the catch-up")?.name
     check(
       "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",

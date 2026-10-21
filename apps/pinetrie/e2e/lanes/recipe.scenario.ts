@@ -27,12 +27,11 @@ import {
   heldLanes,
   heldRootRecords,
   heldTree,
-  idleNow,
   join,
   laneHolding,
   START_AGENT,
   setUpAccepted,
-  waitFor,
+  untilSent,
 } from "../harness.ts"
 import { cleanUp, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
@@ -69,10 +68,6 @@ async function recipeSection(
   const wu = await join(wh, "uma", "recipe")
   await wu.request({ kind: "name", name: "Uma" })
   const tree = () => heldTree(wh)
-  const idle = async () => {
-    await waitFor(() => idleNow(wh), 180_000)
-    await wh.quiet()
-  }
   const laneTip = (lane: ThreadId) =>
     heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
@@ -108,8 +103,8 @@ async function recipeSection(
     how: Parameters<typeof wu.send>[2] = START_AGENT,
   ) => {
     script.use([{ tool: "bash", args: { command } }, { text: "done" }])
-    await wu.send(text, where, how)
-    await idle()
+    await untilSent(wh, await wu.send(text, where, how), 180_000)
+    await wh.quiet()
     return laneWith(text)
   }
 
@@ -132,10 +127,14 @@ async function recipeSection(
       { text: "wrote them" },
     ])
     const earlier = recordsOf(first).length
-    await wu.send("@agent build, and write .env", at(laneTip(first)), {
-      thread: first,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent build, and write .env", at(laneTip(first)), {
+        thread: first,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     // Each tool call is a turn of its own, with its own record.
     const wrote = recordsOf(first).slice(earlier)
     const derived = wrote.flatMap(r => r.disk?.derived.paths ?? [])
@@ -171,10 +170,14 @@ async function recipeSection(
       { tool: "bash", args: { command: `${GONE}; ls .store` } },
       { text: "caught up" },
     ])
-    await wu.send("@agent get the latest", at(laneTip(first)), {
-      thread: first,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent get the latest", at(laneTip(first)), {
+        thread: first,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     const after = lastResult(first)
     check(
       "getting the latest after what a recipe read changed removes what it made, and keeps its cache",
@@ -199,15 +202,23 @@ async function recipeSection(
       { tool: "bash", args: { command: "printf 'a\\n' > pkgs.txt" } },
       { text: "built, then changed" },
     ])
-    await wu.send("@agent build, then drop package b", at(laneTip(first)), {
-      thread: first,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent build, then drop package b", at(laneTip(first)), {
+        thread: first,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     script.use([{ tool: "bash", args: { command: GONE } }, { text: "looked" }])
-    await wu.send("@agent which outputs now?", at(laneTip(first)), {
-      thread: first,
-    })
-    await idle()
+    await untilSent(
+      wh,
+      await wu.send("@agent which outputs now?", at(laneTip(first)), {
+        thread: first,
+      }),
+      180_000,
+    )
+    await wh.quiet()
     check(
       "a run starts without the outputs of a recipe whose input changed since",
       lastResult(first).trim() === "checked",
