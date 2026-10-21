@@ -17,12 +17,12 @@ import type { Scenario } from "../scenario.ts"
 
 import {
   asPerson,
+  chooseDensity,
   chooseFromMenu,
   col,
   launchBrowser,
   openProfile,
   PANE_VIEWPORT,
-  readRaw,
   typeAfter,
 } from "./page.ts"
 
@@ -565,7 +565,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const say = async (text: string, reply: string) => {
           await typeAfter(ip, `${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)
-          await readRaw(ip)
+          await chooseDensity(ip, 0, "raw")
           await ip
             .waitForFunction(
               ([c, r]) =>

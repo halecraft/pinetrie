@@ -46,7 +46,6 @@ import {
   type ColumnFacts,
   type ColumnShows,
   columnView,
-  type HeadIdentity,
   handleTitle,
   headLine,
   identityWords,
@@ -332,8 +331,8 @@ describe("columnView: the header", () => {
         work: work({ revisions: OWNERS, names: NAMES, focuses }),
       }),
     )
-    expect(shows.head.identity).toMatchObject({
-      kind: "agent",
+    expect(shows.head.line).toEqual({
+      kind: "focus",
       focus: { kind: "model", text: "Planning the billing page" },
     })
   })
@@ -358,8 +357,8 @@ describe("columnView: the header", () => {
         ]),
       }),
     )
-    expect(shows.head.identity).toMatchObject({
-      kind: "agent",
+    expect(shows.head.line).toMatchObject({
+      kind: "status",
       status: {
         level: "worth-a-read",
         quiet: false,
@@ -382,8 +381,6 @@ describe("columnView: the header", () => {
     expect(about({ createsLane: true }).head.identity).toEqual({
       kind: "agent",
       name: COPPER,
-      focus: null,
-      status: null,
       icon: { kind: "banner", url: `/blob/${sha}`, fade: true },
     })
     expect(about({ createsLane: false }).head.identity).toEqual({
@@ -643,16 +640,6 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
 })
 
 describe("headLine: what shows under a column's line", () => {
-  const agent = (
-    status: ColumnStatus | null,
-    focus: ThreadFocus | null,
-  ): HeadIdentity => ({
-    kind: "agent",
-    name: AMBER,
-    focus,
-    status,
-    icon: null,
-  })
   const status = (quiet: boolean): ColumnStatus => ({
     level: "needs-you",
     quiet,
@@ -662,16 +649,15 @@ describe("headLine: what shows under a column's line", () => {
   })
   const focus: ThreadFocus = { kind: "model", text: "Fixing the sync bug" }
   test("a raised status, else the focus; never a quiet status, which leaves the focus shown", () => {
-    expect(headLine(agent(status(false), focus))).toEqual({
+    expect(headLine(status(false), focus)).toEqual({
       kind: "status",
       status: status(false),
     })
-    expect(headLine(agent(status(true), focus))).toEqual({
+    expect(headLine(status(true), focus)).toEqual({
       kind: "focus",
       focus,
     })
-    expect(headLine(agent(null, null))).toEqual({ kind: "none" })
-    expect(headLine({ kind: "none" })).toEqual({ kind: "none" })
+    expect(headLine(null, null)).toEqual({ kind: "none" })
   })
 })
 
@@ -1385,8 +1371,6 @@ describe("identityWords", () => {
       {
         kind: "agent",
         name: "amber-fox" as ThreadName,
-        focus: null,
-        status: null,
         icon: null,
       },
       "amber-fox",

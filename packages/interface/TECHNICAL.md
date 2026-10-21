@@ -828,10 +828,10 @@ pending.
 - **`standingRunEnds` is the one rule for a run-end report**: each thread's
   report that asks something of you (`attentionLevel`), for its followers,
   while its lane is idle and its canvas not archived, and whether it is
-  still `raised`. `attentionItems` keeps the raised ones; a column's status
-  line (`columnStatus`, on `HeadIdentity`'s agent case) shows any, `quiet`
-  once read or dismissed, first in the column's details (ADR-0200). So the
-  sidebar and the column cannot disagree.
+  still `raised`. `attentionItems` keeps the raised ones; a named column's
+  `columnStatus` reads any, and `headLine` draws its reason under the line
+  while raised, the focus once it is `quiet` (read or dismissed, ADR-0203).
+  So the sidebar and the column cannot disagree.
   The line's words are `reasonedWords`: the level's signal words, then
   `attentionWords`' reason, as every status's title is (`statusWords`,
   *Signals*). Selector: `.head-status[data-level]`, with `data-quiet`.
@@ -1061,7 +1061,7 @@ two in one call, which the page's message list and `apps/tui` make, with
   (`aria-pressed`), `.ask-work[data-ask-of]`, `.ask-fold` (`aria-expanded`,
   `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-headline`, `.ask-digest`,
   `.ask-outcome`, `.ask-bar` (`data-ask`, `data-where`), `.left-line`.
-  The browser suite reads finished work raw (`readRaw`).
+  The browser suite reads finished work raw (`chooseDensity`).
 
 ## A proposal's card (`proposal-view.ts`, ADR-0157)
 
@@ -1467,9 +1467,9 @@ composer*).
   (`IconLookup`) that the glances and the list share. `ThreadIcon.kind` says how it is drawn: a
   `banner` on black, blended off; a `built-in` sprite on a transparent
   ground, unblended.
-- **The header's focus is its named agent's thread's, by type** (ADR-0173):
-  `HeadIdentity`'s `agent` case carries `focus`, as it carries its icon,
-  so a chat or a pending column has none. `threadFocus` (`thread-face.ts`)
+- **The header's focus is its named agent's thread's** (ADR-0173):
+  `columnView` reads it, and the run-end status, only for `HeadIdentity`'s
+  `agent` case, so a chat or a pending column shows neither. `threadFocus` (`thread-face.ts`)
   is the one place its words are decided: the thread's `FocusRecord`, a
   model's (`kind: "model"`), else the first line of how the thread began
   (`threadOpening`, `kind: "opening"`), else null. The header, a thread's

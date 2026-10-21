@@ -309,9 +309,19 @@ export const mutations: readonly Mutation[] = [
       "resolve and send queues your message with getting the latest, while the thread conflicts",
   },
   {
+    name: "the dock's ⋯ drops the changes while their row is not drawn",
+    file: "packages/web/dock.tsx",
+    from: "  const changes = p.strip === null ? null : workStripMenu(p.strip, p.onStrip)",
+    to: "  const changes =\n    !p.stripShown || p.strip === null ? null : workStripMenu(p.strip, p.onStrip)",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "with nothing to accept, the dock draws no changes row and its ⋯ still offers getting the latest",
+  },
+  {
     name: "the dock draws no changes row",
     file: "packages/web/dock.tsx",
-    from: "          {p.strip !== null && (\n            <WorkStripView",
+    from: "          {row !== null && (\n            <WorkStripView",
     to: "          {false && (\n            <WorkStripView",
     suite: "browser",
     scenario: "tools",

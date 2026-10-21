@@ -360,16 +360,6 @@ export const col = (n: number) => `.column[data-position="${n}"]`
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
 /**
- * Read column `n` raw: every message and tool row, which the
- * checks written before densities look at once a run has ended. A column
- * opens in story, folding each ask's work; the choice is kept with it. Its
- * control appears with its first message.
- */
-export async function readRaw(p: Page, n = 0): Promise<void> {
-  await chooseDensity(p, n, "raw")
-}
-
-/**
  * Read column `n` at `density`, from its ⋯'s reading choices, which a column
  * offers once it has a message. Nothing when it reads so already.
  */

@@ -107,8 +107,13 @@ export function Dock(p: {
   latestSources: LatestSources
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
-  /** The changes row, while it has something to say or do (`DockShows`); null otherwise. */
+  /**
+   * The thread's proposed changes (`DockShows`): their commands are the
+   * ⋯'s whether or not the row is drawn; null for none.
+   */
   strip: WorkStrip | null
+  /** The changes row is drawn: it has something to say or do (`workStripShown`). */
+  stripShown: boolean
   /** What a press on a changes button does (`actOnProposedChanges`). */
   onStrip: (button: WorkStripButton) => void
   /** The changes' review, in the column's pane. */
@@ -159,6 +164,8 @@ export function Dock(p: {
           },
         ]),
   ]
+  const row = p.stripShown ? p.strip : null
+  const headShown = (head !== null && plan !== null) || menu.length > 0
   const addToQueue = () => {
     if (lane === null || p.queueAt === null) return
     p.onAct({
@@ -175,12 +182,12 @@ export function Dock(p: {
       className="dock"
       data-next={mark?.kind === "message" ? "message" : undefined}
     >
-      {(p.strip !== null || (head !== null && plan !== null)) && (
+      {(row !== null || headShown) && (
         <div className="dock-head">
-          {p.strip !== null && (
-            <WorkStripView act={p.onStrip} review={p.review} strip={p.strip} />
+          {row !== null && (
+            <WorkStripView act={p.onStrip} review={p.review} strip={row} />
           )}
-          {((head !== null && plan !== null) || menu.length > 0) && (
+          {headShown && (
             <div className="queue-head" data-next={mark?.kind}>
               {head !== null && plan !== null && (
                 <>

@@ -202,10 +202,6 @@ export type HeadIdentity =
   | {
       readonly kind: "agent"
       readonly name: ThreadName
-      /** What the thread is doing now (`threadFocus`); null for none yet. */
-      readonly focus: ThreadFocus | null
-      /** What its last run needs from you (`columnStatus`); null for nothing. */
-      readonly status: ColumnStatus | null
       /** Its icon (`threadIcon`); only a named agent's header draws one. */
       readonly icon: HeadIcon | null
     }
@@ -240,10 +236,15 @@ export type HeadLine =
   | { readonly kind: "focus"; readonly focus: ThreadFocus }
   | { readonly kind: "none" }
 
-/** `identity`'s line under the header (`HeadLine`). */
-export function headLine(identity: HeadIdentity): HeadLine {
-  if (identity.kind !== "agent") return { kind: "none" }
-  const { status, focus } = identity
+/**
+ * The line under a named thread's header (`HeadLine`), from what its last
+ * run needs from you (`columnStatus`) and what it is doing now
+ * (`threadFocus`).
+ */
+export function headLine(
+  status: ColumnStatus | null,
+  focus: ThreadFocus | null,
+): HeadLine {
   if (status !== null && !status.quiet) return { kind: "status", status }
   return focus === null ? { kind: "none" } : { kind: "focus", focus }
 }
@@ -383,7 +384,11 @@ interface HeadShows {
 
 /** What a column's dock does with the thread's work. */
 interface DockShows {
-  /** The thread's proposed changes; null for a column with no lane of its own that it may write. */
+  /**
+   * The thread's proposed changes; null for a column with no lane of its
+   * own that it may write. Their commands are the dock ⋯'s even while the
+   * row is not drawn: catching up, with nothing to accept, is only there.
+   */
   readonly strip: WorkStrip | null
   /** The dock draws them as its changes row: they have something to say or do (`workStripShown`). */
   readonly shown: boolean
@@ -441,20 +446,24 @@ export function columnView(f: ColumnFacts): ColumnShows {
   const head = headLane(lane, f.createsLane, f.thread)
   const parent =
     lane.kind === "lane" ? parentOfLane(index, work, f.lanes, lane.name) : null
-  const identity = identityOf(
-    head,
-    f.createsLane,
-    work.names,
-    thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
-    thread => threadFocus({ focuses: work.focuses, index, thread }),
-    thread =>
-      columnStatus(f.runEnds.get(thread), w => displayName(w, f.nameOf.get(w))),
+  const identity = identityOf(head, f.createsLane, work.names, thread =>
+    shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
   )
+  // Only a named thread's header says what it is doing or needs.
+  const line: HeadLine =
+    identity.kind !== "agent" || head === null
+      ? { kind: "none" }
+      : headLine(
+          columnStatus(f.runEnds.get(head), w =>
+            displayName(w, f.nameOf.get(w)),
+          ),
+          threadFocus({ focuses: work.focuses, index, thread: head }),
+        )
   const strip = workStrip(f, parent)
   return {
     head: {
       identity,
-      line: headLine(identity),
+      line,
       origin: originOf(f, stretches),
       access:
         head === null
@@ -599,16 +608,14 @@ export function handleTitle(
 }
 
 /**
- * `head` is `headLane`'s. Only a named agent carries a status, an icon and
- * a focus: pending, the header shows ✦ alone, and a chat's names no thread.
+ * `head` is `headLane`'s. Only a named agent carries an icon: pending, the
+ * header shows ✦ alone, and a chat's names no thread.
  */
 function identityOf(
   head: ThreadId | null,
   createsLane: boolean,
   names: ReadonlyMap<ThreadId, ThreadName>,
   iconOf: (thread: ThreadId) => HeadIcon | null,
-  focusOf: (thread: ThreadId) => ThreadFocus | null,
-  statusOf: (thread: ThreadId) => ColumnStatus | null,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
   const name = names.get(head)
@@ -616,8 +623,6 @@ function identityOf(
   return {
     kind: "agent",
     name,
-    focus: focusOf(head),
-    status: statusOf(head),
     icon: iconOf(head),
   }
 }

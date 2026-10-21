@@ -1079,7 +1079,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   buttons, which act at once; the rest
   ("get the latest from accepted work", "rewrite description") are the
   dock ⋯'s `changes` section (`workStripMenu`, each item `.work-<button>`).
-  The dock draws it while `workStripShown`. What the lane runs
+  The dock draws the row while `workStripShown`; its ⋯ holds the strip's
+  commands either way, since with nothing to accept getting the latest is
+  only there. What the lane runs
   now (`laneActivity`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
@@ -1968,7 +1970,7 @@ ADR-0203). What made each step cheap or dear:
   spacer included.
 - **A message folded into an ask's work is not drawn**, so it has no
   `.msg[data-entry]` until its fold opens: a check on a finished run's
-  work reads the column raw (`readRaw`), or opens the fold.
+  work reads the column raw (`chooseDensity`), or opens the fold.
 - **A streaming reply is a `.msg` with no `data-entry`**, as a waiting message
   is. Anything that means "a message in the tree" looks for
   `.msg[data-entry]`; the browser suite counts the agent's steps by

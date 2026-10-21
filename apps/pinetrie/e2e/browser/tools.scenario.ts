@@ -68,7 +68,6 @@ import {
   openFromBoard,
   PANE_VIEWPORT,
   railCount,
-  readRaw,
   recordFrames,
   seeInMenu,
   stepAway,
@@ -93,7 +92,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   try {
     // ── asks: each ask's work folds, and the rail opens it ────────────────
     // The column is read in story, as a new one opens. A column is read raw
-    // in the blocks below (`readRaw`).
+    // in the blocks below (`chooseDensity`).
     {
       const script = scriptedModel({ tokensPerSecond: 400 })
       const asks = await lanes.sectionHost({
@@ -685,7 +684,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const say = async (text: string) => {
           await typeAfter(tp, `${col(0)} .composer .input`, text)
           await tp.click(`${col(0)} .composer .send`)
-          await readRaw(tp)
+          await chooseDensity(tp, 0, "raw")
         }
         const toolIdle = () => waitFor(() => idleNow(toolHost))
         const appears = (sel: string, timeout = 20_000) =>
@@ -764,7 +763,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         // Sent as typed above, after the new canvas's `@agent `.
         await tp.click(`${col(0)} .composer .send`)
-        await readRaw(tp)
+        await chooseDensity(tp, 0, "raw")
         const streamed = await tp
           .waitForFunction(
             c => {
@@ -793,6 +792,32 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("quick")
         await toolIdle()
+
+        // Nothing to accept: the changes row is not drawn, and its commands
+        // are still the dock's ⋯'s.
+        {
+          // While the run's end reaches the page, the row says it works.
+          const rowHidden = await tp
+            .waitForSelector(`${col(0)} .dock [data-role="changes"]`, {
+              state: "detached",
+              timeout: 10_000,
+            })
+            .then(
+              () => true,
+              () => false,
+            )
+          const catchUp = await seeInMenu(
+            tp,
+            `${col(0)} [data-role="dock-menu"]`,
+            ".work-update",
+          ).catch(() => null)
+          await tp.keyboard.press("Escape")
+          check(
+            "with nothing to accept, the dock draws no changes row and its ⋯ still offers getting the latest",
+            rowHidden && catchUp !== null,
+            JSON.stringify({ rowHidden, catchUp: catchUp !== null }),
+          )
+        }
 
         // Eight ticks, each four lines after it, fed as the steps read them.
         const ticking = newGate("tick")

@@ -1258,7 +1258,8 @@ export function Column(p: ColumnProps) {
                 </div>
               )}
               <Dock
-                strip={shows.dock.shown ? shows.dock.strip : null}
+                strip={shows.dock.strip}
+                stripShown={shows.dock.shown}
                 onStrip={actOnProposedChanges}
                 review={{
                   id: paneId,

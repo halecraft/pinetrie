@@ -3115,8 +3115,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's header carries no status line",
     file: "packages/interface/column-view.ts",
-    from: "    status: statusOf(head),",
-    to: "    status: null,",
+    from: "          columnStatus(f.runEnds.get(head), w =>",
+    to: "          columnStatus(undefined, w =>",
     command: unit,
     expect: "a thread whose last run needs you says so in its header",
   },
