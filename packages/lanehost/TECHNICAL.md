@@ -90,7 +90,8 @@ host, whatever their projects.
   - What was at a path before is read in the kernel: an open's from
     `FMODE_CREATED`, a path call's from its dentry's inode. An open whose
     lookup finds nothing never reaches `security_file_open`: it is seen at
-    `do_filp_open`'s return, its name joined to the caller's directory.
+    `do_file_open`'s return (`do_filp_open` before 7.0), its name joined
+    to the caller's directory.
   - A run ends when its last task has exited and its last written file
     been let go of (`live` counts both): an exit releases its files after
     its tracepoint.
@@ -245,6 +246,14 @@ host, whatever their projects.
     that returns at once for a pipe no run's. Nothing suggests they are
     slow; a report of slow pipes on a host with the observer is the reason
     to measure.
+  - **A kernel function renamed upstream is attached by either name**
+    (`RENAMED` in the loader): a program's section names the newer, and
+    the loader attaches it, not the skeleton, trying the older when the
+    newer is missing. A file program that attaches to neither stops the
+    loader, as any file program's failure does. **Gotcha: the skeleton
+    attaches by the section's name alone**, so a hook whose function a
+    kernel renames stops the loader on that kernel until it is listed
+    there.
   - **The loader** attaches the `attr_*` programs itself and prints `hook
     <name> attached|missing` for each before `ready`; one the kernel cannot
     load is left out, so file tracking loads whatever attribution's fate.

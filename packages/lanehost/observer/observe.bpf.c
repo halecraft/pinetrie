@@ -191,7 +191,7 @@ struct opening {
   int flags;
 };
 
-// An open in progress by a tagged task, from do_filp_open's entry to its return.
+// An open in progress by a tagged task, from do_file_open's entry to its return.
 struct {
   __uint(type, BPF_MAP_TYPE_HASH);
   __uint(max_entries, 1 << 16);
@@ -556,7 +556,7 @@ int BPF_KPROBE(on_open, struct file *file) {
   if (!t) return 0;
   struct run_key run = t->run;
   u32 tid = current_tid();
-  // The open succeeded as far as its lookup: do_filp_open's return need not report it.
+  // The open succeeded as far as its lookup: do_file_open's return need not report it.
   bpf_map_delete_elem(&openings, &tid);
   struct event *e = begin(EV_OPEN, &run);
   if (!e) return 0;
@@ -578,9 +578,11 @@ int BPF_KPROBE(on_open, struct file *file) {
 }
 
 // Every open's lookup, kept until its return: one that finds nothing never
-// reaches security_file_open, and is reported there.
-SEC("kprobe/do_filp_open")
-int BPF_KPROBE(on_filp_open, int dfd, struct filename *name, const struct open_flags *op) {
+// reaches security_file_open, and is reported there. Before 7.0 the kernel
+// names it `do_filp_open`, with the same arguments: the loader attaches this
+// and its return to whichever exists.
+SEC("kprobe/do_file_open")
+int BPF_KPROBE(on_lookup, int dfd, struct filename *name, const struct open_flags *op) {
   if (!current_tag()) return 0;
   u32 tid = current_tid();
   struct opening o = {.name = (u64)name, .dfd = dfd, .flags = BPF_CORE_READ(op, open_flag)};
@@ -604,8 +606,8 @@ static __always_inline struct file *fd_file(int fd) {
 
 // A lookup that found nothing: an open of a missing path, named as the call
 // named it, joined to its directory's path.
-SEC("kretprobe/do_filp_open")
-int BPF_KRETPROBE(on_filp_open_ret, long ret) {
+SEC("kretprobe/do_file_open")
+int BPF_KRETPROBE(on_lookup_ret, long ret) {
   u32 tid = current_tid();
   struct opening *o = bpf_map_lookup_elem(&openings, &tid);
   if (!o) return 0;

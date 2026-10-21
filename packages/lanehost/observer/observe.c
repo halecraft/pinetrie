@@ -615,9 +615,50 @@ static int fail(const char *step, int err) {
 
 static int is_attribution(const struct bpf_program *p) { return strncmp(bpf_program__name(p), "attr_", 5) == 0; }
 
+// Kernel functions a program attaches to that kernels before a release name
+// otherwise: its section names the newer, and the loader tries both.
+static const struct {
+  const char *name;
+  const char *before;
+} RENAMED[] = {
+    {"anon_pipe_write", "pipe_write"},  // 6.15
+    {"do_file_open", "do_filp_open"},   // 7.0
+};
+
+// The kernel function the program's section names.
+static const char *section_function(const struct bpf_program *p) {
+  const char *fn = strchr(bpf_program__section_name(p), '/');
+  return fn ? fn + 1 : "";
+}
+
+static const char *older_name(const char *fn) {
+  for (size_t i = 0; i < sizeof RENAMED / sizeof RENAMED[0]; i++)
+    if (strcmp(fn, RENAMED[i].name) == 0) return RENAMED[i].before;
+  return NULL;
+}
+
+// The program attached at its section's function, or at that function's
+// older name; null, with errno set, when the kernel has neither.
+static struct bpf_link *attach_kprobe_either_name(struct bpf_program *p) {
+  const char *fn = section_function(p);
+  int ret = strncmp(bpf_program__section_name(p), "kretprobe/", 10) == 0;
+  struct bpf_link *link = bpf_program__attach_kprobe(p, ret, fn);
+  const char *before = older_name(fn);
+  if (!link && before) link = bpf_program__attach_kprobe(p, ret, before);
+  return link;
+}
+
+// A file program the skeleton cannot attach, as its function may have
+// either name.
+static int is_renamed_file_program(const struct bpf_program *p) {
+  return !is_attribution(p) && older_name(section_function(p));
+}
+
 // The skeleton opened and loaded. Attribution's programs are attached by
-// `attach_attribution`, never by the skeleton; ones the kernel cannot load
-// are left out, so file tracking loads whatever attribution's fate.
+// `attach_attribution`, and renamed functions' file programs by
+// `attach_renamed`, never by the skeleton; attribution's programs the
+// kernel cannot load are left out, so file tracking loads whatever
+// attribution's fate.
 static int load(unsigned ring_kib, unsigned output_kib, int with_attribution) {
   skel = observe_bpf__open();
   if (!skel) return -errno;
@@ -625,6 +666,7 @@ static int load(unsigned ring_kib, unsigned output_kib, int with_attribution) {
   bpf_map__set_max_entries(skel->maps.output_events, output_kib << 10);
   struct bpf_program *p;
   bpf_object__for_each_program(p, skel->obj) {
+    if (is_renamed_file_program(p)) bpf_program__set_autoattach(p, false);
     if (!is_attribution(p)) continue;
     bpf_program__set_autoattach(p, false);
     if (!with_attribution) bpf_program__set_autoload(p, false);
@@ -637,21 +679,25 @@ static int load(unsigned ring_kib, unsigned output_kib, int with_attribution) {
   return err;
 }
 
+// The file programs `load` kept from the skeleton's attach. Their links
+// last as long as the loader.
+static int attach_renamed(void) {
+  struct bpf_program *p;
+  bpf_object__for_each_program(p, skel->obj) {
+    if (!is_renamed_file_program(p)) continue;
+    if (!attach_kprobe_either_name(p)) return -errno;
+  }
+  return 0;
+}
+
 // Each attribution program attached to the kernel function its section
-// names, and reported by that name: `attr_pipe_write` falls back to the
-// name kernels before 6.15 give the function.
+// names, or that function's older name, and reported by the section's.
 static void attach_attribution(int loaded) {
   struct bpf_program *p;
   bpf_object__for_each_program(p, skel->obj) {
     if (!is_attribution(p)) continue;
-    const char *fn = strchr(bpf_program__section_name(p), '/');
-    fn = fn ? fn + 1 : "";
-    struct bpf_link *link = NULL;
-    if (loaded) {
-      link = bpf_program__attach_kprobe(p, false, fn);
-      if (!link && strcmp(fn, "anon_pipe_write") == 0) link = bpf_program__attach_kprobe(p, false, "pipe_write");
-    }
-    printf("hook\t%s\t%s\n", fn, link ? "attached" : "missing");
+    struct bpf_link *link = loaded ? attach_kprobe_either_name(p) : NULL;
+    printf("hook\t%s\t%s\n", section_function(p), link ? "attached" : "missing");
   }
 }
 
@@ -678,6 +724,7 @@ int main(int argc, char **argv) {
   }
   if (err) return fail("load", err);
   err = observe_bpf__attach(skel);
+  if (!err) err = attach_renamed();
   if (err) return fail("attach", err);
   attach_attribution(with_attribution);
   struct ring_buffer *rb = NULL;

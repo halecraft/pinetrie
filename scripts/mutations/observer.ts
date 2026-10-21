@@ -50,6 +50,14 @@ export const mutations: readonly Mutation[] = [
   },
   {
     ...kernel,
+    name: "the open lookup's function has no older name",
+    file: loader,
+    from: '    {"do_file_open", "do_filp_open"},   // 7.0\n',
+    to: "",
+    expect: "the loader loads, attaches and is ready on the lane VM's kernel",
+  },
+  {
+    ...kernel,
     name: "a rename's source is reported missing before it",
     file: bpf,
     from: "  e->before = kind_of(BPF_CORE_READ(old_d, d_inode));\n",
