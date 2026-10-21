@@ -6,7 +6,7 @@ Numbered 0196 until 2026-10-20, when two files held that number.
 - **Area:** `docs/01-architecture.md`, `packages/protocol/TECHNICAL.md`,
   `packages/schema/TECHNICAL.md`, `packages/session/TECHNICAL.md`
 - **Evidence:** S3, S19, S21, S28, S75, S264, S289, S290, S291, S292, S293,
-  S294, S295, S296, S297
+  S294, S295, S296, S297, S299
 - **Amends:**
   - ADR-0037: a page keeps a Kyneta store in the browser and reconnects; a
     tab's seat lasts across reloads; a client's work and requests outlast the
@@ -156,8 +156,12 @@ tab gives its seat back; on a plain `http://` LAN address every page
 load is a new seat (S297). pine·trie's invite links are such addresses
 today (`planInvites`, `apps/pinetrie/host/admission.ts`). A page there
 works as it does now, with less held between loads; nothing waits on
-HTTPS. HTTPS comes with the mesh's names (below), not with certificates
-a collaborator must click past.
+HTTPS. No mesh gives a browser with nothing installed HTTPS it trusts
+(S299). A member who runs pine·trie on their own device gets lasting
+seats without a certificate: their device forwards to the host over the
+mesh, and the page at `localhost` is a secure context with Web Locks
+(S299). Trusted HTTPS for a browser alone needs a domain of ours, or
+Tailscale's own service.
 
 *What an authority acts on is an intent log.* A merge after a partition
 reaches a subscriber as its net change: a write added and removed, or
@@ -239,7 +243,9 @@ card's text now (ADR-0037). What that takes, and where it holds (S296):
 
 So intents are signed before peers relay one another's writes. Signing
 removes the table of seats and makes a forged `clientID` harmless. It is
-later work, and until then this holds for honest peers only.
+later work, and until then this holds for honest peers only. A mesh
+proves who is at the other end of a link (S299), but not who wrote each
+operation sent over it, so it does not replace signing.
 
 *A message written against an older tip is taken, framed by what its
 writer had seen.* It is never a branch: a branch is an act of its own.
@@ -364,12 +370,28 @@ grant it again), and a command set on a card.
 
 **Directions, not decided here.**
 
-- **A mesh between hosts** (WireGuard: Headscale, Netbird or Nebula),
-  with Kyneta's WebSocket transport over it and WebRTC for browsers only.
-  Its node keys would prove a principal, so the author check would hold
-  against adversaries on direct links, every member's peer could link to
-  a tether (lifting S293's limit on documents with one writer), and its
-  names would give the host's page HTTPS. It is the next spike (S299).
+- **A mesh between the peers that run pine·trie** (hosts, tethers, a
+  person's devices), with Kyneta's WebSocket transport over it. Measured
+  with Headscale and Tailscale clients, and checked against Nebula
+  (S299):
+  - Kyneta syncs over it as over loopback, and every member dials the
+    tether directly, which lifts S293's limit on documents with one
+    writer for members on the mesh.
+  - The receiving end learns who connected (`tailscale whois` on the
+    source address, or Nebula's certificate), and with an email as a
+    Headscale user that is a pine·trie principal as it is. A spoofed
+    source address is dropped. But Kyneta's `canConnect` sees only the
+    stated principal: refusing a peer that claims another's needs the
+    connection's mesh identity bound to its stated principal, which the
+    probe did by hand. Kyneta's authors are to be asked to pass a
+    transport's verified identity to `canConnect`.
+  - The identity is a device's, shared by every tab and process on it.
+  - Joining asks more than an invite link: an admin's key, or an admin's
+    approval. So browser-only collaborators keep the invite link, and the
+    mesh is for peers that run pine·trie. Whoever runs the coordination
+    server can register a node as any user.
+  - With the coordination server down, running links keep working; a new
+    node cannot join until it is back. It runs over HTTPS.
 - **Three ways things travel**: what is addressed by its content (blobs,
   git objects, derived outputs) from any holder, checked by its hash;
   what merges, over any link; what has one writer, on links to it. Only

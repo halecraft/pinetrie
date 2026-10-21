@@ -1,6 +1,7 @@
 # S299 — can a WireGuard mesh be pine·trie's network and its proof of who a peer is?
 
 - **Status:** Answered
+- **Led to:** ADR-0202
 
 For ADR-0202's first direction. Its spikes found that a document with one
 writer travels only on links to its writer (S293), that the author of an
