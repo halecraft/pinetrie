@@ -377,6 +377,9 @@
         border-top: 4px solid var(--track, var(--slot-pending)); font-size: var(--font-md); color: var(--text-muted); }
       .column-head button { border-radius: 0; padding: 0; }
       .column-head .head-row { display: flex; gap: var(--space-6); align-items: center; min-height: 1.5rem; }
+      /* Takes the row's slack, so what follows it (a search's count, who has
+         seen it, the ⋯) sits at the right edge. */
+      .column-head .head-space { flex: 1; }
       /* The toggle comes first and is centred as a strip's is, from the
          column's left edge, so a fold leaves it under the pointer. */
       .column-head .head-row > :is(.fold, .trash-column):first-child { flex: 0 0 var(--strip-width);
