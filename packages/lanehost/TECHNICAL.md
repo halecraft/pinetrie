@@ -206,6 +206,59 @@ host, whatever their projects.
   connection it opens is a connection of its own to the role (the lane
   observation's `relay`, `observer-client.ts`), so the role owns and
   routes the inner host's lanes by it. Its notices go only to it.
+- **A `bash` call's output is attributed to its statements** (ADR-0204),
+  on types, a ring and a route of their own, so output volume never costs a
+  file event:
+  - **The tag** carries the statement and its line beside the run, taken
+    at `task_newtask` and kept across `exec`. **The right to signal** is
+    the run's first task's from the exec that begins the run, inherited,
+    and cleared at every other exec: only pine·trie's bash and its forks
+    may signal. A signal is a `prctl` of core's `STATEMENT_SIGNAL`, seen at
+    `security_task_prctl`; one from a task without the right is counted
+    against its run (`refusals`, read by the loader's `stats`), never sent.
+  - **A run's pipes are learned at its first accepted signal:** the
+    signalling shell's descriptors 1 and 2, each kept if a FIFO, in
+    `pipes`, and in `pipes_by_run` so the run's end lets them go;
+    `free_pipe_info` lets a freed one go, so its address cannot be
+    attributed to a run that outlives it. The first signal comes before any
+    statement runs, so a run that never signals (`grep`, `find`, pi's
+    `exec`) has no pipes, and its writes cost one map lookup.
+  - **Every byte entering a learned pipe is attributed while its mutex is
+    held** (S283), so the ring's order is the bytes' order: each
+    `copy_page_from_iter` of a write noted at `anon_pipe_write` (`pipe_write`
+    before 6.15), and the buffers between the accounted head and the real
+    one at `pipe_unlock` and `pipe_wait_writable`, every other route's. A
+    writer of another run, or of none, is statement 0, which core decodes
+    as no statement.
+  - **What it cannot place is lost output, counted** (`output_lost`), never
+    guessed: an event the output ring has no room for, buffers a write
+    finds unaccounted, a head behind the accounted one, a copy that does
+    not continue where the last left its iterator.
+  - **Gotcha: a pipe's ring is indexed by the running kernel's stride**
+    (`bpf_core_type_size`), as `numbers` is: `kernel.h`'s `pipe_buffer`
+    declares three fields of the kernel's six, and indexed by its own size
+    it read other slots' lengths. **Gotcha: an emptied slot keeps its old
+    page**, which the next write may reuse, so a copy is a merge into the
+    last buffer only while the pipe holds one.
+  - **The hooks' cost is not measured, by choice.** They run on every pipe
+    write and page copy on the machine, each a kprobe and one map lookup
+    that returns at once for a pipe no run's. Nothing suggests they are
+    slow; a report of slow pipes on a host with the observer is the reason
+    to measure.
+  - **The loader** attaches the `attr_*` programs itself and prints `hook
+    <name> attached|missing` for each before `ready`; one the kernel cannot
+    load is left out, so file tracking loads whatever attribution's fate.
+    `planAttribution` turns the lines into the hello's required
+    `attribution`: on only when every one of `ATTRIBUTION_HOOKS` attached.
+    A test checks each `attr_*` program's kprobe is on that list. It drains
+    every ring of `RINGS` before a flush's `flushed`, and writes consecutive
+    output of one pipe and statement as one `out` line.
+  - **The role sends output only to its lane's owner, by
+    `subscribe-output`**, and holds none for a host gone: a call in flight
+    dies with its host. A host holds output that comes before a call
+    claims its run (`unclaimed.ts`), bounded per lane: past the bound, the
+    claim gets `output-lost`, so the bound makes a call undivided, never
+    short. A run let go of drops its late output.
 - **Under rootless Docker nothing can load it:** a host there is observed
   through its lane's helper when the socket is there (`planObserver`),
   and refuses lanes when it is not.

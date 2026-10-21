@@ -1,0 +1,19 @@
+#!/bin/sh
+# S298's guest: PID 1 on the lane VM's kernel. Runs the patched bash on the
+# command and on the trap's command, then a uprobe on Alpine's stock bash,
+# prints what the driver printed between markers, and powers off.
+export PATH=/bin:/usr/bin
+mount -t devtmpfs dev /dev
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t tmpfs tmp /tmp
+ln -s /proc/self/fd /dev/fd
+printf 'echo "$1"\n' > /tmp/src.sh
+echo "=== run signal main"
+timeout 300 drive signal /bin/bash-pt /cmd.sh 2>&1
+echo "=== run signal trap"
+timeout 60 drive signal /bin/bash-pt /cmd-trap.sh 2>&1
+echo "=== run uprobe main"
+timeout 300 drive uprobe /bin/bash /cmd.sh 2>&1
+echo "=== end"
+poweroff -f

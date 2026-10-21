@@ -39,12 +39,12 @@ test("the files a Containerfile copies in, never another stage's", () => {
   ).toEqual(["a.json", "b.txt", "c.tar"])
 })
 
-test("the default image copies in its daemon.json, so a change to it is a new tag", () => {
+test("the default image copies in its daemon.json and bash's checksums and patch, so a change to one is a new tag", () => {
   expect(
     filesContainerfileCopies(
       readFileSync(here("image", "Containerfile"), "utf8"),
     ),
-  ).toEqual(["daemon.json"])
+  ).toEqual(["bash/SHA256SUMS", "bash/apply.py", "daemon.json"])
 })
 
 test("the default image's tag follows the files it copies in", async () => {
@@ -72,7 +72,11 @@ test("the default image's tag follows the files it copies in", async () => {
     }).pinetrie.tag
   expect(given.map(p => p.tag)).toEqual([runtimeFrom])
   expect(runtimeFrom).toBe(
-    await tagWith([readFileSync(here("image", "daemon.json"), "utf8")]),
+    await tagWith(
+      ["bash/SHA256SUMS", "bash/apply.py", "daemon.json"].map(f =>
+        readFileSync(here("image", f), "utf8"),
+      ),
+    ),
   )
   expect(runtimeFrom).not.toBe(await tagWith([]))
 })

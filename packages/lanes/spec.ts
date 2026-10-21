@@ -2,15 +2,18 @@
 // base's scratch lane), its container's name, its grants, what is attached
 // to it, and where the lane runtime and its jj config are inside it.
 
-import { type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
+import { RUNTIME_SHELL, type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
 
 /**
- * pine·trie's lane runtime, read-only: Node and its libraries, and in
- * `bin/` the static programs core's `RUNTIME_PROGRAMS` lists.
+ * pine·trie's lane runtime, read-only: Node and its libraries, and what
+ * core's `RUNTIME_ENTRIES` lists: in `bin/` the static programs, in
+ * `shell/` pine·trie's bash.
  */
 export const RUNTIME_MOUNT = "/pinetrie-runtime"
 /** The runtime's programs, as a lane sees them: on its `PATH`, last. */
 export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
+/** pine·trie's bash, as a lane sees it: the `bash` tool's shell, off the `PATH`. */
+export const RUNTIME_SHELL_PATH = `${RUNTIME_MOUNT}/${RUNTIME_SHELL}`
 /** The lane's own jj config, on its disk so that forks inherit it. */
 export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pinetrie-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`

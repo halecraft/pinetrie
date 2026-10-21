@@ -3,7 +3,6 @@
 
 import path from "node:path"
 import {
-  createBashTool,
   createEditTool,
   createReadTool,
   createWriteTool,
@@ -37,6 +36,7 @@ import {
   WRITE_TOOL,
 } from "@pinetrie/threads"
 import { bannerTool } from "./banner.ts"
+import { bashTool } from "./bash-tool.ts"
 import { readImageProcessor } from "./images.ts"
 import { type PiTool, requireIntent, TAKES_INTENT } from "./intent.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
@@ -82,7 +82,7 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
     ),
   [EDIT_TOOL]: input =>
     noteConfigWrites(createEditTool(), lane => input.hooks.configWritten(lane)),
-  [BASH_TOOL]: () => createBashTool(),
+  [BASH_TOOL]: () => bashTool(),
   [GREP_TOOL]: () => grepTool(),
   [FIND_TOOL]: () => findTool(),
   [CONFLICT_TOOL]: input =>

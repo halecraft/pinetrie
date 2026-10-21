@@ -31,6 +31,13 @@ const gathering = [
 ]
 const gathered = "packages/lanehost/gathered.ts"
 const client = "packages/lanehost/observer-client.ts"
+const sources = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "packages/lanehost/attribution.test.ts",
+]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -176,8 +183,8 @@ export const mutations: readonly Mutation[] = [
     ...kernel,
     name: "a tagged canvas's exec looks for another run",
     file: bpf,
-    from: "  if (bpf_map_lookup_elem(&tags, &tid)) return 0;\n",
-    to: "",
+    from: "  if (had) {\n    had->may_signal = 0;\n    return 0;\n  }\n",
+    to: "  if (had) had->may_signal = 0;\n",
     expect: "a tagged canvas's exec with another run's number stays in its run",
   },
   {
@@ -202,7 +209,7 @@ export const mutations: readonly Mutation[] = [
     ...kernel,
     name: "a flush answers without draining the ring",
     file: loader,
-    from: "  ring_buffer__consume(rb);\n  int m = run_keys(",
+    from: "  drain(rb);\n  int m = run_keys(",
     to: "  int m = run_keys(",
     expect:
       "a flush is answered after every event its lane's runs made before it",
@@ -503,5 +510,141 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/docker/api.test.ts"],
     expect:
       "the machine role's container is made with its grant and nothing more",
+  },
+  {
+    ...kernel,
+    name: "an attribution hook names a function the kernel lacks",
+    file: bpf,
+    from: 'SEC("kprobe/free_pipe_info")\n',
+    to: 'SEC("kprobe/free_pipe_info_nowhere")\n',
+    expect: "every attribution hook attaches on the lane VM's kernel",
+  },
+  {
+    ...kernel,
+    name: "a run's pipes are never learned",
+    file: bpf,
+    from: "  learn_pipes(&run);\n",
+    to: "",
+    expect:
+      "a run's pipes are learned at its first signal, and a run that never signals has none",
+  },
+  {
+    ...kernel,
+    name: "a pipe's ring is indexed by kernel.h's stride",
+    file: bpf,
+    from: "(u64)i * bpf_core_type_size(struct pipe_buffer)",
+    to: "(u64)i * sizeof(struct pipe_buffer)",
+    expect:
+      "every byte of a call's stdout and stderr is attributed to the statement that wrote it",
+  },
+  {
+    ...kernel,
+    name: "the kernel takes a signal from any task of the run",
+    file: bpf,
+    from: "  if (!t->may_signal || arg2 == 0 || arg2 > 0xffffffffUL) {\n",
+    to: "  if (arg2 == 0 || arg2 > 0xffffffffUL) {\n",
+    expect:
+      "a signal forged by a program or a nested bash is refused and counted, and each statement's own is taken once, within its lines",
+  },
+  {
+    ...kernel,
+    name: "a forked task takes no statement",
+    file: bpf,
+    from: "  t.first = 0;\n",
+    to: "  t.first = 0;\n  t.statement = 0;\n",
+    expect:
+      "a compound command's failed redirection is tagged with its own statement",
+  },
+  {
+    ...kernel,
+    name: "output events go on the disk events' ring",
+    file: bpf,
+    from: "  if (bpf_ringbuf_output(&output_events, e, sizeof *e, 0))",
+    to: "  if (bpf_ringbuf_output(&events, e, sizeof *e, 0))",
+    expect:
+      "an output flood past its ring loses output, counted against its run, and no file event",
+  },
+  {
+    ...kernel,
+    name: "a drain keeps merged output past the flush",
+    file: loader,
+    from: "  ring_buffer__consume(rb);\n  write_pending();\n}\n",
+    to: "  ring_buffer__consume(rb);\n}\n",
+    expect:
+      "output written just before a call returns is in the flush that follows it",
+  },
+  {
+    name: "attribution is on with a hook reported missing",
+    file: policy,
+    from: "    if (!hooks.some(h => h.name === hook && h.attached))\n",
+    to: "    if (!hooks.some(h => h.name === hook))\n",
+    command: unit,
+    expect: "it is off, naming the hook, when any one is missing",
+  },
+  {
+    name: "the role sends no output",
+    file: "packages/lanehost/observer-server.ts",
+    from: '  if (r.kind === "send") connections.get(r.to)?.output?.(output)\n',
+    to: "",
+    command: unit,
+    expect: "a host's lane's notices reach it, and a flush answers after them",
+  },
+  {
+    name: "a relay refuses the output subscription",
+    file: policy,
+    from: '    case "subscribe-output":\n    case "flush":',
+    to: '    case "flush":',
+    command: unit,
+    expect:
+      "a relayed registration is forwarded within the relaying lane, whatever it claimed",
+  },
+  {
+    name: "the bash patch signals with another option",
+    file: "packages/lanes/image/bash/apply.py",
+    from: "#define PT_PRCTL 0x50540001",
+    to: "#define PT_PRCTL 0x50540002",
+    command: sources,
+    expect:
+      "the bash patch signals with core's option, its ordinal then its line",
+  },
+  {
+    name: "the kernel side has a hook the list lacks",
+    file: policy,
+    from: '  "free_pipe_info",\n]',
+    to: "]",
+    command: sources,
+    expect: "every attribution program's kprobe is an attribution hook",
+  },
+  {
+    name: "a claim is not told of output past the bound",
+    file: "packages/lanehost/unclaimed.ts",
+    from: '  lost > 0 ? [{ kind: "output-lost", count: lost }, ...held] : held\n',
+    to: "  held\n",
+    command: gathering,
+    expect: "output past the unclaimed bound reaches its claim as output-lost",
+  },
+  {
+    name: "a released run's late output is held",
+    file: client,
+    from: "  if (lane.released.has(run)) return\n",
+    to: "",
+    command: gathering,
+    expect: "a released run's late output is dropped, not held",
+  },
+  {
+    name: "settle answers without the role's flush",
+    file: client,
+    from: '          await now.call({ kind: "flush" })\n          return SETTLED\n',
+    to: "          return SETTLED\n",
+    command: gathering,
+    expect: "settle answers after the role's flush",
+  },
+  {
+    name: "the kernel's statement 0 decodes as a statement",
+    file: "packages/core/output.ts",
+    from: "  Number.isSafeInteger(n) && n >= 1 ? (n as StatementIndex) : null\n",
+    to: "  Number.isSafeInteger(n) && n >= 0 ? (n as StatementIndex) : null\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/output.test.ts"],
+    expect: "the kernel's statement 0 decodes as no statement",
   },
 ]

@@ -1,7 +1,8 @@
 # The observer's loader (observe.c, with observe.bpf.c in its skeleton),
 # static, for the machine's own architecture; the suite's guest, an
-# initramfs of busybox, the loader and the workloads
-# (apps/pinetrie/e2e/observer); and the machine role's image (`machine`).
+# initramfs of busybox, the loader, the workloads and what the suite gives
+# it as the named context `guest` (pine·trie's bash and its command, from
+# apps/pinetrie/e2e/observer); and the machine role's image (`machine`).
 FROM docker.io/library/alpine:3.23 AS build
 RUN apk add --no-cache clang llvm libbpf-dev bpftool elfutils-dev zlib-static zstd-static zstd-dev linux-headers build-base
 COPY kernel.h observe.h observe.bpf.c observe.c /src/
@@ -14,7 +15,8 @@ RUN arch=$(uname -m | sed 's/aarch64/arm64/; s/x86_64/x86/') \
 FROM build AS suite
 RUN apk add --no-cache busybox-static liburing-dev cpio
 COPY suite/work.c suite/init /suite/
-RUN cc -O2 -Wall -Wextra -static -o /suite/work /suite/work.c -luring -lpthread \
+COPY --from=guest . /guest/
+RUN cc -O2 -Wall -Wextra -static -I/src -o /suite/work /suite/work.c -luring -lpthread \
  && mkdir -p /guest/bin /guest/proc /guest/sys /guest/dev /guest/w /guest/tmp \
  && cp /bin/busybox.static /guest/bin/busybox \
  && for a in $(/bin/busybox.static --list); do ln -sf busybox /guest/bin/$a; done \

@@ -33,12 +33,40 @@ export const LANE_HOME = `${WORKSPACE_ROOT}/${LANE_HOME_PATH}`
 export const SHARED_ENV = "PINETRIE_SHARED"
 
 /**
- * The programs the lane runtime carries into every lane of its own, on its
- * `PATH` whatever the image. Each must be a static build in pinetrie's default
- * image, which the runtime is copied out of.
+ * What the lane runtime carries into every lane of its own, whatever the
+ * image, each a static build in pinetrie's default image, which the runtime
+ * is copied out of. A `program` is on the lane's `PATH`; the `shell`,
+ * pine·trie's bash, is not: it runs the `bash` tool's calls, and a command's
+ * own `bash` stays the image's. Every list of the runtime's contents is
+ * this table's, so none can name an entry the copy leaves out.
  */
-export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
-export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
+export const RUNTIME_ENTRIES = [
+  { kind: "program", name: "jj" },
+  { kind: "program", name: "rg" },
+  { kind: "program", name: "fd" },
+  { kind: "program", name: "sd" },
+  { kind: "shell", name: "bash" },
+] as const
+export type RuntimeEntry = (typeof RUNTIME_ENTRIES)[number]
+export type RuntimeProgram = Extract<RuntimeEntry, { kind: "program" }>["name"]
+
+/** The runtime's programs, from `RUNTIME_ENTRIES`. */
+export const RUNTIME_PROGRAMS: readonly RuntimeProgram[] =
+  RUNTIME_ENTRIES.flatMap(e => (e.kind === "program" ? [e.name] : []))
+
+/** Where an entry is under the runtime: a program in `bin/`, the shell in `shell/`. */
+export const runtimeEntryPath = (entry: RuntimeEntry): string =>
+  entry.kind === "program" ? `bin/${entry.name}` : `shell/${entry.name}`
+
+/** The runtime's shell, under the runtime. */
+export const RUNTIME_SHELL = runtimeEntryPath({ kind: "shell", name: "bash" })
+
+/**
+ * The GNU bash the runtime's shell is built from: a release and how many of
+ * GNU's official patches to it, which the default image's build takes as
+ * arguments, and the agent is told of.
+ */
+export const RUNTIME_BASH = { version: "5.3", patches: 20 } as const
 
 /** `s` as one POSIX shell word. */
 export const shellWord = (s: string): string =>

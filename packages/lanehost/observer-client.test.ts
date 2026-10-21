@@ -4,6 +4,7 @@
 
 import type {
   FoldNotices,
+  OutputEvent,
   PathTrace,
   RunEvent,
   RunNotice,
@@ -12,24 +13,33 @@ import type {
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { MIN_BATCH } from "./gathered.ts"
-import type { ObserverNotice } from "./observer.ts"
+import type { ObserverUpdate } from "./observer.ts"
 import { type ObserverChannel, observerClient } from "./observer-client.ts"
+import { UNCLAIMED_PER_LANE } from "./unclaimed.ts"
 
 const LANE = "4026532001"
 
 interface FakeRole {
   /** A notice of the lane, as the role sends it on the channel open now. */
   send(run: string, event: RunEvent): void
+  /** An output event of the lane, as the role sends it on the channel open now. */
+  sendOutput(run: string, output: OutputEvent): void
+  /** Flushes the role has answered. */
+  readonly flushes: () => number
   /** Notices the role sends on the next channel before it answers `register`. */
   holdForNext(notices: readonly RunNotice[]): void
   readonly open: () => Promise<ObserverChannel>
 }
 
 function fakeRole(): FakeRole {
-  let subscriber: ((n: ObserverNotice) => void) | null = null
+  let subscriber: ((n: ObserverUpdate) => void) | null = null
+  let outputs: ((n: ObserverUpdate) => void) | null = null
   let held: readonly RunNotice[] = []
+  let flushes = 0
   return {
     send: (run, event) => subscriber?.({ lane: LANE, run, event }),
+    sendOutput: (run, output) => outputs?.({ lane: LANE, run, output }),
+    flushes: () => flushes,
     holdForNext: notices => {
       held = notices
     },
@@ -39,12 +49,21 @@ function fakeRole(): FakeRole {
         close = resolve
       })
       return {
-        ready: Promise.resolve({ version: "v1", loader: { kind: "ready" } }),
+        ready: Promise.resolve({
+          version: "v1",
+          loader: { kind: "ready" },
+          attribution: { on: true },
+        }),
         call: async (call, _signal, onUpdate) => {
           if (call.kind === "subscribe") {
             subscriber = onUpdate ?? null
             return closed
           }
+          if (call.kind === "subscribe-output") {
+            outputs = onUpdate ?? null
+            return closed
+          }
+          if (call.kind === "flush") flushes++
           if (call.kind === "register") {
             for (const n of held) subscriber?.({ lane: LANE, ...n })
             held = []
@@ -226,8 +245,70 @@ test("connect rejects with the loader's refusal", async () => {
       ready: Promise.resolve({
         version: "v1",
         loader: { kind: "failed", why: "observe: load: Invalid" },
+        attribution: { on: true },
       }),
     }),
   })
   await expect(client.connect()).rejects.toThrow("observe: load: Invalid")
+})
+
+const bytes = (n: number): OutputEvent => ({
+  kind: "output",
+  fd: "stdout",
+  statement: null,
+  bytes: n,
+})
+
+const observed = async (role: FakeRole) => {
+  const client = observerClient({ open: role.open })
+  const { fold } = firstEventFold()
+  return client.observe({ pid: async () => 4, remote: [], fold })
+}
+
+test("a claim gets its run's earlier output first, then each as it comes", async () => {
+  const role = fakeRole()
+  const lane = await observed(role)
+  role.sendOutput("7", bytes(1))
+  role.sendOutput("8", bytes(9))
+  role.sendOutput("7", bytes(2))
+  const got: OutputEvent[] = []
+  lane.output("7", e => got.push(e))
+  role.sendOutput("7", bytes(3))
+  expect(got).toEqual([bytes(1), bytes(2), bytes(3)])
+})
+
+test("output past the unclaimed bound reaches its claim as output-lost", async () => {
+  const role = fakeRole()
+  const lane = await observed(role)
+  for (let i = 0; i < UNCLAIMED_PER_LANE; i++) role.sendOutput("1", bytes(1))
+  role.sendOutput("2", bytes(1))
+  role.sendOutput("2", bytes(1))
+  const got: OutputEvent[] = []
+  lane.output("2", e => got.push(e))
+  expect(got).toEqual([{ kind: "output-lost", count: 2 }])
+})
+
+test("a released run's late output is dropped, not held", async () => {
+  const role = fakeRole()
+  const lane = await observed(role)
+  const release = lane.output("1", () => {})
+  release()
+  for (let i = 0; i < UNCLAIMED_PER_LANE; i++) role.sendOutput("1", bytes(1))
+  role.sendOutput("2", bytes(4))
+  const got: OutputEvent[] = []
+  lane.output("2", e => got.push(e))
+  expect(got).toEqual([bytes(4)])
+})
+
+test("settle answers after the role's flush", async () => {
+  const role = fakeRole()
+  const lane = await observed(role)
+  expect(role.flushes()).toBe(0)
+  await lane.settle()
+  expect(role.flushes()).toBe(1)
+})
+
+test("a lane's attribution is the role's hello's", async () => {
+  const lane = await observed(fakeRole())
+  expect(lane.attribution).toEqual({ on: true })
 })

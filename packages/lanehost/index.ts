@@ -21,6 +21,7 @@ export {
   projectDisks,
 } from "./layout.ts"
 export {
+  ATTRIBUTION_HOOKS,
   decodeLoaderLine,
   encodeLoaderCommand,
   isRaced,
@@ -34,6 +35,7 @@ export {
   type ObserverNotice,
   type ObserverPlan,
   observerVersion,
+  planAttribution,
   planObserver,
   type ReleaseInodes,
 } from "./observer.ts"

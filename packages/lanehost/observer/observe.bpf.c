@@ -1,7 +1,9 @@
 // The observer's kernel side: every file call of a run's tasks, sent through
-// one ring buffer, stopping none. It decides nothing but which task is in
-// which run; the loader (`observe.c`) names releases and reads remote
-// stamps, and lanehost's machine role routes (packages/lanehost/TECHNICAL.md).
+// one ring buffer, and every byte entering a `bash` call's output pipes, with
+// the statement whose task wrote it, through another; stopping none. It
+// decides nothing but which task is in which run and statement; the loader
+// (`observe.c`) names releases and reads remote stamps, and lanehost's
+// machine role routes (packages/lanehost/TECHNICAL.md).
 //
 // - A run begins where an untagged task in a registered PID namespace execs
 //   with `PINETRIE_RUN=<n>` in its environment. Its tag is the run and that
@@ -15,6 +17,8 @@
 //   which an exit makes after its tracepoint, come before it. One the ring
 //   has no room for is kept in `ended`, and the loader sends it at its next
 //   flush.
+// - A task takes its parent's statement at birth and keeps it across exec.
+//   Only a task allowed to signal changes its own (`attr_signal`).
 // - The VM's kernel has no FUNCTION_TRACER: no fentry, no BPF LSM. Kprobes
 //   and raw tracepoints only.
 #include "kernel.h"
@@ -56,7 +60,13 @@ struct tag {
   struct run_key run;
   // The task that began the run: its exit is the command's.
   u32 first;
-  u32 pad;
+  // It may signal statements: the run's first task from its exec, and what
+  // it starts, until each execs again.
+  u32 may_signal;
+  // The statement the task was started in, 0 before the run's shell
+  // signalled one, and that statement's line.
+  u32 statement;
+  u32 line;
 };
 
 struct {
@@ -94,6 +104,72 @@ struct {
   __type(key, u32);
   __type(value, struct event);
 } scratch SEC(".maps");
+
+// Output's own ring, sized on its own: a flood of output cannot crowd out a
+// file event.
+struct {
+  __uint(type, BPF_MAP_TYPE_RINGBUF);
+  __uint(max_entries, 16 << 20);
+} output_events SEC(".maps");
+
+// A run's output pipe: which of the run's descriptors it was, and the head
+// below which its buffers are attributed.
+struct opipe {
+  struct run_key run;
+  u32 fd;
+  u32 seen_head;
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 1 << 14);
+  __type(key, u64);  // struct pipe_inode_info *
+  __type(value, struct opipe);
+} pipes SEC(".maps");
+
+// Each run's pipes, learned at its first signal, so its end can let them go.
+struct run_pipes {
+  u64 out;
+  u64 err;
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 1 << 14);
+  __type(key, struct run_key);
+  __type(value, struct run_pipes);
+} pipes_by_run SEC(".maps");
+
+// Output a run could not have attributed: the split of its call cannot be trusted.
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 1 << 16);
+  __type(key, struct run_key);
+  __type(value, u64);
+} output_lost SEC(".maps");
+
+// Signals from a task of the run not allowed to signal, for the suite.
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 1 << 12);
+  __type(key, struct run_key);
+  __type(value, u64);
+} refusals SEC(".maps");
+
+// A write into a run's pipe in progress, by its task: the copies of its
+// iterator are the bytes it adds.
+struct inflight {
+  u64 iter;  // struct iov_iter *
+  u64 pipe;
+  s64 remaining;
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 1 << 16);
+  __type(key, u32);  // tid
+  __type(value, struct inflight);
+} writing SEC(".maps");
 
 struct wfile {
   struct run_key run;
@@ -142,16 +218,18 @@ struct {
   __type(value, struct envbuf);
 } envbufs SEC(".maps");
 
-static __always_inline void count_lost(struct run_key *run) {
-  u64 *n = bpf_map_lookup_elem(&lost_by_run, run);
+static __always_inline void count_in(void *map, struct run_key *run) {
+  u64 *n = bpf_map_lookup_elem(map, run);
   if (n) {
     __sync_fetch_and_add(n, 1);
   } else {
     u64 one = 1;
-    if (bpf_map_update_elem(&lost_by_run, run, &one, BPF_NOEXIST))
-      if ((n = bpf_map_lookup_elem(&lost_by_run, run))) __sync_fetch_and_add(n, 1);
+    if (bpf_map_update_elem(map, run, &one, BPF_NOEXIST))
+      if ((n = bpf_map_lookup_elem(map, run))) __sync_fetch_and_add(n, 1);
   }
 }
+
+static __always_inline void count_lost(struct run_key *run) { count_in(&lost_by_run, run); }
 
 static __always_inline void live_add(struct run_key *run, s64 d) {
   s64 *n = bpf_map_lookup_elem(&live, run);
@@ -228,6 +306,23 @@ static __always_inline void send(struct event *e) {
   count_lost(&e->run);
 }
 
+static __always_inline void forget_pipe(u64 key, struct run_key *run) {
+  if (!key) return;
+  struct opipe *o = bpf_map_lookup_elem(&pipes, &key);
+  // The address may be another run's pipe by now: the old one was freed.
+  if (o && o->run.lane == run->lane && o->run.run == run->run) bpf_map_delete_elem(&pipes, &key);
+}
+
+// A run's pipes let go of at its end: nothing of it is attributed after.
+static __always_inline void forget_pipes(struct run_key *run) {
+  struct run_pipes *rp = bpf_map_lookup_elem(&pipes_by_run, run);
+  if (!rp) return;
+  struct run_pipes p = *rp;
+  bpf_map_delete_elem(&pipes_by_run, run);
+  forget_pipe(p.out, run);
+  forget_pipe(p.err, run);
+}
+
 // A run's task exited or its written file was let go of: at the last, the
 // run has ended, and nothing of it is still to come.
 static __always_inline void live_done(struct run_key *run) {
@@ -235,6 +330,7 @@ static __always_inline void live_done(struct run_key *run) {
   if (!n || __sync_fetch_and_add(n, -1) != 1) return;
   struct run_key r = *run;
   bpf_map_delete_elem(&live, &r);
+  forget_pipes(&r);
   struct event *e = begin(EV_END, &r);
   if (e) send(e);
 }
@@ -342,7 +438,8 @@ SEC("raw_tp/task_newtask")
 int BPF_PROG(on_newtask, struct task_struct *child, u64 clone_flags) {
   struct tag *parent = current_tag();
   if (!parent) return 0;
-  struct tag t = {.run = parent->run, .first = 0};
+  struct tag t = *parent;
+  t.first = 0;
   u32 ctid = BPF_CORE_READ(child, pid);
   // A task the map cannot hold escapes its run: the run is incomplete.
   if (bpf_map_update_elem(&tags, &ctid, &t, BPF_ANY)) {
@@ -367,6 +464,7 @@ int BPF_PROG(on_exit, struct task_struct *p) {
   u32 first = t->first;
   bpf_map_delete_elem(&tags, &tid);
   bpf_map_delete_elem(&openings, &tid);
+  bpf_map_delete_elem(&writing, &tid);
   if (first) {
     struct event *e = begin(EV_EXIT, &run);
     if (e) {
@@ -422,7 +520,13 @@ int BPF_PROG(on_exec, struct task_struct *p, pid_t old_pid, struct linux_binprm 
       bpf_map_update_elem(&tags, &tid, &t, BPF_ANY);
     }
   }
-  if (bpf_map_lookup_elem(&tags, &tid)) return 0;
+  // Any exec but the one that begins a run ends the right to signal: only
+  // pine·trie's bash, exec'd as the run, and its forks may.
+  struct tag *had = bpf_map_lookup_elem(&tags, &tid);
+  if (had) {
+    had->may_signal = 0;
+    return 0;
+  }
   u64 pid_namespace = pid_namespace_of(p);
   if (!pid_namespace || !bpf_map_lookup_elem(&registered, &pid_namespace)) return 0;
   struct mm_struct *mm = BPF_CORE_READ(p, mm);
@@ -432,7 +536,7 @@ int BPF_PROG(on_exec, struct task_struct *p, pid_t old_pid, struct linux_binprm 
   };
   bpf_loop(ENV_STEPS, env_step, &s, 0);
   if (!s.run) return 0;
-  struct tag t = {.run = {.lane = pid_namespace, .run = s.run}, .first = 1};
+  struct tag t = {.run = {.lane = pid_namespace, .run = s.run}, .first = 1, .may_signal = 1};
   if (bpf_map_update_elem(&tags, &tid, &t, BPF_NOEXIST)) {
     count_lost(&t.run);
     return 0;
@@ -611,5 +715,202 @@ int BPF_KPROBE(on_rename, const struct path *old_dir, struct dentry *old_d, cons
   walk_in(&e->a, 0, old_dir, old_d);
   walk_in(&e->b, 1, new_dir, new_d);
   send(e);
+  return 0;
+}
+
+// --- Output by statement. Only pine·trie's bash signals; its first signal
+// comes before any statement runs, so the run's pipes are learned from its
+// descriptors then, and a run that never signals costs nothing below. Every
+// output event is sent while its pipe's mutex is held, so the ring's order
+// is the order bytes entered the pipe. The loader attaches these programs
+// (`attr_*`) itself, and says which attached: attribution is on only when
+// all did.
+
+#define S_IFIFO_ 0010000
+
+// A run's output to its ring; one the ring has no room for is lost output.
+static __always_inline void send_output(struct output_event *e) {
+  e->ts = bpf_ktime_get_ns();
+  if (bpf_ringbuf_output(&output_events, e, sizeof *e, 0)) count_in(&output_lost, &e->run);
+}
+
+// The run's descriptors 1 and 2 of the current task, each kept if it is a
+// pipe (a FIFO inode). One pipe on both is kept once, as stdout.
+static __always_inline void learn_pipes(struct run_key *run) {
+  if (bpf_map_lookup_elem(&pipes_by_run, run)) return;
+  struct run_pipes rp = {0, 0};
+  for (int fd = 1; fd <= 2; fd++) {
+    struct file *f = fd_file(fd);
+    if (!f || (BPF_CORE_READ(f, f_inode, i_mode) & S_IFMT_) != S_IFIFO_) continue;
+    u64 key = (u64)BPF_CORE_READ(f, private_data);
+    if (!key || bpf_map_lookup_elem(&pipes, &key)) continue;
+    struct pipe_inode_info *pipe = (struct pipe_inode_info *)key;
+    struct opipe o = {.run = *run, .fd = (u32)fd, .seen_head = BPF_CORE_READ(pipe, head)};
+    if (bpf_map_update_elem(&pipes, &key, &o, BPF_NOEXIST)) {
+      count_in(&output_lost, run);
+      continue;
+    }
+    if (fd == 1)
+      rp.out = key;
+    else
+      rp.err = key;
+  }
+  if (bpf_map_update_elem(&pipes_by_run, run, &rp, BPF_NOEXIST)) count_in(&output_lost, run);
+}
+
+// prctl's first act is this LSM hook, for every option, known or not.
+SEC("kprobe/security_task_prctl")
+int BPF_KPROBE(attr_signal, int option, unsigned long arg2, unsigned long arg3) {
+  if (option != STATEMENT_SIGNAL) return 0;
+  struct tag *t = current_tag();
+  if (!t) return 0;
+  struct run_key run = t->run;
+  if (!t->may_signal || arg2 == 0 || arg2 > 0xffffffffUL) {
+    count_in(&refusals, &run);
+    return 0;
+  }
+  t->statement = (u32)arg2;
+  t->line = (u32)arg3;
+  learn_pipes(&run);
+  struct output_event e = {.kind = OE_STATEMENT, .run = run, .statement = (u32)arg2, .line = (u32)arg3};
+  send_output(&e);
+  return 0;
+}
+
+// `n` bytes of pipe `o`, written by the current task: its statement, if it
+// is of the pipe's run.
+static __always_inline void send_bytes(struct opipe *o, u64 n) {
+  if (!n) return;
+  struct output_event e = {.kind = OE_OUTPUT, .fd = o->fd, .run = o->run, .n = n};
+  struct tag *t = current_tag();
+  if (t && t->run.lane == o->run.lane && t->run.run == o->run.run) e.statement = t->statement;
+  send_output(&e);
+}
+
+// Slot `i` of a pipe's ring: by the running kernel's stride, never
+// `kernel.h`'s, which declares only the fields read.
+static __always_inline struct pipe_buffer *pipe_slot(struct pipe_buffer *bufs, u32 i) {
+  return (struct pipe_buffer *)((char *)bufs + (u64)i * bpf_core_type_size(struct pipe_buffer));
+}
+
+struct sum_ctx {
+  struct pipe_buffer *bufs;
+  u32 mask;
+  u32 from;
+  u64 sum;
+};
+
+static long add_len(u64 i, struct sum_ctx *c) {
+  struct pipe_buffer *slot = pipe_slot(c->bufs, (c->from + (u32)i) & c->mask);
+  c->sum += BPF_CORE_READ(slot, len);
+  return 0;
+}
+
+// The buffers between the accounted head and the real one: the current
+// task's, or, where a write is about to copy (`orphan`), buffers no hook
+// saw added, lost. A head behind the accounted one is lost too (a copy
+// that faulted and was dropped). Called only with the pipe's mutex held.
+static __always_inline void account(struct pipe_inode_info *pipe, struct opipe *o, int orphan) {
+  u32 head = BPF_CORE_READ(pipe, head);
+  s32 n = (s32)(head - o->seen_head);
+  if (n < 0) {
+    o->seen_head = head;
+    count_in(&output_lost, &o->run);
+    return;
+  }
+  if (n == 0) return;
+  struct sum_ctx c = {
+      .bufs = BPF_CORE_READ(pipe, bufs),
+      .mask = BPF_CORE_READ(pipe, ring_size) - 1,
+      .from = o->seen_head,
+  };
+  bpf_loop((u32)n, add_len, &c, 0);
+  o->seen_head = head;
+  if (!c.sum) return;
+  if (orphan)
+    count_in(&output_lost, &o->run);
+  else
+    send_bytes(o, c.sum);
+}
+
+// Before 6.15 the kernel names it `pipe_write`: the loader attaches this to
+// whichever exists, and reports it by this name.
+SEC("kprobe/anon_pipe_write")
+int BPF_KPROBE(attr_pipe_write, struct kiocb *iocb, struct iov_iter *from) {
+  struct file *f = BPF_CORE_READ(iocb, ki_filp);
+  u64 key = (u64)BPF_CORE_READ(f, private_data);
+  if (!bpf_map_lookup_elem(&pipes, &key)) return 0;
+  s64 count = (s64)BPF_CORE_READ(from, count);
+  if (count <= 0) return 0;
+  u32 tid = current_tid();
+  struct inflight w = {.iter = (u64)from, .pipe = key, .remaining = count};
+  if (bpf_map_update_elem(&writing, &tid, &w, BPF_ANY)) {
+    struct opipe *o = bpf_map_lookup_elem(&pipes, &key);
+    if (o) count_in(&output_lost, &o->run);
+  }
+  return 0;
+}
+
+// Each page a write copies in, inside the pipe's mutex. Entry probes only,
+// so no kretprobe instance limit applies to a writer that sleeps.
+SEC("kprobe/copy_page_from_iter")
+int BPF_KPROBE(attr_copy, struct page *page, unsigned long offset, unsigned long bytes, struct iov_iter *i) {
+  u32 tid = current_tid();
+  struct inflight *w = bpf_map_lookup_elem(&writing, &tid);
+  if (!w || w->iter != (u64)i) return 0;
+  u64 key = w->pipe;
+  struct opipe *o = bpf_map_lookup_elem(&pipes, &key);
+  if (!o) {
+    bpf_map_delete_elem(&writing, &tid);
+    return 0;
+  }
+  u64 count = BPF_CORE_READ(i, count);
+  // Not where the last copy left it: an earlier copy came up short, or the
+  // write it was noted for ended early. What landed is not known.
+  if ((s64)count != w->remaining) {
+    count_in(&output_lost, &o->run);
+    bpf_map_delete_elem(&writing, &tid);
+    return 0;
+  }
+  struct pipe_inode_info *pipe = (struct pipe_inode_info *)key;
+  account(pipe, o, 1);
+  u64 n = bytes < count ? bytes : count;
+  send_bytes(o, n);
+  // The copy fills the last buffer (a merge), or a new one, which some
+  // kernels make the head before the copy and others after it: whether its
+  // page is the last buffer's says which. Only while the pipe holds a
+  // buffer: an emptied slot keeps its old page, which a new write may reuse.
+  u32 head = BPF_CORE_READ(pipe, head);
+  u32 tail = BPF_CORE_READ(pipe, tail);
+  struct pipe_buffer *bufs = BPF_CORE_READ(pipe, bufs);
+  u32 mask = BPF_CORE_READ(pipe, ring_size) - 1;
+  struct page *last = 0;
+  if (head != tail) last = BPF_CORE_READ(pipe_slot(bufs, (head - 1) & mask), page);
+  o->seen_head = last == page ? head : head + 1;
+  w->remaining -= (s64)n;
+  if (w->remaining <= 0) bpf_map_delete_elem(&writing, &tid);
+  return 0;
+}
+
+// Every other route (splice, sendfile, vmsplice, tee) adds whole buffers
+// under the pipe's lock and lets go of it here.
+static __always_inline int unlocking(struct pipe_inode_info *pipe) {
+  u64 key = (u64)pipe;
+  struct opipe *o = bpf_map_lookup_elem(&pipes, &key);
+  if (o) account(pipe, o, 0);
+  return 0;
+}
+
+SEC("kprobe/pipe_unlock")
+int BPF_KPROBE(attr_pipe_unlock, struct pipe_inode_info *pipe) { return unlocking(pipe); }
+
+SEC("kprobe/pipe_wait_writable")
+int BPF_KPROBE(attr_wait_writable, struct pipe_inode_info *pipe) { return unlocking(pipe); }
+
+// A pipe freed: its address can be another pipe's next.
+SEC("kprobe/free_pipe_info")
+int BPF_KPROBE(attr_free_pipe, struct pipe_inode_info *pipe) {
+  u64 key = (u64)pipe;
+  bpf_map_delete_elem(&pipes, &key);
   return 0;
 }

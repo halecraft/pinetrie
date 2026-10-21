@@ -9,6 +9,9 @@
   - ADR-0046: every lane of its own is also told to search with the `grep` and
     `find` tools and that rg, fd and sd are on `PATH`; the browser fact is
     `defaultImage`, and its line names python3 too.
+- **Amended by:**
+  - ADR-0204: the lane runtime also carries pine·trie's bash, one pinned
+    version, static against glibc, off `PATH`, as the shell of tool calls.
 
 **Context.** pi's prompt builder adds "Use bash for file operations like ls,
 rg, find" whenever the tools it is given name `bash` and none of `grep`,

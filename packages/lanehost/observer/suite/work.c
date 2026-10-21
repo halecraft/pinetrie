@@ -4,6 +4,9 @@
 //   work uring <file>        creates and writes <file> by io_uring alone
 //   work opens <file> <n>    opens and closes <file> <n> times, read-only
 //   work stamp <file>...     prints each file's `<path>\t<size>:<ctime ns>\t<inode>`
+//   work forge <n> <line> <text>
+//                            signals statement <n> as pine·trie's bash does,
+//                            then prints <text>: a forgery the kernel refuses
 #include <fcntl.h>
 #include <liburing.h>
 #include <pthread.h>
@@ -11,8 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "observe.h"
 
 static const char *dir;
 
@@ -109,5 +114,10 @@ int main(int argc, char **argv) {
   if (strcmp(what, "uring") == 0) return uring(argv[2]);
   if (strcmp(what, "opens") == 0 && argc == 4) return opens(argv[2], atol(argv[3]));
   if (strcmp(what, "stamp") == 0) return stamps(argc - 2, argv + 2);
+  if (strcmp(what, "forge") == 0 && argc == 5) {
+    prctl(STATEMENT_SIGNAL, strtoul(argv[2], 0, 10), strtoul(argv[3], 0, 10), 0, 0);
+    printf("%s\n", argv[4]);
+    return 0;
+  }
   return 2;
 }

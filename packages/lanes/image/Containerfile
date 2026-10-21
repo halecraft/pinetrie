@@ -8,13 +8,48 @@
 #   in the build, which needs no BuildKit). The lane runtime copies them out
 #   of this image, so every lane has them whatever its image (`runtime.ts`).
 #   Debian's own rg and fd link glibc, and would not run on a musl image.
+# - pine·trie's bash, built by the stage below at
+#   `/usr/local/libexec/pinetrie/bash`, off the `PATH`: the runtime copies
+#   it out as the `bash` tool's shell (`runtime.ts`), and the image's own
+#   bash stays every command's.
 # - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
 # - Rootless Docker, the docker CLI and buildx, for a lane granted lanes of
 #   its own (`lanes.nested`); unused otherwise.
 # A project's own `pinetrie.Containerfile` replaces it. The lane runtime is
 # copied out of this image (`runtime.ts`).
+
+# pine·trie's bash: GNU's release `BASH_VERSION` with its first
+# `BASH_PATCHES` official patches, checked against `bash/SHA256SUMS`, then
+# pine·trie's patch (`bash/apply.py`), which fails the build if an anchor
+# moved. Static against glibc, from this image's own base, so its layers are
+# already here: as fast as Debian's bash, and reading an image's locale data
+# as a glibc bash does. bash's own allocator stays off: the static build
+# uses glibc's.
+FROM docker.io/library/node:24-trixie-slim AS bash
+ARG BASH_VERSION
+ARG BASH_PATCHES
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends build-essential ca-certificates curl patch python3 > /dev/null
+WORKDIR /src
+COPY bash/SHA256SUMS bash/apply.py /src/
+RUN v=$(echo "$BASH_VERSION" | tr -d .) \
+ && curl -fsSLO "https://ftp.gnu.org/gnu/bash/bash-${BASH_VERSION}.tar.gz" \
+ && for i in $(seq 1 "$BASH_PATCHES"); do \
+      curl -fsSLO "https://ftp.gnu.org/gnu/bash/bash-${BASH_VERSION}-patches/bash${v}-$(printf %03d "$i")"; \
+    done \
+ && sha256sum -c --quiet SHA256SUMS \
+ && tar -xzf "bash-${BASH_VERSION}.tar.gz" \
+ && for p in bash${v}-*; do patch -s -p0 -d "bash-${BASH_VERSION}" < "$p"; done \
+ && python3 apply.py "bash-${BASH_VERSION}" \
+ && cd "bash-${BASH_VERSION}" \
+ && ./configure --enable-static-link --without-bash-malloc --quiet \
+ && make -s -j"$(nproc)" > /tmp/make.log 2>&1 || { tail -40 /tmp/make.log; exit 1; } \
+ && mkdir -p /out && cp "/src/bash-${BASH_VERSION}/bash" /out/bash \
+ && /out/bash -c 'echo "bash $BASH_VERSION"'
+
 FROM docker.io/library/node:24-trixie-slim
+COPY --from=bash /out/bash /usr/local/libexec/pinetrie/bash
 ARG JJ_VERSION
 ARG RG_VERSION=15.2.0
 ARG FD_VERSION=10.5.0

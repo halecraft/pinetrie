@@ -9,15 +9,22 @@
 //   machine's architecture names it. The helper is started through that
 //   loader with those libraries, so the image's own libc and Node are never
 //   used. Its `process.execPath` is then the loader.
-// - `bin/`: each of core's `RUNTIME_PROGRAMS`, a static musl build that runs
-//   on any Linux. Debian's own builds of rg and fd link glibc, so the default
-//   image downloads release builds instead.
+// - `bin/`: each program of core's `RUNTIME_ENTRIES`, a static musl build
+//   that runs on any Linux. Debian's own builds of rg and fd link glibc, so
+//   the default image downloads release builds instead.
+// - `shell/bash`: pine·trie's bash, static against glibc, built by the
+//   default image (`image/bash/`); the `bash` tool's shell.
 // Every lane mounts it read-only at `/pinetrie-runtime`. Only `bin/` goes on a
-// lane's `PATH`: pinetrie's `node` cannot start without its loader.
+// lane's `PATH`: pinetrie's `node` cannot start without its loader, and the
+// shell is the tool's, never a command's `bash`.
 
 import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { RUNTIME_PROGRAMS } from "@pinetrie/core"
+import {
+  RUNTIME_ENTRIES,
+  type RuntimeEntry,
+  runtimeEntryPath,
+} from "@pinetrie/core"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 import { RUNTIME_MOUNT } from "./spec.ts"
@@ -29,6 +36,9 @@ export const RUNTIME_NODE: readonly string[] = [
   `${RUNTIME_MOUNT}/node/lib`,
   `${RUNTIME_MOUNT}/node/node`,
 ]
+
+/** Where the default image keeps pine·trie's bash, which `EXTRACT` copies to the runtime's shell. */
+export const IMAGE_SHELL = "/usr/local/libexec/pinetrie/bash"
 
 /**
  * The script that copies the runtime out of the default image, as a tar on
@@ -44,20 +54,30 @@ export const EXTRACT = [
   // The loader is the one line without `=>`: `ld-linux-aarch64.so.1` on
   // arm64, `ld-linux-x86-64.so.2` on x86_64.
   "cp -L \"$(ldd /out/node/node | awk '!/=>/ && $1 ~ /^\\// {print $1}')\" /out/node/ld.so",
-  ...RUNTIME_PROGRAMS.map(
-    p =>
-      `p=$(command -v ${p}) || { echo "the lane image has no ${p}" >&2; exit 1; }; cp "$p" /out/bin/${p}`,
-  ),
+  ...RUNTIME_ENTRIES.map(entryCopy),
   "tar -C /out -cf - .",
 ].join("\n")
 
-/** Whether a runtime holds its loader and every program, given the names in its `node/` and `bin/`. */
-export const runtimeComplete = (
-  nodeEntries: readonly string[],
-  binEntries: readonly string[],
-): boolean =>
-  nodeEntries.includes("ld.so") &&
-  RUNTIME_PROGRAMS.every(p => binEntries.includes(p))
+/** The lines of `EXTRACT` that copy one entry, failing by its name when the image lacks it. */
+function entryCopy(entry: RuntimeEntry): string {
+  const to = `/out/${runtimeEntryPath(entry)}`
+  const from =
+    entry.kind === "program"
+      ? `p=$(command -v ${entry.name})`
+      : `p=${IMAGE_SHELL}; [ -x "$p" ]`
+  return `mkdir -p "$(dirname ${to})"; ${from} || { echo "the lane image has no ${entry.name}" >&2; exit 1; }; cp "$p" ${to}`
+}
+
+/** The directories a runtime's files are in, which `ensureRuntime` lists. */
+const RUNTIME_DIRS = ["node", "bin", "shell"] as const
+
+/**
+ * Whether a runtime holds its loader and every entry of `RUNTIME_ENTRIES`,
+ * given its files' paths under it (`bin/jj`).
+ */
+export const runtimeComplete = (files: readonly string[]): boolean =>
+  files.includes("node/ld.so") &&
+  RUNTIME_ENTRIES.every(e => files.includes(runtimeEntryPath(e)))
 
 /**
  * The runtime for `image` under `dir` (the session's `runtime/`), copied out of it
@@ -73,10 +93,16 @@ export async function ensureRuntime(
 ): Promise<string> {
   const name = image.replace(/[^A-Za-z0-9._-]/g, "-")
   const final = path.join(dir, name)
-  const [node, bin] = await Promise.all(
-    ["node", "bin"].map(d => readdir(path.join(final, d)).catch(() => [])),
-  )
-  if (!runtimeComplete(node ?? [], bin ?? [])) {
+  const files = (
+    await Promise.all(
+      RUNTIME_DIRS.map(async d =>
+        (
+          await readdir(path.join(final, d)).catch(() => [])
+        ).map(f => `${d}/${f}`),
+      ),
+    )
+  ).flat()
+  if (!runtimeComplete(files)) {
     extracting()
     await extract(runtime, final, image)
   }

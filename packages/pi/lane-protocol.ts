@@ -1,7 +1,7 @@
 // pi/lane-protocol — the calls between the host and a lane's helper,
 // carried by `@pinetrie/channel`.
 
-import type { Recipe } from "@pinetrie/core"
+import type { OutputFd, Recipe } from "@pinetrie/core"
 import type { IgnoreFile } from "@pinetrie/rules/ignores"
 
 /**
@@ -39,6 +39,8 @@ export const isEnvMethod = (name: string): name is EnvMethod =>
 export type LaneCall =
   /** An environment call; its `Context` is the helper's own. */
   | { readonly method: EnvMethod; readonly args: readonly unknown[] }
+  /** A `bash` call's command in pine·trie's bash: `ShellUpdate`s, then a `ShellEnd`. */
+  | { readonly shell: ShellRequest }
   /** A command with no shell, for the host's own jj and git (`laneRunner`). */
   | {
       readonly run: readonly string[]
@@ -119,3 +121,38 @@ export interface LaneHello {
   /** Those under `cwd`, relative to it: what the host's fold of its runs counts as shared. */
   readonly sharedInside: readonly string[]
 }
+
+/** What pine·trie's `bash` tool asks the helper to run. */
+export interface ShellRequest {
+  /** pine·trie's bash, as the lane sees it. */
+  readonly shell: string
+  readonly command: string
+  readonly cwd: string
+  /** Seconds, or null for none. */
+  readonly timeout: number | null
+  /** Past either count, every byte from the start also goes to a file, named in the end. */
+  readonly spill: { readonly maxBytes: number; readonly maxLines: number }
+  /** Bytes sent before `overCap`, after which none are: the channel's bound. */
+  readonly cap: number
+}
+
+/** A `shell` call's update, in the order the helper makes them. */
+export type ShellUpdate =
+  /** The run's number, before any output. */
+  | { readonly started: string }
+  /** A chunk as one read gave it, never split or joined. */
+  | { readonly fd: OutputFd; readonly bytes: Uint8Array }
+  /** The cap is reached: no more chunks are sent. */
+  | { readonly overCap: true }
+
+/** How a `shell` call ended: the shell's exit, or what stopped it. */
+export type ShellEnd =
+  | {
+      readonly kind: "exited"
+      /** The exit code, or 128 and the signal that killed it. */
+      readonly code: number
+      readonly spill: string | null
+    }
+  | { readonly kind: "timeout"; readonly spill: string | null }
+  | { readonly kind: "aborted"; readonly spill: string | null }
+  | { readonly kind: "failed"; readonly message: string }

@@ -1,0 +1,11 @@
+# S298: pine·trie's bash, static against glibc (Debian 13's), to set beside
+# the musl build in the sameness check.
+FROM docker.io/library/debian:13
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential curl patch > /dev/null
+WORKDIR /src
+RUN curl -sfL https://ftp.gnu.org/gnu/bash/bash-5.2.37.tar.gz | tar xz
+COPY bash.patch /src/
+RUN cd bash-5.2.37 && patch -p1 < ../bash.patch > /dev/null \
+ && CFLAGS="-O2 -std=gnu17 -Wno-error=implicit-function-declaration" ./configure --enable-static-link --without-bash-malloc --quiet \
+ && make -s -j4 > /tmp/make.log 2>&1 || (tail -40 /tmp/make.log; exit 1)
+RUN grep -i "statically linked" /tmp/make.log | sort -u | head -5; cp bash-5.2.37/bash /bash-pt

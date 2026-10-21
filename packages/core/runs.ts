@@ -5,6 +5,7 @@
 // relative to the lane's directory.
 
 import type { DiskPath } from "./disks.ts"
+import type { Attribution, OutputEvent, Settled } from "./output.ts"
 
 declare const stampBrand: unique symbol
 /**
@@ -294,6 +295,16 @@ export interface ObserverRelay {
 
 /** A lane being observed: its runs' source, until it is closed. */
 export interface LaneObservation extends RunSource {
+  /** Whether its `bash` calls' output can be attributed to statements: each call's join starts from it. */
+  readonly attribution: Attribution
+  /**
+   * Claim run `run`'s output events: each, in order, to `onEvent`, those
+   * that came before the claim first. Output the host had no room to hold
+   * before the claim comes as one `output-lost`. Its result lets the run go.
+   */
+  output(run: string, onEvent: (event: OutputEvent) => void): () => void
+  /** Resolves once every observer event of the lane before the call has arrived. */
+  settle(): Promise<Settled>
   /** Stop observing it: no run begins in it after. */
   close(): Promise<void>
   /**

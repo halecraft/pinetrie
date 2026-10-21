@@ -21,6 +21,7 @@ import {
   laneNote,
   nestedLaneDockerNote,
   RUNTIME_BIN,
+  RUNTIME_SHELL_PATH,
   type Step,
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
@@ -233,6 +234,7 @@ export function createContainers(deps: {
         }),
         hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,
+        shell: RUNTIME_SHELL_PATH,
         gate: async () => {
           await handle.queue.idle()
           return (await handle.link()).channel

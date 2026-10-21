@@ -25,7 +25,10 @@ import {
   type ObserverCall,
   type ObserverHello,
   type ObserverNotice,
+  type ObserverOutput,
+  type ObserverUpdate,
   observerNotice,
+  planAttribution,
   planHeld,
   planIdle,
   planLookup,
@@ -45,6 +48,8 @@ loader.stderr.on("data", (chunk: string) => {
 })
 let state: ObserverHello["loader"] | null = null
 let readyHook: () => void = () => {}
+/** The loader's attribution hooks, as it reported them before `ready`. */
+const hooks: { readonly name: string; readonly attached: boolean }[] = []
 const started = new Promise<ObserverHello["loader"]>(resolve => {
   loader.on("error", error => {
     state ??= { kind: "failed", why: `${loaderPath}: ${error.message}` }
@@ -71,6 +76,8 @@ const send = (c: LoaderCommand) =>
 
 interface Connection {
   update: ((n: ObserverNotice) => void) | null
+  /** Its output subscription's. */
+  output: ((n: ObserverOutput) => void) | null
 }
 const connections = new Map<ConnectionId, Connection>()
 /** Every lane the loader holds registered, pinned, owned or not. */
@@ -95,6 +102,8 @@ let quietSince = Date.now()
 
 const subscribed = () =>
   new Set([...connections].flatMap(([id, c]) => (c.update ? [id] : [])))
+const subscribedOutput = () =>
+  new Set([...connections].flatMap(([id, c]) => (c.output ? [id] : [])))
 const monotonicUs = () => Number(process.hrtime.bigint() / 1000n)
 
 function route(notice: ObserverNotice) {
@@ -111,6 +120,15 @@ function route(notice: ObserverNotice) {
   if (planHeld(h.notices.length, HELD_PER_LANE, notice) === "keep")
     h.notices.push(notice)
   else h.lost.set(notice.run, (h.lost.get(notice.run) ?? 0) + 1)
+}
+
+/**
+ * Output goes only to its lane's owner, as it subscribed: none is held for
+ * a host gone, whose calls in flight went with it.
+ */
+function routeOutput(output: ObserverOutput) {
+  const r = routeEvent(registrations, subscribedOutput(), output)
+  if (r.kind === "send") connections.get(r.to)?.output?.(output)
 }
 
 /** A lane's held notices, to the connection that now owns it, once it has subscribed. */
@@ -140,11 +158,20 @@ readline.createInterface({ input: loader.stdout }).on("line", text => {
   const line = decodeLoaderLine(text)
   if (line === null) return
   switch (line.kind) {
+    case "hook":
+      hooks.push({ name: line.name, attached: line.attached })
+      return
     case "ready":
       readyHook()
       return
     case "event":
       route(observerNotice(line))
+      return
+    case "output":
+      routeOutput({ lane: line.lane, run: line.run, output: line.output })
+      return
+    case "refusals":
+    case "stats-done":
       return
     case "candidate": {
       const { kind: _, token, ...candidate } = line
@@ -222,7 +249,7 @@ async function register(
 async function answer(
   id: ConnectionId,
   call: ObserverCall,
-  update: ((n: ObserverNotice) => void) | undefined,
+  update: ((n: ObserverUpdate) => void) | undefined,
   signal: AbortSignal,
 ): Promise<unknown> {
   const loaded = await started
@@ -258,6 +285,16 @@ async function answer(
       conn.update = null
       return null
     }
+    case "subscribe-output": {
+      if (update === undefined)
+        throw new Error("subscribe-output asks for updates")
+      conn.output = update
+      await new Promise<void>(resolve =>
+        signal.addEventListener("abort", () => resolve(), { once: true }),
+      )
+      conn.output = null
+      return null
+    }
     case "flush": {
       const token = String(nextToken++)
       await new Promise<void>(resolve => {
@@ -287,15 +324,15 @@ let nextConnection = 0
 net
   .createServer(socket => {
     const id = nextConnection++
-    connections.set(id, { update: null })
+    connections.set(id, { update: null, output: null })
     // At the end of its input, before the host sees its side close: a host
     // that opens a new connection once the old one closed reclaims its lanes.
     socket.on("end", () => disconnect(id))
     socket.on("close", () => disconnect(id))
     socket.on("error", () => {})
     void started.then(loaded =>
-      serve<ObserverHello, ObserverCall, ObserverNotice, unknown>(
-        { version, loader: loaded },
+      serve<ObserverHello, ObserverCall, ObserverUpdate, unknown>(
+        { version, loader: loaded, attribution: planAttribution(hooks) },
         (call, context) => answer(id, call, context.update, context.signal),
         { input: socket, output: socket },
       ),

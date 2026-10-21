@@ -14,6 +14,8 @@
 - **Amended by:**
   - ADR-0173: in story, a tool row with an intent leads with it, and its
     command is in its detail.
+  - ADR-0204: a row's output is shown under the statement that wrote it, when
+    its bytes are attributed; undivided otherwise.
 
 Restates what ADR-0049 decided of the floor and of a column's and a row's
 memory across an unmount, which stand. What changes is how much of a row

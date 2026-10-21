@@ -75,6 +75,7 @@ test("laneToolContext: no access is no lane, named by the project's root, whose 
       facts: facts(),
       hostPaths: ["/skills"],
       programs: "/pinetrie-runtime/bin",
+      shell: "/pinetrie-runtime/shell/bash",
       gate: () => new Promise(() => {}),
     },
     "/repo",
@@ -91,6 +92,7 @@ test("laneToolContext: a lane of its own runs the runtime's programs by path", a
       facts: facts(),
       hostPaths: [],
       programs: "/pinetrie-runtime/bin",
+      shell: "/pinetrie-runtime/shell/bash",
       gate: () => new Promise(() => {}),
     },
     "/repo",
@@ -291,6 +293,13 @@ describe("laneGuidelines", () => {
       "Nothing installs dependencies for you. After getting the latest, pine·trie removes what commands made from files that changed (node_modules, a build), and its message names what went: make them again as you would after a pull.",
     )
     expect(text(facts())).toContain("add it to .gitignore")
+  })
+
+  test("names pine·trie's bash, at the runtime's pinned release, on any image", () => {
+    for (const told of [text(facts()), text(facts({ defaultImage: true }))])
+      expect(told).toContain(
+        "Your bash tool runs commands in pine·trie's own bash 5.3, whatever the image; a script a command runs (#!/bin/bash, bash x.sh) uses the image's bash.",
+      )
   })
 
   test("names the runtime's programs for bash, on any image", () => {
@@ -515,6 +524,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
+      shell: "bash",
       gate: async () => {
         await ready
         return channel
@@ -590,6 +600,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir, shared: [".plans"] }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
+      shell: "bash",
       gate: async () => channel,
     })
     script.use([
@@ -639,6 +650,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
+      shell: "bash",
       gate: async () => channel,
     })
     script.use([

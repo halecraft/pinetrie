@@ -23,6 +23,9 @@ import {
   type LaneHello,
   type RelayReply,
   type RelayRequest,
+  type ShellEnd,
+  type ShellRequest,
+  type ShellUpdate,
 } from "./lane-protocol.ts"
 
 type Context = { readonly abortSignal: AbortSignal | undefined }
@@ -71,6 +74,12 @@ export interface LaneChannel {
     onRequest: (request: RelayRequest) => void,
   ): Promise<void>
   observerReply(reply: RelayReply): Promise<void>
+  /** A `bash` call's command in pine·trie's bash: each update as it comes, then how it ended. */
+  shell(
+    request: ShellRequest,
+    signal: AbortSignal | undefined,
+    onUpdate: (update: ShellUpdate) => void,
+  ): Promise<ShellEnd>
   /**
    * End the helper's input: it finishes and exits. Never a signal: killing
    * the `exec` process does not reach the helper.
@@ -117,6 +126,10 @@ export function openChannel(argv: readonly string[]): LaneChannel {
     observerReply: async reply => {
       await channel.call({ observerReply: reply })
     },
+    shell: (request, signal, onUpdate) =>
+      channel.call({ shell: request }, signal, update =>
+        onUpdate(update as ShellUpdate),
+      ) as Promise<ShellEnd>,
     close: channel.close,
   }
 }
@@ -222,6 +235,115 @@ export function laneRunner(channel: LaneChannel): {
         r,
         r.stdout instanceof Uint8Array ? r.stdout : new Uint8Array(),
       )
+    },
+  }
+}
+
+/** A chunk of a `bash` call's output, as one read in the lane gave it. */
+export type ShellChunk = Extract<ShellUpdate, { readonly fd: unknown }>
+
+/** A `bash` call's command, running: its run, its output as it comes, and how it ended. */
+export interface ShellRun {
+  /** The run's number, once the lane has started it. */
+  readonly started: Promise<string>
+  /** Each chunk, in the order the lane read them; `"over-cap"` once the cap is reached. */
+  readonly chunks: AsyncIterable<ShellChunk | "over-cap">
+  readonly end: Promise<ShellEnd>
+}
+
+/** What a `bash` call asks of its lane, beyond its command. */
+export type ShellAsk = Pick<ShellRequest, "timeout" | "spill" | "cap">
+
+/** Runs a `bash` call's command in a lane. */
+export type LaneShell = (
+  command: string,
+  ask: ShellAsk,
+  signal: AbortSignal | undefined,
+) => ShellRun
+
+/**
+ * A lane's shell: pine·trie's bash at `shell`, in `cwd`, once `gate()` has
+ * let the lane's queue through, as every environment call waits.
+ */
+export function laneShell(
+  shell: string,
+  cwd: string,
+  gate: () => Promise<LaneChannel>,
+): LaneShell {
+  return (command, ask, signal) => {
+    const chunks = queue<ShellChunk | "over-cap">()
+    let started: (run: string) => void = () => {}
+    const run = new Promise<string>(r => {
+      started = r
+    })
+    const end = (async () => {
+      const channel = await gate()
+      return channel.shell({ shell, command, cwd, ...ask }, signal, update => {
+        if ("started" in update) started(update.started)
+        else if ("overCap" in update) chunks.push("over-cap")
+        else chunks.push(update)
+      })
+    })().then(
+      e => e,
+      (error: unknown): ShellEnd => ({
+        kind: "failed",
+        message: String(error),
+      }),
+    )
+    void end.then(() => chunks.close())
+    return { started: run, chunks: chunks.iterable, end }
+  }
+}
+
+/** A lane's shell for an agent with none: every call fails, saying why. */
+export function refusingShell(why: string): LaneShell {
+  return () => {
+    const chunks = queue<ShellChunk | "over-cap">()
+    chunks.close()
+    return {
+      started: new Promise(() => {}),
+      chunks: chunks.iterable,
+      end: Promise.resolve({ kind: "failed", message: why }),
+    }
+  }
+}
+
+/** Values pushed by one side, read as an async iterable by the other, until closed. */
+function queue<T>(): {
+  readonly push: (value: T) => void
+  readonly close: () => void
+  readonly iterable: AsyncIterable<T>
+} {
+  const values: T[] = []
+  let closed = false
+  let wake: (() => void) | null = null
+  const woken = () => {
+    wake?.()
+    wake = null
+  }
+  return {
+    push: value => {
+      values.push(value)
+      woken()
+    },
+    close: () => {
+      closed = true
+      woken()
+    },
+    iterable: {
+      async *[Symbol.asyncIterator]() {
+        for (;;) {
+          const next = values.shift()
+          if (next !== undefined) {
+            yield next
+            continue
+          }
+          if (closed) return
+          await new Promise<void>(r => {
+            wake = r
+          })
+        }
+      },
     },
   }
 }

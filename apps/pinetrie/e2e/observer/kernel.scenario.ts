@@ -6,10 +6,17 @@
 // Which candidate a registration takes, and whether it may, is the machine
 // role's policy: its unit tests prove it, not this suite.
 
-import type { CallOp, PathKind, RunEvent } from "@pinetrie/core"
-import type { LoaderLine } from "@pinetrie/lanehost"
+import type {
+  CallOp,
+  OutputEvent,
+  OutputFd,
+  PathKind,
+  RunEvent,
+} from "@pinetrie/core"
+import { type LoaderLine, planAttribution } from "@pinetrie/lanehost"
 import type { Checks } from "../checks.ts"
 import type { Scenario } from "../scenario.ts"
+import { commandStatements, FORGED_SIGNALS } from "./statements.ts"
 import { bootGuest, guestProblem } from "./support.ts"
 
 type Event = Extract<LoaderLine, { kind: "event" }>
@@ -40,6 +47,45 @@ const hasCall = (
   )
 
 const O_CREAT = 0o100
+
+const outputsOf = (
+  lines: readonly LoaderLine[],
+  run: string,
+): readonly OutputEvent[] =>
+  lines.flatMap(l => (l.kind === "output" && l.run === run ? [l.output] : []))
+
+/** Each byte of a run's pipe `fd`, by the statement its output events give it, in order. */
+const byteTags = (
+  outputs: readonly OutputEvent[],
+  fd: OutputFd,
+): readonly (number | null)[] =>
+  outputs.flatMap(e =>
+    e.kind === "output" && e.fd === fd
+      ? Array<number | null>(e.bytes).fill(e.statement)
+      : [],
+  )
+
+/** A pipe's lines, each with the statements its bytes were attributed to. */
+const taggedLines = (
+  bytes: Buffer,
+  tags: readonly (number | null)[],
+): readonly {
+  readonly text: string
+  readonly tags: ReadonlySet<number | null>
+}[] => {
+  const out: { text: string; tags: Set<number | null> }[] = []
+  let at = 0
+  while (at < bytes.length) {
+    const nl = bytes.indexOf(0x0a, at)
+    const end = nl < 0 ? bytes.length : nl + 1
+    out.push({
+      text: bytes.subarray(at, end).toString("latin1"),
+      tags: new Set(tags.slice(at, end)),
+    })
+    at = end
+  }
+  return out
+}
 
 export const scenario: Scenario = {
   needs: guestProblem,
@@ -327,6 +373,130 @@ export const scenario: Scenario = {
       guest.events.some(l => l.kind === "unregistered") &&
         events.every(e => e.run !== "22"),
       JSON.stringify(events.filter(e => e.run === "22")),
+    )
+
+    const hooks = guest.events.flatMap(l => (l.kind === "hook" ? [l] : []))
+    check(
+      "every attribution hook attaches on the lane VM's kernel",
+      planAttribution(hooks).on,
+      JSON.stringify(hooks),
+    )
+
+    const pipeBytes = (run: string, fd: string) =>
+      Buffer.from(said("bytes", run, fd)?.[3] ?? "", "hex")
+    const out30 = outputsOf(guest.events, "30")
+    const out31 = outputsOf(guest.events, "31")
+    check(
+      "a run's pipes are learned at its first signal, and a run that never signals has none",
+      out30.some(e => e.kind === "output") && out31.length === 0,
+      JSON.stringify({ thirty: out30.length, thirtyOne: out31 }),
+    )
+    const pipes = (["stdout", "stderr"] as const).map(fd => {
+      const bytes = pipeBytes("30", fd === "stdout" ? "1" : "2")
+      const tags = byteTags(out30, fd)
+      const lines = taggedLines(bytes, tags)
+      const wrong = lines.filter(l => {
+        const token = /S(\d+)/.exec(l.text)?.[1]
+        return (
+          token !== undefined &&
+          (l.tags.size !== 1 || !l.tags.has(Number(token)))
+        )
+      })
+      return {
+        fd,
+        received: bytes.length,
+        attributed: tags.length,
+        lines,
+        wrong,
+      }
+    })
+    const unplaced = out30.filter(
+      e =>
+        (e.kind === "output" && e.statement === null) ||
+        e.kind === "output-lost",
+    )
+    check(
+      "every byte of a call's stdout and stderr is attributed to the statement that wrote it",
+      pipes.every(
+        p =>
+          p.received > 0 && p.received === p.attributed && p.wrong.length === 0,
+      ) && unplaced.length === 0,
+      JSON.stringify({
+        pipes: pipes.map(p => ({
+          fd: p.fd,
+          received: p.received,
+          attributed: p.attributed,
+          wrong: p.wrong.map(l => [l.text, [...l.tags]]),
+        })),
+        unplaced,
+      }),
+    )
+    const spans = commandStatements()
+    const signals = out30.flatMap(e => (e.kind === "statement" ? [e] : []))
+    const refusals = guest.events.find(
+      l => l.kind === "refusals" && l.lane === laneA && l.run === "30",
+    )
+    check(
+      "a signal forged by a program or a nested bash is refused and counted, and each statement's own is taken once, within its lines",
+      refusals?.kind === "refusals" &&
+        refusals.count === FORGED_SIGNALS &&
+        signals.length === spans.length &&
+        signals.every((s, i) => {
+          const span = spans[i]
+          return (
+            span !== undefined &&
+            s.statement === span.statement &&
+            s.line >= span.first &&
+            s.line <= span.last
+          )
+        }),
+      JSON.stringify({ refusals, signals, spans: spans.length }),
+    )
+    const redirections = pipes
+      .flatMap(p => p.lines)
+      .filter(l => l.text.includes("/nonexistent/d/"))
+    check(
+      "a compound command's failed redirection is tagged with its own statement",
+      redirections.length === 4 &&
+        redirections.every(l => {
+          const token = /\/nonexistent\/d\/S(\d+)/.exec(l.text)?.[1]
+          return l.tags.size === 1 && l.tags.has(Number(token))
+        }),
+      JSON.stringify(redirections.map(l => [l.text, [...l.tags]])),
+    )
+    const settledAt = guest.events.findIndex(
+      l => l.kind === "flushed" && l.token === "t32",
+    )
+    const r32 = guest.events.flatMap((l, i) =>
+      l.kind === "output" && l.run === "32" ? [i] : [],
+    )
+    const out32 = outputsOf(guest.events, "32")
+    const bytes32 = ["1", "2"].map(fd => pipeBytes("32", fd).length)
+    check(
+      "output written just before a call returns is in the flush that follows it",
+      settledAt >= 0 &&
+        r32.length > 0 &&
+        r32.every(i => i < settledAt) &&
+        byteTags(out32, "stdout").length === bytes32[0] &&
+        byteTags(out32, "stderr").length === bytes32[1] &&
+        bytes32.every(n => n > 0),
+      JSON.stringify({ settledAt, r32, out32, bytes32 }),
+    )
+
+    const oflood = eventsOf(guest.outputFlood)
+    const ofOpens = callsOf(oflood, "40").filter(
+      c => c.op === "open" && c.path.startsWith("/w/oflood/f"),
+    ).length
+    const ofLostFiles = oflood.filter(
+      e => e.run === "40" && e.event.kind === "lost",
+    )
+    const ofLostOutput = outputsOf(guest.outputFlood, "40").filter(
+      e => e.kind === "output-lost",
+    )
+    check(
+      "an output flood past its ring loses output, counted against its run, and no file event",
+      ofOpens === 50 && ofLostFiles.length === 0 && ofLostOutput.length > 0,
+      JSON.stringify({ ofOpens, ofLostFiles, ofLostOutput }),
     )
 
     const flood = eventsOf(guest.flood)

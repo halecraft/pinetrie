@@ -7,6 +7,7 @@ import { encodeRunEvent, type RunEvent, stamp } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { standInRole } from "./fixtures.ts"
 import {
+  ATTRIBUTION_HOOKS,
   decodeLoaderLine,
   encodeLoaderCommand,
   HELD_PER_LANE,
@@ -19,8 +20,10 @@ import {
   type ObserverCall,
   type ObserverHello,
   type ObserverNotice,
+  type ObserverUpdate,
   observerNotice,
   observerVersion,
+  planAttribution,
   planHeld,
   planIdle,
   planLookup,
@@ -96,6 +99,23 @@ describe("the loader's lines", () => {
     expect(decodeLoaderLine("ev\t21\tx\t-\tend\t1")).toBeNull()
     expect(decodeLoaderLine("looked\t7\tsome")).toBeNull()
     expect(decodeLoaderLine("hello")).toBeNull()
+  })
+  test("an output line is its lane, its run and core's output event", () => {
+    expect(decodeLoaderLine("out\t21\t3\toutput\t2\t4\t100")).toEqual({
+      kind: "output",
+      lane: "21",
+      run: "3",
+      output: { kind: "output", fd: "stderr", statement: 4, bytes: 100 },
+    })
+    expect(decodeLoaderLine("out\t21\t3\tend\t1")).toBeNull()
+  })
+  test("a hook line says whether it attached", () => {
+    expect(decodeLoaderLine("hook\tpipe_unlock\tmissing")).toEqual({
+      kind: "hook",
+      name: "pipe_unlock",
+      attached: false,
+    })
+    expect(decodeLoaderLine("hook\tpipe_unlock\tmaybe")).toBeNull()
   })
   test("a candidate is its pid, its NSpid and its namespaces, its own first", () => {
     expect(decodeLoaderLine("candidate\t2\t900\t900,12,1\t30,20,10")).toEqual({
@@ -380,6 +400,9 @@ describe("namespace registration", () => {
     expect(relayedCall({ kind: "flush", extra: 1 }, "20")).toEqual({
       kind: "flush",
     })
+    expect(relayedCall({ kind: "subscribe-output" }, "20")).toEqual({
+      kind: "subscribe-output",
+    })
     expect(() => relayedCall({ kind: "grant" }, "20")).toThrow()
     expect(() =>
       relayedCall(
@@ -387,6 +410,30 @@ describe("namespace registration", () => {
         null,
       ),
     ).toThrow()
+  })
+})
+
+describe("attribution", () => {
+  const all = ATTRIBUTION_HOOKS.map(name => ({ name, attached: true }))
+  test("it is on when every hook attached", () => {
+    expect(planAttribution(all)).toEqual({ on: true })
+  })
+  test("it is off, naming the hook, when any one is missing", () => {
+    for (const hook of ATTRIBUTION_HOOKS) {
+      const missing = all.map(h =>
+        h.name === hook ? { name: hook, attached: false } : h,
+      )
+      expect(planAttribution(missing)).toEqual({
+        on: false,
+        why: "missing-hook",
+        hook,
+      })
+      expect(planAttribution(all.filter(h => h.name !== hook))).toEqual({
+        on: false,
+        why: "missing-hook",
+        hook,
+      })
+    }
   })
 })
 
@@ -417,6 +464,7 @@ describe("the role's life", () => {
     const hello = (loader: ObserverHello["loader"]): ObserverHello => ({
       version: "v",
       loader,
+      attribution: { on: true },
     })
     expect(loaderRefusal(hello({ kind: "ready" }))).toBeNull()
     expect(
@@ -447,16 +495,28 @@ describe("the machine role's server, with a stand-in loader", () => {
       expect(await channel.ready).toEqual({
         version: "v1",
         loader: { kind: "ready" },
+        attribution: { on: true },
       })
-      const got: ObserverNotice[] = []
-      // It answers only when the connection ends.
+      const got: ObserverUpdate[] = []
+      const output: ObserverUpdate[] = []
+      // Each answers only when the connection ends.
       channel
         .call({ kind: "subscribe" }, undefined, n => got.push(n))
         .catch(() => {})
+      channel
+        .call({ kind: "subscribe-output" }, undefined, n => output.push(n))
+        .catch(() => {})
       expect(await channel.call(direct(4))).toBe("40")
       await channel.call({ kind: "flush" })
-      expect(got.map(n => [n.lane, n.run, n.event.kind])).toEqual([
-        ["40", "1", "exit"],
+      expect(got).toEqual([
+        { lane: "40", run: "1", event: { kind: "exit", at: 1, status: 0 } },
+      ])
+      expect(output).toEqual([
+        {
+          lane: "40",
+          run: "1",
+          output: { kind: "output", fd: "stdout", statement: 1, bytes: 5 },
+        },
       ])
       await expect(channel.call(direct(0))).rejects.toThrow("not a process id")
       await expect(channel.call(direct(3))).rejects.toThrow(

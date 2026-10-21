@@ -305,6 +305,10 @@ every lane, reports each file its processes name, daemons included, and
 stops none of their calls. A lane is its first process's PID namespace;
 a host inside a lane is served the observer through that lane's helper,
 relayed by the host outside, and registers only lanes below its own.
+ADR-0204, accepted and not yet built, has the observer also attribute
+each byte of a tool call's output to the top-level statement of its
+command that wrote it, told by pine·trie's own bash, one pinned version
+that every lane's runtime carries.
 From those runs and `.gitignore`, each path is source, derived or local. A
 recipe is a recorded run, and a disk made for a new state (an update's
 merge, a container on another image) loses the outputs whose recipe no

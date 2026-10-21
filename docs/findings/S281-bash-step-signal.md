@@ -1,6 +1,7 @@
 # S281 — A `DEBUG` trap under `set -T`, installed by `BASH_ENV`, tells the kernel which line bash runs; a short list of constructs, all visible in the parse, must fall back
 
 - **Status:** Answered
+- **Led to:** ADR-0204
 
 Measured in a lane (Debian 13, bash 5.2.37) and, end to end with S283's
 kernel side, in a QEMU guest on the lane VM's kernel (Linux 6.18.57) with
@@ -43,7 +44,7 @@ cannot rule out from the parse. Either means attribution could be wrong
 without the host knowing, or a command could behave differently because
 pine·trie watched it.
 
-**Throw away.** The probe (`docs/findings/archive/S281-bash-step-signal/`), unless
+**Throw away.** The probe (`docs/findings/S281-bash-step-signal/`), unless
 a plan builds on it. It runs in the lane, on Debian 13's bash 5.2.37: the
 trap's behaviour is bash's, not the kernel's, so S283's kernel side is not
 repeated.
@@ -206,7 +207,7 @@ a real lane.
 
 ## Sources
 
-`docs/findings/archive/S281-bash-step-signal/`, which a plan would build on:
+`docs/findings/S281-bash-step-signal/`, which a plan would build on:
 
 - `coverage.py`: Q1 and Q2 in the lane, with signals counted from inside
   each statement.

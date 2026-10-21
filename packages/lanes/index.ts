@@ -133,6 +133,7 @@ export {
   NOTHING_ATTACHED,
   RUNTIME_BIN,
   RUNTIME_MOUNT,
+  RUNTIME_SHELL_PATH,
 } from "./spec.ts"
 export {
   decideContainerStart,

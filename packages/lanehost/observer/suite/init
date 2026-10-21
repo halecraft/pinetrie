@@ -12,6 +12,8 @@ mount -t cgroup2 cgroup /sys/fs/cgroup
 mkdir -p /w /tmp
 mount -t tmpfs w /w
 mount -t tmpfs tmp /tmp
+# bash's process substitution names its pipes here.
+ln -s /proc/self/fd /dev/fd
 mkdir -p /w/remote
 # A tmpfs registered as remote stands for virtiofs: the loader lstats its files.
 mount -t tmpfs remote /w/remote
@@ -64,13 +66,34 @@ outside() {
   nsenter -t $f -p -- "$@" 3>&-
 }
 
-# <ring KiB> <events file>: a loader, its commands on fd 3.
+# <first pid> <run> <shell> <command file>: the shell on the command, as
+# run <run>, begun in that lane as a helper's `shell` call is: stdin
+# /dev/null, stdout and stderr each a pipe of its own, read to their ends
+# into /tmp/out<run>.1 and .2.
+piperun() {
+  f=$1 r=$2 sh=$3
+  rm -f /tmp/p$r.1 /tmp/p$r.2
+  mkfifo /tmp/p$r.1 /tmp/p$r.2
+  cat /tmp/p$r.1 > /tmp/out$r.1 &
+  c1=$!
+  cat /tmp/p$r.2 > /tmp/out$r.2 &
+  c2=$!
+  nsenter -t $f -p -- env PINETRIE_RUN=$r $sh -c "$(cat $4)" < /dev/null > /tmp/p$r.1 2> /tmp/p$r.2 3>&-
+  wait $c1 $c2
+}
+# <run>: what its pipes carried, in hex, for the scenario to attribute.
+sayout() {
+  say bytes $1 1 "$(od -An -v -tx1 /tmp/out$1.1 | tr -d ' \n')"
+  say bytes $1 2 "$(od -An -v -tx1 /tmp/out$1.2 | tr -d ' \n')"
+}
+
+# <ring KiB> <events file> [<output ring KiB>]: a loader, its commands on fd 3.
 start() {
   rm -f /tmp/ctl
   mkfifo /tmp/ctl
   # Read and write, so opening it waits for no reader.
   exec 3<> /tmp/ctl
-  observe "$1" < /tmp/ctl > "$2" 2> "$2.err" 3>&- &
+  observe "$1" $3 < /tmp/ctl > "$2" 2> "$2.err" 3>&- &
   op=$!
   for i in $(seq 600); do
     grep -q '^ready$' "$2" 2> /dev/null && return 0
@@ -182,6 +205,29 @@ if start 65536 $EV; then
   inrun $PI 23 sh -c 'echo i > /w/r23/i.txt'
   inrun $PA 24 sh -c 'echo o > /w/r23/o.txt'
 
+  step bash
+  # Every kind of statement, in pine·trie's bash (/cmd.sh, from the scenario).
+  printf 'echo "$1"\n' > /tmp/src.sh
+  mkdir -p /w/r30
+  cd /w/r30
+  piperun $PA 30 /bin/bash-pt /cmd.sh
+  cd /
+  sayout 30
+  # busybox's sh never signals: its run's pipes are never learned.
+  printf 'echo x; echo y >&2' > /tmp/plain.sh
+  piperun $PA 31 sh /tmp/plain.sh
+  printf 'stats\ts30\n' >&3
+  answer "stats-done${T}s30\$" $EV
+  # The loader stopped while a call writes, then sent the flush before it
+  # reads on: the call's output is in its rings when it answers.
+  printf 'echo a; echo b >&2' > /tmp/settle.sh
+  kill -STOP $op
+  piperun $PA 32 /bin/bash-pt /tmp/settle.sh
+  printf 'flush\tt32\n' >&3
+  kill -CONT $op
+  answer "flushed${T}t32\$" $EV
+  sayout 32
+
   step flush
   # The loader stopped while the run writes, then sent the flush before it
   # reads on: the run's events are all still in the ring when it answers.
@@ -218,10 +264,28 @@ if start 16 $FL; then
 fi
 say flood $N
 
+# An output ring far too small for a call's output, read by a loader stopped
+# meanwhile: its output is lost, counted, and none of its file events, though
+# the disk ring has room for its file events only, not its output's.
+OF=/tmp/oflood.tsv
+if start 256 $OF 16; then
+  register $OF a $PA
+  step oflood
+  mkdir -p /w/oflood
+  printf 'for i in $(seq 50); do head -c 2097152 /dev/zero; echo x > /w/oflood/f$i; done' > /tmp/oflood.sh
+  kill -STOP $op
+  piperun $PA 40 /bin/bash-pt /tmp/oflood.sh
+  kill -CONT $op
+  flush end $OF
+  stop
+fi
+
 echo "=== events"
 cat $EV
 echo "=== flood"
 cat $FL
+echo "=== oflood"
+cat $OF
 echo "=== expect"
 cat $E
 echo "=== end"

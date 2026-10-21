@@ -14,6 +14,7 @@ import {
   isWithin,
   laneSkillPath,
   PRODUCT_NAME,
+  RUNTIME_BASH,
   type RuntimeProgram,
   type ThreadId,
 } from "@pinetrie/core"
@@ -23,11 +24,23 @@ import {
   type PutImageAsk,
   type ToolAnswer,
 } from "@pinetrie/rules"
-import { CONFLICT_TOOL, FIND_TOOL, GREP_TOOL } from "@pinetrie/threads"
+import {
+  BASH_TOOL,
+  CONFLICT_TOOL,
+  FIND_TOOL,
+  GREP_TOOL,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPromptSections } from "./deep.ts"
-import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
+import {
+  type LaneChannel,
+  type LaneShell,
+  laneEnv,
+  laneShell,
+  refusingEnv,
+  refusingShell,
+} from "./lane-env.ts"
 import type { CardReadAnswer } from "./read-card.ts"
 import type { BlobAnswer } from "./save-blob.ts"
 import { threadOfContext } from "./thread-context.ts"
@@ -50,6 +63,8 @@ export interface LaneAccess {
   readonly hostPaths: readonly string[]
   /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
   readonly programs: string
+  /** Where pine·trie's bash is in the lane (`RUNTIME_SHELL_PATH`). */
+  readonly shell: string
   readonly gate: () => Promise<LaneChannel>
 }
 
@@ -102,6 +117,14 @@ export interface LaneFacts {
   /** The lane note's path in the lane. */
   readonly note: string
 }
+
+/**
+ * Which bash runs the `bash` tool's commands: pine·trie's own, of the release
+ * the lane runtime is built from, whatever the image; a script the command
+ * runs keeps the image's.
+ */
+const bashRule = (version: string): string =>
+  `Your ${BASH_TOOL} tool runs commands in ${PRODUCT_NAME}'s own bash ${version}, whatever the image; a script a command runs (#!/bin/bash, bash x.sh) uses the image's bash.`
 
 /**
  * What each program the runtime carries for `bash` is preferred over. Keyed
@@ -165,6 +188,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
           `Docker runs here, rootless, at $DOCKER_HOST. There is no /var/run/docker.sock: point a tool that assumes it at $DOCKER_HOST. Before building or running images here, read ${grants.nestedDockerNote}.`,
         ]),
     `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER), "and")} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER), "and")}.`,
+    bashRule(RUNTIME_BASH.version),
     ...(facts.defaultImage
       ? [
           "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",
@@ -230,6 +254,8 @@ export interface ToolContext {
   readonly env: ExecutionEnv
   /** Where a search tool finds the program it runs, in `env`'s file system. */
   readonly programs: ProgramPath
+  /** Runs a `bash` call's command in pine·trie's bash, in the lane. */
+  readonly shell: LaneShell
   readonly dir: string
   readonly lane: {
     readonly facts: LaneFacts
@@ -258,6 +284,7 @@ export function laneToolContext(
     return {
       env: refusingEnv(project, NO_TOOLS),
       programs: async program => program,
+      shell: refusingShell(NO_TOOLS),
       dir: project,
       lane: null,
     }
@@ -265,6 +292,7 @@ export function laneToolContext(
   return {
     env: laneEnv(facts.dir, access.gate),
     programs: async program => `${programs}/${program}`,
+    shell: laneShell(access.shell, facts.dir, access.gate),
     dir: facts.dir,
     lane: { facts, hostPaths },
   }

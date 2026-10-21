@@ -607,8 +607,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool is named other than its id",
     file: "packages/pi/tools.ts",
-    from: "  [BASH_TOOL]: () => createBashTool(),",
-    to: '  [BASH_TOOL]: () => ({ ...createBashTool(), name: "shell" }),',
+    from: "  [BASH_TOOL]: () => bashTool(),",
+    to: '  [BASH_TOOL]: () => ({ ...bashTool(), name: "shell" }),',
     command: unit,
     expect: "bash is the name of the tool made for it",
   },
@@ -1232,5 +1232,82 @@ export const mutations: readonly Mutation[] = [
     command: config,
     expect:
       "the shipped copy loads, registers anthropic, and leaves a subscription shaped",
+  },
+  {
+    name: "the agent is not told which bash runs its commands",
+    file: "packages/pi/lanes.ts",
+    from: "    bashRule(RUNTIME_BASH.version),\n",
+    to: "",
+    command: unit,
+    expect:
+      "names pine·trie's bash, at the runtime's pinned release, on any image",
+  },
+  {
+    name: "a cut view's first line is off by one",
+    file: "packages/pi/bash-tool.ts",
+    from: "    const first = t.totalLines - t.outputLines + 1",
+    to: "    const first = t.totalLines - t.outputLines + 2",
+    command: unit,
+    expect:
+      "bashResult: a cut view names the lines it shows and the full output's file",
+  },
+  {
+    name: "a call with no output says nothing",
+    file: "packages/pi/bash-tool.ts",
+    from: '  return { ok: true, text: text || "(no output)", details }',
+    to: "  return { ok: true, text, details }",
+    command: unit,
+    expect: "its result is pi's bash tool's: no output",
+  },
+  {
+    name: "the bash tool's description drifts from pi's",
+    file: "packages/pi/bash-tool.ts",
+    from: "    description: `Execute a bash command in the current working directory.",
+    to: "    description: `Run a bash command in the current working directory.",
+    command: unit,
+    expect:
+      "the model meets pi's bash tool: its name, description and parameters",
+  },
+  {
+    name: "a background job holds a bash call to its end",
+    file: "packages/pi/lane-shell.ts",
+    from: "      else waitQuiet()",
+    to: "      else {}",
+    command: unit,
+    expect: "a background job holding the pipes does not hold the call",
+  },
+  {
+    name: "a bash call's output is never cut off at the cap",
+    file: "packages/pi/lane-shell.ts",
+    from: "      if (sent + bytes.length > request.cap) {",
+    to: "      if (false) {",
+    command: unit,
+    expect: "past the cap, one over-cap and no more chunks",
+  },
+  {
+    name: "a bash call's output never spills",
+    file: "packages/pi/lane-shell.ts",
+    from: "        if (!isSpillDue(counts, request.spill)) return",
+    to: "        return",
+    command: unit,
+    expect:
+      "past the spill's limits, every byte from the start goes to its file",
+  },
+  {
+    name: "a run starts unrecorded",
+    file: "packages/pi/lane-helper.ts",
+    from: "  launched.push({ run, command })",
+    to: "  void command",
+    command: unit,
+    expect:
+      "through the helper, a bash call's run is in the next drain, with its command",
+  },
+  {
+    name: "a character split across chunks is decoded in halves",
+    file: "packages/pi/shell-capture.ts",
+    from: "    return need > back ? bytes.length - back : bytes.length",
+    to: "    return bytes.length",
+    command: unit,
+    expect: "a character split across chunks, and across pipes, reads whole",
   },
 ]

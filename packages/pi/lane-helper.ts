@@ -59,7 +59,8 @@ import {
   type LaneHello,
   type RelayReply,
 } from "./lane-protocol.ts"
-import { launchOptions, serveRelay } from "./observer.ts"
+import { runShell } from "./lane-shell.ts"
+import { launchOptions, RUN_ENV, serveRelay } from "./observer.ts"
 
 const cwd = process.env.PINETRIE_WORKSPACE_ROOT ?? WORKSPACE_ROOT
 const env = new NodeExecutionEnv({ cwd })
@@ -96,7 +97,17 @@ const monotonicUs = () => Number(process.hrtime.bigint() / 1000n)
  * may still report under its number. Within a safe integer for 280 years.
  */
 let nextRun = Date.now() * 1024
-const runId = () => String(nextRun++)
+
+/**
+ * A new run of `command`: numbered, and recorded with its command for the
+ * next drain, which the disk model's recipes read. `exec` and `shell` both
+ * start theirs here, so no run starts unrecorded.
+ */
+const startRun = (command: string): string => {
+  const run = String(nextRun++)
+  launched.push({ run, command })
+  return run
+}
 
 const isPresent = (p: string): boolean => {
   try {
@@ -328,6 +339,24 @@ serve<LaneHello, LaneCall, unknown, unknown>(
     if ("hashes" in call) return hashes(call.hashes)
     if ("ignoreFacts" in call) return ignoreFacts(call.ignoreFacts)
     if ("checkRecipes" in call) return checkRecipes(call.checkRecipes)
+    if ("shell" in call) {
+      const { update } = context
+      if (update === undefined) throw new Error("a shell call asks for updates")
+      return runShell(call.shell, {
+        startRun,
+        runEnv: run => ({ ...process.env, [RUN_ENV]: run }),
+        spillFile: async () => {
+          const made = await env.createTempFile(
+            { prefix: "pi-output-", suffix: ".log" },
+            BACKGROUND_CONTEXT,
+          )
+          if (!made.ok) throw made.error
+          return made.value
+        },
+        signal: context.signal,
+        update,
+      })
+    }
     if (!isEnvMethod(call.method))
       throw new Error(`${call.method} does not cross into a lane`)
     const args = [...call.args]
@@ -340,8 +369,7 @@ serve<LaneHello, LaneCall, unknown, unknown>(
           ...((args[1] as object | undefined) ?? {}),
           onUpdate: update,
         }
-      const run = runId()
-      launched.push({ run, command: String(args[0]) })
+      const run = startRun(String(args[0]))
       args[1] = launchOptions(run, args[1] as object | undefined)
       return method.apply(env, [...args, signal])
     }

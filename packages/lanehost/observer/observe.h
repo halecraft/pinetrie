@@ -53,4 +53,22 @@ struct event {
   struct pathbuf b;  // a rename's and a link's target
 };
 
+// The prctl option by which pine·trie's bash signals the top-level statement
+// it starts: arg2 its ordinal, from 1, arg3 its line. core's
+// STATEMENT_SIGNAL, which a test checks this spells.
+#define STATEMENT_SIGNAL 0x50540001
+
+enum output_kind { OE_STATEMENT = 1, OE_OUTPUT, OE_LOST };
+
+// What the output ring carries, never the disk events' ring.
+struct output_event {
+  u32 kind;
+  u32 fd;  // output: 1 for the run's stdout pipe, 2 for its stderr
+  struct run_key run;
+  u32 statement;  // output: the writer's, 0 for none of this run's
+  u32 line;       // statement: its line
+  u64 n;          // output: bytes; lost: pieces lost
+  u64 ts;         // bpf_ktime_get_ns: CLOCK_MONOTONIC
+};
+
 #endif

@@ -1,0 +1,15 @@
+# time.py (RUNS = 3, the long string 5,000 pairs), inside alpine:3.23:
+# Alpine's bash 5.3.3 (musl, dynamic) against bash 5.3.20 + apply.py static
+# against musl, with musl's allocator and with mimalloc 2.2.4 linked in.
+case                                  alpine          musl       musl+mi
+arithmetic loop                   0.612s 1.0x    0.508s 0.8x    0.383s 0.6x
+string append                     0.394s 1.0x    0.378s 1.0x    0.345s 0.9x
+array append and walk             0.374s 1.0x    0.323s 0.9x    0.193s 0.5x
+associative array                 0.214s 1.0x    0.181s 0.8x    0.108s 0.5x
+expansions on a long string       1.330s 1.0x    0.730s 0.5x    0.708s 0.5x
+function calls                    0.679s 1.0x    0.498s 0.7x    0.395s 0.6x
+printf -v                         0.376s 1.0x    0.285s 0.8x    0.209s 0.6x
+read a file line by line          0.470s 1.0x    0.385s 0.8x    0.304s 0.6x
+command substitution              0.675s 1.0x    0.682s 1.0x    0.787s 1.2x
+glob over 5,000 files             0.068s 1.0x    0.069s 1.0x    0.055s 0.8x
+case patterns                     0.318s 1.0x    0.274s 0.9x    0.185s 0.6x

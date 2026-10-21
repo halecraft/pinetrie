@@ -2,6 +2,7 @@
 // built from, and why an image cannot host a lane.
 
 import { createHash } from "node:crypto"
+import { RUNTIME_BASH } from "@pinetrie/core"
 
 /** The oldest git a lane's image may have: jj's fetch needs 2.41. */
 const MIN_GIT: readonly [number, number] = [2, 41]
@@ -57,8 +58,9 @@ export function filesContainerfileCopies(content: string): readonly string[] {
 /**
  * The images a project's lanes need. pine·trie's is built
  * with the host's jj version and the app's Playwright version, so its jj and
- * its browser match what drives them. A project's own image gets the jj
- * version only. Each is tagged by a hash of its Containerfile and build
+ * its browser match what drives them, and with the bash release and patch
+ * count of core's `RUNTIME_BASH`, so the runtime's shell is the one the
+ * agent is told of. A project's own image gets the jj version only. Each is tagged by a hash of its Containerfile and build
  * arguments, so a change of either builds it again.
  */
 export function planImages(input: {
@@ -73,6 +75,8 @@ export function planImages(input: {
     pinetrie: imagePlan(input.pinetrie, [
       jj,
       `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,
+      `BASH_VERSION=${RUNTIME_BASH.version}`,
+      `BASH_PATCHES=${RUNTIME_BASH.patches}`,
     ]),
     project: input.project === null ? null : imagePlan(input.project, [jj]),
   }

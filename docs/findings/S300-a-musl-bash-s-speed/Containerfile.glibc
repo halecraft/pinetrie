@@ -1,0 +1,12 @@
+# S300: the same bash 5.3 (GNU's patches 001-020, apply.py), static against
+# Debian 13's glibc, to tell the C library's cost from the version's.
+FROM docker.io/library/debian:13
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential curl python3 patch > /dev/null
+WORKDIR /src
+RUN curl -sfL https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz | tar xz \
+ && for i in $(seq -w 1 20); do curl -sfL https://ftp.gnu.org/gnu/bash/bash-5.3-patches/bash53-0$i | patch -s -p0 -d bash-5.3 || exit 1; done
+COPY apply.py /src/
+RUN python3 apply.py bash-5.3 && cd bash-5.3 \
+ && ./configure --enable-static-link --without-bash-malloc --quiet \
+ && (make -s -j4 > /tmp/make.log 2>&1 || (tail -25 /tmp/make.log; exit 1)) \
+ && cp bash /bash-pt && /bash-pt -c 'echo "built $BASH_VERSION"'

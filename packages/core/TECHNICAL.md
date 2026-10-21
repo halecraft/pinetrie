@@ -80,8 +80,29 @@ A type lives in the highest package that all its users can import
 | `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
 | `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk, its snapshots and the operations on it (`DiskOp`) |
 | `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded; proposed changes' facts and decisions; the commit trailers |
-| `folder.ts`, `runs.ts`, `images.ts` | a folder project's history; what a command did to a disk; blobs |
+| `folder.ts`, `runs.ts`, `output.ts`, `images.ts` | a folder project's history; what a command did to a disk; what a `bash` call wrote, by statement; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
+
+## Output apart from runs (`output.ts`)
+
+A `bash` call's output events (`OutputEvent`: a statement signalled, bytes
+of a pipe written by a statement, output lost) are a type of their own, never
+`RunEvent` kinds, with a line codec of their own. They travel apart at every
+layer (the observer's ring, the loader's `out` lines, the role's
+`subscribe-output`), so a chatty command cannot crowd a file event out of
+the disk events' ring, batches or held notices.
+
+- **The kernel's statement 0 is never a statement.** It marks a writer no
+  statement of the run tagged; the decoder reads it as `null`, and a known
+  statement is a `StatementIndex`, from 1, which only `statementIndex`
+  makes.
+- **`STATEMENT_SIGNAL` is spelled three times**: here, in the bash patch
+  (`packages/lanes/image/bash/apply.py`) and in the observer's `observe.h`.
+  C and Python cannot import it; `packages/lanehost/attribution.test.ts`
+  reads both and checks they spell this.
+- **A `Settled` proves the observer's flush answered**: only a lane
+  observation's `settle` makes one (`packages/lanehost`), so what folds a
+  call's end cannot fold it before every output event of the call arrived.
 
 ## Paths as strings (`paths.ts`)
 

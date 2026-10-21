@@ -1,0 +1,15 @@
+# time.py (RUNS = 7, the long string 50,000 pairs), in a Debian 13 lane:
+# Debian's bash 5.2.37 (glibc, dynamic) against bash 5.3.20 + apply.py static
+# against glibc, musl, and musl with mimalloc 2.2.4 linked in.
+case                                  debian         glibc          musl       musl+mi
+arithmetic loop                   0.418s 1.0x    0.365s 0.9x    0.525s 1.3x    0.357s 0.9x
+string append                     0.127s 1.0x    0.125s 1.0x    0.343s 2.7x    0.324s 2.5x
+array append and walk             0.215s 1.0x    0.199s 0.9x    0.268s 1.2x    0.178s 0.8x
+associative array                 0.127s 1.0x    0.107s 0.8x    0.148s 1.2x    0.106s 0.8x
+expansions on a long string      58.185s 1.0x   57.599s 1.0x   66.914s 1.2x   66.562s 1.1x
+function calls                    1.743s 1.0x    1.401s 0.8x    1.755s 1.0x    1.637s 0.9x
+printf -v                         0.216s 1.0x    0.186s 0.9x    0.263s 1.2x    0.203s 0.9x
+read a file line by line          0.314s 1.0x    0.295s 0.9x    0.358s 1.1x    0.294s 0.9x
+command substitution              0.318s 1.0x    0.266s 0.8x    0.241s 0.8x    0.315s 1.0x
+glob over 5,000 files             0.029s 1.0x    0.028s 1.0x    0.064s 2.2x    0.055s 1.9x
+case patterns                     0.199s 1.0x    0.167s 0.8x    0.223s 1.1x    0.168s 0.8x

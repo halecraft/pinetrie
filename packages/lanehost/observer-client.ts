@@ -15,17 +15,24 @@
 // - A drain begins with the role's flush: once it answers, every notice of
 //   the lane's runs before it has arrived, and is folded into what the
 //   drain is given.
+// - A lane's output events come by a subscription of their own, never into
+//   its batch: each goes to the call that claimed its run, or is held,
+//   bounded, until one does (`unclaimed.ts`). A run let go of drops its late
+//   output; one never claimed holds the bound's room.
 // - A relay is a channel of its own for the host inside a lane, so the role
 //   owns that host's lanes by that channel. Each of its registrations is
 //   made forwarded, within the lane, whatever it said (`relayedCall`).
 
 import { type Channel, openChannel } from "@pinetrie/channel"
 import {
+  type Attribution,
   errorText,
   type FoldNotices,
   type LaneObservation,
+  type OutputEvent,
   type RunNotice,
   type RunTraces,
+  type Settled,
 } from "@pinetrie/core"
 import {
   drainEnded,
@@ -40,16 +47,21 @@ import {
   loaderRefusal,
   type ObserverCall,
   type ObserverHello,
-  type ObserverNotice,
+  type ObserverUpdate,
+  planAttribution,
   relayedCall,
 } from "./observer.ts"
+import { claimedEvents, planUnclaimed, RELEASED_KEPT } from "./unclaimed.ts"
 
 export type ObserverChannel = Channel<
   ObserverHello,
   ObserverCall,
-  ObserverNotice,
+  ObserverUpdate,
   unknown
 >
+
+// The one place a `Settled` is made: after the role's flush has answered.
+const SETTLED = {} as Settled
 
 /**
  * A channel to the machine role through a socket on this machine: a host
@@ -99,6 +111,58 @@ interface Held {
   batch: RunNotice[]
   /** The last drain, settled or not: the next starts after it. */
   draining: Promise<unknown>
+  /** Each claimed run's listener. */
+  readonly claims: Map<string, (event: OutputEvent) => void>
+  /** Output of runs no call has claimed yet, by run, in order. */
+  readonly unclaimed: Map<string, OutputEvent[]>
+  /** How many events `unclaimed` holds in all. */
+  unclaimedCount: number
+  /** Events of unclaimed runs past the bound, by run. */
+  readonly lost: Map<string, number>
+  /** Runs let go of, oldest first, at most `RELEASED_KEPT`. */
+  readonly released: Set<string>
+}
+
+/** `event` to its run's call, or held for the call that will claim it. */
+function takeOutput(lane: Held, run: string, event: OutputEvent): void {
+  const claim = lane.claims.get(run)
+  if (claim !== undefined) {
+    claim(event)
+    return
+  }
+  if (lane.released.has(run)) return
+  if (planUnclaimed(lane.unclaimedCount) === "lose") {
+    lane.lost.set(run, (lane.lost.get(run) ?? 0) + 1)
+    return
+  }
+  const held = lane.unclaimed.get(run)
+  if (held === undefined) lane.unclaimed.set(run, [event])
+  else held.push(event)
+  lane.unclaimedCount++
+}
+
+/** Run `run` claimed by `onEvent`: what was held first, then each event as it comes. */
+function claimOutput(
+  lane: Held,
+  run: string,
+  onEvent: (event: OutputEvent) => void,
+): () => void {
+  const held = lane.unclaimed.get(run) ?? []
+  const events = claimedEvents(held, lane.lost.get(run) ?? 0)
+  lane.unclaimed.delete(run)
+  lane.unclaimedCount -= held.length
+  lane.lost.delete(run)
+  lane.claims.set(run, onEvent)
+  for (const e of events) onEvent(e)
+  return () => {
+    if (lane.claims.get(run) !== onEvent) return
+    lane.claims.delete(run)
+    lane.released.add(run)
+    for (const old of lane.released) {
+      if (lane.released.size <= RELEASED_KEPT) break
+      lane.released.delete(old)
+    }
+  }
 }
 
 /** `notice` taken into the lane's batch, and the batch folded once full. */
@@ -116,6 +180,8 @@ export function observerClient(input: {
   /** Each registered lane by its namespace on the channel now. */
   const byNamespace = new Map<LaneNamespace, Held>()
   let channel: Promise<ObserverChannel> | null = null
+  /** The role's, as its last hello said: none is attributed before one has. */
+  let attribution: Attribution = planAttribution([])
   /** The channel last reset, until it has closed. */
   let closing: Promise<void> = Promise.resolve()
   /**
@@ -146,10 +212,18 @@ export function observerClient(input: {
         c.close()
         throw new Error(refused)
       }
+      attribution = hello.attribution
       void c.closed.then(() => {
         if (channel === opening) channel = null
       })
+      c.call({ kind: "subscribe-output" }, undefined, n => {
+        if (!("output" in n)) return
+        // A lane not registered on this channel yet: its call shows undivided.
+        const lane = byNamespace.get(n.lane)
+        if (lane !== undefined) takeOutput(lane, n.run, n.output)
+      }).catch(() => {})
       c.call({ kind: "subscribe" }, undefined, n => {
+        if (!("event" in n)) return
         const notice = { run: n.run, event: n.event }
         const lane = byNamespace.get(n.lane)
         if (lane !== undefined) take(lane, notice)
@@ -182,6 +256,11 @@ export function observerClient(input: {
         gathered: newGathered(),
         batch: [],
         draining: Promise.resolve(),
+        claims: new Map(),
+        unclaimed: new Map(),
+        unclaimedCount: 0,
+        lost: new Map(),
+        released: new Set(),
       }
       const c = await opened()
       // Gathering before it is registered: its first notices may come before the answer.
@@ -193,6 +272,16 @@ export function observerClient(input: {
         throw error
       }
       return {
+        get attribution() {
+          return attribution
+        },
+        output: (run, onEvent) => claimOutput(held, run, onEvent),
+        async settle() {
+          const now = await opened()
+          if (held.namespace === null) await register(now, held)
+          await now.call({ kind: "flush" })
+          return SETTLED
+        },
         drain(drain) {
           const drained = held.draining.then(async () => {
             const now = await opened()
@@ -236,6 +325,7 @@ export function observerClient(input: {
             hello: {
               version: "",
               loader: { kind: "failed", why: errorText(error) },
+              attribution: planAttribution([]),
             } satisfies ObserverHello,
             call: () => Promise.reject(new Error(errorText(error))),
             close: () => {},

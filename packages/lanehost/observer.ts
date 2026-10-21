@@ -3,7 +3,14 @@
 // decision about them, each a planner the server executes.
 
 import { createHash } from "node:crypto"
-import { decodeRunEvent, OBSERVER_SOCKET, type RunEvent } from "@pinetrie/core"
+import {
+  type Attribution,
+  decodeOutputEvent,
+  decodeRunEvent,
+  OBSERVER_SOCKET,
+  type OutputEvent,
+  type RunEvent,
+} from "@pinetrie/core"
 
 /** A lane, as the observer knows it: its PID namespace's inode, in decimal. */
 export type LaneNamespace = string
@@ -32,6 +39,12 @@ export interface Candidate {
 
 /** One line of the loader's stdout. */
 export type LoaderLine =
+  /** An attribution hook, attached or not, before `ready`. */
+  | {
+      readonly kind: "hook"
+      readonly name: string
+      readonly attached: boolean
+    }
   | { readonly kind: "ready" }
   | {
       readonly kind: "event"
@@ -41,6 +54,12 @@ export type LoaderLine =
       /** Only on a release under a remote directory that the loader lstat'ed. */
       readonly inodes: ReleaseInodes | null
       readonly event: RunEvent
+    }
+  | {
+      readonly kind: "output"
+      readonly lane: LaneNamespace
+      readonly run: string
+      readonly output: OutputEvent
     }
   | ({ readonly kind: "candidate"; readonly token: string } & Candidate)
   /** Every candidate of a lookup is out; `cut` when the loader could hold no more. */
@@ -53,6 +72,14 @@ export type LoaderLine =
   | { readonly kind: "refused"; readonly token: string; readonly why: string }
   | { readonly kind: "unregistered"; readonly lane: LaneNamespace }
   | { readonly kind: "flushed"; readonly token: string }
+  /** Signals refused from a run's tasks since the last stats: the suite reads them. */
+  | {
+      readonly kind: "refusals"
+      readonly lane: LaneNamespace
+      readonly run: string
+      readonly count: number
+    }
+  | { readonly kind: "stats-done"; readonly token: string }
 
 const DECIMAL = /^\d+$/
 const DECIMALS = /^\d+(,\d+)*$/
@@ -77,6 +104,26 @@ export function decodeLoaderLine(line: string): LoaderLine | null {
   const f = line.split("\t")
   const [word, a = "", b = "", c = "", d = ""] = f
   switch (word) {
+    case "hook":
+      return f.length === 3 && (b === "attached" || b === "missing")
+        ? { kind: "hook", name: a, attached: b === "attached" }
+        : null
+    case "out": {
+      if (!DECIMAL.test(a) || !DECIMAL.test(b)) return null
+      const output = decodeOutputEvent(f.slice(3).join("\t"))
+      return output === null
+        ? null
+        : { kind: "output", lane: a, run: b, output }
+    }
+    case "refusals":
+      return f.length === 4 &&
+        DECIMAL.test(a) &&
+        DECIMAL.test(b) &&
+        DECIMAL.test(c)
+        ? { kind: "refusals", lane: a, run: b, count: Number(c) }
+        : null
+    case "stats-done":
+      return f.length === 2 ? { kind: "stats-done", token: a } : null
     case "ready":
       return f.length === 1 ? { kind: "ready" } : null
     case "ev": {
@@ -149,6 +196,8 @@ export type LoaderCommand =
   | { readonly kind: "drop"; readonly token: string }
   | { readonly kind: "unregister"; readonly lane: LaneNamespace }
   | { readonly kind: "flush"; readonly token: string }
+  /** The refusals counted since the last, for the suite. */
+  | { readonly kind: "stats"; readonly token: string }
 
 /** A command's line, without its newline. */
 export function encodeLoaderCommand(c: LoaderCommand): string {
@@ -167,6 +216,8 @@ export function encodeLoaderCommand(c: LoaderCommand): string {
       return `unregister\t${c.lane}`
     case "flush":
       return `flush\t${c.token}`
+    case "stats":
+      return `stats\t${c.token}`
   }
 }
 
@@ -203,7 +254,9 @@ export type ObserverCall =
   | Extract<LoaderCommand, { kind: "unregister" }>
   /** Its updates are the notices of this connection's lanes; it answers only when the connection ends. */
   | { readonly kind: "subscribe" }
-  /** Answered once every notice before it has gone out as an update. */
+  /** Its updates are the output of this connection's lanes' runs; it answers only when the connection ends. */
+  | { readonly kind: "subscribe-output" }
+  /** Answered once every notice and output before it has gone out as an update. */
   | { readonly kind: "flush" }
 
 /** What the machine role says when a connection opens. */
@@ -214,6 +267,11 @@ export interface ObserverHello {
   readonly loader:
     | { readonly kind: "ready" }
     | { readonly kind: "failed"; readonly why: string }
+  /**
+   * Whether the loader's attribution hooks all attached (`planAttribution`).
+   * Required, so whatever serves a hello, a relay included, says it.
+   */
+  readonly attribution: Attribution
 }
 
 /** A run's event, for the host that registered its lane. */
@@ -221,6 +279,48 @@ export interface ObserverNotice {
   readonly lane: LaneNamespace
   readonly run: string
   readonly event: RunEvent
+}
+
+/**
+ * A run's output event, for the host that registered its lane. Its field is
+ * `output`, never `event`, so it cannot be read as an `ObserverNotice`.
+ */
+export interface ObserverOutput {
+  readonly lane: LaneNamespace
+  readonly run: string
+  readonly output: OutputEvent
+}
+
+/** What the machine role's subscriptions send: `subscribe`'s notices, `subscribe-output`'s output. */
+export type ObserverUpdate = ObserverNotice | ObserverOutput
+
+/**
+ * The kernel functions the observer's attribution programs (`attr_*` in
+ * `observe.bpf.c`) attach to, by the names the loader reports them: a test
+ * checks each program's is here. `anon_pipe_write` is `pipe_write` before
+ * 6.15, attached to whichever exists.
+ */
+export const ATTRIBUTION_HOOKS: readonly string[] = [
+  "security_task_prctl",
+  "anon_pipe_write",
+  "copy_page_from_iter",
+  "pipe_unlock",
+  "pipe_wait_writable",
+  "free_pipe_info",
+]
+
+/**
+ * Attribution on only when every hook of `ATTRIBUTION_HOOKS` attached, by the
+ * loader's `hook` lines: one it did not report is missing. File tracking
+ * loads whatever this decides.
+ */
+export function planAttribution(
+  hooks: readonly { readonly name: string; readonly attached: boolean }[],
+): Attribution {
+  for (const hook of ATTRIBUTION_HOOKS)
+    if (!hooks.some(h => h.name === hook && h.attached))
+      return { on: false, why: "missing-hook", hook }
+  return { on: true }
 }
 
 const stampSize = (stamp: string): string => stamp.slice(0, stamp.indexOf(":"))
@@ -264,12 +364,13 @@ export type Route =
 /**
  * A notice's route. A lane whose host's connection closed (a host
  * restarting) has its notices held until a connection registers it again;
- * so has one whose connection has not subscribed yet.
+ * so has one whose connection has not subscribed yet. Output's route is
+ * the same, its subscription's; held, it is dropped.
  */
 export const routeEvent = (
   registrations: ReadonlyMap<LaneNamespace, Pick<Registration, "owner">>,
   subscribed: ReadonlySet<ConnectionId>,
-  notice: ObserverNotice,
+  notice: Pick<ObserverNotice, "lane">,
 ): Route => {
   const to = registrations.get(notice.lane)?.owner
   return to != null && subscribed.has(to)
@@ -542,6 +643,7 @@ export function relayedCall(
   const call = body as Partial<Record<string, unknown>> | null
   switch (call?.kind) {
     case "subscribe":
+    case "subscribe-output":
     case "flush":
       return { kind: call.kind }
     case "unregister":

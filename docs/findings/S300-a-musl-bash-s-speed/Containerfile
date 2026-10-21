@@ -1,0 +1,14 @@
+# S300: pine·trie's bash as the plan builds it (5.3, GNU's patches 001-020,
+# apply.py, static, musl), with musl's allocator or bash's own (MALLOC).
+#   docker build --build-arg MALLOC=--without-bash-malloc …
+FROM docker.io/library/alpine:3.23
+ARG MALLOC
+RUN apk add --no-cache build-base curl python3 patch > /dev/null
+WORKDIR /src
+RUN curl -sfL https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz | tar xz \
+ && for i in $(seq -w 1 20); do curl -sfL https://ftp.gnu.org/gnu/bash/bash-5.3-patches/bash53-0$i | patch -s -p0 -d bash-5.3 || exit 1; done
+COPY apply.py /src/
+RUN python3 apply.py bash-5.3 && cd bash-5.3 \
+ && ./configure --enable-static-link ${MALLOC} --quiet \
+ && (make -s -j4 > /tmp/make.log 2>&1 || (grep -m5 error /tmp/make.log; exit 1)) \
+ && cp bash /bash-pt && /bash-pt -c 'echo "built $BASH_VERSION"'

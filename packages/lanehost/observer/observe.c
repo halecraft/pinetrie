@@ -3,7 +3,7 @@
 // architecture. It decides nothing: lanehost's machine role reads its lines
 // (packages/lanehost/observer.ts) and routes them.
 //
-//   observe [ring KiB]
+//   observe [ring KiB] [output ring KiB]
 //
 // stdin, one command a line, fields tab-separated, paths escaped as core's
 // codec escapes them (`\\`, `\t`, `\n`):
@@ -18,9 +18,14 @@
 //   drop <token>                       every candidate of <token> let go
 //   unregister <namespace>
 //   flush <token>
+//   stats <token>
 // stdout, one a line:
-//   ready                              every program is attached
+//   hook <name> attached|missing       each attribution hook, before ready
+//   ready                              every file program is attached
 //   ev <lane> <run> <inodes> <event>   <event> is core's line (`encodeRunEvent`)
+//   out <lane> <run> <event>           <event> is core's output line
+//                                      (`encodeOutputEvent`): consecutive
+//                                      bytes of one pipe and statement as one
 //   candidate <token> <pid> <nspid> <namespaces>
 //                                      <nspid>: its NSpid, comma-separated;
 //                                      <namespaces>: its PID namespace's inode,
@@ -30,7 +35,10 @@
 //                                      no more could be held
 //   registered <token> <namespace>  |  refused <token> <why>
 //   unregistered <namespace>
-//   flushed <token>                    after every event before the flush
+//   flushed <token>                    after every event before the flush,
+//                                      of every ring
+//   refusals <lane> <run> <n>          signals refused since the last stats
+//   stats-done <token>                 after them
 // A candidate's namespace is held open from its lookup until it is installed
 // or dropped, and a lane's until it is unregistered, so its inode cannot be
 // another namespace's: what was checked is what is registered. Which
@@ -214,6 +222,62 @@ static void send_lost(const struct run_key *r) {
   unsigned long long n = 0;
   if (bpf_map__lookup_and_delete_elem(skel->maps.lost_by_run, r, sizeof *r, &n, sizeof n, 0) == 0 && n > 0)
     lost_line(r, n);
+}
+
+// Output bytes not written yet: the next of the same pipe and statement adds to them.
+static struct {
+  int held;
+  struct run_key run;
+  unsigned fd, statement;
+  unsigned long long n;
+} pending;
+
+static void write_pending(void) {
+  if (!pending.held) return;
+  printf("out\t%llu\t%llu\toutput\t%u\t%u\t%llu\n", (unsigned long long)pending.run.lane,
+         (unsigned long long)pending.run.run, pending.fd, pending.statement, pending.n);
+  pending.held = 0;
+}
+
+static int on_output(void *ctx, void *data, size_t len) {
+  (void)ctx;
+  struct output_event e;
+  if (len < sizeof e) return 0;
+  memcpy(&e, data, sizeof e);
+  if (e.kind == OE_OUTPUT) {
+    if (e.fd != 1 && e.fd != 2) return 0;
+    if (pending.held && pending.run.lane == e.run.lane && pending.run.run == e.run.run && pending.fd == e.fd &&
+        pending.statement == e.statement) {
+      pending.n += e.n;
+      return 0;
+    }
+    write_pending();
+    pending.held = 1;
+    pending.run = e.run;
+    pending.fd = e.fd;
+    pending.statement = e.statement;
+    pending.n = e.n;
+    return 0;
+  }
+  if (e.kind != OE_STATEMENT) return 0;
+  write_pending();
+  printf("out\t%llu\t%llu\tstatement\t%llu\t%u\t%u\n", (unsigned long long)e.run.lane,
+         (unsigned long long)e.run.run, (unsigned long long)(e.ts / 1000ULL), e.statement, e.line);
+  return 0;
+}
+
+// The run's output lost so far, sent and reset.
+static void send_output_lost(const struct run_key *r) {
+  unsigned long long n = 0;
+  if (bpf_map__lookup_and_delete_elem(skel->maps.output_lost, r, sizeof *r, &n, sizeof n, 0) == 0 && n > 0)
+    printf("out\t%llu\t%llu\toutput-lost\t%llu\n", (unsigned long long)r->lane, (unsigned long long)r->run, n);
+}
+
+// Every ring, read to its end: what a flush answers after. Each ring is
+// added to `rb` from `RINGS`, so one added there is drained here too.
+static void drain(struct ring_buffer *rb) {
+  ring_buffer__consume(rb);
+  write_pending();
 }
 
 static void stamp_of(char *out, size_t cap, long long size, long long sec, unsigned nsec) {
@@ -495,8 +559,10 @@ static struct rb_keys {
 } keys;
 
 static void do_flush(struct ring_buffer *rb, char **f, int n) {
-  ring_buffer__consume(rb);
-  int m = run_keys(skel->maps.lost_by_run, keys.k, 1 << 16);
+  drain(rb);
+  int m = run_keys(skel->maps.output_lost, keys.k, 1 << 16);
+  for (int i = 0; i < m; i++) send_output_lost(&keys.k[i]);
+  m = run_keys(skel->maps.lost_by_run, keys.k, 1 << 16);
   for (int i = 0; i < m; i++) send_lost(&keys.k[i]);
   // Ends the ring had no room for, after their runs' losses.
   m = run_keys(skel->maps.ended, keys.k, 1 << 16);
@@ -509,6 +575,17 @@ static void do_flush(struct ring_buffer *rb, char **f, int n) {
     printf("end\t%llu\n", ts / 1000ULL);
   }
   printf("flushed\t%s\n", n > 1 ? f[1] : "");
+}
+
+static void do_stats(char **f, int n) {
+  int m = run_keys(skel->maps.refusals, keys.k, 1 << 16);
+  for (int i = 0; i < m; i++) {
+    unsigned long long count = 0;
+    if (bpf_map__lookup_and_delete_elem(skel->maps.refusals, &keys.k[i], sizeof keys.k[i], &count, sizeof count, 0) == 0)
+      printf("refusals\t%llu\t%llu\t%llu\n", (unsigned long long)keys.k[i].lane, (unsigned long long)keys.k[i].run,
+             count);
+  }
+  printf("stats-done\t%s\n", n > 1 ? f[1] : "");
 }
 
 static void command(struct ring_buffer *rb, char *line) {
@@ -527,6 +604,7 @@ static void command(struct ring_buffer *rb, char *line) {
   else if (strcmp(f[0], "drop") == 0) do_drop(f, n);
   else if (strcmp(f[0], "unregister") == 0) do_unregister(f, n);
   else if (strcmp(f[0], "flush") == 0) do_flush(rb, f, n);
+  else if (strcmp(f[0], "stats") == 0) do_stats(f, n);
   else if (f[0][0]) fprintf(stderr, "observe: unknown command %s\n", f[0]);
 }
 
@@ -535,8 +613,56 @@ static int fail(const char *step, int err) {
   return 1;
 }
 
+static int is_attribution(const struct bpf_program *p) { return strncmp(bpf_program__name(p), "attr_", 5) == 0; }
+
+// The skeleton opened and loaded. Attribution's programs are attached by
+// `attach_attribution`, never by the skeleton; ones the kernel cannot load
+// are left out, so file tracking loads whatever attribution's fate.
+static int load(unsigned ring_kib, unsigned output_kib, int with_attribution) {
+  skel = observe_bpf__open();
+  if (!skel) return -errno;
+  bpf_map__set_max_entries(skel->maps.events, ring_kib << 10);
+  bpf_map__set_max_entries(skel->maps.output_events, output_kib << 10);
+  struct bpf_program *p;
+  bpf_object__for_each_program(p, skel->obj) {
+    if (!is_attribution(p)) continue;
+    bpf_program__set_autoattach(p, false);
+    if (!with_attribution) bpf_program__set_autoload(p, false);
+  }
+  int err = observe_bpf__load(skel);
+  if (err) {
+    observe_bpf__destroy(skel);
+    skel = NULL;
+  }
+  return err;
+}
+
+// Each attribution program attached to the kernel function its section
+// names, and reported by that name: `attr_pipe_write` falls back to the
+// name kernels before 6.15 give the function.
+static void attach_attribution(int loaded) {
+  struct bpf_program *p;
+  bpf_object__for_each_program(p, skel->obj) {
+    if (!is_attribution(p)) continue;
+    const char *fn = strchr(bpf_program__section_name(p), '/');
+    fn = fn ? fn + 1 : "";
+    struct bpf_link *link = NULL;
+    if (loaded) {
+      link = bpf_program__attach_kprobe(p, false, fn);
+      if (!link && strcmp(fn, "anon_pipe_write") == 0) link = bpf_program__attach_kprobe(p, false, "pipe_write");
+    }
+    printf("hook\t%s\t%s\n", fn, link ? "attached" : "missing");
+  }
+}
+
+static const struct {
+  const char *name;
+  ring_buffer_sample_fn fn;
+} RINGS[] = {{"events", on_event}, {"output_events", on_output}};
+
 int main(int argc, char **argv) {
   unsigned ring_kib = argc > 1 ? (unsigned)atoi(argv[1]) : 64 << 10;
+  unsigned output_kib = argc > 2 ? (unsigned)atoi(argv[2]) : 16 << 10;
   signal(SIGPIPE, SIG_IGN);
   // Each lane and each candidate holds a descriptor.
   struct rlimit nofile;
@@ -544,15 +670,26 @@ int main(int argc, char **argv) {
     nofile.rlim_cur = nofile.rlim_max;
     setrlimit(RLIMIT_NOFILE, &nofile);
   }
-  skel = observe_bpf__open();
-  if (!skel) return fail("open", errno);
-  bpf_map__set_max_entries(skel->maps.events, ring_kib << 10);
-  int err = observe_bpf__load(skel);
+  int with_attribution = 1;
+  int err = load(ring_kib, output_kib, 1);
+  if (err) {
+    with_attribution = 0;
+    err = load(ring_kib, output_kib, 0);
+  }
   if (err) return fail("load", err);
   err = observe_bpf__attach(skel);
   if (err) return fail("attach", err);
-  struct ring_buffer *rb = ring_buffer__new(bpf_map__fd(skel->maps.events), on_event, NULL, NULL);
-  if (!rb) return fail("ring", errno);
+  attach_attribution(with_attribution);
+  struct ring_buffer *rb = NULL;
+  for (size_t i = 0; i < sizeof RINGS / sizeof RINGS[0]; i++) {
+    struct bpf_map *m = bpf_object__find_map_by_name(skel->obj, RINGS[i].name);
+    if (!m) return fail("ring", ENOENT);
+    if (!rb)
+      rb = ring_buffer__new(bpf_map__fd(m), RINGS[i].fn, NULL, NULL);
+    else if (ring_buffer__add(rb, bpf_map__fd(m), RINGS[i].fn, NULL))
+      return fail("ring", errno);
+    if (!rb) return fail("ring", errno);
+  }
   int ep = epoll_create1(EPOLL_CLOEXEC);
   struct epoll_event in = {.events = EPOLLIN, .data.fd = 0};
   struct epoll_event ring = {.events = EPOLLIN, .data.fd = -1};
@@ -591,7 +728,7 @@ int main(int argc, char **argv) {
       memmove(buf, start, used);
       if (used == sizeof buf - 1) used = 0;
     }
-    ring_buffer__consume(rb);
+    drain(rb);
     fflush(stdout);
   }
 }

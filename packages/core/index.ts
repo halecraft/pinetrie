@@ -175,8 +175,13 @@ export {
   LANE_HOME_PATH,
   laneSkillPath,
   NO_EDITOR,
+  RUNTIME_BASH,
+  RUNTIME_ENTRIES,
   RUNTIME_PROGRAMS,
+  RUNTIME_SHELL,
+  type RuntimeEntry,
   type RuntimeProgram,
+  runtimeEntryPath,
   SHARED_ENV,
   shellWord,
   WORKSPACE_ROOT,
@@ -190,6 +195,16 @@ export {
   proveRunnable,
   type RunnableLane,
 } from "./lanes.ts"
+export {
+  type Attribution,
+  decodeOutputEvent,
+  encodeOutputEvent,
+  type OutputEvent,
+  type OutputFd,
+  type Settled,
+  STATEMENT_SIGNAL,
+  statementIndex,
+} from "./output.ts"
 export { isWithin, pathUnder } from "./paths.ts"
 export { HOST_OPERATOR, PRODUCT_NAME } from "./product.ts"
 export {

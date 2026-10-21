@@ -85,6 +85,32 @@ struct file {
   struct inode *f_inode;
   unsigned int f_flags;
   unsigned int f_mode;
+  void *private_data;
+} CORE;
+
+struct page;
+
+struct kiocb {
+  struct file *ki_filp;
+} CORE;
+
+struct iov_iter {
+  unsigned long count;
+} CORE;
+
+struct pipe_buffer {
+  struct page *page;
+  unsigned int offset;
+  unsigned int len;
+} CORE;
+
+// `head` and `tail` are `pipe_index_t`s since 6.14, an unsigned int on 64-bit machines,
+// as it was before.
+struct pipe_inode_info {
+  unsigned int head;
+  unsigned int tail;
+  unsigned int ring_size;
+  struct pipe_buffer *bufs;
 } CORE;
 
 struct fs_struct {

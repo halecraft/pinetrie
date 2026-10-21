@@ -3,6 +3,7 @@
 Numbered S280 until 2026-10-20, when two files held that number.
 
 - **Status:** Answered
+- **Led to:** ADR-0204
 
 Measured in a QEMU guest on the lane VM's kernel (Linux 6.18.57,
 `linux-virt`, the observer suite's), two emulated CPUs, from a lane.
@@ -34,7 +35,7 @@ attribution claims to see, or a gap the reader cannot detect. Either means
 the split could show output under a command that did not write it, and the
 approach is dropped.
 
-**Throw away.** The probe (`docs/findings/archive/S283-output-by-writer/`), unless
+**Throw away.** The probe (`docs/findings/S283-output-by-writer/`), unless
 a plan builds on it: its BPF program, its driver standing in for the shell
 and the wrapper, and the guest's init. It runs in a QEMU guest on the lane
 VM's kernel, as `pnpm run e2e:observer` does.
@@ -146,7 +147,7 @@ each version the observer supports would need its list.
 
 ## Sources
 
-`docs/findings/archive/S283-output-by-writer/`, which a plan would build on:
+`docs/findings/S283-output-by-writer/`, which a plan would build on:
 
 - `attr.bpf.c`, `attr.h`: the kernel side, and its `NAIVE` and `NOCLEAN`
   controls.

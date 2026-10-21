@@ -819,15 +819,32 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a runtime with jj alone is taken as complete",
     file: "packages/lanes/runtime.ts",
-    from: "  RUNTIME_PROGRAMS.every(p => binEntries.includes(p))",
-    to: '  binEntries.includes("jj")',
+    from: "  RUNTIME_ENTRIES.every(e => files.includes(runtimeEntryPath(e)))",
+    to: '  files.includes("bin/jj")',
     command: unit,
     expect: "runtimeComplete: the loader and every program, not only jj",
   },
   {
+    name: "a runtime without pine·trie's bash is taken as complete",
+    file: "packages/lanes/runtime.ts",
+    from: "  RUNTIME_ENTRIES.every(e => files.includes(runtimeEntryPath(e)))",
+    to: '  RUNTIME_ENTRIES.every(e => e.kind === "shell" || files.includes(runtimeEntryPath(e)))',
+    command: unit,
+    expect:
+      "runtimeComplete: a runtime without pine·trie's bash is not complete",
+  },
+  {
+    name: "the runtime takes the image's bash for pine·trie's",
+    file: "packages/lanes/runtime.ts",
+    from: '      : `p=${IMAGE_SHELL}; [ -x "$p" ]`',
+    to: "      : `p=$(command -v ${entry.name})`",
+    command: unit,
+    expect: "EXTRACT copies pine·trie's bash to shell/, off the PATH's bin/",
+  },
+  {
     name: "a runtime without its loader is taken as complete",
     file: "packages/lanes/runtime.ts",
-    from: '  nodeEntries.includes("ld.so") &&\n',
+    from: '  files.includes("node/ld.so") &&\n',
     to: "",
     command: unit,
     expect: "runtimeComplete: the loader and every program, not only jj",
@@ -844,8 +861,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane runtime leaves rg behind",
     file: "packages/core/lane-env.ts",
-    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const',
-    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd"] as const',
+    from: '  { kind: "program", name: "rg" },\n',
+    to: "",
     suite: "lanes",
     scenario: "images",
     expect:
