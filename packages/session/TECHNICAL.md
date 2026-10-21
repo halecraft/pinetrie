@@ -140,7 +140,10 @@ session or someone else's inventory throws before it is made.
   trashing, and setting a command; and queueing, which is `queue-card`
   alone (`queueCard`, ADR-0113): the host refuses a `move` into a queue. A
   card made in the queue is drawn there at once as `queuedDraft` (empty,
-  with its command), never in another place first. The
+  with its command), never in another place first. A card that exists
+  carries its command into the queue in the same request ("resolve and
+  send"): a separate set-command could reach the host after the drain had
+  popped the card. The
   host applies each in arrival order or refuses it. A queue gets its text's
   version as this client has it as it is sent (`stampSeen`, S96); nothing
   else changes the move the page planned.

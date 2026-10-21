@@ -281,7 +281,7 @@ bar, each column's matches, and the rail's marks.
 
 - **The thread stays under its matches** (S126). Everything in a column below
   its header is in `.column-below`, positioned; in it, `.column-under` holds
-  the thread, its details, its cards, its work strip and its composer, and
+  the thread, its cards and its dock, and
   takes `inert` while searching. `MatchList` lies over it, absolutely, and
   scrolls on its own. Covering changes no box under it: the body keeps its
   `scrollTop`, and no `ResizeObserver` callback fires, so leaving restores
@@ -459,8 +459,7 @@ colour. There are no connector lines, so sibling branches never cross.
   columns anyway, so memoised messages are not redrawn for it. Context
   reaches the narrow pane's dialog through its portal.
 - **One inline `--track` per column** (`useTrackColors().style`), on
-  `.column`: the header's border, name and origin dot, the thread's details
-  and the pane read `var(--track)` in CSS. A fork dot sets its own, the
+  `.column`: the header's border, name and origin dot and the pane read `var(--track)` in CSS. A fork dot sets its own, the
   track of the branch it opens, and so does the narrow pane's dialog, which
   is outside the column.
 - **Hover linking is CSS.** Headers and fork dots carry `data-color`, the
@@ -511,7 +510,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 - **A folded column is a `.folded-column`** (`folded-column.tsx`), never a
   `.column`: a strip with `data-card` and `data-kind` (`thread` or
   `note-column`, as the wide `Column` and `NoteColumn` carry too), which
-  its ⇥ and its status button unfold, the latter with its details open. So
+  its ⇥ alone unfolds (ADR-0203). So
   `.column` counts whole thread columns, and the browser suite counts with
   it. Its handle is its mark and name (`ColumnHandle`), as an unfolded
   header's is; `data-ticked` marks its box ticked. The folded canvas column
@@ -519,7 +518,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   `FoldedStrip` (`folded-strip.tsx`): its start (`.folded-start`: ⇥ and a
   card's box), then `.folded-title`, holding the handle (the mark
   `foldedMark` decides, the name on its side, the detail; its title the
-  focus) and a card's status button.
+  focus) and a card's status dot (`ColumnDot`).
 - **A strip is its header turned on its side** (ADR-0137, ADR-0198): in
   the header's order, ⇥ where the header's ⇤ is (the same top border, its
   row the header's height), a thread's mark and its name at the header's
@@ -547,8 +546,15 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   `.column-take`, `.column-trash`). Neither it nor the canvas column makes
   a column: ＋ past the last column does (ADR-0138).
 - **Every ＋ is one split button** (`AddButton`, `add-button.tsx`): it
-  draws a `StartButton`, its main item and, when it has one, a `Menu` of
-  the rest, with no words of its own; each button's class is `add-<key>`.
+  draws, through `SplitButton` (`split-button.tsx`, a main button and, when
+  there is more, a ▾ `Menu`), a `StartButton`, its main item and a `Menu`
+  of the rest, with no words of its own; each button's class is `add-<key>`.
+  The send button is the other `SplitButton` (`.send-root`): while
+  `sendMore` gives an item (the thread conflicts, the box holds text, the
+  card carries no command), its ▾ (`.send-menu`, in `.send-more`) offers
+  `.send-resolve`, which queues the card with the resolving command
+  (`queueHere`'s `command`). Its main button keeps `.send`, which the
+  dock's ▸ marks.
   The sidebar's and a board column's make a canvas, with no menu; the strip's, in `.canvas-end` while
   the canvas takes a drop there (so never on a read-only canvas), is drawn
   folded, ＋ over its ▾, and makes a column of the canvas
@@ -583,15 +589,20 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   on it clicks anything. Nothing else in a header or a strip is a handle, so
   a drag and a click never share an element. `.column-head` keeps
   `data-column-head`, which the lift's look reads.
-- **The header is one line; its status button opens the rest** (ADR-0198,
-  ADR-0200): after the handle, `StatusButton` (`.head-status-button`,
-  `root-signals.tsx`, `aria-expanded`) holds the dot, the word a raised
-  status says (`.head-status-word`, `statusWord`) and a chevron, and asks
-  `columnHead`'s `status`. Closed, under the line is only an ssh ask
-  (`AccessRowView`). Open, `.head-details` holds the run-end row
-  (`.head-status`), the focus, the fork row, the agents line, the density
-  and the work strip, and `ThreadDetailsPanel` shows under the header as
-  before. + pin is the ⋯'s Pin a card until the thread has a pinned card.
+- **The header is one line, and what is under it is always shown**
+  (ADR-0198, ADR-0200, ADR-0203): after the handle, `ColumnDot` with
+  `worded` (`.head-status-mark[data-role="status"]`, `data-level`) draws
+  the dot and, while raised, the word (`.head-status-word`, `statusWord`):
+  a mark, no button. Under the line, `headLine`'s value: a raised run-end
+  status's reason (`.head-status[data-role="reason"]`, a press bringing the
+  run's last entry into view), else the focus
+  (`.head-focus[data-role="focus"]`), each two lines at most; then the fork
+  row (`Origin`, `data-role="origin"`) and an ssh ask (`AccessRowView`).
+  The handle's title is `handleTitle`'s. Density is three checked items in
+  the column's ⋯ (`.column-density-<density>`), which `Column`'s
+  `chooseDensity` handles: the `density` act, then `PLACED`, one function
+  so the two cannot drift apart. + pin is the ⋯'s Pin a card until the
+  thread has a pinned card.
 - **A column's dot is its thread's status** (`ColumnDot`,
   `root-signals.tsx`): a `SignalMark` of `statusSignal`, `data-quiet` when
   not raised for you, or `.signal[data-signal="none"]` with nothing to
@@ -965,8 +976,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.msg.assistant.streaming`, and its mark is a 2px bar in the gutter, drawn
   by a border image outside the box, which takes no width: text wraps as its
   entry will.
-- **The dock** (`dock.tsx`, ADR-0113) is the column's foot, after the
-  scrolling body: the queue's header (`.queue-head`, sticky), the queued
+- **The dock** (`dock.tsx`, ADR-0113, ADR-0203) is the column's foot, after the
+  scrolling body: `.dock-head`, one sticky block holding the changes row
+  and the queue's header (`.queue-head`), so both stay in view as the dock
+  scrolls, then the queued
   cards (`.queue-cards`, each a `QueuedCardEditor` in a `.queued-card`, a
   fact a `.queued-fact`), "+ add to queue" (`.add-to-queue`), the line
   (`.the-line`), the column's notices, then what `Column` puts in it: your
@@ -982,8 +995,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   nothing that reads it.
   - **The header's one button** (`.next-button`) is `.stop` (sending
     `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
-    the `hold-queue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
-    `.hold-queue`, `.release-queue` ("unpause") and `.unqueue-all`.
+    the `hold-queue` act). The dock's one ⋯ (`.dock-menu-trigger`,
+    `data-role="dock-menu"`), drawn when either section has items, holds
+    the changes' commands, then the queue's: `.resume`, `.hold-queue`,
+    `.release-queue` ("unpause") and `.unqueue-all`.
     The browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
     carry-on message's row is `.msg.carry-on`. No header is drawn
     read-only, nor for a thread with no lane.
@@ -1054,15 +1069,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   no place to choose. The words are `.start-words`: `Menu` passes no
   attributes to its trigger, so they sit on a span inside it.
 - **A column's header** (ADR-0040) names who works in it (`✦ amber-fox`,
-  `✦ new agent`, or nothing in a chat), then, in a second row, where
+  `✦ new agent`, or "chat"), then, under its line, where
   it forks. It shows no commit and nothing of where the lane works.
-- **The work strip** (`WorkStripView`, a row of the column's header,
-  ADR-0113) is the lane's
+- **The work strip** (`WorkStripView`, `work-strip.tsx`, the dock's changes
+  row, `data-role="changes"`, ADR-0113, ADR-0203) is the lane's
   proposed changes for its own copy (ADR-0105): `workStripWords`' line, which opens the
   review while the proposed changes are open and hold files (ADR-0047, below), the
-  bookmark apart, which a press copies to find it in jj or jjui, its
-  buttons, and a `⋯` menu for the rest
-  ("get the latest from accepted work", "rewrite description"). What the lane runs
+  bookmark apart, which a press copies to find it in jj or jjui, and its
+  buttons, which act at once; the rest
+  ("get the latest from accepted work", "rewrite description") are the
+  dock ⋯'s `changes` section (`workStripMenu`, each item `.work-<button>`).
+  The dock draws it while `workStripShown`. What the lane runs
   now (`laneActivity`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
@@ -1901,6 +1918,33 @@ What S151 measured, and these handlers rest on:
   (S212): the start after anything typed at it meanwhile, the end before,
   so a share never replaces text it was not put over. An unbound box holds
   only its sender's typing, so its offsets stand.
+
+## Changing the page cheaply
+
+The column's header was redesigned four times (ADR-0198, ADR-0200,
+ADR-0203). What made each step cheap or dear:
+
+- **An affordance's state starts in the page.** A toggle under trial is
+  one piece of view state; it earns a stored field, a view change and an
+  intent once it has survived use. "Details open" lived in five layers
+  (the column, the card's view, the stored layout, the intent, the page)
+  and cost five to take out.
+- **A component takes values and one named handler.** `WorkStripView`
+  moved from the header to the dock in one step because it takes the strip
+  and `act`. Density did not: it called an act and marked the scroll
+  inline, so moving it meant finding both (`chooseDensity` now names them).
+- **One fact, one function for its words, and a test that two surfaces
+  agree** (`column-status.test.ts`: the run-end row and a status's title).
+- **What a column shows is typed by where it goes** (`ColumnShows`' `head`
+  and `dock`, `packages/interface/TECHNICAL.md`): the header tells, the
+  dock does, so where a new element belongs is a question of type.
+- **Browser checks select by `data-role` and act through helpers**
+  (`dragHeader`, `chooseFromMenu`, `chooseDensity` in the suite's
+  `page.ts`): a redesign changes the helper and the role's element, not
+  every check. The roles: `handle`, `status`, `reason`, `focus`, `origin`,
+  `changes`, `dock-menu`.
+- **What moves is tagged, not listed** (`data-fold-*`): adding the toggle
+  and the box to the fold was two attributes.
 
 ## Gotchas
 

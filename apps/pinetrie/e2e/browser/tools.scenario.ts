@@ -4,7 +4,7 @@
 // following, the header's work, and the rail's capsules; first, each ask's work
 // folded and opened from the rail, on a host of its own.
 
-import { existsSync, rmSync } from "node:fs"
+import { existsSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import {
   atEntry,
@@ -36,6 +36,7 @@ import {
 import {
   canvasHolding,
   committedProject,
+  entryMessageIn,
   FIXTURE_PACKAGES,
   heldLanes,
   heldTree,
@@ -55,6 +56,7 @@ import type { Scenario } from "../scenario.ts"
 import {
   asPerson,
   boardSel,
+  chooseDensity,
   chooseFromMenu,
   col,
   componentRenders,
@@ -63,7 +65,6 @@ import {
   OWN_MENU,
   oneFrame,
   openBoard,
-  openDetails,
   openFromBoard,
   PANE_VIEWPORT,
   railCount,
@@ -472,9 +473,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
 
         // 8. A column's density is kept with it across a reload. It is in
-        // the column's details.
-        await openDetails(ap, col(0))
-        await ap.click(`${col(0)} .density-choice[data-density="outline"]`)
+        // the column's ⋯.
+        await chooseDensity(ap, 0, "outline")
         await ap.reload({ waitUntil: "domcontentloaded" })
         const kept = await ap
           .waitForSelector(`${col(0)}[data-density="outline"]`, {
@@ -505,6 +505,37 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           words.join() === "0,0,1",
           `${JSON.stringify(words)}`,
         )
+        // 9. A run that fails while you are away needs you: its reason shows
+        // under the column's line with no press. Hidden, the page reads
+        // nothing past, which would turn the reason quiet.
+        await visibility("hidden")
+        const cy = await join(askHost, "bo", "asks")
+        // Nothing queued and no standing answer: the model's request fails.
+        script.use([])
+        const failing = heldLanes(
+          askHost,
+          heldTree(askHost),
+          readPlaces(askHost.places),
+        )[0]
+        await cy.send("@agent and now?", atEntry(entryId(failing?.tip ?? "")), {
+          thread: failing?.name,
+        })
+        await idle()
+        const reason = await ap
+          .waitForSelector(`${col(0)} .column-head [data-role="reason"]`, {
+            timeout: 15_000,
+          })
+          .then(
+            r => r.textContent(),
+            () => null,
+          )
+        check(
+          "a run that needs you shows its reason under the column's line, with no press",
+          reason?.startsWith("the run failed") === true,
+          JSON.stringify(reason),
+        )
+        await visibility("visible")
+        await cy.close()
       } finally {
         await ap.context().close()
         await asks.close()
@@ -1631,14 +1662,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("write two files")
         await toolIdle()
-        // The proposed changes are in the column's details: its line opens them.
-        await tp
-          .click(`${col(0)} .head-status-button[aria-expanded="false"]`, {
-            timeout: 2_000,
-          })
-          .catch(() => {})
         const acceptShown = await appears(
-          `${col(0)} .work.work-strip[data-state="ready"] .work-accept`,
+          `${col(0)} .dock [data-role="changes"][data-state="ready"] .work-accept`,
         )
         const line =
           (await tp
@@ -2244,6 +2269,94 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         } finally {
           await railer.close()
+        }
+
+        // ── resolving: your words go with the command that resolves ──────────
+        // A new thread writes a file; you write the same file and move accepted
+        // work to your commit: its proposed changes, rebuilt on it, conflict.
+        // With text in the box, the send button's ▾ resolves and sends.
+        {
+          await tp.click("#sidebar .add-canvas")
+          script.use([
+            { tool: "write", args: { path: "shared.txt", content: "lane\n" } },
+            { text: "wrote it" },
+          ])
+          await say("write shared")
+          await toolIdle()
+          await command("jj", ["-R", work, "new", "pinetrie-accepted"])
+          writeFileSync(path.join(work, "shared.txt"), "yours\n")
+          await command("jj", ["-R", work, "commit", "-m", "you write shared"])
+          await command("jj", [
+            "-R",
+            work,
+            "bookmark",
+            "move",
+            "pinetrie-accepted",
+            "--to",
+            "@-",
+          ])
+          const conflicted = await appears(
+            `${col(0)} .dock [data-role="changes"][data-state="conflicts"]`,
+            30_000,
+          )
+          const intent = "keep both sides"
+          /** The land messages: each a card that got the latest. */
+          const lands = () =>
+            Object.entries(heldTree(toolHost).entries)
+              .filter(([, e]) => e?.message?.role === "land")
+              .map(([id]) => id)
+          const landsBefore = lands().length
+          script.use([{ text: "resolved" }])
+          await typeAfter(tp, `${col(0)} .composer .input`, intent)
+          // What is queued is the box's card, which typing makes.
+          const bound = await appears(
+            `${col(0)} .composer .input[data-card]`,
+            10_000,
+          )
+          // The ▾ sits low in the dock, which scrolls within: brought into
+          // view first, as a person would, since a scroll that moves a menu's
+          // trigger closes the menu.
+          await tp
+            .$eval(`${col(0)} .composer .send-menu`, b =>
+              b.scrollIntoView({ block: "nearest" }),
+            )
+            .catch(() => {})
+          await twoFrames(tp)
+          const chosen = await chooseFromMenu(
+            tp,
+            `${col(0)} .composer .send-menu`,
+            ".send-resolve",
+          ).catch(() => false)
+          const landed =
+            (await waitFor(() => lands().length > landsBefore, 60_000)) >= 0
+          // What the model read: the land message's content ends with yours.
+          const land = lands().at(-1)
+          const stored =
+            land === undefined
+              ? { present: false as const }
+              : entryMessageIn(toolHost, land)
+          const content = stored.present
+            ? (stored.message as { content?: unknown }).content
+            : undefined
+          const carried =
+            typeof content === "string" && content.endsWith(intent)
+          const box =
+            (await tp
+              .inputValue(`${col(0)} .composer .input`)
+              .catch(() => null)) ?? null
+          check(
+            "resolve and send queues your message with getting the latest, while the thread conflicts",
+            conflicted && chosen && landed && carried && box === "",
+            JSON.stringify({
+              bound,
+              conflicted,
+              chosen,
+              landed,
+              carried,
+              box,
+            }),
+          )
+          await toolIdle()
         }
       } finally {
         await tp.close().catch(() => {})

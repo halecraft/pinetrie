@@ -45,7 +45,8 @@ export function ListColumnHead(p: {
     unstarted: false,
     folded: false,
     ticked: p.ticked,
-    details: false,
+    density: null,
+    start: null,
     pin: false,
     renamable: writable,
   })

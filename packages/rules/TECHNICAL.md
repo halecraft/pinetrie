@@ -907,8 +907,9 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   move, so the move's drain finds the queue as planned. A send on an idle
   held thread is `release`: sending removes the hold. A move with no `from`
   makes the card in the queue, carrying the request's `command` in its
-  first write: a command sent as `set-command` after it could arrive after
-  the drain popped the card plain. A card is never made elsewhere to be
+  first write, and a card that exists takes it in the move's own write
+  (ADR-0203's "resolve and send"): a command sent as `set-command` after
+  it could arrive after the drain popped the card plain. A card is never made elsewhere to be
   queued: a note is a place of its own, not a step on the way.
 
 # A card made a thread (`spin-off.ts`, `root.ts`, ADR-0111, ADR-0126)

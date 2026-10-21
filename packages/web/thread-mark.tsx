@@ -1,5 +1,5 @@
-// web/thread-mark — the mark before a thread's name, in its column's header,
-// its details and its folded strip alike.
+// web/thread-mark — the mark before a thread's name, in its column's header
+// and its folded strip alike.
 
 import { AGENT_MARK, type HeadIcon, type ThreadIcon } from "@pinetrie/interface"
 import { useState } from "react"

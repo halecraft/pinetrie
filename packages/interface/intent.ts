@@ -51,7 +51,6 @@ import {
 } from "@pinetrie/threads"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
-import { keptTaskView } from "./canvas-columns.ts"
 import {
   afterUndo,
   canvasSpot,
@@ -86,7 +85,6 @@ import {
   type Minted,
   type Pending,
   type Prefill,
-  type ReaderAction,
 } from "./columns.ts"
 import {
   closeCanvasEffects,
@@ -133,8 +131,6 @@ export type ColumnAct =
   | { readonly kind: "put-away"; readonly card: CardId }
   /** Read the column at `density`. */
   | { readonly kind: "density"; readonly density: Density }
-  /** Open or close the thread's details under the header. */
-  | { readonly kind: "details"; readonly open: boolean }
   /** After a conflict: a thread opened at `at`, whose column sends `pending` there. */
   | {
       readonly kind: "branch-instead"
@@ -151,6 +147,8 @@ export type ColumnAct =
       readonly lane: ThreadId
       readonly at: Position
       readonly hold: QueueHoldChange
+      /** What the host does first when it pops the card: "resolve and send"'s get the latest; null for none. */
+      readonly command: CardCommand | null
     }
   /** Pin a card below the line at the top of its thread's column. */
   | { readonly kind: "pin"; readonly card: CardId }
@@ -741,16 +739,6 @@ function planColumn(
 ): readonly Effect[] {
   const key = keyText(column)
   const onCanvas = (change: ViewChange) => onCanvasYouAreOn(state, change)
-  /** A reader's setting, of a card's column. */
-  const reading = (action: ReaderAction): readonly Effect[] => {
-    if (column.kind !== "card") return []
-    const { card } = column
-    return onCanvas(
-      action.kind === "density"
-        ? { kind: "density", card, density: action.density }
-        : { kind: "details", card, open: action.open },
-    )
-  }
   switch (act.kind) {
     case "proposal":
       return planProposal(act.proposal, act.press, state, minted)
@@ -778,12 +766,14 @@ function planColumn(
     case "put-away":
       return planPutAway(act.card, state, minted)
     case "density":
-      return reading({ kind: "density", density: act.density })
-    case "details":
-      return [
-        ...(act.open ? unfoldFirst(column, state) : []),
-        ...reading({ kind: "details", open: act.open }),
-      ]
+      // How you read it: your view of its card, never the document's.
+      return column.kind === "card"
+        ? onCanvas({
+            kind: "density",
+            card: column.card,
+            density: act.density,
+          })
+        : []
     case "queue": {
       const now = findTextCard(state.cards, act.card)
       return now === undefined
@@ -793,7 +783,7 @@ function planColumn(
               kind: "queue-card",
               move: queueMove(now, act),
               hold: act.hold,
-              command: null,
+              command: act.command,
               how: IN_COLUMN(key),
             },
           ]
@@ -946,34 +936,6 @@ function planOpenIn(
   if (state.index.entries[entry] !== undefined)
     return planOpenEntry(entry, state)
   return [...showCanvas(canvas), { kind: "open-when-held", entry }]
-}
-
-/**
- * Opening a folded column's details unfolds it first, with its motion: the
- * status button on a strip asks for the details, as the header's does. An
- * unfolded column, or one off the canvas you are on, needs nothing.
- */
-function unfoldFirst(
-  column: ColumnKey,
-  state: Pick<IntentState, "canvases" | "layout">,
-): readonly Effect[] {
-  const active = state.layout.active
-  if (column.kind !== "card" || active?.kind !== "canvas") return []
-  const { card } = column
-  const view = keptTaskView(
-    state.layout.canvases,
-    active.canvas,
-    state.canvases.index.cardsOn.get(active.canvas) ?? [],
-  )
-  return view.cards.get(card)?.unfolded === true
-    ? []
-    : [
-        foldViewEffect(state, active.canvas, {
-          kind: "fold",
-          card,
-          unfolded: true,
-        }),
-      ]
 }
 
 /**

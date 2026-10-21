@@ -249,18 +249,22 @@ describe("planQueueCard", () => {
       holds: [],
     })
   })
-  test("a command names only a card made in the queue: one that exists keeps its own", () => {
-    const planned = planQueueCard({
-      cards: [card],
-      holds: new Map(),
-      move,
-      hold: "keep",
-      command: "split",
-      by: BEA,
-      now: 7,
-      running: () => false,
+  test("a card that exists, queued with a command, carries it in the move's own write; queued with none, it keeps its own", () => {
+    const queued = (command: "get-latest" | null) =>
+      planQueueCard({
+        cards: [card],
+        holds: new Map(),
+        move,
+        hold: "keep",
+        command,
+        by: BEA,
+        now: 7,
+        running: () => false,
+      }).step
+    expect(queued("get-latest")).toMatchObject({
+      steps: [{ record: { content: { command: "get-latest" } } }],
     })
-    expect(planned.step).toMatchObject({
+    expect(queued(null)).toMatchObject({
       steps: [{ record: { content: { command: null } } }],
     })
   })

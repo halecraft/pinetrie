@@ -159,23 +159,12 @@ describe("layoutReducer", () => {
     expect(defaultView(null).canvas).toEqual({ unfolded: false })
   })
 
-  test("a reader's settings are kept by card, folded or not", () => {
+  test("a reader's density is kept by card, folded or not", () => {
     const l = layoutReducer(
-      layoutReducer(
-        initialLayout(),
-        view("1-r1", { kind: "density", card: C, density: "outline" }),
-      ),
-      view("1-r1", { kind: "details", card: C, open: true }),
+      initialLayout(),
+      view("1-r1", { kind: "density", card: C, density: "outline" }),
     )
     expect(l.canvases.get(TK("1-r1"))?.cards.get(C)).toEqual({
-      density: "outline",
-      details: true,
-    })
-    const closed = layoutReducer(
-      l,
-      view("1-r1", { kind: "details", card: C, open: false }),
-    )
-    expect(closed.canvases.get(TK("1-r1"))?.cards.get(C)).toEqual({
       density: "outline",
     })
   })
@@ -200,12 +189,12 @@ describe("layoutReducer", () => {
     })
     const read = layoutReducer(
       opened,
-      view("1-r1", { kind: "details", card: T, open: true }),
+      view("1-r1", { kind: "density", card: T, density: "raw" }),
     )
     const sent = layoutReducer(read, view("1-r1", { kind: "sent", card: T }))
     expect(sent.canvases.get(TK("1-r1"))?.cards.get(T)).toEqual({
       unfolded: true,
-      details: true,
+      density: "raw",
     })
     expect(layoutReducer(sent, view("1-r1", { kind: "sent", card: T }))).toBe(
       sent,
@@ -539,7 +528,7 @@ describe("encodeLayout / decodeLayout", () => {
   const VIEW: YourCanvasView = {
     cards: new Map([
       [TRUNK, { unfolded: true, density: "outline" }],
-      [C, { details: true }],
+      [C, { density: "raw" }],
       [
         F,
         {
@@ -561,6 +550,21 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(l)).toEqual(l)
     expect(trip({ ...l, open: [TK("1-r1")] })?.open).toEqual([])
     expect(trip(initialLayout())).toEqual(initialLayout())
+  })
+
+  test("a view stored with an older key, its details open, loads as the view without it", () => {
+    const stored = JSON.parse(
+      JSON.stringify(
+        encodeLayout({
+          ...initialLayout(),
+          canvases: new Map([[TK("1-r1"), VIEW]]),
+        }),
+      ),
+    )
+    stored.canvases[TK("1-r1")].cards[C] = { density: "raw", details: true }
+    expect(
+      decodeLayout(stored)?.canvases.get(TK("1-r1"))?.cards.get(C),
+    ).toEqual({ density: "raw" })
   })
 
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {

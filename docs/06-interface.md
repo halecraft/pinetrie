@@ -392,8 +392,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A strip is its column's header turned on its side** (ADR-0137,
   ADR-0198), in the header's order: **⇥** where the header's ⇤ is, so a
   second click lands on it, the column's box, its mark, its name at the
-  header's size, in its colour, and its status button. Only ⇥ and the
-  status button unfold it, the latter with its details open (ADR-0200).
+  header's size, in its colour, and its status's dot. Only ⇥ unfolds it
+  (ADR-0203).
   Folding turns the name 90°
   into the strip, its mark and its box moving with it and ⇤ flipping into
   ⇥ where it stands, while the rest of the column
@@ -427,35 +427,38 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   what you type in it is your message, yours alone until you send it. An aside of
   an aside opens a third column.
 - **A column's header says who works in it and where it came from**
-  (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
+  (ADR-0040, ADR-0203). Its line names the agent working there, `✦ amber-fox` in
   the column's colour. While the composer's next send would start one, the
   agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A chat
-  shows nothing there, since a message goes to people. Before the agent's name
+  reads "chat" there, since a message goes to people. Before the agent's name
   is its icon (ADR-0143): its banner, drawn from its name (ADR-0053) or
   pasted, under any icon
   source; else its name's noun's built-in pixel sprite, when the user config's
   `icons.source` is `built-in`, the default; else ✦. Under `drawn` a new
   agent shows ✦ until its drawn banner fades in, and never a built-in icon
-  first. The same icon heads its folded strip and its card. Its second row, for a column
-  that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
+  first. The same icon heads its folded strip and its card. Hovering the
+  name says who started the thread and when ("started by Ada · 3 h ago"),
+  where it works ("on wip/search", or "wip/search is gone" once it is,
+  ADR-0104; nothing on the line), and the agents along its path. For a column
+  that forks, the fork row under the line names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view. A copy names its source instead, "↰ copied from
   amber-fox · Fix the sync bug", and a thread whose parent thread is in
   another canvas names that, "↰ from amber-fox · Fix the sync bug": clicking
   either opens that canvas at the fork. Where someone holds the source in
-  their inventory, the row says "Bea has it" and opens nothing. A thread that started from unfinished work says so, "on
-  wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
-  line says nothing.
-- **A column's header is one line** (ADR-0198, ADR-0200): its toggle, its
-  box, its mark and name, its status button, then who is reading, and ⋯.
-  The mark and name are its handle: they drag it, and a press there does
-  nothing else. A chat's handle reads "chat". The status button holds its
-  dot, a word while something is raised for you (needs you, conflicts,
-  ready, worth a read), and a chevron; it opens the details, and a second
-  press closes them. Closed, under the line is only an ssh request for
-  its owner. Open, the details hold the run-end row, its focus, its fork
-  row, the agents line, its density, its proposed changes with their
-  buttons, and what follows. Pinning a first card is its ⋯'s **Pin a
-  card**; a note or media column's ⋯ starts with **Rename**.
+  their inventory, the row says "Bea has it" and opens nothing.
+- **A column's header is one line** (ADR-0198, ADR-0200, ADR-0203): its
+  toggle, its box, its mark and name, its status, then who is reading,
+  and ⋯. The mark and name are its handle: they drag it, and a press there
+  does nothing else. The status is a mark, not a button: its dot, and a
+  word while something is raised for you (needs you, conflicts, ready,
+  worth a read). Under the line, always, nothing behind a press: the run-end
+  reason while raised for you, else the thread's focus; the fork row; and
+  an ssh request for its owner. The column's ⋯ starts with how it reads
+  (**brief**, **story**, **everything**, the current one checked) for a
+  column with messages, then, where the agent joined below the path's first
+  message, **Go to where it started**, which brings that message into view.
+  Pinning a first card is its ⋯'s **Pin a card**; a note or media column's
+  ⋯ starts with **Rename**. A column has no details panel (ADR-0203).
 - **A column's dot is its thread's status** (ADR-0198), the same value
   folded or not, and the one the sidebar and the board read: an amber dot
   when it needs you (a run's end, an ask about a conflict, an ssh
@@ -465,9 +468,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   dot with nothing to say. What is not raised for you (a thread you do not
   follow, a report you read) is drawn grey. Its title says why, in the
   same words wherever a status is titled.
-- **A named agent's details say what its thread is doing now** (ADR-0173):
-  its focus, first in them, one line cut to the column with the whole of
-  it in its title, "written by a model". A model names it after each of the thread's runs, once the
+- **Under a named agent's line is what its thread is doing now** (ADR-0173,
+  ADR-0203): its focus, two lines at most, with the whole of it in its
+  title, "written by a model". A model names it after each of the thread's runs, once the
   run's summary is written, from the thread's asks and their headlines; it
   stays while the work goes on, and changes when the thread moves to a new
   phase. Until a thread's first run ends, the row shows its first message's
@@ -475,21 +478,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no such row. A focus follows the digests' setting. A thread's preview
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
-- **A column's details say what its thread's last run needs from you**
-  (ADR-0175, ADR-0200), on their first row: "needs you: asks whether to
-  drop the v1 table", "worth a read: Bea stopped it", in the sidebar's
-  words and for its followers alone, as its dot is; the status button
-  says its level in a word. It stays until the next run starts: read past
-  or dismissed, its amber turns grey. A press brings the run's last entry
-  into view. A run that was done, or a stop you made, shows nothing.
-- **A column's status button opens its details** (ADR-0073, ADR-0198,
-  ADR-0200), and a second press closes them; its chevron turns as they
-  open. They show the thread's icon magnified, which spins in as they open
-  and again at a click, its name, "started by Ada · 3 h ago", where it
-  works, what it is working on, and what its base has new, in full. Where
-  the agent joined below the path's first message, **where it started**
-  brings that message into view. Open details stay open, through a reload
-  too, as a column's density does.
+- **In its focus's place, what its last run needs from you** (ADR-0175,
+  ADR-0203), while raised for you: the reason alone, "asks whether to drop
+  the v1 table", "Bea stopped it", in its level's colour, two lines at
+  most, titled with the level then the reason in the sidebar's words, and
+  for its followers alone, as its dot is; the status says its level in a
+  word. A press brings the run's last entry into view. Read past or
+  dismissed, it turns quiet and the focus shows again; the next run's start
+  clears it. A run that was done, or a stop you made, shows nothing.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
   its rail track's colour: its column's header carries a stripe of it and a dot
   beside its fork, and the fork point in the parent column shows a dot of it.
@@ -588,11 +584,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   keeps its text, but its column says "Bea has it" in place of that
   thread's messages and sends nothing until the thread is on a canvas
   again.
-- **Each column's foot is its dock** (ADR-0113), pinned there while the
-  messages scroll above it: the queue's header, which says what happens
+- **Each column's foot is its dock** (ADR-0113, ADR-0203), pinned there while the
+  messages scroll above it: the changes row, the queue's header, which says what happens
   next, the cards queued, **+ add to queue**, the line, and your message.
   It takes at most a third of the column and scrolls within
-  itself past that, its queue header kept in view.
+  itself past that, the changes row and the queue header kept in view as
+  one block. The header tells and the dock does: what acts on the thread's
+  work is here, beside the box you write in. The dock has one ⋯: the
+  changes' commands, then the queue's.
 - **The queue's header says what happens next**, with one button. ▸ marks
   what goes next: the run, the queued card the host sends next (a blank
   one is passed over, as the host passes it), or your message's send.
@@ -660,8 +659,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   project: an image's before and after side by side, any other binary
   file its sizes and both versions to open, a moved, unchanged file one
   row `{old => new}`, "moved, unchanged".
-- **A row of the column's header, the work strip, says what became of the
-  agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its proposed changes in plain words ("2
+- **The dock's changes row, the work strip, says what became of the
+  agent's files** (ADR-0040, ADR-0113, ADR-0203), drawn while it has
+  something to say or do, and its buttons act at once: an agent on its own copy shows its proposed changes in plain words ("2
   files changed"), with **accept changes** and its bookmark, which a press copies. The
   button names unfinished work the work goes into (ADR-0104, ADR-0090): "accept changes", or
   "accept changes into wip/search" for a thread on unfinished work, whose menu also offers
@@ -680,20 +680,22 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   done: the changes are not what you were shown: review them again"), and
   the strip shows the new proposed changes. A rebase onto moved accepted work, or your
   own edit of the proposed changes, is still the proposed changes you saw, and is accepted. Proposed changes that conflict are never accepted into accepted work; their button is
-  **get the latest from accepted work and resolve**: the agent resolves what the merge leaves. Proposed changes whose
+  **get the latest from accepted work and resolve**: the agent resolves what the merge leaves.
+  While they conflict and your box holds text, the send button has a ▾
+  whose **resolve and send** queues your message with that command, so the
+  agent resolves with what you wrote; **send** always sends. Proposed changes whose
   every conflicted file was already conflicted where its thread's copy
   started says so instead: "began from a copy with an unresolved conflict
   in 1 file", and, when the thread it branched from has since resolved
   those files, "· amber-fox has resolved it", with **get the latest from
-  amber-fox** as its button (ADR-0072). Its **⋯** menu holds **catch
+  amber-fox** as its button (ADR-0072). Its commands in the dock's **⋯** are **catch
   up with** the thread's base (accepted work, or its unfinished work), or, once its unfinished work
   is gone, **continue from accepted work**; and, while the thread it branched
   from has new commits, **get the latest from** that thread by its name, greyed
   out while that thread's agent works. When getting the latest would change files
   in the thread, the strip says so ("2 files changed · accepted work has
   moved on"), getting the latest stands beside the proposed changes, titled with how many files it
-  changes, and the column's header shows ↓, titled with the count, the
-  bookmark and both commits. When it would change nothing, it stays in the
+  changes. When it would change nothing, it stays in the
   menu, greyed out, and says why: "already got the latest from accepted work",
   or, when accepted work moved only by this thread's own work you accepted,
   "what's new in accepted work is this thread's own: getting the latest changes no
@@ -702,8 +704,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   never changed a file, so its work never reached your repo) keeps it in
   the menu, enabled, and claims nothing. Proposed changes whose work accepted work
   already has says "nothing to accept: accepted work already has this
-  thread's work": the header does not
-  count it, and archiving its thread warns of nothing. A thread whose
+  thread's work": nothing
+  counts it, and archiving its thread warns of nothing. A thread whose
   earlier accept was made before pine·trie recorded what an accept brought
   says "an earlier accept of this thread can't be traced: get the latest from
   accepted work to offer what's new", with getting the latest beside it. Every time it gets the latest button does
@@ -766,7 +768,7 @@ person's message to the agent, a land message or a stack message. A message
 for people only is not one. Nothing about an ask is stored; it is read from
 the tree.
 
-- **A column is read at one of three densities**, chosen in its header, kept
+- **A column is read at one of three densities**, chosen in its ⋯ (ADR-0203), kept
   with the column and never written: **brief**, **story** and
   **everything** (stored `outline`, `story`, `raw`, ADR-0172). A new column
   opens in story.

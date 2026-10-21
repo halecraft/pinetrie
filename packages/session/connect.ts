@@ -430,7 +430,7 @@ export async function connectSession(
           kind: "queue-card",
           move,
           hold,
-          command: move.from === null ? command : null,
+          command,
         },
         [pendingMove(crypto.randomUUID(), move, how, draft)],
         null,

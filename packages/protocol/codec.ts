@@ -352,10 +352,7 @@ export function decodeCommand(
     if (name === "") return { kind, move, hold, command: null }
     if (!isCardCommand(name))
       return refused(ERR.UNKNOWN_KIND, `unknown card command: ${name}`)
-    // A command rides only on a creation: a card that exists keeps its own.
-    return move.from === null
-      ? { kind, move, hold, command: name }
-      : refused(ERR.UNKNOWN_TARGET, "only a card queued new names a command")
+    return { kind, move, hold, command: name }
   }
   if (kind === "spin-off") {
     const moves = decodeMoves(text(wire?.moves))

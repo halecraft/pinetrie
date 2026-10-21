@@ -494,33 +494,12 @@ describe("planIntent", () => {
     ])
   })
 
-  test.each([
-    [
-      "density",
-      { kind: "density", density: "outline" },
-      { kind: "density", card: C, density: "outline" },
-    ],
-    [
-      "details closing",
-      { kind: "details", open: false },
-      { kind: "details", card: C, open: false },
-    ],
-  ] as const)("a column's %s is your view of its card", (_, act, change) => {
-    expect(plan(column(act, CARD_C))).toEqual([onR1(change)])
-    expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
-  })
-
-  test("opening a folded column's details unfolds it, with its motion, then opens them; an unfolded one's only opens them", () => {
-    const moving = (change: object) => ({ ...onR1(change), moves: true })
-    expect(plan(column({ kind: "details", open: true }, CARD_C))).toEqual([
-      moving({ kind: "fold", card: C, unfolded: true }),
-      onR1({ kind: "details", card: C, open: true }),
+  test("a column's density is your view of its card; off a canvas, nothing", () => {
+    const act = { kind: "density", density: "outline" } as const
+    expect(plan(column(act, CARD_C))).toEqual([
+      onR1({ kind: "density", card: C, density: "outline" }),
     ])
-    expect(
-      plan(
-        column({ kind: "details", open: true }, { kind: "card", card: TRUNK }),
-      ),
-    ).toEqual([onR1({ kind: "details", card: TRUNK, open: true })])
+    expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
   })
 
   test("a fold you ask for is your view of the canvas you are on, and moves; off a canvas, nothing", () => {
@@ -896,6 +875,7 @@ describe("planIntent", () => {
         lane,
         at: where,
         hold: "release",
+        command: null,
       })
       for (const layout of [onRoot("1-r1"), onNothing]) {
         const state = at(layout, undefined, withCard(atEnd))
@@ -915,6 +895,20 @@ describe("planIntent", () => {
         ])
       }
       expect(plan(queue)).toEqual([])
+    })
+    test("a queue with a command queues the card with it, in the same request", () => {
+      const queue = column({
+        kind: "queue",
+        card: c,
+        lane,
+        at: where,
+        hold: "release",
+        command: "get-latest",
+      })
+      const state = at(onRoot("1-r1"), undefined, withCard(atEnd))
+      expect(plan(queue, state)).toMatchObject([
+        { kind: "queue-card", command: "get-latest" },
+      ])
     })
     test("an unqueue puts the card back where it was queued, saying who queued it; a card not queued, nothing", () => {
       const unqueue = column({ kind: "unqueue", card: c, lane, by: ada })

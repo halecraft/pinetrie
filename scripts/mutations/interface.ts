@@ -735,24 +735,6 @@ export const mutations: readonly Mutation[] = [
       "an accepted strip says so, its change id in the line's title alone",
   },
   {
-    name: "the header never marks a thread behind",
-    file: "packages/interface/column-view.ts",
-    from: '  if (now.kind !== "brings") return null\n',
-    to: "  return null\n",
-    command: unit,
-    expect:
-      "worded as the project, its title naming the files, never jj's bookmark or commits",
-  },
-  {
-    name: "the header marks a thread behind by its own work",
-    file: "packages/interface/column-view.ts",
-    from: '  if (now.kind !== "brings") return null\n',
-    to: '  if (now.kind === "current") return null\n',
-    command: unit,
-    expect:
-      "none once caught up, before the host read the base, or with nothing read to catch up",
-  },
-  {
     name: "catching up that would change nothing is enabled",
     file: "packages/interface/column-view.ts",
     from: "    view.quiet.includes(button)\n",
@@ -2280,16 +2262,6 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a column's open details are not stored",
-    file: "packages/interface/layout.ts",
-    from: "        ...(v.details ? { details: true } : {}),\n        ...(v.prefill === undefined\n",
-    to: "        ...(v.prefill === undefined\n",
-    command: unit,
-    expect:
-      "a round trip keeps what you are on, each canvas's view and the board",
-  },
-
-  {
     name: "the details offer to reveal a start at the path's first message",
     file: "packages/interface/column-view.ts",
     from: "    start: start === null || isFirst(index, start) ? null : start,",
@@ -3134,8 +3106,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's status line words every level as needs you",
     file: "packages/interface/column-status.ts",
-    from: "    words: reasonedWords(\n      level,",
-    to: '    words: reasonedWords(\n      "needs-you",',
+    from: "    words: reasonedWords(level, reason),",
+    to: '    words: reasonedWords("needs-you", reason),',
     command: unit,
     expect:
       "a stop is worth a read for others and shows nothing for whoever stopped it",
@@ -4492,14 +4464,6 @@ export const mutations: readonly Mutation[] = [
       "a column's ⋯ ends in Move to trash for a reader who may write, and offers none to one who may not",
   },
   {
-    name: "opening a folded column's details leaves it folded",
-    file: "packages/interface/intent.ts",
-    from: "        ...(act.open ? unfoldFirst(column, state) : []),\n",
-    to: "        ...[],\n",
-    command: unit,
-    expect: "opening a folded column's details unfolds it",
-  },
-  {
     name: "a list column's ⋯ offers no Rename",
     file: "packages/interface/column-menu.ts",
     from: "      ...(input.renamable\n",
@@ -4516,20 +4480,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a list column's ⋯ starts with Rename for a reader who may write",
   },
   {
-    name: "a status button only ever opens the details",
-    file: "packages/interface/column-menu.ts",
-    from: '      act: { kind: "details", open: !input.details },\n',
-    to: '      act: { kind: "details", open: true },\n',
-    command: unit,
-    expect: "a column's status button asks its details' other state",
-  },
-  {
     name: "a quiet status's button says its word",
     file: "packages/interface/signals.ts",
     from: "  status?.raised === true ? SIGNAL_WORDS[status.level].short : null",
     to: "  status !== null ? SIGNAL_WORDS[status.level].short : null",
     command: unit,
-    expect: "a status button says a word only while its status is raised",
+    expect: "a column's status says a word only while it is raised",
   },
   {
     name: "a status's title drops its reason",
@@ -4843,5 +4799,94 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "outline's summary is the headline alone; story's and raw's have its points, as a markdown list too",
+  },
+  {
+    name: "the dock draws a changes row that says nothing",
+    file: "packages/interface/column-view.ts",
+    from: "    strip.words.buttons.length > 0 ||\n",
+    to: "    true ||\n",
+    command: unit,
+    expect:
+      "is drawn while it says something: never for nothing to accept with no button and no note",
+  },
+  {
+    name: "a strip's get the latest queues no command",
+    file: "packages/interface/column-view.ts",
+    from: '  update: "get-latest",\n',
+    to: "",
+    command: unit,
+    expect: "a button queues its command; accept queues none",
+  },
+  {
+    name: "a conflict that came with the copy resolves by getting accepted work",
+    file: "packages/interface/column-view.ts",
+    from: '    if (button === "update" || button === "get-latest-from-parent")\n      return buttonCommand(button)',
+    to: '    if (button === "update" || button === "get-latest-from-parent")\n      return "get-latest"',
+    command: unit,
+    expect:
+      "a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves",
+  },
+  {
+    name: "ready changes offer resolving",
+    file: "packages/interface/column-view.ts",
+    from: '  if (strip?.state !== "conflicts") return null',
+    to: "  if (strip === null) return null",
+    command: unit,
+    expect:
+      "a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves",
+  },
+  {
+    name: "a quiet status shows under the line",
+    file: "packages/interface/column-view.ts",
+    from: '  if (status !== null && !status.quiet) return { kind: "status", status }',
+    to: '  if (status !== null) return { kind: "status", status }',
+    command: unit,
+    expect:
+      "a raised status, else the focus; never a quiet status, which leaves the focus shown",
+  },
+  {
+    name: "the send button offers resolving with an empty box",
+    file: "packages/interface/send.ts",
+    from: '  if (text.trim() === "") return null\n  return {\n    label: "resolve and send",',
+    to: '  return {\n    label: "resolve and send",',
+    command: unit,
+    expect:
+      "the send button's ▾ resolves only while conflicted, with text in the box and no command on the card",
+  },
+  {
+    name: "a column's reading choices check none",
+    file: "packages/interface/column-menu.ts",
+    from: "              checked: d === density,",
+    to: "              checked: false,",
+    command: unit,
+    expect:
+      "a thread's ⋯ starts with three reading choices, the current one checked, then Go to where it started when there is a start",
+  },
+  {
+    name: "a column's ⋯ never goes to where it started",
+    file: "packages/interface/column-menu.ts",
+    from: "        ...(start === null\n          ? []",
+    to: "        ...(true\n          ? []",
+    command: unit,
+    expect:
+      "a thread's ⋯ starts with three reading choices, the current one checked, then Go to where it started when there is a start",
+  },
+  {
+    name: "a column's status draws its level's words under the line",
+    file: "packages/interface/column-status.ts",
+    from: "    words: reasonedWords(level, reason),\n    reason,",
+    to: "    words: reasonedWords(level, reason),\n    reason: reasonedWords(level, reason),",
+    command: unit,
+    expect:
+      "a run that needs you shows its reason in the header: the reason alone under the line, the level then the reason as its title",
+  },
+  {
+    name: "a queue drops the command it is queued with",
+    file: "packages/interface/intent.ts",
+    from: "              move: queueMove(now, act),\n              hold: act.hold,\n              command: act.command,",
+    to: "              move: queueMove(now, act),\n              hold: act.hold,\n              command: null,",
+    command: unit,
+    expect:
+      "a queue with a command queues the card with it, in the same request",
   },
 ]

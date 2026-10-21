@@ -28,7 +28,7 @@ describe("foldMotion", () => {
         kind: "view",
         canvas,
         first: null,
-        change: { kind: "details", card, open: true },
+        change: { kind: "density", card, density: "outline" },
       }),
     ).toBeNull()
     expect(foldMotion({ kind: "close-canvas", canvas })).toBeNull()

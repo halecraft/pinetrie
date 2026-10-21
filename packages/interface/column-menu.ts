@@ -1,11 +1,12 @@
 // interface/column-menu — a card column's head, folded or not, as values. It
 // starts with its toggle, ⇤ or ⇥, yours alone, or the bin on a thread not yet
-// started, and the card's box, everyone's; after its name, its status button,
-// which opens its details; an unfolded head ends in its ⋯, what changes the
-// canvas everyone shares, ending in its trash.
+// started, and the card's box, everyone's; an unfolded head ends in its ⋯:
+// how you read it, yours, then what changes the canvas everyone shares,
+// ending in its trash.
 
-import { isThreadId } from "@pinetrie/core"
+import { type EntryId, isThreadId } from "@pinetrie/core"
 import type { CardId, CardWidth } from "@pinetrie/threads"
+import { DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { moveWords } from "./card-frame.ts"
 import {
   type ControlWords,
@@ -28,11 +29,20 @@ type ColumnMenuItem = {
   | { readonly kind: "intent"; readonly intent: Intent }
   | { readonly kind: "rename" }
   | { readonly kind: "pin" }
+  /**
+   * How you read the column, yours alone; `checked` is how you read it now.
+   * The page chooses it, since a choice also keeps the reader's scroll.
+   */
+  | {
+      readonly kind: "density"
+      readonly density: Density
+      readonly checked: boolean
+    }
 )
 
-/** A run of a column's ⋯: the canvas's own items, a thread's, or its trash. */
+/** A run of a column's ⋯: how you read it, the canvas's own items, a thread's, or its trash. */
 export interface ColumnMenuSection {
-  readonly key: "canvas" | "thread" | "trash"
+  readonly key: "reading" | "canvas" | "thread" | "trash"
   readonly items: readonly ColumnMenuItem[]
 }
 
@@ -60,11 +70,6 @@ export interface ColumnHead {
   readonly box: HeadBox
   /** ⋯, unfolded only: a column is unfolded to act on it. */
   readonly menu: readonly ColumnMenuSection[]
-  /**
-   * What its status button asks: the details' other state. Opening a folded
-   * column's details unfolds it first (`unfoldFirst`, `intent.ts`).
-   */
-  readonly status: Intent
 }
 
 /** The title of the bin and of Move to trash: the card goes to the canvas's trash, for everyone. */
@@ -113,8 +118,10 @@ export function columnHead(input: {
   readonly unstarted: boolean
   readonly folded: boolean
   readonly ticked: boolean
-  /** Its details are open. */
-  readonly details: boolean
+  /** How you read it now; null for a column with nothing to read so (a list column, a thread with no message). */
+  readonly density: Density | null
+  /** Where its lane started on its path, which its ⋯ goes to; null for none. */
+  readonly start: EntryId | null
   /** Its ⋯ offers Pin a card (`newPinPlace` says `menu`). */
   readonly pin: boolean
   /** Its ⋯ offers Rename: a list column a reader may write. */
@@ -136,12 +143,13 @@ export function columnHead(input: {
       intent: writable ? { kind: "card-tick", card, ticked: !ticked } : null,
     },
     menu: folded ? [] : columnMenu(input),
-    status: {
-      kind: "column",
-      column: { kind: "card", card },
-      act: { kind: "details", open: !input.details },
-    },
   }
+}
+
+/** Where the ⋯'s go-to takes you: the message where the thread's lane started. */
+const WHERE_IT_STARTED = {
+  label: "Go to where it started",
+  title: "bring the message this thread's agent started at into view",
 }
 
 /**
@@ -154,10 +162,28 @@ function columnMenu(input: {
   readonly card: CardId
   readonly width: CardWidth
   readonly writable: boolean
+  readonly density: Density | null
+  readonly start: EntryId | null
   readonly pin: boolean
   readonly renamable: boolean
 }): readonly ColumnMenuSection[] {
   const wide = input.width === 2
+  const { density } = input
+  const reading: readonly ColumnMenuSection[] =
+    density === null
+      ? []
+      : [
+          {
+            key: "reading",
+            items: DENSITIES.map(d => ({
+              kind: "density",
+              key: `density-${d}`,
+              ...densityWords(d),
+              density: d,
+              checked: d === density,
+            })),
+          },
+        ]
   const canvas: ColumnMenuSection = {
     key: "canvas",
     items: [
@@ -208,13 +234,29 @@ function columnMenu(input: {
         },
       ]
     : []
-  if (!isThreadId(input.card)) return [canvas, ...trash]
+  if (!isThreadId(input.card)) return [...reading, canvas, ...trash]
   const source = input.card
+  const { start } = input
   return [
+    ...reading,
     canvas,
     {
       key: "thread",
       items: [
+        ...(start === null
+          ? []
+          : [
+              {
+                kind: "intent",
+                key: "where-it-started",
+                ...WHERE_IT_STARTED,
+                intent: {
+                  kind: "column",
+                  column: { kind: "card", card: source },
+                  act: { kind: "open-at", entry: start },
+                },
+              } as const,
+            ]),
         {
           kind: "intent",
           key: "copy",

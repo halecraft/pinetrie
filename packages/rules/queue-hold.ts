@@ -71,16 +71,17 @@ export function planQueueHold(input: {
  * accepted, the hold's writes. The hold goes first when the host carries it
  * out, so the drain the move asks for finds the queue as this says: held
  * before a staged card can be popped, released before the drain. A move
- * that queues nothing changes no hold. A card created in the queue carries
- * `command` from its first write: a command set by a later request could
- * come after the drain popped the card.
+ * that queues nothing changes no hold. A card queued with `command`, made
+ * there or moved there (a "resolve and send"), carries it in the move's own
+ * write: a command set by a later request could come after the drain
+ * popped the card.
  */
 export function planQueueCard(input: {
   readonly cards: readonly CardRecord[]
   readonly holds: ReadonlyMap<ThreadId, QueueHold>
   readonly move: QueueMove
   readonly hold: QueueHoldChange
-  /** The created card's command; ignored for a card that exists. */
+  /** The queued card's command; null leaves a card that exists as it is. */
   readonly command: CardCommand | null
   readonly by: WriterId
   readonly now: number
@@ -95,7 +96,7 @@ export function planQueueCard(input: {
   const planned = planMoveCommand(input.cards, [move], input.by, input.running)
   const { drain } = planned
   const step =
-    move.from === null && input.command !== null
+    input.command !== null
       ? withCommand(planned.step, input.command)
       : planned.step
   if (step.kind === "refused" || move.to.kind !== "queued" || hold === "keep")
@@ -113,7 +114,7 @@ export function planQueueCard(input: {
   return { step, drain, holds }
 }
 
-/** A creation's write, carrying `command`. */
+/** The queued card's write, carrying `command`. */
 const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
   step.kind === "refused"
     ? step

@@ -3,8 +3,8 @@
 // (`start`: the toggle, and a card's box) sits where the unfolded header's
 // does, so the toggle stays under the pointer; then its handle, holding its
 // mark, its name on its side and its detail, which a drag starts from and a
-// click does nothing on; then a card's status button. Only the toggle and the
-// status button unfold it. The name and mark are where a fold's turn lands
+// click does nothing on; then a card's dot. Only the toggle unfolds it. The
+// name and mark are where a fold's turn lands
 // (`data-fold-name`, `data-fold-mark`): at the header's size, so the turn ends
 // on them exactly.
 
@@ -24,7 +24,7 @@ export function FoldedStrip(p: {
   detail: string | null
   /** The handle's title: a thread's focus; null for none. */
   hint: string | null
-  /** Its status button, after its name; null for none. */
+  /** Its thread's dot, after its name; null for none. */
   status: ReactNode
 }) {
   const inner = (

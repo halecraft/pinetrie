@@ -360,31 +360,37 @@ export const col = (n: number) => `.column[data-position="${n}"]`
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
 /**
- * Open `column`'s details, where its density and fork row are: its status
- * button opens them. Nothing when they are open already.
- */
-export const openDetails = (p: Page, column: string) =>
-  p
-    .click(`${column} .head-status-button[aria-expanded="false"]`, {
-      timeout: 5_000,
-    })
-    .catch(() => {})
-
-/**
  * Read column `n` raw: every message and tool row, which the
  * checks written before densities look at once a run has ended. A column
  * opens in story, folding each ask's work; the choice is kept with it. Its
  * control appears with its first message.
  */
 export async function readRaw(p: Page, n = 0): Promise<void> {
-  const raw = `${col(n)} .density-choice[data-density="raw"]`
-  await openDetails(p, col(n))
-  const shown = await p.waitForSelector(raw, { timeout: 15_000 }).then(
-    () => true,
-    () => false,
-  )
+  await chooseDensity(p, n, "raw")
+}
+
+/**
+ * Read column `n` at `density`, from its ⋯'s reading choices, which a column
+ * offers once it has a message. Nothing when it reads so already.
+ */
+export async function chooseDensity(
+  p: Page,
+  n: number,
+  density: "outline" | "story" | "raw",
+): Promise<void> {
+  const shown = await p
+    .waitForSelector(`${col(n)} .msg`, { timeout: 15_000 })
+    .then(
+      () => true,
+      () => false,
+    )
   if (!shown) return
-  if ((await p.getAttribute(raw, "aria-pressed")) !== "true") await p.click(raw)
+  if ((await p.getAttribute(col(n), "data-density")) === density) return
+  await chooseFromMenu(
+    p,
+    `${col(n)} .column-head .column-menu`,
+    `.column-density-${density}`,
+  )
 }
 /**
  * Wait until `p` has connected and synced: the sidebar is drawn, which waits

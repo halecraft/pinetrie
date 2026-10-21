@@ -297,6 +297,34 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
   return { ...words, disabled: busy.uploading || busy.sending, setup: false }
 }
 
+/** The send button's ▾ item: what it says, and the command it queues your message with. */
+interface SendMoreItem extends ButtonWords {
+  readonly command: CardCommand
+}
+
+/**
+ * The send button's ▾ item, beside `sendButton`: while the thread's changes
+ * conflict (`resolve`, `resolveCommand`), your box holds text and your card
+ * carries no command of its own, **resolve and send** queues your message
+ * with `resolve`, its text the resolution's instructions. Null otherwise: the
+ * send button alone, which never resolves.
+ */
+export function sendMore(
+  plan: SendPlan,
+  resolve: CardCommand | null,
+  text: string,
+): SendMoreItem | null {
+  if (resolve === null || plan.command !== null || plan.noModel !== null)
+    return null
+  if (text.trim() === "") return null
+  return {
+    label: "resolve and send",
+    title:
+      "gets the latest, and the agent resolves the conflicts with what you wrote",
+    command: resolve,
+  }
+}
+
 /**
  * Who a send is for, in the button's words. A send that asks the agent says
  * so, whoever else it names. Other threads' agents it invites come first

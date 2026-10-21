@@ -32,8 +32,8 @@ export type Signal = "unsent" | Level | "done"
 
 /**
  * A signal's words, its mark's name and title, and the word a column's
- * status button says while it is raised for you; null where the dot says
- * enough.
+ * status says after its dot while it is raised for you; null where the dot
+ * says enough.
  */
 interface SignalWording {
   readonly words: string
@@ -75,7 +75,7 @@ export const statusWords = (
     status.item === null ? null : attentionWords(status.item.raised, nameOf),
   )
 
-/** The word a column's status button says: its level's, while raised for you; null otherwise. */
+/** The word a column's status says after its dot: its level's, while raised for you; null otherwise. */
 export const statusWord = (status: Status | null): string | null =>
   status?.raised === true ? SIGNAL_WORDS[status.level].short : null
 

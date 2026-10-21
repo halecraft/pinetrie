@@ -1,7 +1,9 @@
-// web/dock — a column's foot: the queue's header, which says what happens next
-// and holds the one control for it, the queued cards, "+ add to queue", the
-// line, and what the column puts below it (your message, the notes line). CSS
-// keeps it to a third of the column, scrolling within, its header in view.
+// web/dock — a column's foot, where you act: its head (the changes row, the
+// queue's header, which says what happens next and holds the one control for
+// it, and the dock's one ⋯, the changes' commands then the queue's), the
+// queued cards, "+ add to queue", the line, and what the column puts below it
+// (your message, the notes line). CSS keeps it to a third of the column,
+// scrolling within, its head in view.
 //
 // It reads presence (who types in which card) itself, so a keystroke anywhere
 // redraws the dock, not the column; which queued cards are blank is `App`'s,
@@ -27,6 +29,8 @@ import {
   type Reader,
   type ReadOnly,
   readTypingIn,
+  type WorkStrip,
+  type WorkStripButton,
 } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import { newCardId } from "@pinetrie/session/connect"
@@ -41,8 +45,9 @@ import type { ReactNode } from "react"
 import { Button } from "./button.tsx"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { CardFrame } from "./card-frame.tsx"
-import { Menu } from "./menu.tsx"
+import { Menu, type MenuSection } from "./menu.tsx"
 import { RENDERINGS } from "./renderings.tsx"
+import { WorkStripView, workStripMenu } from "./work-strip.tsx"
 
 /**
  * A reference queued to tell the agent, framed as a queued message is: who
@@ -102,6 +107,16 @@ export function Dock(p: {
   latestSources: LatestSources
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
+  /** The changes row, while it has something to say or do (`DockShows`); null otherwise. */
+  strip: WorkStrip | null
+  /** What a press on a changes button does (`actOnProposedChanges`). */
+  onStrip: (button: WorkStripButton) => void
+  /** The changes' review, in the column's pane. */
+  review: {
+    readonly id: string
+    readonly open: boolean
+    readonly toggle: () => void
+  }
   /** Between the line and your message: what you did here that was refused. */
   notices: ReactNode
   /** Below the line: your message, and the notes line. */
@@ -122,6 +137,28 @@ export function Dock(p: {
   const plan = head === null ? null : queueHeadPlan(head)
   const mark = plan?.mark
   const drawn = queuedCardsDrawn(queued, head?.next ?? null)
+  // One ⋯ for the dock: the changes' commands, then the queue's.
+  const changes = p.strip === null ? null : workStripMenu(p.strip, p.onStrip)
+  const menu: readonly MenuSection[] = [
+    ...(changes === null ? [] : [changes]),
+    ...(head === null || plan === null || plan.items.length === 0
+      ? []
+      : [
+          {
+            key: "queue",
+            items: plan.items.map(item => {
+              const w = nextItemWords(item)
+              return {
+                key: item,
+                className: w.className,
+                label: w.label,
+                title: w.title,
+                onChoose: () => itemAct(item, head, p.onAct, p.session),
+              }
+            }),
+          },
+        ]),
+  ]
   const addToQueue = () => {
     if (lane === null || p.queueAt === null) return
     p.onAct({
@@ -138,41 +175,39 @@ export function Dock(p: {
       className="dock"
       data-next={mark?.kind === "message" ? "message" : undefined}
     >
-      {head !== null && plan !== null && (
-        <div className="queue-head" data-next={mark?.kind}>
-          <span className="next-state" data-next={head.next.kind}>
-            {nextWords(head.next, p.reader)}
-          </span>
-          {plan.button !== null && (
-            <HeadButton
-              button={plan.button}
-              head={head}
-              onAct={p.onAct}
-              session={p.session}
-            />
+      {(p.strip !== null || (head !== null && plan !== null)) && (
+        <div className="dock-head">
+          {p.strip !== null && (
+            <WorkStripView act={p.onStrip} review={p.review} strip={p.strip} />
           )}
-          {plan.items.length > 0 && (
-            <Menu
-              className="queue-menu"
-              label="queue actions"
-              sections={[
-                {
-                  key: "queue",
-                  items: plan.items.map(item => {
-                    const w = nextItemWords(item)
-                    return {
-                      key: item,
-                      className: w.className,
-                      label: w.label,
-                      title: w.title,
-                      onChoose: () => itemAct(item, head, p.onAct, p.session),
-                    }
-                  }),
-                },
-              ]}
-              trigger="⋯"
-              triggerClassName="queue-menu-trigger"
-            />
+          {((head !== null && plan !== null) || menu.length > 0) && (
+            <div className="queue-head" data-next={mark?.kind}>
+              {head !== null && plan !== null && (
+                <>
+                  <span className="next-state" data-next={head.next.kind}>
+                    {nextWords(head.next, p.reader)}
+                  </span>
+                  {plan.button !== null && (
+                    <HeadButton
+                      button={plan.button}
+                      head={head}
+                      onAct={p.onAct}
+                      session={p.session}
+                    />
+                  )}
+                </>
+              )}
+              {menu.length > 0 && (
+                <Menu
+                  className="dock-menu"
+                  label="the changes and the queue"
+                  sections={menu}
+                  trigger="⋯"
+                  triggerClassName="dock-menu-trigger"
+                  triggerProps={{ "data-role": "dock-menu" }}
+                />
+              )}
+            </div>
           )}
         </div>
       )}

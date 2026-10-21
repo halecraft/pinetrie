@@ -30,6 +30,8 @@
     strip; the status button, not the line, opens the details; a raised
     run-end status is a word on that button, its row in the details; density
     and + pin leave the line.
+  - ADR-0203: under the line is the raised reason, else the focus, and the
+    fork row, always; nothing is closed behind a press.
 
 **Context.**
 

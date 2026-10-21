@@ -9,6 +9,9 @@
     run-end status is a word on that button, its row in the details; density
     and + pin leave the line.
   - ADR-0182: a list column's title renames from its ⋯, not a click.
+- **Amended by:**
+  - ADR-0203: the status is a mark, not a button; a strip unfolds from ⇥
+    alone; density is in the column's ⋯.
 
 **Context.**
 

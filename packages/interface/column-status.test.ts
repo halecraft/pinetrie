@@ -61,7 +61,7 @@ const statusOf = (report: RunEndReport, over: Partial<AttentionInput> = {}) =>
     nameOf,
   )
 
-test("a status's title reads as its run-end row does, in the sidebar, a dot and a status button", () => {
+test("a status's title reads as its run-end row does, in the sidebar and on a column's dot", () => {
   const facts: AttentionInput = {
     me: ADA,
     writers: new Map([[A, [ADA, BEA]]]),
@@ -85,11 +85,12 @@ test("a status's title reads as its run-end row does, in the sidebar, a dot and 
 })
 
 describe("columnStatus", () => {
-  test("a run that needs you shows its reason in the header", () => {
+  test("a run that needs you shows its reason in the header: the reason alone under the line, the level then the reason as its title", () => {
     expect(statusOf(needsYou)).toEqual({
       level: "needs-you",
       quiet: false,
       words: "needs you: asks whether to drop the v1 table",
+      reason: "asks whether to drop the v1 table",
       end: entryId("e-5"),
     })
   })

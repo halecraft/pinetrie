@@ -1,4 +1,4 @@
-import { threadIdFor } from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
 import { type CardId, cardIdOfKind } from "@pinetrie/threads"
 import { expect, test } from "vitest"
 import { columnHead } from "./column-menu.ts"
@@ -17,7 +17,8 @@ const menuOf = (
     unstarted: false,
     folded: false,
     ticked: false,
-    details: false,
+    density: null,
+    start: null,
     pin: false,
     renamable: false,
   }).menu
@@ -78,7 +79,8 @@ test("a column's head starts with its toggle: it folds a started thread or a not
       unstarted,
       folded: false,
       ticked: false,
-      details: false,
+      density: null,
+      start: null,
       pin: false,
       renamable: false,
     })
@@ -115,7 +117,8 @@ test("folded, a column's head unfolds it from the same toggle, keeps its box, an
     unstarted: false,
     folded: true,
     ticked: true,
-    details: false,
+    density: null,
+    start: null,
     pin: false,
     renamable: false,
   })
@@ -137,7 +140,8 @@ test("a column's box asks the other state, for everyone; a reader who may not ch
       unstarted: false,
       folded: false,
       ticked,
-      details: false,
+      density: null,
+      start: null,
       pin: false,
       renamable: false,
     }).box
@@ -162,7 +166,8 @@ const head = (over: Partial<Parameters<typeof columnHead>[0]> = {}) =>
     unstarted: false,
     folded: false,
     ticked: false,
-    details: false,
+    density: null,
+    start: null,
     pin: false,
     renamable: false,
     ...over,
@@ -179,13 +184,43 @@ test("a list column's ⋯ starts with Rename for a reader who may write; a threa
   ])
 })
 
-test("a column's status button asks its details' other state, folded or not", () => {
+test("a thread's ⋯ starts with three reading choices, the current one checked, then Go to where it started when there is a start", () => {
   const card = threadIdFor("a")
-  for (const folded of [false, true])
-    for (const details of [false, true])
-      expect(head({ card, folded, details }).status).toEqual({
-        kind: "column",
-        column: { kind: "card", card },
-        act: { kind: "details", open: !details },
-      })
+  const start = entryId("e-3")
+  const menu = head({ card, density: "story", start }).menu
+  expect(menu[0]).toEqual({
+    key: "reading",
+    items: [
+      expect.objectContaining({
+        kind: "density",
+        density: "outline",
+        checked: false,
+      }),
+      expect.objectContaining({
+        kind: "density",
+        density: "story",
+        checked: true,
+      }),
+      expect.objectContaining({
+        kind: "density",
+        density: "raw",
+        checked: false,
+      }),
+    ],
+  })
+  expect(menu.find(m => m.key === "thread")?.items[0]).toMatchObject({
+    kind: "intent",
+    key: "where-it-started",
+    intent: {
+      kind: "column",
+      column: { kind: "card", card },
+      act: { kind: "open-at", entry: start },
+    },
+  })
+  const plain = head({ card }).menu
+  expect(plain.map(m => m.key)).not.toContain("reading")
+  expect(
+    plain.find(m => m.key === "thread")?.items.map(i => i.key),
+  ).not.toContain("where-it-started")
+  expect(head({ density: null }).menu.map(m => m.key)).not.toContain("reading")
 })

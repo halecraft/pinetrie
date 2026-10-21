@@ -25,6 +25,7 @@ import {
   type SendPlan,
   sendable,
   sendButton,
+  sendMore,
   settleSend,
   spent,
   startWords,
@@ -315,6 +316,26 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     noModel: null,
   })
   const IDLE = { uploading: false, sending: false }
+  test("the send button's ▾ resolves only while conflicted, with text in the box and no command on the card", () => {
+    const plain = sent(AGENT)
+    expect(sendMore(plain, "get-latest", "use theirs for the table")).toEqual({
+      label: "resolve and send",
+      title: expect.any(String),
+      command: "get-latest",
+    })
+    expect(sendMore(plain, "get-latest-from-parent", "x")?.command).toBe(
+      "get-latest-from-parent",
+    )
+    expect(sendMore(plain, null, "use theirs")).toBeNull()
+    expect(sendMore(plain, "get-latest", "  ")).toBeNull()
+    expect(
+      sendMore(
+        { ...plain, command: { command: "split", text: true } },
+        "get-latest",
+        "x",
+      ),
+    ).toBeNull()
+  })
   const people = (...names: string[]): Recipients => ({
     compels: NOBODY,
     people: names,

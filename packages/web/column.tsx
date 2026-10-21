@@ -21,12 +21,12 @@ import {
   agentsRow,
   agentsWords,
   askLine,
+  buttonCommand,
   type ColumnAct,
   type ColumnHow,
   type ColumnKey,
   type ColumnMatches,
   type Column as ColumnSpec,
-  type ColumnStatus,
   type ColumnView,
   type ComposerPlacesStore,
   columnHead,
@@ -35,10 +35,8 @@ import {
   composerPlace,
   conflictsView,
   crossCanvasLinks,
-  DENSITIES,
   type Density,
   type DigestRecord,
-  densityWords,
   earlierWords,
   effectiveBase,
   endTraces,
@@ -46,9 +44,10 @@ import {
   type FoldMemory,
   focusTitle,
   gridKeyAct,
-  type HeadIcon,
   type HeadIdentity,
+  type HeadLine,
   type HeadOrigin,
+  handleTitle,
   headLane,
   type Intent,
   identityWords,
@@ -73,14 +72,10 @@ import {
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
-  reviewToggleTitle,
   type SeatRecord,
-  START_WORDS,
   type StandingRunEnd,
   type Status,
   seenBatches,
-  startedWords,
-  type ThreadDetails,
   type ThreadLink,
   type TraceRecord,
   threadIcon,
@@ -91,7 +86,6 @@ import {
   traceWords,
   unstartedMode,
   type WorkFacts,
-  type WorkStrip,
   type WorkStripButton,
   workingWords,
   yourCard,
@@ -147,15 +141,13 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { Button, IconButton } from "./button.tsx"
+import { Button } from "./button.tsx"
 import { NewCardBox } from "./card-editor.tsx"
 import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
-import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
 import { Margin } from "./margin.tsx"
 import { MatchList } from "./match-list.tsx"
-import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
@@ -170,7 +162,7 @@ import { Pane } from "./pane.tsx"
 import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
-import { StatusButton } from "./root-signals.tsx"
+import { ColumnDot } from "./root-signals.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadMark } from "./thread-mark.tsx"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -346,8 +338,6 @@ export function Column(p: ColumnProps) {
       ? ROOT
       : atEntry(view.tipId)
   const writable = p.readOnly === null
-  // Open details stay open, through a reload too, as a density does.
-  const detailsOpen = p.column.details === true
   // What this column's reader asks, a message's acts among it: the one
   // handler every message shares, so none of them redraws when this column
   // does.
@@ -498,7 +488,6 @@ export function Column(p: ColumnProps) {
     p.onIntent({ kind: "open-at", entry }),
   )
   // What the name's `aria-controls` points at.
-  const detailsId = `details-${p.column.key}`
 
   // The lanes running on this column's path stream here.
   const streamingLanes = p.activity
@@ -601,6 +590,8 @@ export function Column(p: ColumnProps) {
   const runningAsk =
     lane.kind === "lane" && lane.running ? runPrompt(index, lane.tip) : null
   const density = p.column.density ?? "story"
+  // When the column mounted: what the handle's title counts back from.
+  const [now] = useState(() => Date.now())
   const nameFn = (w: WriterId) => nameFor(p.nameOf, w)
   const askLineOf = (ask: EntryId | null): string | null =>
     askLine(index, ask, nameFn)
@@ -633,10 +624,6 @@ export function Column(p: ColumnProps) {
       threadIcon({ thread: headLane(lane, true, thread), ...p.work })?.url ??
       null,
   )
-  // Whether the reader opened the thread's details here, since the column
-  // mounted: they spin only then, and not when a reload or a tab switch
-  // mounts them open, as an icon there at mount does not fade.
-  const [openedHere, setOpenedHere] = useState(false)
   const working = workingWords(running, askLineOf(runningAsk))
   // The cards at this column's end: yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
@@ -816,15 +803,15 @@ export function Column(p: ColumnProps) {
     () => ({ shown: pane, open: openPane }),
     [pane, openPane],
   )
-  const review = shows.strip?.review ?? null
+  const review = shows.dock.strip?.review ?? null
   const paneShows =
     pane === null
       ? null
       : paneView(pane, {
           strip:
-            review === null || shows.strip === null
+            review === null || shows.dock.strip === null
               ? null
-              : { target: review, line: shows.strip.words.line },
+              : { target: review, line: shows.dock.strip.words.line },
           nodes: view.nodes,
           askTarget: ask =>
             askReviewTarget(
@@ -864,9 +851,10 @@ export function Column(p: ColumnProps) {
   // pops it when the lane is free. An acceptance names its destination: the default,
   // or accepted work.
   const actOnProposedChanges = (button: WorkStripButton) => {
+    const command = buttonCommand(button)
     if (lane.kind !== "lane") return
     if (button === "accept" || button === "accept-into-accepted") {
-      const destinations = shows.strip?.destinations ?? []
+      const destinations = shows.dock.strip?.destinations ?? []
       const to =
         button === "accept"
           ? destinations[0]
@@ -897,14 +885,7 @@ export function Column(p: ColumnProps) {
       kind: "queue-new",
       card: newCardId(),
       hold: "keep",
-      command:
-        button === "continue"
-          ? "continue-on-accepted"
-          : button === "get-latest-from-parent"
-            ? "get-latest-from-parent"
-            : button === "split"
-              ? "split"
-              : "get-latest",
+      command,
       lane: lane.name,
       at,
     })
@@ -954,6 +935,11 @@ export function Column(p: ColumnProps) {
     pinned: pinned.length,
   })
   const openPin = () => setPinning(true)
+  /** Read the column at `d`: the reader's own move, so at the end it stays there, and no floor holds the change (`follow.ts`). */
+  const chooseDensity = (d: Density) => {
+    act({ kind: "density", density: d })
+    body.current?.dispatchEvent(new Event(PLACED))
+  }
   const head =
     card === null
       ? null
@@ -964,7 +950,8 @@ export function Column(p: ColumnProps) {
           unstarted,
           folded: false,
           ticked: p.ticked,
-          details: detailsOpen,
+          density: view.nodes.length > 0 ? density : null,
+          start: shows.head.facts?.start ?? null,
           pin: newPin === "menu",
           renamable: false,
         })
@@ -1027,24 +1014,21 @@ export function Column(p: ColumnProps) {
               )}
               <HeadHandle
                 card={card}
-                identity={shows.identity}
+                identity={shows.head.identity}
                 running={running}
+                title={handleTitle(
+                  shows.head.facts,
+                  shows.head.base,
+                  agentsLine === null ? null : agentsWords(agentsLine),
+                  now,
+                )}
                 working={working}
               />
               {head !== null && card !== null && isThreadId(card) && (
-                <StatusButton
+                <ColumnDot
                   arrived={p.threadArrivals.arrived.get(card) ?? null}
-                  detailsId={detailsId}
                   done={p.threadArrivals.done.get(card) ?? null}
                   nameOf={p.nameOf}
-                  onPress={() => {
-                    // No `PLACED`, unlike density: this changes the
-                    // viewport's height, not the content's, and
-                    // `useFollow`'s resize step keeps a column at its end.
-                    if (!detailsOpen) setOpenedHere(true)
-                    p.onIntent(head.status)
-                  }}
-                  open={detailsOpen}
                   status={p.statuses.get(card) ?? null}
                   worded
                 />
@@ -1052,14 +1036,6 @@ export function Column(p: ColumnProps) {
               <span className="head-space" />
               {p.matches !== null && (
                 <span className="match-count">{p.matches.count}</span>
-              )}
-              {shows.base !== null && (
-                <span className="thread-base">{shows.base}</span>
-              )}
-              {shows.behind !== null && (
-                <span className="thread-behind" title={shows.behind.title}>
-                  {shows.behind.mark}
-                </span>
               )}
               {view.tipId !== null && (
                 <SeenBy
@@ -1072,70 +1048,29 @@ export function Column(p: ColumnProps) {
               )}
               {head !== null && (
                 <ColumnMenu
+                  onDensity={chooseDensity}
                   onIntent={p.onIntent}
                   onPin={openPin}
                   sections={head.menu}
                 />
               )}
             </div>
-            {/* Closed, under the line is only what waits on your answer:
-            an ssh ask, for its owner. */}
-            {shows.access !== null && lane.kind === "lane" && (
+            {/* Under the line, always: why it needs you, else what it is
+            doing; where it came from; and an ssh ask, for its owner. */}
+            <HeadLineView line={shows.head.line} onOpen={openAt} />
+            <Origin
+              onLink={openLink}
+              onOpen={openAt}
+              origin={shows.head.origin}
+            />
+            {shows.head.access !== null && lane.kind === "lane" && (
               <AccessRowView
                 acting={acting.access.get(lane.name) ?? null}
                 answer={answer =>
                   void p.session.access(lane.name, answer).catch(() => {})
                 }
-                view={shows.access}
+                view={shows.head.access}
               />
-            )}
-            {detailsOpen && (
-              <div className="head-details" id={detailsId}>
-                {shows.identity.kind === "agent" &&
-                  shows.identity.status !== null && (
-                    <StatusRow onOpen={openAt} status={shows.identity.status} />
-                  )}
-                {shows.identity.kind === "agent" &&
-                  shows.identity.focus !== null && (
-                    <div
-                      className="head-focus"
-                      data-kind={shows.identity.focus.kind}
-                      title={focusTitle(shows.identity.focus)}
-                    >
-                      {shows.identity.focus.text}
-                    </div>
-                  )}
-                <Origin
-                  onLink={openLink}
-                  onOpen={openAt}
-                  origin={shows.origin}
-                />
-                {agentsLine !== null && (
-                  // Other threads' agents in this thread, and what agents
-                  // talking from it spent.
-                  <div className="agents-row">{agentsWords(agentsLine)}</div>
-                )}
-                {view.nodes.length > 0 && (
-                  <DensityControl
-                    density={density}
-                    onChoose={d => {
-                      act({ kind: "density", density: d })
-                      // The reader's own move: at the end, it stays there,
-                      // and no floor holds the change (`follow.ts`).
-                      body.current?.dispatchEvent(new Event(PLACED))
-                    }}
-                  />
-                )}
-                <WorkStripView
-                  act={actOnProposedChanges}
-                  review={{
-                    id: paneId,
-                    open: pane?.kind === "strip",
-                    toggle: toggleReview,
-                  }}
-                  strip={shows.strip}
-                />
-              </div>
             )}
             {view.above.length > 0 && (
               <Button
@@ -1154,18 +1089,6 @@ export function Column(p: ColumnProps) {
           body's, so their offsets from the body hold. */}
           <div className="column-below">
             <div className="column-under" inert={p.matches !== null}>
-              {shows.identity.kind === "agent" && detailsOpen && (
-                <ThreadDetailsPanel
-                  details={shows.identity.details}
-                  icon={shows.identity.icon}
-                  id={`${detailsId}-thread`}
-                  name={shows.identity.name}
-                  onOpen={openAt}
-                  running={running}
-                  spinFirst={openedHere}
-                  working={working}
-                />
-              )}
               {!unstarted && threadEnd !== null && (
                 <PinnedStrip
                   box={
@@ -1335,6 +1258,13 @@ export function Column(p: ColumnProps) {
                 </div>
               )}
               <Dock
+                strip={shows.dock.shown ? shows.dock.strip : null}
+                onStrip={actOnProposedChanges}
+                review={{
+                  id: paneId,
+                  open: pane?.kind === "strip",
+                  toggle: toggleReview,
+                }}
                 asks={p.asks}
                 blank={p.blank}
                 cards={p.cards}
@@ -1376,6 +1306,7 @@ export function Column(p: ColumnProps) {
                   onIntent={p.onIntent}
                   onTyping={p.onTyping}
                   latestSources={latestSources}
+                  resolve={shows.dock.resolve}
                   putColumn={putColumn}
                   participants={p.participants}
                   agents={agents}
@@ -1463,11 +1394,14 @@ function HeadHandle({
   card,
   identity,
   running,
+  title,
   working,
 }: {
   card: CardId | null
   identity: HeadIdentity
   running: boolean
+  /** Who started the thread and when, its base and the agents line (`handleTitle`). */
+  title: string | null
   working: string | undefined
 }) {
   const inner = (
@@ -1494,6 +1428,7 @@ function HeadHandle({
       card={card}
       className={className}
       thread={identity.kind === "agent" ? identity.name : undefined}
+      {...(title === null ? {} : { title })}
     >
       {inner}
     </ColumnHandle>
@@ -1501,74 +1436,48 @@ function HeadHandle({
 }
 
 /**
- * A named thread's details, under its header: its mark
- * magnified, its name, who started it, what it works on
- * now, whether its base has moved on, and where its lane started on this
- * path. The mark is `ThreadMark` itself, scaled by CSS. It spins as the
- * reader opens the details here (`spinFirst`) and at each click; mounted
- * open, by a reload or a tab switch, it stays still. The spin is on the
- * button around the mark, since the mark's own transform pulses while the
- * lane runs.
+ * Under a column's line, always (`headLine`): the reason of a run-end status
+ * raised for you, alone, in its level's colour, its title the level then the
+ * reason, a press bringing the run's last entry into view; else the
+ * thread's focus, dimmed; else nothing.
  */
-function ThreadDetailsPanel({
-  details,
-  icon,
-  id,
-  name,
+function HeadLineView({
+  line,
   onOpen,
-  running,
-  spinFirst,
-  working,
 }: {
-  details: ThreadDetails
-  icon: HeadIcon | null
-  id: string
-  name: string
+  line: HeadLine
   onOpen: (id: EntryId) => void
-  running: boolean
-  spinFirst: boolean
-  working: string | undefined
 }) {
-  const [spins, setSpins] = useState(spinFirst ? 1 : 0)
-  const [now] = useState(() => Date.now())
-  const { started, behind, start } = details
-  return (
-    <section aria-label={name} className="thread-details" id={id}>
-      <IconButton
-        label="spin"
-        className="thread-details-icon"
-        // Each spin changes the animation's name, which restarts it without
-        // drawing the mark again: a new icon would fade in again.
-        data-spin={spins === 0 ? undefined : spins % 2 === 1 ? "odd" : "even"}
-        onClick={() => setSpins(n => n + 1)}
-      >
-        <ThreadMark icon={icon} running={running} working={working} />
-      </IconButton>
-      <div className="thread-details-facts">
-        <div className="thread-details-name">{name}</div>
-        {started !== null && (
-          <div className="thread-details-started">
-            {startedWords(started, now)}
-          </div>
-        )}
-        {working !== undefined && (
-          <div className="thread-details-working">{working}</div>
-        )}
-        {behind !== null && (
-          <div className="thread-details-behind">{behind}</div>
-        )}
-        {start !== null && (
-          <Button
-            look="plain"
-            className="thread-details-start"
-            onClick={() => onOpen(start)}
-          >
-            {START_WORDS}
-          </Button>
-        )}
-      </div>
-    </section>
-  )
+  switch (line.kind) {
+    case "none":
+      return null
+    case "status": {
+      const { status } = line
+      return (
+        <Button
+          look="plain"
+          className="head-status"
+          data-level={status.level}
+          data-role="reason"
+          onClick={() => onOpen(status.end)}
+          title={status.words}
+        >
+          {status.reason}
+        </Button>
+      )
+    }
+    case "focus":
+      return (
+        <div
+          className="head-focus"
+          data-kind={line.focus.kind}
+          data-role="focus"
+          title={focusTitle(line.focus)}
+        >
+          {line.focus.text}
+        </div>
+      )
+  }
 }
 
 /**
@@ -1576,31 +1485,6 @@ function ThreadDetailsPanel({
  * or a copy's source, or a parent thread in another canvas, by its link,
  * which opens nothing where someone else holds it.
  */
-/**
- * The status line: what the thread's last run needs from you. A press brings
- * the run's last entry into view.
- */
-function StatusRow({
-  status,
-  onOpen,
-}: {
-  status: ColumnStatus
-  onOpen: (id: EntryId) => void
-}) {
-  return (
-    <Button
-      look="plain"
-      className="head-status"
-      data-level={status.level}
-      data-quiet={status.quiet || undefined}
-      onClick={() => onOpen(status.end)}
-      title={status.words}
-    >
-      {status.words}
-    </Button>
-  )
-}
-
 function Origin({
   origin,
   onOpen,
@@ -1616,6 +1500,7 @@ function Origin({
       <Button
         look="plain"
         className="origin"
+        data-role="origin"
         data-copied={origin.copied || undefined}
         disabled={!opens(origin.link)}
         onClick={() => onLink(origin.link, origin.at)}
@@ -1632,28 +1517,11 @@ function Origin({
     <Button
       look="plain"
       className="origin"
+      data-role="origin"
       onClick={() => onOpen(origin.at)}
       title="show where this branch starts"
     >
       <span className="origin-dot" />↰ {origin.speaker}: “{origin.text}”
-    </Button>
-  )
-}
-
-/**
- * Proposed changes' bookmark, which a press copies. Where it can't be copied, a
- * press selects the bookmark's own text (`useCopy`).
- */
-function Bookmark({ name }: { name: string }) {
-  const { copied, copy } = useCopy()
-  return (
-    <Button
-      look="plain"
-      className="work-bookmark"
-      onClick={e => copy(name, [e.currentTarget])}
-      title={copied ? COPIED : "copy the bookmark, to find it in jj"}
-    >
-      {name}
     </Button>
   )
 }
@@ -1693,126 +1561,5 @@ function AccessRowView({
         </Button>
       ))}
     </div>
-  )
-}
-
-/**
- * What became of the column's files, at its foot: the lane's proposed changes
- * in your repo. An
- * proposed changes' line opens its review; its bookmark, copied, finds it in
- * jj or jjui.
- */
-function WorkStripView({
-  strip,
-  act,
-  review,
-}: {
-  strip: WorkStrip | null
-  act: (button: WorkStripButton) => void
-  review: {
-    readonly id: string
-    readonly open: boolean
-    readonly toggle: () => void
-  }
-}) {
-  if (strip === null) return null
-  const { words } = strip
-  return (
-    <div className="work work-strip" data-state={strip.state}>
-      {strip.review === null ? (
-        <span className="work-line" title={words.lineTitle ?? undefined}>
-          {words.line}
-        </span>
-      ) : (
-        <Button
-          look="plain"
-          aria-controls={review.id}
-          aria-expanded={review.open}
-          className="work-line"
-          onClick={review.toggle}
-          title={reviewToggleTitle(review.open)}
-        >
-          {words.line}
-        </Button>
-      )}
-      {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
-      {words.note !== null && (
-        <span
-          className="work-note"
-          data-acting={strip.waiting ? "sent" : "said"}
-          role="status"
-        >
-          {words.note}
-        </span>
-      )}
-      <span className="work-space" />
-      {words.buttons.map(({ button, label, title, disabled }) => (
-        <Button
-          look="outline"
-          className={`work-${button}`}
-          disabled={strip.waiting || disabled === true}
-          key={button}
-          onClick={() => act(button)}
-          title={title}
-        >
-          {label}
-        </Button>
-      ))}
-      {words.menu.length > 0 && (
-        <Menu
-          className="work-more"
-          sections={[
-            {
-              key: "work",
-              items: words.menu.map(({ button, label, title, disabled }) => ({
-                key: button,
-                label,
-                className: `work-${button}`,
-                disabled: strip.waiting || disabled === true,
-                ...(title === undefined ? {} : { title }),
-                onChoose: () => act(button),
-              })),
-            },
-          ]}
-          label="more for this thread's changes"
-          title="this thread's changes"
-          trigger="⋯"
-          triggerClassName="work-more-trigger"
-        />
-      )}
-    </div>
-  )
-}
-
-/**
- * How much of each ask the column draws: outline, story or raw.
- * The reader's choice, kept with the column, never written.
- */
-function DensityControl({
-  density,
-  onChoose,
-}: {
-  density: Density
-  onChoose: (d: Density) => void
-}) {
-  return (
-    <span className="density" title="how much to show">
-      {DENSITIES.map(d => {
-        const words = densityWords(d)
-        return (
-          <Button
-            look="plain"
-            aria-pressed={d === density}
-            className="density-choice"
-            data-density={d}
-            key={d}
-            onClick={() => onChoose(d)}
-            title={words.title}
-          >
-            {words.label}
-          </Button>
-        )
-      })}
-    </span>
   )
 }

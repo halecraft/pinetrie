@@ -4,7 +4,6 @@ import {
   type EntryId,
   entryId,
   type JjAcceptedRecord,
-  type JjBaseRecord,
   type JjProposedChangesRecord,
   type LaneRecord,
   pointId,
@@ -21,6 +20,7 @@ import {
   type ParentNow,
   type ProjectRecord,
   proposedChangesStatus,
+  type WorkStripButton,
   workStripView,
 } from "@pinetrie/rules"
 import type { ProposedChangesActing } from "@pinetrie/session"
@@ -40,11 +40,15 @@ import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { canvasMarkerWords, canvasPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"
+import type { ColumnStatus } from "./column-status.ts"
 import {
-  behindMark,
+  buttonCommand,
   type ColumnFacts,
   type ColumnShows,
   columnView,
+  type HeadIdentity,
+  handleTitle,
+  headLine,
   identityWords,
   joinWords,
   lanesAlong,
@@ -53,10 +57,12 @@ import {
   pinnedMarkers,
   pinnedStatus,
   promptParent,
-  startedWords,
+  resolveCommand,
   textTokens,
   type WorkFacts,
+  type WorkStrip,
   workingWords,
+  workStripShown,
   workStripWords,
 } from "./column-view.ts"
 import {
@@ -66,6 +72,7 @@ import {
   TEST_ROOT,
   toolResultMessage,
 } from "./fixtures.ts"
+import type { ThreadFocus } from "./thread-glance.ts"
 import { builtInIconUrl } from "./thread-icon.ts"
 import { threadLink } from "./thread-link.ts"
 
@@ -223,20 +230,6 @@ const ACCEPTED = {
   },
   publishCatchesUp: true,
 } satisfies JjAcceptedRecord
-const BASE: JjBaseRecord = {
-  kind: "jj",
-  lane: threadIdFor("1"),
-  base: { kind: "accepted" as const },
-  start: commitId("aaaaaaaaaaaa"),
-  state: "ok" as const,
-  getLatest: {
-    tip: commitId("t"),
-    to: commitId("bbbbbbbbbbbb"),
-    files: ["a.txt", "b.txt"],
-  },
-  untraced: [],
-  work: "some",
-}
 const laneView = (name: ThreadId, tip: string, running = false): LaneView => ({
   name,
   tip: entryId(tip),
@@ -297,7 +290,7 @@ const facts = (
 const OWNERS = revisions({ "3": A, "5": A, b1: B })
 /** The header's icon: a named agent's alone carries one. */
 const headIconOf = (shows: ColumnShows) =>
-  shows.identity.kind === "agent" ? shows.identity.icon : null
+  shows.head.identity.kind === "agent" ? shows.head.identity.icon : null
 
 const NAMES = new Map([
   [A, AMBER],
@@ -312,17 +305,14 @@ describe("columnView: the header", () => {
         work: work({ revisions: OWNERS, names: NAMES }),
       }),
     )
-    expect(named.identity).toMatchObject({
-      kind: "agent",
-      name: COPPER,
-      details: { start: entryId("b1") },
-    })
+    expect(named.head.identity).toMatchObject({ kind: "agent", name: COPPER })
+    expect(named.head.facts).toMatchObject({ start: entryId("b1") })
     const unnamed = columnView(facts(1, { lane: onLane(laneView(B, "b2")) }))
-    expect(unnamed.identity).toEqual({ kind: "pending" })
-    expect(columnView(facts(1, { createsLane: true })).identity).toEqual({
+    expect(unnamed.head.identity).toEqual({ kind: "pending" })
+    expect(columnView(facts(1, { createsLane: true })).head.identity).toEqual({
       kind: "pending",
     })
-    expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
+    expect(columnView(facts(1)).head.identity).toEqual({ kind: "none" })
   })
   test("a thread with a focus shows it in its header", () => {
     const focuses = new Map([
@@ -342,7 +332,7 @@ describe("columnView: the header", () => {
         work: work({ revisions: OWNERS, names: NAMES, focuses }),
       }),
     )
-    expect(shows.identity).toMatchObject({
+    expect(shows.head.identity).toMatchObject({
       kind: "agent",
       focus: { kind: "model", text: "Planning the billing page" },
     })
@@ -368,7 +358,7 @@ describe("columnView: the header", () => {
         ]),
       }),
     )
-    expect(shows.identity).toMatchObject({
+    expect(shows.head.identity).toMatchObject({
       kind: "agent",
       status: {
         level: "worth-a-read",
@@ -389,21 +379,18 @@ describe("columnView: the header", () => {
           ...over,
         }),
       )
-    expect(about({ createsLane: true }).identity).toEqual({
+    expect(about({ createsLane: true }).head.identity).toEqual({
       kind: "agent",
       name: COPPER,
       focus: null,
       status: null,
-      details: {
-        started: null,
-        behind: null,
-        start: null,
-      },
       icon: { kind: "banner", url: `/blob/${sha}`, fade: true },
     })
-    expect(about({ createsLane: false }).identity).toEqual({ kind: "none" })
+    expect(about({ createsLane: false }).head.identity).toEqual({
+      kind: "none",
+    })
     expect(
-      columnView(facts(1, { createsLane: true, thread: B })).identity,
+      columnView(facts(1, { createsLane: true, thread: B })).head.identity,
     ).toEqual({ kind: "pending" })
   })
   test.each([
@@ -515,24 +502,21 @@ describe("columnView: the header", () => {
       lane: onLane(laneView(A, "b3")),
       work: work({ revisions: revisions({ "3": A }), names: NAMES }),
     })
-    expect(shows.identity).toMatchObject({
-      kind: "agent",
-      name: AMBER,
-      details: { start: entryId("3") },
-    })
+    expect(shows.head.identity).toMatchObject({ kind: "agent", name: AMBER })
+    expect(shows.head.facts?.start).toBe(entryId("3"))
   })
   test("the origin: a chat by its speaker, an agent reply by its lane, else 'agent'", () => {
     const byLane = columnView(
       facts(1, { work: work({ revisions: OWNERS, names: NAMES }) }),
     )
-    expect(byLane.origin).toEqual({
+    expect(byLane.head.origin).toEqual({
       kind: "fork",
       at: entryId("4"),
       speaker: "amber-fox",
       text: "It says MANGO.",
     })
-    expect(columnView(facts(1)).origin).toMatchObject({ speaker: "agent" })
-    expect(columnView(facts(0)).origin).toEqual({ kind: "none" })
+    expect(columnView(facts(1)).head.origin).toMatchObject({ speaker: "agent" })
+    expect(columnView(facts(0)).head.origin).toEqual({ kind: "none" })
     const index = tree(TRUNK)
     const [, fromMessage] = projectColumns(index, [
       { anchor: entryId("6") },
@@ -540,7 +524,7 @@ describe("columnView: the header", () => {
     ])
     if (fromMessage === undefined) throw new Error("no view")
     expect(
-      columnView({ ...facts(0), index, view: fromMessage }).origin,
+      columnView({ ...facts(0), index, view: fromMessage }).head.origin,
     ).toMatchObject({ speaker: "Ada", text: "hi" })
   })
 })
@@ -553,7 +537,7 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
     const forks = new Map([
       [thread, { kind: "fork", at: entryId("4"), how } as const],
     ])
-    return columnView(facts(1, { thread, work: work({ forks }) })).origin
+    return columnView(facts(1, { thread, work: work({ forks }) })).head.origin
   }
   test("a copy whose fork began from its base says its files could not be copied", () => {
     if (thread === null) throw new Error("no thread")
@@ -574,7 +558,7 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
       ])
       const o = columnView(
         facts(1, { thread, work: work({ forks, laneForks }) }),
-      ).origin
+      ).head.origin
       return o.kind === "source" ? o.words : ""
     }
     expect(words("e1")).toContain("its files could not be copied")
@@ -648,7 +632,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
           reader: { me: ADA, nameOf: new Map() },
         },
       }),
-    ).origin
+    ).head.origin
     expect(origin).toEqual({
       kind: "fork",
       at: entryId("4"),
@@ -658,9 +642,41 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
   })
 })
 
-describe("columnView: a thread's details", () => {
-  const detailsOf = (shows: ReturnType<typeof columnView>) =>
-    shows.identity.kind === "agent" ? shows.identity.details : null
+describe("headLine: what shows under a column's line", () => {
+  const agent = (
+    status: ColumnStatus | null,
+    focus: ThreadFocus | null,
+  ): HeadIdentity => ({
+    kind: "agent",
+    name: AMBER,
+    focus,
+    status,
+    icon: null,
+  })
+  const status = (quiet: boolean): ColumnStatus => ({
+    level: "needs-you",
+    quiet,
+    words: "needs you: asks why",
+    reason: "asks why",
+    end: entryId("e"),
+  })
+  const focus: ThreadFocus = { kind: "model", text: "Fixing the sync bug" }
+  test("a raised status, else the focus; never a quiet status, which leaves the focus shown", () => {
+    expect(headLine(agent(status(false), focus))).toEqual({
+      kind: "status",
+      status: status(false),
+    })
+    expect(headLine(agent(status(true), focus))).toEqual({
+      kind: "focus",
+      focus,
+    })
+    expect(headLine(agent(null, null))).toEqual({ kind: "none" })
+    expect(headLine({ kind: "none" })).toEqual({ kind: "none" })
+  })
+})
+
+describe("columnView: a thread's facts", () => {
+  const detailsOf = (shows: ReturnType<typeof columnView>) => shows.head.facts
   const onB = (over: Partial<ColumnFacts> = {}) =>
     facts(1, {
       lane: onLane(laneView(B, "b2")),
@@ -750,8 +766,8 @@ describe("columnView: the work strip", () => {
       ...over,
     })
   test("none without a lane, without a project, or read-only", () => {
-    expect(columnView(facts(1)).strip).toBeNull()
-    expect(columnView(own({ writable: false })).strip).toBeNull()
+    expect(columnView(facts(1)).dock.strip).toBeNull()
+    expect(columnView(own({ writable: false })).dock.strip).toBeNull()
     expect(
       columnView(
         own({
@@ -760,7 +776,7 @@ describe("columnView: the work strip", () => {
             lanes: new Map([[B, record(B, true)]]),
           }),
         }),
-      ).strip,
+      ).dock.strip,
     ).toBeNull()
   })
   test("a lane the host has never read (no base record) can catch up, and claims nothing", () => {
@@ -772,16 +788,17 @@ describe("columnView: the work strip", () => {
         }),
       }),
     )
-    if (shows.strip === null) throw new Error("no work strip")
-    expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
+    if (shows.dock.strip === null) throw new Error("no work strip")
+    expect(
+      shows.dock.strip.words.menu.find(b => b.button === "update"),
+    ).toEqual({
       button: "update",
       label: "get the latest",
       title: "merges accepted work into this thread's copy",
     })
-    expect(shows.behind).toBeNull()
   })
   test("own copy: the proposed changes, in words", () => {
-    expect(columnView(own()).strip).toMatchObject({
+    expect(columnView(own()).dock.strip).toMatchObject({
       state: "nothing",
       bookmark: null,
       waiting: false,
@@ -794,7 +811,7 @@ describe("columnView: the work strip", () => {
       action: "accept",
       to: null,
     } as const
-    expect(columnView(own({ acting: sent })).strip).toMatchObject({
+    expect(columnView(own({ acting: sent })).dock.strip).toMatchObject({
       waiting: true,
       words: { note: "accepting…" },
     })
@@ -808,7 +825,7 @@ describe("columnView: the work strip", () => {
             message: "no",
           },
         }),
-      ).strip,
+      ).dock.strip,
     ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
   })
   test("open proposed changes with files can be reviewed, in every state; an accepted or empty one cannot", () => {
@@ -838,7 +855,7 @@ describe("columnView: the work strip", () => {
             proposedByLane: new Map([[B, proposed]]),
           }),
         }),
-      ).strip
+      ).dock.strip
     const target = {
       spans: [{ kind: "revision", commit: commitId("c1") }],
       conflicts: [],
@@ -857,10 +874,45 @@ describe("columnView: the work strip", () => {
       review: null,
     })
     expect(strip({ ...open, files: [] })).toMatchObject({ review: null })
-    expect(columnView(own()).strip).toMatchObject({
+    expect(columnView(own()).dock.strip).toMatchObject({
       state: "nothing",
       review: null,
     })
+  })
+  test("the dock draws ready and conflicted changes, never nothing to accept; a conflicted one resolves by getting the latest", () => {
+    const open: JjProposedChangesRecord = {
+      kind: "jj",
+      lane: B,
+      size: 1,
+      stale: false,
+      files: ["a.txt"],
+      conflicts: [],
+      startConflicts: [],
+      workingCopyEdits: [],
+      described: true,
+      edited: false,
+      bookmark: "pinetrie-proposed/copper-owl",
+      acceptedAs: null,
+      commits: [commitId("c1")],
+      ledger: null,
+      at: 1,
+    }
+    const dock = (proposed: JjProposedChangesRecord | null) =>
+      columnView(
+        own({
+          work: work({
+            lanes: new Map([[B, record(B, true)]]),
+            proposedByLane:
+              proposed === null ? new Map() : new Map([[B, proposed]]),
+          }),
+        }),
+      ).dock
+    expect(dock(open)).toMatchObject({ shown: true, resolve: null })
+    expect(dock({ ...open, conflicts: ["a.txt"] })).toMatchObject({
+      shown: true,
+      resolve: "get-latest",
+    })
+    expect(dock(null)).toMatchObject({ shown: false, resolve: null })
   })
   test("a lane with no copy of its own has no strip", () => {
     const shows = columnView(
@@ -869,7 +921,52 @@ describe("columnView: the work strip", () => {
         work: work({ lanes: new Map([[B, record(B, false)]]), names: NAMES }),
       }),
     )
-    expect(shows.strip).toBeNull()
+    expect(shows.dock.strip).toBeNull()
+  })
+})
+
+describe("the dock's changes row", () => {
+  const strip = (
+    state: WorkStrip["state"],
+    buttons: readonly WorkStripButton[],
+    note: string | null = null,
+  ): WorkStrip => ({
+    state,
+    words: {
+      line: "",
+      lineTitle: null,
+      note,
+      buttons: buttons.map(button => ({ button, label: button })),
+      menu: [],
+    },
+    waiting: false,
+    bookmark: null,
+    review: null,
+    destinations: [],
+  })
+  test("is drawn while it says something: never for nothing to accept with no button and no note", () => {
+    expect(workStripShown(null)).toBe(false)
+    expect(workStripShown(strip("nothing", []))).toBe(false)
+    expect(workStripShown(strip("nothing", ["update"]))).toBe(true)
+    expect(workStripShown(strip("nothing", [], "a note"))).toBe(true)
+    expect(workStripShown(strip("ready", []))).toBe(true)
+  })
+  test("a button queues its command; accept queues none", () => {
+    expect(buttonCommand("update")).toBe("get-latest")
+    expect(buttonCommand("continue")).toBe("continue-on-accepted")
+    expect(buttonCommand("get-latest-from-parent")).toBe(
+      "get-latest-from-parent",
+    )
+    expect(buttonCommand("split")).toBe("split")
+    expect(buttonCommand("accept")).toBeNull()
+  })
+  test("a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves", () => {
+    expect(resolveCommand(strip("conflicts", ["update"]))).toBe("get-latest")
+    expect(resolveCommand(strip("conflicts", ["get-latest-from-parent"]))).toBe(
+      "get-latest-from-parent",
+    )
+    expect(resolveCommand(strip("ready", ["update"]))).toBeNull()
+    expect(resolveCommand(null)).toBeNull()
   })
 })
 
@@ -1282,41 +1379,6 @@ describe("workStripWords", () => {
   })
 })
 
-describe("behindMark: the header's mark for a base that moved on", () => {
-  test("worded as the project, its title naming the files, never jj's bookmark or commits", () => {
-    expect(behindMark(BASE, ACCEPTED)).toEqual({
-      mark: "↓",
-      title: "accepted work has moved on since this thread started, in 2 files",
-    })
-  })
-  test("a thread's details say it in full", () => {
-    const shows = columnView(
-      facts(1, {
-        lane: onLane(laneView(B, "b2")),
-        work: work({
-          names: NAMES,
-          accepted: ACCEPTED,
-          bases: new Map([[B, BASE]]),
-        }),
-      }),
-    )
-    expect(shows.identity).toMatchObject({
-      details: { behind: behindMark(BASE, ACCEPTED)?.title },
-    })
-    expect(shows.behind?.title).toBe(behindMark(BASE, ACCEPTED)?.title)
-  })
-  test("none once caught up, before the host read the base, or with nothing read to catch up", () => {
-    expect(behindMark({ ...BASE, start: ACCEPTED.commit }, ACCEPTED)).toBe(null)
-    expect(behindMark(undefined, ACCEPTED)).toBe(null)
-    const read = BASE.getLatest
-    if (read === null) throw new Error("no read")
-    expect(
-      behindMark({ ...BASE, getLatest: { ...read, files: [] } }, ACCEPTED),
-    ).toBe(null)
-    expect(behindMark({ ...BASE, getLatest: null }, ACCEPTED)).toBe(null)
-  })
-})
-
 describe("identityWords", () => {
   test.each<[Parameters<typeof identityWords>[0], string]>([
     [
@@ -1326,26 +1388,42 @@ describe("identityWords", () => {
         focus: null,
         status: null,
         icon: null,
-        details: {
-          started: null,
-          behind: null,
-          start: null,
-        },
       },
       "amber-fox",
     ],
     [{ kind: "pending" }, "new agent"],
+    [{ kind: "none" }, "chat"],
   ])("%o", (identity, words) => {
     expect(identityWords(identity)).toBe(words)
   })
 })
 
-describe("startedWords", () => {
+describe("handleTitle", () => {
   test.each([
     [30, "started by Ada · just now"],
     [3 * 3600, "started by Ada · 3 h ago"],
   ])("%d s ago: %s", (seconds, words) => {
-    expect(startedWords({ by: "Ada", at: 0 }, seconds * 1000)).toBe(words)
+    expect(
+      handleTitle(
+        { started: { by: "Ada", at: 0 }, start: null },
+        null,
+        null,
+        seconds * 1000,
+      ),
+    ).toBe(words)
+  })
+  test("who started it, then its base, then the agents line; none with nothing to say", () => {
+    expect(
+      handleTitle(
+        { started: { by: "Ada", at: 0 }, start: null },
+        "started from your unfinished work: wip/search",
+        "with amber-fox",
+        30_000,
+      ),
+    ).toBe(
+      "started by Ada · just now\nstarted from your unfinished work: wip/search\nwith amber-fox",
+    )
+    expect(handleTitle(null, null, null, 0)).toBeNull()
   })
 })
 

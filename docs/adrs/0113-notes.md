@@ -21,6 +21,8 @@
 - **Amended by:**
   - ADR-0116: notes are in note columns, the task's; the notes board and the
     dock's notes line go.
+  - ADR-0203: the dock holds the changes row and one ⋯, with the changes' and
+    the queue's sections.
 
 **Context.**
 

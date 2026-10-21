@@ -1,8 +1,7 @@
 // web/folded-column — a card's column folded to a strip in its place on the
-// canvas: its head as `columnHead` decides it folded (its toggle, its box and
-// its status button, which unfolds it with its details open), and its card's
-// glance, worded for a strip (`foldedWords`), in its thread's colour, drawn by
-// `FoldedStrip`. Its mark and name are its handle, as an unfolded header's are
+// canvas: its head as `columnHead` decides it folded (its toggle and its
+// box), its thread's dot, and its card's glance, worded for a strip
+// (`foldedWords`), in its thread's colour, drawn by `FoldedStrip`. Its mark and name are its handle, as an unfolded header's are
 // (`use-drag.ts`). Folds are yours, the order and the box everyone's. It has
 // no ⋯: a column is unfolded to act on it.
 
@@ -21,7 +20,7 @@ import {
 import { ColumnHeadStart } from "./column-menu.tsx"
 import { FoldedStrip } from "./folded-strip.tsx"
 import { useTrackColors } from "./palette-context.ts"
-import { StatusButton } from "./root-signals.tsx"
+import { ColumnDot } from "./root-signals.tsx"
 
 export function FoldedColumn(p: {
   glance: FoldedGlance
@@ -49,7 +48,8 @@ export function FoldedColumn(p: {
     unstarted: false,
     folded: true,
     ticked: p.ticked,
-    details: false,
+    density: null,
+    start: null,
     pin: false,
     renamable: false,
   })
@@ -73,14 +73,11 @@ export function FoldedColumn(p: {
         start={<ColumnHeadStart head={head} onIntent={p.onIntent} />}
         status={
           glance.kind === "thread" ? (
-            <StatusButton
+            <ColumnDot
               arrived={p.arrivals.arrived.get(glance.thread) ?? null}
               done={p.arrivals.done.get(glance.thread) ?? null}
               nameOf={p.nameOf}
-              onPress={() => p.onIntent(head.status)}
-              open={false}
               status={glance.status}
-              worded={false}
             />
           ) : null
         }

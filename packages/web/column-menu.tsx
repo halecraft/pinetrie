@@ -8,6 +8,7 @@ import {
   COLUMN_MENU_LABEL,
   type ColumnHead,
   type ColumnMenuSection,
+  type Density,
   type Intent,
 } from "@pinetrie/interface"
 import type { CardId } from "@pinetrie/threads"
@@ -75,6 +76,7 @@ export function ColumnHandle(p: {
     <span
       {...(p.card === null ? {} : dragProps({ kind: "card", card: p.card }))}
       className={`head-handle${p.className === undefined ? "" : ` ${p.className}`}`}
+      data-role="handle"
       data-thread={p.thread}
       title={p.title}
     >
@@ -93,6 +95,8 @@ export function ColumnMenu(p: {
   onIntent: (intent: Intent) => void
   onRename?: () => void
   onPin?: () => void
+  /** Read the column so: its reading choices, which a list column has none of. */
+  onDensity?: (density: Density) => void
 }) {
   if (p.sections.length === 0) return null
   return (
@@ -104,6 +108,7 @@ export function ColumnMenu(p: {
         items: section.items.map(item => ({
           key: item.key,
           className: `column-${item.key}`,
+          ...(item.kind === "density" ? { checked: item.checked } : {}),
           title: item.title,
           // Take has one icon wherever it is offered.
           label:
@@ -117,6 +122,7 @@ export function ColumnMenu(p: {
           onChoose: () => {
             if (item.kind === "intent") p.onIntent(item.intent)
             else if (item.kind === "rename") p.onRename?.()
+            else if (item.kind === "density") p.onDensity?.(item.density)
             else p.onPin?.()
           },
         })),

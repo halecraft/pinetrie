@@ -155,6 +155,7 @@ const moveItems = (
               lane: queueOn.lane,
               at: queueOn.at,
               hold: "keep",
+              command: null,
             },
           },
         ]

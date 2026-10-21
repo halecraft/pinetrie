@@ -32,8 +32,6 @@ export interface CardView {
   readonly unfolded?: true
   /** How much of each ask is drawn; absent is story. */
   readonly density?: Density
-  /** The thread's details are open under the header. */
-  readonly details?: true
   /**
    * A thread you opened, until its first send: a first message
    * its column sends as it opens ("branch here" after a conflict), never
@@ -135,12 +133,8 @@ export const buildTaskStrip = (
 export const stripCards = ([, ...cards]: Strip): readonly CardColumn[] => cards
 
 /** How a column is read, as your view of its card says. */
-const readerOf = (
-  view: CardView | undefined,
-): Pick<Column, "density" | "details"> => ({
-  ...(view?.density === undefined ? {} : { density: view.density }),
-  ...(view?.details === true ? { details: true } : {}),
-})
+const readerOf = (view: CardView | undefined): Pick<Column, "density"> =>
+  view?.density === undefined ? {} : { density: view.density }
 
 /**
  * A canvas's columns: each card of its canvas in its order. A thread whose

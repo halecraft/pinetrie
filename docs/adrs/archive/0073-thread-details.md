@@ -1,13 +1,16 @@
 # ADR-0073 — A thread's name opens its details, under the header: its icon magnified, who started it, where it works
 Numbered 0071 until 2026-10-04, when two files held that number.
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `packages/interface/TECHNICAL.md`, `docs/06-interface.md`
 - **Amends:**
   - ADR-0040: the name opens the thread's details; the reveal of where its
     lane started is in them, offered only below the path's first message.
   - ADR-0053: the icon is also drawn magnified, in the thread's details, where
     it spins in as they are opened.
+- **Superseded by:**
+  - ADR-0203: a thread has no details panel; what it showed is under the line,
+    in the name's title, or in ⋯.
 - **Amended by:**
   - ADR-0198: the header's line, the name and the free space after it, opens
     the details, for every thread column.

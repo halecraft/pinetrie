@@ -1321,7 +1321,8 @@ rejects `shutdown()`.
   or released as planned. The move is in the sender's history; the hold is
   not, so an undo takes the card back and leaves the hold. One with no
   `from` makes the card in the queue with its command (`targetId` on the
-  wire), in no history, as any creation.
+  wire), in no history, as any creation; one that moves a card that exists
+  writes the command with the move (ADR-0203).
 - **Trashed cards are swept** (`sweepTrash`, `housekeeping.ts`): a card past
   its `trashDeadline`, and every card on a surface it owns, loses its
   record, then its text and its history, in one change of the host's, at

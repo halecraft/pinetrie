@@ -17,6 +17,7 @@ import {
 import type { SessionClient } from "@pinetrie/session"
 import type {
   AgentCandidate,
+  CardCommand,
   CardId,
   TextCard,
   TextPlace,
@@ -66,6 +67,8 @@ export function Composer(p: {
   readOnly: ReadOnly | null
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   latestSources: LatestSources
+  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  resolve: CardCommand | null
   /** The column's key when a card may be dropped here (`put-target.ts`). */
   putColumn: string | null
 }) {
@@ -96,6 +99,7 @@ export function Composer(p: {
         onCreatesLane={p.onCreatesLane}
         onIntent={p.onIntent}
         latestSources={p.latestSources}
+        resolve={p.resolve}
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}

@@ -88,11 +88,6 @@ export interface Column {
    */
   readonly density?: Density
   /**
-   * The thread's details are open under the header. The reader's
-   * choice, never the document's.
-   */
-  readonly details?: true
-  /**
    * How its next send writes: at its thread's end; or, not yet
    * started, as a branch at its anchor, its thread's first message.
    */
@@ -156,14 +151,6 @@ export type CardKey = Extract<ColumnKey, { kind: "card" }>
  */
 export const keyText = (key: ColumnKey): string =>
   key.kind === "card" ? key.card : key.canvas
-
-/**
- * A reader's setting: how much of each ask a column
- * draws, and whether its thread's details are open.
- */
-export type ReaderAction =
-  | { readonly kind: "density"; readonly density: Density }
-  | { readonly kind: "details"; readonly open: boolean }
 
 /**
  * Where a thread's column ends: its thread's end (`threadEnd`), or, before

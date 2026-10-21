@@ -541,10 +541,13 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   Pin a card where `newPinPlace` says `menu` (ADR-0200). The ⋯ ends in a
   `trash` section, Move to trash, on every column for a reader who may
   write; the bin and it ask one `trash` intent, built once.
-- **Opening a folded column's details unfolds it first** (`unfoldFirst`,
-  `intent.ts`, ADR-0200): the `details` act's plan is the unfold, with its
-  motion, then the details change, so the status button on a strip and in
-  a header ask one thing.
+- **A thread's ⋯ starts with how it reads** (`columnHead`'s `reading`
+  section, ADR-0203): three `density` items worded by `densityWords`, the
+  current one `checked`, for a column with messages (`density` null for a
+  list column and an empty one); then, with a `start`, its `thread`
+  section's **Go to where it started**, the column's `open-at` act. The page
+  handles `density` items itself, since a density change also marks the
+  column's scroll as the reader's own.
 - **A ticked column starts folded for whoever has not opened its canvas**
   (ADR-0198): `defaultView` unfolds `firstUnticked`, and `resolveLayout`
   keeps the canvas you are on's default view once its cards are drawn
@@ -990,11 +993,9 @@ two in one call, which the page's message list and `apps/tui` make, with
   `density` column act and stored with the layout as an optional field,
   with no new `v`: a layout stored before it decodes. A change dispatches
   `PLACED`, so a column at its end stays there and no floor holds the
-  change. Whether its thread's details are open (`Column.details`,
-  ADR-0073) is kept the same way.
-- **Both are `ReaderAction`s** (`columns.ts`), acts on a card's column:
-  `planColumn` sends them through `onCanvasYouAreOn`, as `sent` is, as your
-  view of the column's card.
+  change. `planColumn` sends the act through `onCanvasYouAreOn`, as `sent`
+  is, as your view of the column's card. A stored view that still carries
+  an older `details` key loads without it.
 - **`workWords` counts what the work's records say** (`entriesWorkStats`): the
   files its turns changed, the private files they wrote ("3 private files",
   each record's topmost and how many more), the directories made from
@@ -1283,10 +1284,27 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 ## What a column shows (`column-view.ts`, ADR-0040)
 
 `Column` gathers the facts (`ColumnFacts`), `columnView` decides, and
-`Column` draws what it returns: who works in the column (`identity`, its
-thread's name, ADR-0039), where it forks (`origin`), where lanes start on
-its path (`joins`), and what became of its files (`strip`, the work
-strip, a row of the column's header, ADR-0113; null for a column with no
+`Column` draws what it returns, `ColumnShows`, in three parts (ADR-0203):
+
+- `head` (`HeadShows`), what the header tells: who works in the column
+  (`identity`, its thread's name, ADR-0039), what shows under its line
+  (`line`, `headLine`'s value: a raised run-end status, else the focus,
+  never a quiet status), where it forks (`origin`), an ssh ask (`access`),
+  who started it and from where (`facts`, `ThreadFacts`, built by
+  `threadFactsOf`; `base`), which `handleTitle` words as the name's title;
+- `dock` (`DockShows`), what the dock does: the work strip (`strip`), whether
+  it is drawn (`shown`, `workStripShown`: never for nothing to accept with
+  no button and no note), and what resolves its conflict (`resolve`,
+  `resolveCommand`), which the send button's ▾ offers (`sendMore`);
+- what the column does apart from both: where lanes start on its path
+  (`joins`), the name it reserves, and its parent.
+
+A new element is the header's when it tells and the dock's when it acts;
+`HeadShows` is named apart from `column-menu.ts`'s `ColumnHead` (the
+toggle, box and ⋯), which it does not hold.
+
+The strip is what became of its files (the dock's changes row, ADR-0113,
+ADR-0203; null for a column with no
 lane of its own that it may write): each lane's proposed changes in your repo
 (ADR-0105), and
 what its review reads (`ReviewTarget`, ADR-0047), proposed changes' revisions or
@@ -1310,8 +1328,9 @@ composer*).
   work is "accepted work", unfinished work its bookmark, the thread a thread branched from its name. The words
   take core's `LatestFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `workStripWords`' button titles ("moves
-  pinetrie-accepted forward to pinetrie-proposed/amber-fox"), `behindMark`'s,
-  `baseChoices`'. Accepted work is named one way for every kind of
+  pinetrie-accepted forward to pinetrie-proposed/amber-fox") and
+  `baseChoices`'. A strip button that queues a command reads it from one
+  table (`buttonCommand`), which its label and `Column`'s queueing share. Accepted work is named one way for every kind of
   project: a folder project's is "accepted work" too, and no word names
   the folder as the person's (pine·trie may run hosted, where the folder
   is no one's own; `scripts/words.test.ts` holds it). Having no bookmark,
@@ -1385,9 +1404,7 @@ composer*).
   and `getLatest` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that
   alone with nothing to accept, getting the latest moves from the `⋯` menu to the
-  buttons, its title counts the files, and the header shows `behindMark`'s
-  ↓, titled with the count and the move (the bookmark, and the commits it
-  went from and to). When it would change nothing (`current`, or
+  buttons, and its title counts the files. When it would change nothing (`current`, or
   `nothing-new`: the base moved by the thread's own work), it stays in the
   menu, quiet: `LabelledButton.disabled`, with the reason as its title, and
   `column.tsx` disables it. Until the host has read the move (`unknown`), it
@@ -1399,7 +1416,7 @@ composer*).
   queued on the lane: getting the latest among them is `workStripView`'s `get-latest`
   activity ("getting the latest from accepted work…"); a split only quiets the
   split button (ADR-0080).
-- **A thread's base** shows in its header only when it is not accepted work
+- **A thread's base** shows in its name's title only when it is not accepted work
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from accepted work" and no acceptance is
   offered.
@@ -1419,31 +1436,25 @@ composer*).
   above the footer, which keeps the `acting` entry you dismissed so the
   same one does not come back. It offers nothing: a conflict in the
   working copy is the person's, in jj (ADR-0102).
-- **The origin row and the details' "where it started" are `open-at`
+- **The origin row and the ⋯'s "Go to where it started" are `open-at`
   intents** (`planOpen`), which reveal the entry in whichever column shows
   it. A column's lane may have started in a column to its left.
-- **A named thread's details (ADR-0073) are `ThreadDetails`**, built by
-  `detailsOf` and carried in `HeadIdentity`'s agent variant, so a pending or
-  absent identity cannot have any, by type. The name is their toggle
-  (`aria-expanded`); its chevron is `::after`, so `.agent-name`'s text stays
-  `✦ name`, which the browser suite reads. The panel is drawn after the
-  header, outside it: no drag handle (`NOT_A_HANDLE` needs `.column-head`),
-  and its text can be selected.
+- **A named thread's facts are `ThreadFacts`** (`started`, `start`), built
+  by `threadFactsOf`; a column has no details panel (ADR-0203).
   - **`start` is null at the path's first message,** where the reveal
     would only scroll to the top. It is the first exactly when its parent is
     null or missing from the index, which is where `ancestry` stops: one
     lookup, no second walk.
-  - **The panel draws `ThreadMark` itself,** scaled by CSS, so the star,
-    the banner, its fade and its blend are one component's. The spin is on
-    the button around it: `.thread-mark` animates `transform` while the lane
-    runs, and a spin on the same element would replace the pulse. A spin
-    restarts by changing the animation's name (`data-spin` odd or even), not
-    by a key, which would draw the mark again and fade a new banner in again.
-  - **It spins only when opened here.** `Column` keeps `openedHere`, set by
-    the opening click; details mounted open, by a reload or a tab switch,
-    are still, as `mountedIcon` keeps an icon there at mount from fading.
-  - **Toggling dispatches no `PLACED`**, unlike density: it changes the
-    view's height, not the content's, and `useFollow` follows that.
+  - **`handleTitle` leaves out the agent's work**: hovering the mark shows
+    `ThreadMark`'s own title, so the work is never in both.
+- **A status's reason and its words are one value** (`ColumnStatus`,
+  `column-status.ts`): `reason` alone is drawn under the line, `words`
+  (`reasonedWords`, the level then the reason) is its title, as the
+  sidebar's and the dot's are.
+- **The `queue` act carries a `command`** to its `queue-card` request, so
+  "resolve and send" queues the message with the resolving command in one
+  write: a later set-command could arrive after the drain had popped the
+  card.
 - **A thread's icon is one rule, `threadIcon`** (`thread-icon.ts`,
   ADR-0143): its `pinetrie.banner` record (ADR-0050, ADR-0053) under any
   icon source; else, while the host's `pinetrie.icons` says `built-in`, its

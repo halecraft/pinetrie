@@ -75,6 +75,7 @@ const queue = {
   lane: LANE,
   at,
   hold: "keep",
+  command: null,
 } as const
 const pin = { kind: "pin", card: C1 } as const
 const take = { kind: "put-away", card: C1 } as const

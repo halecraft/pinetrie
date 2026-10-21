@@ -88,8 +88,6 @@ export type ViewChange =
       readonly card: CardId
       readonly density: Density
     }
-  /** Whether a thread's details are open under its header. */
-  | { readonly kind: "details"; readonly card: CardId; readonly open: boolean }
   /**
    * A thread you opened: its column unfolded, with what it starts with, until
    * its first send.
@@ -190,7 +188,6 @@ const withCard = (
 const sameCardView = (a: CardView, b: CardView): boolean =>
   a.unfolded === b.unfolded &&
   a.density === b.density &&
-  a.details === b.details &&
   a.pending === b.pending &&
   a.prefill === b.prefill
 
@@ -217,10 +214,6 @@ function changeView(view: YourCanvasView, change: ViewChange): YourCanvasView {
         : { ...view, canvas: { unfolded: change.unfolded } }
     case "density":
       return withCard(view, change.card, c => set(c, "density", change.density))
-    case "details":
-      return withCard(view, change.card, c =>
-        set(c, "details", change.open ? true : undefined),
-      )
     case "opened":
       return withCard(view, change.card, c => ({
         ...set(set(c, "pending", change.pending), "prefill", change.prefill),
@@ -523,9 +516,9 @@ export function planOpen(
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored. A thread
 // you opened keeps its `prefill`; its `pending` is not
-// kept: restoring it would send its message again. The reader's settings,
-// `density` and `details`, are kept so a reload shows the column as it was
-// left.
+// kept: restoring it would send its message again. The reader's setting,
+// `density`, is kept so a reload shows the column as it was left. A stored
+// key the schema does not name (an older `details`) is passed over.
 
 const StoredDensity = Type.Union([
   Type.Literal("outline"),
@@ -541,7 +534,6 @@ const StoredPrefill = Type.Object({
 const StoredCardView = Type.Object({
   unfolded: Type.Optional(Type.Literal(true)),
   density: Type.Optional(StoredDensity),
-  details: Type.Optional(Type.Literal(true)),
   prefill: Type.Optional(StoredPrefill),
 })
 
@@ -580,7 +572,6 @@ const toStoredView = (
       {
         ...(v.unfolded ? { unfolded: true } : {}),
         ...(v.density === undefined ? {} : { density: v.density }),
-        ...(v.details ? { details: true } : {}),
         ...(v.prefill === undefined
           ? {}
           : { prefill: storedPrefill(v.prefill) }),
@@ -601,7 +592,6 @@ const fromStoredView = (
     cards.set(card, {
       ...(v.unfolded ? { unfolded: true } : {}),
       ...(v.density === undefined ? {} : { density: v.density }),
-      ...(v.details ? { details: true } : {}),
       ...(v.prefill === undefined ? {} : { prefill: storedPrefill(v.prefill) }),
     })
   }

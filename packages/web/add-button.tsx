@@ -1,11 +1,10 @@
 // web/add-button — ＋: its main action, and the rest in its ▾ when it has
-// any. What it starts and its words are its `StartButton`'s
+// any (`SplitButton`). What it starts and its words are its `StartButton`'s
 // (`start-button.ts`, `@pinetrie/interface`): at the sidebar's foot, on each
 // board column, and past a canvas's last column.
 
 import type { Intent, StartButton } from "@pinetrie/interface"
-import { Button } from "./button.tsx"
-import { Menu } from "./menu.tsx"
+import { SplitButton } from "./split-button.tsx"
 
 export function AddButton({
   add,
@@ -19,22 +18,24 @@ export function AddButton({
 }) {
   const { main, more } = add
   return (
-    <span className={folded ? "add-root folded" : "add-root"}>
-      <Button
-        look="outline"
-        aria-label={folded ? main.name : undefined}
-        className={`add-${main.key}`}
-        onClick={() => onIntent(main.intent)}
-        title={main.title}
-      >
-        {folded ? "＋" : `＋ ${main.label}`}
-      </Button>
-      {more !== null && (
-        <Menu
-          className="add-more"
-          sections={[
-            {
+    <SplitButton
+      className={folded ? "add-root folded" : "add-root"}
+      main={{
+        look: "outline",
+        className: `add-${main.key}`,
+        label: folded ? "＋" : `＋ ${main.label}`,
+        title: main.title,
+        ...(folded ? { ariaLabel: main.name } : {}),
+        onClick: () => onIntent(main.intent),
+      }}
+      more={
+        more === null
+          ? null
+          : {
               key: "add",
+              label: more.label,
+              className: "add-more",
+              triggerClassName: "add-menu",
               items: more.items.map(item => ({
                 key: item.key,
                 className: `add-${item.key}`,
@@ -42,13 +43,8 @@ export function AddButton({
                 label: item.label,
                 onChoose: () => onIntent(item.intent),
               })),
-            },
-          ]}
-          label={more.label}
-          trigger="▾"
-          triggerClassName="add-menu"
-        />
-      )}
-    </span>
+            }
+      }
+    />
   )
 }

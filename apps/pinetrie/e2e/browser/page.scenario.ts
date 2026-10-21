@@ -66,7 +66,6 @@ import {
   launchBrowser,
   OWN_MENU,
   openBoard,
-  openDetails as openDetailsOf,
   openFromBoard,
   openNote,
   openProfile,
@@ -227,8 +226,6 @@ async function run(check: Checks["check"]): Promise<void> {
       const stillMsg = (scope: string) =>
         `${scope} .msg:has(> .text > p:only-child:has-text(${JSON.stringify(STILL)}))`
       const col = (n: number) => `.column[data-position="${n}"]`
-      /** Open a column's details, where its fork row is. */
-      const openDetails = (column: string) => openDetailsOf(page, column)
       // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
       // smallest element holding the text, which is that paragraph.
       const msg = (text: string) =>
@@ -558,7 +555,6 @@ async function run(check: Checks["check"]): Promise<void> {
             )
           })
         const hidden = !(await inView())
-        await openDetails(col(1))
         await page.click(`${col(1)} .column-head .origin`)
         const back = await waitFor(() => inView(), 5_000)
         if (size !== null) await page.setViewportSize(size)
@@ -817,74 +813,38 @@ async function run(check: Checks["check"]): Promise<void> {
             },
           )
           .catch(() => {})
-        // Folded again, its status button unfolds it with its details open.
-        await page.click(`.column[data-card="${card}"] .fold`).catch(() => {})
-        await page
-          .click(`.folded-column[data-card="${card}"] .head-status-button`, {
-            timeout: 15_000,
-          })
-          .catch(() => {})
-        const unfoldedOpen = await page
-          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
-            timeout: 10_000,
-          })
+        // Under the line, with no press: what the thread is doing (its
+        // opening line, before a model names a focus).
+        const focusShown = await page
+          .waitForSelector(
+            `.column[data-card="${card}"] .column-head [data-role="focus"]`,
+            { timeout: 10_000 },
+          )
           .then(
             () => true,
             () => false,
           )
         check(
-          "a strip's status button unfolds its column with its details open",
-          unfoldedOpen,
+          "under a column's line, with no press, is what its thread is doing",
+          focusShown,
         )
+        // A press on the name, the handle, does nothing but drag: the column
+        // stays as it is.
         await page
-          .click(
-            `.column[data-card="${card}"] .head-status-button[aria-expanded="true"]`,
-          )
+          .click(`.column[data-card="${card}"] .head-handle`)
           .catch(() => {})
         await page
           .waitForFunction(
             () => document.getAnimations().every(a => a.id !== "fold"),
             undefined,
-            { timeout: 15_000 },
+            { timeout: 5_000 },
           )
           .catch(() => {})
-        // A press on the name, the handle, opens nothing.
-        await page
-          .click(`.column[data-card="${card}"] .head-handle`)
-          .catch(() => {})
-        const nameOpened =
-          (await page
-            .locator(`.column[data-card="${card}"] .head-details`)
-            .count()) > 0
+        const stillOpen =
+          (await page.locator(`.column[data-card="${card}"]`).count()) === 1
         check(
           "a press on a column's name, its handle, opens nothing",
-          !nameOpened,
-        )
-        // The status button opens the details, and a second press closes them.
-        const line = `.column[data-card="${card}"] .head-status-button`
-        await page.click(line).catch(() => {})
-        const opened = await page
-          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
-            timeout: 5_000,
-          })
-          .then(
-            () => true,
-            () => false,
-          )
-        await page.click(line).catch(() => {})
-        const closed = await page
-          .waitForSelector(`.column[data-card="${card}"] .head-details`, {
-            state: "detached",
-            timeout: 5_000,
-          })
-          .then(
-            () => true,
-            () => false,
-          )
-        check(
-          "a press on a column's status button opens its details, and a second closes them",
-          opened && closed,
-          JSON.stringify({ opened, closed }),
+          stillOpen,
         )
         // Moved back, before the columns are dragged and measured.
         await page
@@ -1234,17 +1194,13 @@ async function run(check: Checks["check"]): Promise<void> {
       // Hold, then unqueue all: both cards go below the line, the queue held.
       // The undo key puts them back, and a release lets them go when Bea's
       // turn ends.
-      await chooseFromMenu(page, `${col(0)} .queue-menu-trigger`, ".hold-queue")
+      await chooseFromMenu(page, `${col(0)} .dock-menu-trigger`, ".hold-queue")
       await waitFor(
         () =>
           beaLane !== undefined && readQueueHolds(host.session).has(beaLane),
         15_000,
       )
-      await chooseFromMenu(
-        page,
-        `${col(0)} .queue-menu-trigger`,
-        ".unqueue-all",
-      )
+      await chooseFromMenu(page, `${col(0)} .dock-menu-trigger`, ".unqueue-all")
       const unqueued = await waitFor(
         () =>
           [again, mine?.id].every(
@@ -1258,7 +1214,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const releaseShown =
         (await seeInMenu(
           page,
-          `${col(0)} .queue-menu-trigger`,
+          `${col(0)} .dock-menu-trigger`,
           ".release-queue",
         ).catch(() => null)) !== null
       await page.keyboard.press("Escape")
@@ -1282,7 +1238,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await chooseFromMenu(
         page,
-        `${col(0)} .queue-menu-trigger`,
+        `${col(0)} .dock-menu-trigger`,
         ".release-queue",
       )
       await waitFor(
@@ -4866,7 +4822,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const messages = [
             ...document.querySelectorAll(`${column} .msg[data-entry]`),
           ].map(m => m.getBoundingClientRect())
-          const centres = [...box.querySelectorAll('[role="menuitem"]')].map(
+          const centres = [...box.querySelectorAll('[role^="menuitem"]')].map(
             item => {
               const r = item.getBoundingClientRect()
               return { item, x: r.left + r.width / 2, y: r.top + r.height / 2 }
@@ -4927,7 +4883,6 @@ async function run(check: Checks["check"]): Promise<void> {
             timeout: 15_000,
           })
           .catch(() => {})
-      await openDetails(`.column[data-card="${copy}"]`)
       const copiedRow = await page
         .waitForFunction(
           c =>

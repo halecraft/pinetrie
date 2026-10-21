@@ -7,7 +7,6 @@
 
 import type { CanvasId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import {
-  detailsTitle,
   moving,
   NO_STATUS_WORDS,
   type OpenMenus,
@@ -27,7 +26,6 @@ import {
 import type { SessionClient } from "@pinetrie/session"
 import type { TreeIndex } from "@pinetrie/threads"
 import { useMemo, useState } from "react"
-import { Button } from "./button.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
@@ -74,57 +72,33 @@ const titleOf = (
     : statusWords(status, w => nameFor(nameOf, w))
 
 /**
- * A column's dot, after its name, folded or not: its thread's status
+ * A column's status, after its name, folded or not: its thread's dot
  * (`statusMark`), or a grey dot with nothing to say, so the line keeps its
- * shape.
+ * shape; `worded`, the unfolded header's, with the word a raised status says
+ * (`statusWord`). A strip draws the dot alone, its title the words. The one
+ * component that draws a column's status: a mark, never a button.
  */
-export function ColumnDot(p: StatusProps) {
-  return (
-    statusMark(p) ?? (
-      <span
-        aria-label={NO_STATUS_WORDS}
-        className="signal"
-        data-signal="none"
-        role="img"
-        title={NO_STATUS_WORDS}
-      />
-    )
+export function ColumnDot(p: StatusProps & { worded?: boolean }) {
+  const word = p.worded === true ? statusWord(p.status) : null
+  const dot = statusMark(p) ?? (
+    <span
+      aria-label={NO_STATUS_WORDS}
+      className="signal"
+      data-signal="none"
+      role="img"
+      title={NO_STATUS_WORDS}
+    />
   )
-}
-
-/**
- * A column's status button, after its name, folded or not: its dot, the
- * word a raised status says (`statusWord`; none in a strip, where the title
- * holds it), and a chevron turned while its details are open. `onPress`
- * asks for them (`columnHead`'s `status`).
- */
-export function StatusButton(
-  p: StatusProps & {
-    open: boolean
-    /** Its word drawn, not only in its title: the unfolded header's. */
-    worded: boolean
-    detailsId?: string
-    onPress: () => void
-  },
-) {
-  const word = p.worded ? statusWord(p.status) : null
-  const why =
-    p.status === null
-      ? NO_STATUS_WORDS
-      : statusWords(p.status, w => nameFor(p.nameOf, w))
+  if (p.worded !== true) return dot
   return (
-    <Button
-      look="plain"
-      aria-controls={p.open ? p.detailsId : undefined}
-      aria-expanded={p.open}
-      className="head-status-button"
+    <span
+      className="head-status-mark"
       data-level={p.status?.raised === true ? p.status.level : undefined}
-      onClick={p.onPress}
-      title={`${why}\n${detailsTitle(p.open)}`}
+      data-role="status"
     >
-      <ColumnDot {...p} />
+      {dot}
       {word !== null && <span className="head-status-word">{word}</span>}
-    </Button>
+    </span>
   )
 }
 

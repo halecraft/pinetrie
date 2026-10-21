@@ -189,14 +189,14 @@ export type Intent =
   /**
    * Queue a card: `move` into a lane's queue, and what it does to that queue's
    * hold, decided with the move in one step. A move with no `from` creates the
-   * card there, carrying `command`, so the drain the queueing starts pops it
-   * with its command.
+   * card there; either way the card carries `command` in the move's own
+   * write, so the drain the queueing starts pops it with its command.
    */
   | {
       readonly kind: "queue-card"
       readonly move: QueueMove
       readonly hold: QueueHoldChange
-      /** The created card's command; null for a move of a card that exists. */
+      /** The queued card's command; null leaves a card that exists as it is. */
       readonly command: CardCommand | null
     }
   /** Take every message card queued on a thread back below the line. */

@@ -53,6 +53,7 @@ import {
   ancestry,
   type CanvasPinnedView,
   type CanvasView,
+  type CardCommand,
   type CardRecord,
   cardCommand,
   entryThread,
@@ -205,7 +206,6 @@ export type HeadIdentity =
       readonly focus: ThreadFocus | null
       /** What its last run needs from you (`columnStatus`); null for nothing. */
       readonly status: ColumnStatus | null
-      readonly details: ThreadDetails
       /** Its icon (`threadIcon`); only a named agent's header draws one. */
       readonly icon: HeadIcon | null
     }
@@ -215,20 +215,37 @@ export type HeadIdentity =
   | { readonly kind: "none" }
 
 /**
- * What a named thread's details show, under the header. Only a
- * named agent has them: a chat has no thread to describe, and a new
- * agent not yet named has nothing to show.
+ * What is known of a thread's lane, for its handle's title and its ⋯: who
+ * started it and when, and where on this path. A chat has none, and a lane
+ * not yet created has no record and no start.
  */
-export interface ThreadDetails {
+interface ThreadFacts {
   /** Who started its lane and when, from the lane's record; null before there is one. */
   readonly started: { readonly by: string; readonly at: number } | null
-  /** `behindMark`'s title, in full: the header shows only its ↓. */
-  readonly behind: string | null
   /**
    * Where its lane started on this path, to reveal it; null when that is the
    * path's first message, where the reveal would only scroll to the top.
    */
   readonly start: EntryId | null
+}
+
+/**
+ * What shows under a column's line, always: the reason of a run-end status
+ * raised for you, else the thread's focus; nothing for neither. A quiet
+ * status is the dot's title alone, so the focus is not hidden by a report
+ * already read.
+ */
+export type HeadLine =
+  | { readonly kind: "status"; readonly status: ColumnStatus }
+  | { readonly kind: "focus"; readonly focus: ThreadFocus }
+  | { readonly kind: "none" }
+
+/** `identity`'s line under the header (`HeadLine`). */
+export function headLine(identity: HeadIdentity): HeadLine {
+  if (identity.kind !== "agent") return { kind: "none" }
+  const { status, focus } = identity
+  if (status !== null && !status.quiet) return { kind: "status", status }
+  return focus === null ? { kind: "none" } : { kind: "focus", focus }
 }
 
 /**
@@ -351,21 +368,41 @@ export interface ColumnFacts {
   readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
 }
 
-export interface ColumnShows {
+/** What a column's header tells: who, how it stands, why, where it came from. */
+interface HeadShows {
   readonly identity: HeadIdentity
+  readonly line: HeadLine
   readonly origin: HeadOrigin
-  /** Dividers, by the entry they sit above. */
-  readonly joins: ReadonlyMap<EntryId, LaneJoin>
-  /** Null for a column with no lane of its own that it may write. */
-  readonly strip: WorkStrip | null
   /** The access row: the lane's ssh identities; null when it holds and used none. */
   readonly access: AccessView | null
-  /** What `Column` does to have its thread named before it starts. */
-  readonly reserve: ReserveStep
+  /** Its lane's facts, for the handle's title and ⋯; null with no lane. */
+  readonly facts: ThreadFacts | null
   /** The thread's base when it is not accepted work, worded; null otherwise. */
   readonly base: string | null
-  /** Catching up would change files in the thread (`latestNow`'s `brings`). */
-  readonly behind: { readonly mark: string; readonly title: string } | null
+}
+
+/** What a column's dock does with the thread's work. */
+interface DockShows {
+  /** The thread's proposed changes; null for a column with no lane of its own that it may write. */
+  readonly strip: WorkStrip | null
+  /** The dock draws them as its changes row: they have something to say or do (`workStripShown`). */
+  readonly shown: boolean
+  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  readonly resolve: CardCommand | null
+}
+
+/**
+ * What a column shows: its header's part, its dock's, and what the column
+ * does apart (its dividers, its naming, its parent). A new element is the
+ * header's when it tells and the dock's when it does.
+ */
+export interface ColumnShows {
+  readonly head: HeadShows
+  readonly dock: DockShows
+  /** Dividers, by the entry they sit above. */
+  readonly joins: ReadonlyMap<EntryId, LaneJoin>
+  /** What `Column` does to have its thread named before it starts. */
+  readonly reserve: ReserveStep
   /** The thread this one branched from, and where both stand; null for none. */
   readonly parent: ParentNow | null
 }
@@ -402,60 +439,85 @@ export function columnView(f: ColumnFacts): ColumnShows {
     lane.kind === "lane" ? lane.name : null,
   )
   const head = headLane(lane, f.createsLane, f.thread)
-  const behind = behindMark(
-    head === null ? undefined : work.bases.get(head),
-    work.accepted,
-  )
   const parent =
     lane.kind === "lane" ? parentOfLane(index, work, f.lanes, lane.name) : null
+  const identity = identityOf(
+    head,
+    f.createsLane,
+    work.names,
+    thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
+    thread => threadFocus({ focuses: work.focuses, index, thread }),
+    thread =>
+      columnStatus(f.runEnds.get(thread), w => displayName(w, f.nameOf.get(w))),
+  )
+  const strip = workStrip(f, parent)
   return {
-    identity: identityOf(
-      head,
-      f.createsLane,
-      work.names,
-      detailsOf(f, head, stretches, behind),
-      thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
-      thread => threadFocus({ focuses: work.focuses, index, thread }),
-      thread =>
-        columnStatus(f.runEnds.get(thread), w =>
-          displayName(w, f.nameOf.get(w)),
-        ),
-    ),
-    origin: originOf(f, stretches),
+    head: {
+      identity,
+      line: headLine(identity),
+      origin: originOf(f, stretches),
+      access:
+        head === null
+          ? null
+          : accessView({
+              record: work.access.get(head),
+              owner: work.project?.owner ?? null,
+              me: f.origins.reader.me,
+              nameOf: f.nameOf,
+            }),
+      facts: head === null ? null : threadFactsOf(f, head, stretches),
+      base: baseWords(head === null ? undefined : work.bases.get(head)),
+    },
+    dock: {
+      strip,
+      shown: workStripShown(strip),
+      resolve: resolveCommand(strip),
+    },
     joins: joinsOf(view, stretches, work.names),
-    strip: workStrip(f, parent),
-    access:
-      head === null
-        ? null
-        : accessView({
-            record: work.access.get(head),
-            owner: work.project?.owner ?? null,
-            me: f.origins.reader.me,
-            nameOf: f.nameOf,
-          }),
     reserve: reserveStep(f),
-    base: baseWords(head === null ? undefined : work.bases.get(head)),
-    behind,
     parent,
   }
 }
 
 /**
- * The header's mark for a thread whose base has new work for it: catching
- * up would change files (`latestNow`'s `brings`). Its title says how many;
- * jj's bookmark and commits are the thread's details', not its mark's.
+ * Whether the dock draws the changes row: while it has something to say or
+ * do. "Nothing to accept yet" with no button and no command of yours
+ * outstanding is not drawn.
  */
-export function behindMark(
-  base: BaseRecord | undefined,
-  accepted: AcceptedRecord | null,
-): ColumnShows["behind"] {
-  const now = latestNow(base, accepted)
-  if (now.kind !== "brings") return null
-  const { move } = now
-  return {
-    mark: "↓",
-    title: `${baseMovedOn(move.base)} since this thread started, in ${count(now.files, "file", "files")}`,
-  }
+export const workStripShown = (strip: WorkStrip | null): boolean =>
+  strip !== null &&
+  (strip.state !== "nothing" ||
+    strip.words.buttons.length > 0 ||
+    strip.words.note !== null)
+
+/**
+ * The command a strip button queues, as a card with no text (`queue-new`);
+ * null for one that acts on the proposed changes directly or opens a pane.
+ */
+export const buttonCommand = (button: WorkStripButton): CardCommand | null =>
+  button in BUTTON_COMMAND
+    ? BUTTON_COMMAND[button as keyof typeof BUTTON_COMMAND]
+    : null
+
+/** The strip's buttons that queue a command: the one table their labels and their queueing read. */
+const BUTTON_COMMAND = {
+  update: "get-latest",
+  continue: "continue-on-accepted",
+  "get-latest-from-parent": "get-latest-from-parent",
+  split: "split",
+} as const satisfies Partial<Record<WorkStripButton, CardCommand>>
+
+/**
+ * What resolves a conflicted strip: its resolving button's command, which
+ * the send button's ▾ queues with your message (`sendMore`). Null while it
+ * does not conflict.
+ */
+export function resolveCommand(strip: WorkStrip | null): CardCommand | null {
+  if (strip?.state !== "conflicts") return null
+  for (const { button } of strip.words.buttons)
+    if (button === "update" || button === "get-latest-from-parent")
+      return buttonCommand(button)
+  return null
 }
 
 /**
@@ -514,28 +576,36 @@ export const identityWords = (identity: HeadIdentity): string =>
 /** A chat's handle, where an agent's name would be: it has none. */
 const CHAT_HANDLE = "chat"
 
-/** Who started a thread, and how long before `now`: its details' line. */
-export const startedWords = (
-  started: NonNullable<ThreadDetails["started"]>,
+/**
+ * A column's handle's title, one line each: who started its lane and how
+ * long before `now`, its base when not accepted work, and the agents line.
+ * Hovering the mark shows `ThreadMark`'s own title (what the agent is doing)
+ * and the name this one, so the agent's work is not repeated here.
+ */
+export function handleTitle(
+  facts: ThreadFacts | null,
+  base: string | null,
+  agents: string | null,
   now: number,
-): string => `started by ${started.by} · ${ago(started.at, now)}`
-
-/** The details' button that reveals where the thread's lane started. */
-export const START_WORDS = "where it started"
-
-/** What a column's status button does, after the status's own words. */
-export const detailsTitle = (open: boolean): string =>
-  open ? "hide this column's details" : "show this column's details"
+): string | null {
+  const lines = [
+    facts?.started == null
+      ? null
+      : `started by ${facts.started.by} · ${ago(facts.started.at, now)}`,
+    base,
+    agents,
+  ].filter((l): l is string => l !== null)
+  return lines.length === 0 ? null : lines.join("\n")
+}
 
 /**
- * `head` is `headLane`'s. Only a named agent carries `details`, an icon and
+ * `head` is `headLane`'s. Only a named agent carries a status, an icon and
  * a focus: pending, the header shows ✦ alone, and a chat's names no thread.
  */
 function identityOf(
   head: ThreadId | null,
   createsLane: boolean,
   names: ReadonlyMap<ThreadId, ThreadName>,
-  details: ThreadDetails,
   iconOf: (thread: ThreadId) => HeadIcon | null,
   focusOf: (thread: ThreadId) => ThreadFocus | null,
   statusOf: (thread: ThreadId) => ColumnStatus | null,
@@ -548,23 +618,21 @@ function identityOf(
     name,
     focus: focusOf(head),
     status: statusOf(head),
-    details,
     icon: iconOf(head),
   }
 }
 
 /**
- * A named thread's details. `head` is `headLane`'s: a lane not yet created
- * has no record and no start on the path.
+ * A lane's facts. `head` is `headLane`'s: a lane not yet created has no
+ * record and no start on the path.
  */
-function detailsOf(
+function threadFactsOf(
   f: ColumnFacts,
-  head: ThreadId | null,
+  head: ThreadId,
   stretches: readonly LaneStretch[],
-  behind: ColumnShows["behind"],
-): ThreadDetails {
+): ThreadFacts {
   const { index, work } = f
-  const record = head === null ? undefined : work.lanes.get(head)
+  const record = work.lanes.get(head)
   const last = stretches.at(-1)
   const start = last?.lane === head ? last.start : null
   return {
@@ -575,7 +643,6 @@ function detailsOf(
             by: displayName(record.by, f.nameOf.get(record.by)),
             at: record.createdAt,
           },
-    behind: behind?.title ?? null,
     start: start === null || isFirst(index, start) ? null : start,
   }
 }
@@ -924,7 +991,7 @@ export function workStripWords(
           ...titled(intoBookmark === null ? undefined : moves(intoBookmark)),
         }
       case "update": {
-        const label = commandWords("get-latest", latestSources)
+        const label = commandWords(BUTTON_COMMAND.update, latestSources)
         return {
           button,
           // Catching up is how a conflict is resolved: the agent resolves
@@ -936,13 +1003,16 @@ export function workStripWords(
       case "continue":
         return {
           button,
-          label: commandWords("continue-on-accepted", latestSources),
+          label: commandWords(BUTTON_COMMAND.continue, latestSources),
           title: `merges ${latestSourceName({ kind: "accepted" })} into this thread's copy, its base from then on`,
         }
       case "get-latest-from-parent":
         return {
           button,
-          label: commandWords("get-latest-from-parent", latestSources),
+          label: commandWords(
+            BUTTON_COMMAND["get-latest-from-parent"],
+            latestSources,
+          ),
           title: view.quiet.includes(button)
             ? `${parent ?? "the thread this one branched from"} is working: get its latest when its run ends`
             : `merges ${parent ?? "the thread this one branched from"}'s newest work into this thread's copy`,

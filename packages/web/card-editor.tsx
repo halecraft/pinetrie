@@ -47,6 +47,7 @@ import {
   type SeatRecord,
   sendable,
   sendButton,
+  sendMore,
   settleSend,
   shownBy,
   spent,
@@ -65,6 +66,7 @@ import {
 import { newCardId } from "@pinetrie/session/connect"
 import {
   type AgentCandidate,
+  type CardCommand,
   type CardId,
   type CardRecord,
   cardCommand,
@@ -89,6 +91,7 @@ import { CardFrame } from "./card-frame.tsx"
 import { eventPastedFiles } from "./clipboard.ts"
 import { useFocusClaim } from "./focus-claim.ts"
 import { Menu } from "./menu.tsx"
+import { SplitButton } from "./split-button.tsx"
 import { useThreadStates } from "./thread-states.ts"
 import { useShareFiles } from "./use-share-files.ts"
 import { useStable } from "./use-stable.ts"
@@ -167,6 +170,8 @@ export function CardEditor(p: {
   onAct: (act: ColumnAct) => void
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   latestSources: LatestSources
+  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  resolve: CardCommand | null
 }) {
   const { session, prefill, pending } = p
   const threadIn = useThreadStates()
@@ -218,6 +223,7 @@ export function CardEditor(p: {
     uploading: shares.uploading,
     sending: state.kind === "sending",
   })
+  const more = sendMore(plan, p.resolve, text)
   const queue = queueWords(plan.queue)
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
@@ -247,7 +253,10 @@ export function CardEditor(p: {
    * when the plan says so. False when there is no card or no lane to queue on:
    * nothing was queued.
    */
-  const queueHere = (from: TextCardId | null): boolean => {
+  const queueHere = (
+    from: TextCardId | null,
+    command: CardCommand | null,
+  ): boolean => {
     if (from === null || p.lane.kind !== "lane" || p.at.kind !== "entry")
       return false
     p.onAct({
@@ -256,19 +265,22 @@ export function CardEditor(p: {
       lane: p.lane.name,
       at: p.at,
       hold: plan.hold,
+      command,
     })
     return true
   }
+  /** Send `message`; with `command`, queued with it whatever the mode ("resolve and send"). */
   const send = async (
     message: string,
     as: ComposerMode,
     from: TextCardId | null,
+    command: CardCommand | null = null,
   ) => {
     step({ kind: "send" })
     setConflict(null)
-    if (as === "queue") {
+    if (as === "queue" || command !== null) {
       p.onSend()
-      step({ kind: "settled", spent: queueHere(from) })
+      step({ kind: "settled", spent: queueHere(from, command) })
       setStatus("")
       return
     }
@@ -331,12 +343,12 @@ export function CardEditor(p: {
     setPicked(0)
   }
 
-  const submit = async () => {
+  const submit = async (with_: CardCommand | null = null) => {
     const message = sendable(text, prefill, shares.uploading, command)
     const now = current.current
     if (message === null || p.readOnly !== null || now.kind === "sending")
       return
-    await send(message, plan.mode, shownBy(now))
+    await send(message, plan.mode, shownBy(now), with_)
   }
 
   const { readOnly } = p
@@ -384,15 +396,41 @@ export function CardEditor(p: {
                     forkConflicts={p.where.forkConflicts}
                   />
                 )}
-                <Button
-                  look="primary"
-                  className="send card-action"
-                  disabled={button.disabled}
-                  onClick={() => void submit()}
-                  title={button.title ?? undefined}
-                >
-                  {button.label}
-                </Button>
+                {/* The main button keeps `send`: the dock's ▸ marks
+                `.composer .send` when your send goes next. */}
+                <SplitButton
+                  className="send-root"
+                  main={{
+                    look: "primary",
+                    className: "send card-action",
+                    label: button.label,
+                    ...(button.title === null ? {} : { title: button.title }),
+                    disabled: button.disabled,
+                    onClick: () => void submit(),
+                  }}
+                  more={
+                    more === null
+                      ? null
+                      : {
+                          key: "send",
+                          label: "more ways to send",
+                          className: "send-more",
+                          triggerClassName: "send-menu",
+                          items: [
+                            {
+                              key: "resolve",
+                              className: "send-resolve",
+                              label: more.label,
+                              ...(more.title === null
+                                ? {}
+                                : { title: more.title }),
+                              disabled: button.disabled,
+                              onChoose: () => void submit(more.command),
+                            },
+                          ],
+                        }
+                  }
+                />
                 {button.setup && (
                   <a className="composer-setup" href="#setup">
                     {SEE_SETUP}

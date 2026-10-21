@@ -26,6 +26,8 @@
     leave it, and the whole header drags.
   - ADR-0198: the header's rows other than its first move into its details,
     except a raised needs-you row and an ssh request.
+  - ADR-0203: the work strip is no row of the header; it is the dock's changes
+    row. Under the line are the raised reason or the focus, and the fork row.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

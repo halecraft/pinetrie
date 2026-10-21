@@ -1276,25 +1276,12 @@ test("decode: a malformed reorder or queue hold is refused", () => {
     decodeCommand({ kind: "queue-card", moves, mode: "later" }).kind,
     "refused",
   )
-  // A command rides only on a card made in the queue, and must be one.
+  // A command must be one.
   assert.equal(
     decodeCommand({ kind: "queue-card", moves, mode: "keep", targetId: "x" })
       .kind,
     "refused",
   )
-  const lane = threadIdFor("abc")
-  const moved = encodeIntent("c", {
-    kind: "queue-card",
-    move: {
-      card: cardIdFor("c1"),
-      from: { kind: "composing", thread: lane },
-      to: { kind: "queued", thread: lane, seen: "" },
-    },
-    hold: "keep",
-    command: "split",
-  })
-  assert.equal(decodeCommand(moved).kind, "refused")
-  assert.equal(decodeCommand({ ...moved, targetId: "" }).kind, "queue-card")
   assert.equal(
     decodeCommand({
       kind: "queue-card",
@@ -1366,6 +1353,31 @@ test("decode: a malformed reorder or queue hold is refused", () => {
     }).kind,
     "refused",
   )
+})
+
+test("decode: a queued card that exists carries the command it is queued with", () => {
+  const lane = threadIdFor("abc")
+  const moved = encodeIntent("c", {
+    kind: "queue-card",
+    move: {
+      card: cardIdFor("c1"),
+      from: { kind: "composing", thread: lane },
+      to: { kind: "queued", thread: lane, seen: "" },
+    },
+    hold: "keep",
+    command: "split",
+  })
+  assert.deepEqual(decodeCommand(moved), {
+    kind: "queue-card",
+    move: {
+      card: cardIdFor("c1"),
+      from: { kind: "composing", thread: lane },
+      to: { kind: "queued", thread: lane, seen: "" },
+    },
+    hold: "keep",
+    command: "split",
+  })
+  assert.equal(decodeCommand({ ...moved, targetId: "" }).kind, "queue-card")
 })
 
 test("decode: an ssh answer is allow, deny or take back; the old approve is none", () => {

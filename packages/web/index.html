@@ -257,6 +257,11 @@
       .add-root .add-agent { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
       .add-root .add-menu { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; border-left: 0; }
       .add-root > button:hover, .add-root .add-menu:hover { color: var(--text); background: var(--raised); }
+      /* The send button's ▾ (ADR-0203): "resolve and send", beside send. */
+      .send-root { display: inline-flex; flex: 0 0 auto; }
+      .send-root:has(.send-more) > .send { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+      .send-root .send-menu { padding: var(--space-4) var(--space-5); border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        border-left: 1px solid color-mix(in srgb, var(--page) 40%, transparent); }
       /* The control at the list's foot that folds it, or shows its titles. */
       .list-fold { margin-top: auto; align-self: flex-start; padding: var(--space-2) var(--space-7);
         color: var(--text-quiet); font-size: var(--font-xl); }
@@ -384,12 +389,9 @@
       /* A ticked column's name dims: the box is the only thing it changes. */
       .column:has(.column-box:checked) .column-head .agent-name,
       .folded-column[data-ticked] .folded-name { opacity: .55; }
-      /* The thread's base has new work it lacks (`behindMark`). */
-      .column-head .thread-behind { color: var(--attention); cursor: help; }
       /* The mark before a thread's name: a fixed square holding the star, and
          the thread's icon laid over it, so the name never moves when one
-         arrives. The same mark, larger, heads the thread's details, and at
-         the header's size, its folded strip.
+         arrives. The same mark, at the header's size, heads its folded strip.
          A banner is a sprite on black: `isolation` on what holds it makes that
          element's own background what `lighten` blends with, so the black
          goes. A built-in icon has a transparent ground and is not blended,
@@ -423,81 +425,38 @@
       .column-head .agent-name.pending { color: var(--text-faint); font-weight: 400; font-style: italic; }
       .column-head .head-chat { display: inline-flex; align-items: center; font-size: var(--font-lg);
         color: var(--text-faint); }
-      /* The status button, after the name: its dot, the word a raised status
-         says, and a chevron turned while the details are open. `.column-head
-         button`'s reset beats a class alone, so each rule names its head. */
-      :is(.column-head, .folded-column) .head-status-button { flex: 0 0 auto; display: inline-flex;
-        align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-4);
-        border-radius: var(--radius-lg); font-size: var(--font-sm); color: var(--text-faint); }
-      :is(.column-head, .folded-column) .head-status-button::after { content: "▸"; font-size: var(--font-xs);
-        color: var(--text-quiet); transition: transform .15s ease-out, color .15s; }
-      :is(.column-head, .folded-column) .head-status-button[aria-expanded="true"]::after { transform: rotate(90deg); }
-      :is(.column-head, .folded-column) .head-status-button:hover,
-      :is(.column-head, .folded-column) .head-status-button:focus-visible { color: var(--text); background: var(--raised); }
-      :is(.column-head, .folded-column) .head-status-button:hover::after { color: var(--text); }
-      .head-status-button[data-level="needs-you"] .head-status-word { color: var(--attention); }
-      .head-status-button[data-level="conflicts"] .head-status-word { color: var(--danger); }
-      .head-status-button[data-level="ready"] .head-status-word { color: var(--attention); }
-      .head-status-button[data-level="worth-a-read"] .head-status-word {
+      /* A column's status, after the name (ADR-0203): its dot and, while
+         raised for you, its word in its level's colour. A mark, not a button. */
+      .column-head .head-status-mark { flex: 0 0 auto; display: inline-flex; align-items: center;
+        gap: var(--space-3); font-size: var(--font-sm); color: var(--text-faint); }
+      .head-status-mark[data-level="needs-you"] .head-status-word { color: var(--attention); }
+      .head-status-mark[data-level="conflicts"] .head-status-word { color: var(--danger); }
+      .head-status-mark[data-level="ready"] .head-status-word { color: var(--attention); }
+      .head-status-mark[data-level="worth-a-read"] .head-status-word {
         color: color-mix(in srgb, var(--attention) 73%, var(--text-faint)); }
-      /* What the line opens: everything the header holds but what asks
-         something of you. */
-      .column-head .head-details { display: flex; flex-direction: column; gap: var(--space-2); }
       /* The mark pulses while its lane runs. Scaled as far as a rail dot, the
          square would cover the name's first letter; at 1.25 it stays within
          the .3rem gap. */
       .column-head .thread-mark.pulse { animation-name: pulse-mark; }
       @keyframes pulse-mark { 50% { transform: scale(1.25); } }
-      /* A thread's details, under its header and outside it, so they are no
-         drag handle and their text can be selected (ADR-0073). The mark spins
-         in as they are opened, and at each click; a new animation name each
-         time (`data-spin` odd or even) restarts it. */
-      .thread-details { flex: 0 0 auto; display: flex; gap: var(--space-8); align-items: center;
-        padding: var(--space-6) var(--space-8) var(--space-7); isolation: isolate; background: var(--page);
-        border-bottom: 1px solid var(--edge); font-size: var(--font-md); color: var(--text-muted); }
-      .thread-details-icon { flex: 0 0 auto; padding: 0; border-radius: 0;
-        color: var(--track, var(--agent)); }
-      .thread-details .thread-mark { width: 7rem; height: 7rem; font-size: 4rem; }
-      /* Magnified, a built-in icon's 32×32 pixels stay square: ×7 at 2× DPR.
-         Shrunk or scaled under ×2 elsewhere, it is smoothed. */
-      .thread-details .thread-mark .thread-icon[data-kind="built-in"] { image-rendering: pixelated; }
-      /* Its pulse while the lane runs stays within the .75rem gap. */
-      .thread-details .thread-mark.pulse { animation-name: pulse-mark-large; }
-      @keyframes pulse-mark-large { 50% { transform: scale(1.08); } }
-      .thread-details-icon[data-spin="odd"] { animation: thread-spin-a .7s cubic-bezier(.34, 1.56, .64, 1); }
-      .thread-details-icon[data-spin="even"] { animation: thread-spin-b .7s cubic-bezier(.34, 1.56, .64, 1); }
-      @keyframes thread-spin-a { from { transform: scale(.25) rotate(0); }
-        60% { transform: scale(1.15) rotate(360deg); } to { transform: scale(1) rotate(360deg); } }
-      @keyframes thread-spin-b { from { transform: scale(.25) rotate(0); }
-        60% { transform: scale(1.15) rotate(360deg); } to { transform: scale(1) rotate(360deg); } }
-      @media (prefers-reduced-motion: reduce) {
-        .thread-details-icon[data-spin] { animation: none; }
-      }
-      .thread-details-facts { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-      .thread-details-name { font-size: var(--font-2xl); font-weight: 600; color: var(--track, var(--agent)); }
-      .thread-details-behind { color: var(--attention); }
-      .thread-details-start { align-self: flex-start; padding: 0; border-radius: 0;
-        color: var(--text-faint); text-decoration: underline; }
-      .thread-details-start:hover, .thread-details-start:focus-visible { color: var(--text-dim); }
-      /* What the thread is doing now (ADR-0173): one line, cut, the whole of
-         it in its title; dimmed while it is only how the thread began. */
-      .column-head .head-focus { display: block; min-width: 0; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+      /* Under the line (ADR-0203): what the thread is doing now (ADR-0173),
+         two lines at most, the whole of it in its title; dimmed while it is
+         only how the thread began. */
+      .column-head .head-focus { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+        min-width: 0; overflow: hidden; color: var(--text-dim); }
       .column-head .head-focus[data-kind="opening"] { color: var(--text-faint); }
-      /* What the thread's last run needs from you (ADR-0175): the signals'
-         amber until read past or dismissed, then the header's grey. */
-      .column-head .head-status { display: block; width: 100%; min-width: 0; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: var(--font-sm);
-        }
+      /* Or, while raised for you, why the thread's last run needs you
+         (ADR-0175): its reason alone, two lines at most, in its level's colour. */
+      .column-head .head-status { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+        width: 100%; min-width: 0; overflow: hidden; white-space: normal; text-align: left;
+        font-size: var(--font-md); }
       .column-head .head-status[data-level="needs-you"] { color: var(--attention); }
       .column-head .head-status[data-level="worth-a-read"] { color: color-mix(in srgb, var(--attention) 73%, var(--text-faint)); }
-      .column-head .head-status[data-quiet] { color: var(--text-faint); }
       .column-head .head-status:hover, .column-head .head-status:focus-visible { color: var(--text-dim); }
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: var(--font-sm); color: var(--text-faint); }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: var(--text-dim); }
       /* A column's path above its own thread, folded (ADR-0117). */
-      .column-head .agents-row { padding: var(--space-1) 0; font-size: var(--font-sm); color: var(--text-faint); }
       .column-head .earlier { display: block; padding: var(--space-1) 0; font-size: var(--font-sm); color: var(--text-faint);
         }
       .column-head .earlier:hover, .column-head .earlier:focus-visible { color: var(--text-dim); }
@@ -567,7 +526,6 @@
       .folded-title > .head-handle { display: flex; flex-direction: column; align-items: center;
         gap: var(--strip-gap); }
       .folded-title .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }
-      .folded-column .head-status-button { padding: var(--space-2) var(--space-1); }
       .folded-name, .folded-detail { writing-mode: vertical-rl; white-space: nowrap; overflow: hidden;
         text-overflow: ellipsis; max-height: var(--strip-name-max); }
       .folded-name { font-weight: 600; }
@@ -634,8 +592,9 @@
          it loads. */
       .initial img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .initial.more { background: var(--line-strong); color: var(--text-muted); }
-      /* What became of a column's files, in its header (ADR-0040): the proposed changes
-         in your repo (ADR-0038), or where a lane that works directly writes. */
+      /* What became of a column's files (ADR-0040): the proposed changes in your
+         repo (ADR-0038), the dock's changes row (ADR-0203); or a lane's ssh
+         identities, under the header's line. */
       .work { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5) var(--space-6);
         padding: var(--space-5) var(--space-8); border-top: 1px solid var(--edge); font-size: var(--font-sm); color: var(--text-faint); }
       /* A row of the column's header (ADR-0113). */
@@ -938,12 +897,6 @@
       @keyframes pulse-line { 50% { opacity: .35; transform: translateY(-.5rem) scaleX(1.6); } }
       /* The outline says a command is running; the line would say the model is. */
       .column-content:has(.tool.live[data-revealed]) .working-line { visibility: hidden; }
-      /* Asks (ADR-0056). A column's density: outline, story or raw. */
-      .column-head .density { display: inline-flex; flex: 0 0 auto; border: 1px solid var(--line);
-        border-radius: var(--radius-md); overflow: hidden; }
-      .column-head .density-choice { padding: 0 var(--space-5); border-radius: 0;
-        color: var(--text-quiet); font-size: var(--font-2xs); line-height: 1.4; }
-      .column-head .density-choice[aria-pressed="true"] { background: var(--edge); color: var(--text); }
       /* An ask's work, folded to one line, or opened under it. */
       .ask-fold, .ask-line { display: block; width: 100%; margin: 0 0 var(--space-9); padding: var(--space-1) var(--space-6);
         text-align: left; font-size: var(--font-sm); color: var(--text-faint);
@@ -1010,9 +963,11 @@
       /* A column's dock (ADR-0113): the queue's header, the queued cards, the
          line, your message and the notes line, pinned to the column's foot.
          At most a third of the column: past that it scrolls within, its
-         queue header kept in view. */
+         head (the changes row and the queue header, one block) kept in view. */
       .dock { flex: 0 0 auto; max-height: 33%; overflow-y: auto; border-top: 1px solid var(--edge); }
-      .queue-head { position: sticky; top: 0; z-index: 1; display: flex; gap: var(--space-6);
+      .dock-head { position: sticky; top: 0; z-index: 1; background: var(--page); }
+      .dock-head > .work { border-top: 0; border-bottom: 1px solid var(--edge); }
+      .queue-head { display: flex; gap: var(--space-6);
         align-items: center; padding: var(--space-4) var(--space-8); font-size: var(--font-xs); color: var(--text-faint);
         background: var(--page); }
       .queue-head .next-state { flex: 1; }
@@ -1024,7 +979,7 @@
       .next-button.stop { border-color: var(--danger); color: var(--danger); }
       .next-button.resume { border-color: var(--accent); color: var(--accent); }
       .next-button.release-queue { border-color: var(--attention); color: var(--attention); }
-      .queue-menu-trigger { padding: 0 var(--space-5); color: var(--text-faint); }
+      .dock-menu-trigger { padding: 0 var(--space-5); color: var(--text-faint); }
       .queue-cards { padding: 0 var(--space-8); }
       /* A queued card at rest is folded to its header and first line; it
          opens while it holds the focus. ▸ marks the one that goes next. */

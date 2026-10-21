@@ -216,7 +216,8 @@ export interface SessionClient {
    * its text's version as this client has it then, and what it does to
    * that queue's hold, which the host decides with the move in one step.
    * A move with no `from` makes the card in the queue, empty, carrying
-   * `command`: it never passes through another place. Drawn queued at once;
+   * `command`: it never passes through another place. A card that exists
+   * takes `command` in the same write. Drawn queued at once;
    * resolves with the host's answer.
    */
   queueCard(

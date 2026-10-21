@@ -1528,11 +1528,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card made in the queue loses its command",
     file: "packages/rules/queue-hold.ts",
-    from: "    move.from === null && input.command !== null\n",
-    to: "    false && input.command !== null\n",
+    from: "    input.command !== null\n      ? withCommand",
+    to: "    false\n      ? withCommand",
     command: unit,
     expect:
       "a card made in the queue carries its command from its first write, and hold-if-idle holds an idle queue first",
+  },
+  {
+    name: "a card that exists loses the command it is queued with",
+    file: "packages/rules/queue-hold.ts",
+    from: "    input.command !== null\n      ? withCommand",
+    to: "    move.from === null && input.command !== null\n      ? withCommand",
+    command: unit,
+    expect:
+      "a card that exists, queued with a command, carries it in the move's own write",
   },
   {
     name: "a reply does not stop the lift",

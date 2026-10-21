@@ -208,7 +208,7 @@ function baseMoved(
  * - `nothing-new`: it moved, but by work the lane already holds, as after
  *   you accepted its own proposed changes: catching up changes no file;
  * - `brings`: catching up changes `files` files in the lane. Only this one
- *   says the move, for the header's ↓ (`behindMark`).
+ *   says the move, on the changes row and its get-the-latest button.
  */
 export type LatestNow =
   | { readonly kind: "current" }

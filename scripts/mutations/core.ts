@@ -41,6 +41,15 @@ export const mutations: readonly Mutation[] = [
     expect: "withTrailers and the WIP line",
   },
   {
+    name: "the wire refuses a command on a card that exists",
+    file: "packages/protocol/codec.ts",
+    from: "    return { kind, move, hold, command: name }",
+    to: '    return move.from === null\n      ? { kind, move, hold, command: name }\n      : refused(ERR.UNKNOWN_TARGET, "only a card queued new names a command")',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a queued card that exists carries the command it is queued with",
+  },
+  {
     name: "a press's rows may go out of order",
     file: "packages/protocol/codec.ts",
     from: "    if (before !== undefined && row <= before.row)",

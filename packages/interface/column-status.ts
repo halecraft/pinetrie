@@ -12,8 +12,13 @@ export interface ColumnStatus {
   readonly level: Level
   /** Read past or dismissed: drawn in the header's grey, not its level's colour. */
   readonly quiet: boolean
-  /** "needs you: asks whether to drop the v1 table". */
+  /** "needs you: asks whether to drop the v1 table": its title, wherever a status is titled. */
   readonly words: string
+  /**
+   * "asks whether to drop the v1 table": the line under a column's header,
+   * whose status mark already says its level.
+   */
+  readonly reason: string
   /** Where a press brings the column: the run's last entry. */
   readonly end: EntryId
 }
@@ -25,16 +30,15 @@ export function columnStatus(
 ): ColumnStatus | null {
   if (standing === undefined) return null
   const { record, level } = standing
+  const reason = attentionWords(
+    { kind: "run-end", report: record.report, ask: record.ask },
+    nameOf,
+  )
   return {
     level,
     quiet: !standing.raised,
-    words: reasonedWords(
-      level,
-      attentionWords(
-        { kind: "run-end", report: record.report, ask: record.ask },
-        nameOf,
-      ),
-    ),
+    words: reasonedWords(level, reason),
+    reason,
     end: record.end,
   }
 }

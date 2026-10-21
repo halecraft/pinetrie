@@ -309,7 +309,7 @@ describe("a status's words", () => {
     ).toBe("the agent is working")
   })
 
-  test("a status button says a word only while its status is raised, and none for running or accepted", () => {
+  test("a column's status says a word only while it is raised, and none for running or accepted", () => {
     const of = (level: (typeof LEVELS)[number], raised = true) =>
       statusWord({ level, raised, item: null })
     expect(of("needs-you")).toBe("needs you")

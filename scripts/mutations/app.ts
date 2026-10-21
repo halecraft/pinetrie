@@ -261,32 +261,62 @@ export const mutations: readonly Mutation[] = [
     expect: "a column's box ticked on its strip is ticked on its header",
   },
   {
-    name: "a column's status button never closes its details",
-    file: "packages/web/root-signals.tsx",
-    from: "      onClick={p.onPress}\n",
-    to: "      onClick={() => {\n        if (!p.open) p.onPress()\n      }}\n",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "a press on a column's status button opens its details, and a second closes them",
-  },
-  {
-    name: "a press on a column's name opens its details",
+    name: "a press on a column's name folds it",
     file: "packages/web/column-menu.tsx",
     from: "      data-thread={p.thread}\n",
-    to: '      data-thread={p.thread}\n      onClick={e =>\n        e.currentTarget\n          .closest(".column-head")\n          ?.querySelector<HTMLElement>(".head-status-button")\n          ?.click()\n      }\n',
+    to: '      data-thread={p.thread}\n      onClick={e =>\n        e.currentTarget\n          .closest(".column-head")\n          ?.querySelector<HTMLElement>(".fold")\n          ?.click()\n      }\n',
     suite: "browser",
     scenario: "page",
     expect: "a press on a column's name, its handle, opens nothing",
   },
   {
-    name: "a strip's status button does nothing",
-    file: "packages/web/folded-column.tsx",
-    from: "              onPress={() => p.onIntent(head.status)}\n",
-    to: "              onPress={() => {}}\n",
+    name: "under a column's line, its focus is never drawn",
+    file: "packages/web/column.tsx",
+    from: '    case "focus":\n      return (',
+    to: '    case "focus":\n      return null\n      return (',
     suite: "browser",
     scenario: "page",
-    expect: "a strip's status button unfolds its column with its details open",
+    expect: "under a column's line, with no press, is what its thread is doing",
+  },
+  {
+    name: "a run's reason is never drawn under the line",
+    file: "packages/web/column.tsx",
+    from: '    case "status": {\n      const { status } = line',
+    to: '    case "status": {\n      return null\n      const { status } = line',
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a run that needs you shows its reason under the column's line, with no press",
+  },
+  {
+    name: "the session drops the command of a card that exists",
+    file: "packages/session/connect.ts",
+    from: "          hold,\n          command,\n        },",
+    to: "          hold,\n          command: move.from === null ? command : null,\n        },",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "resolve and send queues your message with getting the latest, while the thread conflicts",
+  },
+  {
+    name: "resolve and send sends without the command",
+    file: "packages/web/card-editor.tsx",
+    from: "                              onChoose: () => void submit(more.command),",
+    to: "                              onChoose: () => void submit(),",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "resolve and send queues your message with getting the latest, while the thread conflicts",
+  },
+  {
+    name: "the dock draws no changes row",
+    file: "packages/web/dock.tsx",
+    from: "          {p.strip !== null && (\n            <WorkStripView",
+    to: "          {false && (\n            <WorkStripView",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "the column's foot shows the thread's proposed changes in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
   },
   {
     name: "a column's bin does nothing",
@@ -1388,8 +1418,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's mark never pulses",
     file: "packages/web/column.tsx",
-    from: "                running={running}\n                working={working}",
-    to: "                running={false}\n                working={working}",
+    from: "            running={running}\n            working={working}",
+    to: "            running={false}\n            working={working}",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -1418,8 +1448,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the queue's header scrolls away in the dock",
     file: "packages/web/index.html",
-    from: "      .queue-head { position: sticky;",
-    to: "      .queue-head { position: static;",
+    from: "      .dock-head { position: sticky;",
+    to: "      .dock-head { position: static;",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1573,7 +1603,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the proposed changes' line opens no review",
-    file: "packages/web/column.tsx",
+    file: "packages/web/work-strip.tsx",
     from: "          onClick={review.toggle}\n",
     to: "          onClick={() => {}}\n",
     suite: "browser",
@@ -1583,7 +1613,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "accepted proposed changes' line stays a button",
-    file: "packages/web/column.tsx",
+    file: "packages/web/work-strip.tsx",
     from: "      {strip.review === null ? (\n",
     to: "      {false ? (\n",
     suite: "browser",
