@@ -10,11 +10,15 @@
   - ADR-0034: a lane at rest is its revisions; what else is on its disk is
     rebuildable.
 - **Amended by:**
-  - ADR-0168: a lane's record naming its host, the runner, and the check that
-    a lane rebuilt from its revisions runs are shelved. One host holds a lane
-    at a time and alone writes its thread's end, as built.
+  - ADR-0168: the runner, and the check that a lane rebuilt from its revisions
+    runs, are shelved. A lane's record naming its host is not: ADR-0202 takes
+    it up as the lane's tether. One host holds a lane at a time and alone
+    writes its thread's end, as built.
   - ADR-0202: a lane's record names the machine it is tethered to, by
-    principal; that machine alone writes the agent's record.
+    principal; that machine alone writes the agent's record. The session's
+    records no longer keep one writer: the board and the places are their
+    members', and the question it deferred, who writes them once hosts are
+    many, is this ADR's table.
 
 **Context.**
 

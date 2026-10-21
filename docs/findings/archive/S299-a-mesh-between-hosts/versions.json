@@ -1,0 +1,13 @@
+{
+ "note": "installed outside the repo; plus Headscale v0.29.5 and tailscale/tailscale 1.104.1 images, the Tailscale 1.104.1 static client for the lane, Nebula v1.11.2",
+ "dependencies": {
+  "@kyneta/exchange": "^4.0.0",
+  "@kyneta/schema": "^4.0.0",
+  "@kyneta/websocket-transport": "^4.0.0",
+  "@kyneta/wire": "^4.0.0",
+  "@kyneta/yjs-schema": "^4.0.0",
+  "playwright-core": "^1.64.1",
+  "ws": "^8.22.0",
+  "yjs": "^13.6.33"
+ }
+}

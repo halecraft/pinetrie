@@ -1,0 +1,17 @@
+{"principal":"ada@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":true,"record":["agent: hello from the tether"],"peers":["host@s299.test"],"syncedWithTether":["synced"]}
+{"principal":"bea@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"NotAWriterError","gotRecord":true,"record":["agent: hello from the tether"],"peers":["host@s299.test"],"syncedWithTether":["synced"]}
+{"principal":"ada@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":false,"record":[],"peers":[],"syncedWithTether":[]}
+--- tether log
+tether (mesh) listening on 0.0.0.0:7000, seat 544ee86b39d9c342f7c702aa4b498b32
+upgrade from 100.64.0.2: mesh says ada (ada.mesh.test.)
+  accepted: stated ada@s299.test = mesh ada@s299.test
+canConnect: stated ada@s299.test
+canConnect: stated ada@s299.test
+upgrade from 100.64.0.3: mesh says bea (bea.mesh.test.)
+  accepted: stated bea@s299.test = mesh bea@s299.test
+canConnect: stated bea@s299.test
+canConnect: stated bea@s299.test
+upgrade from 100.64.0.3: mesh says bea (bea.mesh.test.)
+  refused at establish: stated ada@s299.test, mesh proved bea@s299.test
+--- tether state
+{"drafts":[["drafts:ada@s299.test",{"t1":"card written on ada","from ada":"ada@s299.test"}],["drafts:bea@s299.test",{"t1":"card written on bea"}]],"log":[{"id":"bea@s299.test-1","author":"bea@s299.test","text":"hi from bea@s299.test, on bea"},{"id":"ada@s299.test-1","author":"ada@s299.test","text":"hi from ada@s299.test, on ada"}],"record":["agent: hello from the tether"]}

@@ -5,7 +5,8 @@ Numbered 0196 until 2026-10-20, when two files held that number.
 - **Status:** Proposed
 - **Area:** `docs/01-architecture.md`, `packages/protocol/TECHNICAL.md`,
   `packages/schema/TECHNICAL.md`, `packages/session/TECHNICAL.md`
-- **Evidence:** S3, S19, S21, S28, S75, S264, S289, S290, S291
+- **Evidence:** S3, S19, S21, S28, S75, S264, S289, S290, S291, S292, S293,
+  S294, S295, S296, S297
 - **Amends:**
   - ADR-0037: a page keeps a Kyneta store in the browser and reconnects; a
     tab's seat lasts across reloads; a client's work and requests outlast the
@@ -17,7 +18,10 @@ Numbered 0196 until 2026-10-20, when two files held that number.
     place.
   - ADR-0066: a move is undone by the tab's own undo stack, as text is.
   - ADR-0119: a lane's record names the machine it is tethered to, by
-    principal; that machine alone writes the agent's record.
+    principal; that machine alone writes the agent's record. The session's
+    records no longer keep one writer: the board and the places are their
+    members', and the question it deferred, who writes them once hosts are
+    many, is this ADR's table.
 
 **Context.**
 
@@ -94,6 +98,29 @@ policy reads, answers them, so every peer decides alike:
 
 *One policy* decides every document's owner and audience from its id
 and the membership records, registered on the host and on every client.
+It reads the membership records on every call and is registered once:
+registering the same policy object again by name removes it, and the
+gate falls open (S292). Its cost does not matter: 1,000 documents and 50
+peers made 221,317 calls on connecting, 57 ms in all, and a write 50
+(S292).
+
+*A change of membership is told by pine·trie, not by Kyneta.* Kyneta
+evaluates `canShare` only when it sends something, so a peer added to a
+document's audience while connected is not sent it, and one removed stops
+receiving changes but keeps its copy and is told nothing (S292; the first
+is reported to Kyneta's authors as a bug). So:
+
+- **An added member asks again.** Its page, reading the membership
+  record, suspends and resumes its copy of each document it may now
+  read, which asks the host for it. The host does not suspend and resume
+  a document to re-announce it: every other peer would get a `dismiss`,
+  which pine·trie's client reads as a spent card (`hostLetGo`).
+- **A removed member is told by pine·trie**, and its page stops offering
+  writes there: Kyneta drops its later writes without a `refuse`, so as
+  not to reveal that the document exists. Removal stops what a member
+  gets from then on, not what it already holds.
+- **A refused request reveals nothing**: it is answered `vacant`, as for
+  an id that does not exist (S292).
 
 *A canvas belongs to its members.* Each card's place is one value under
 its own key in the canvas's document, and a field that changes on its
@@ -121,7 +148,16 @@ image is kept by its hash in the browser's store until it is uploaded;
 an upload is idempotent.
 
 *A page keeps a store and reconnects.* It writes whatever it may with no
-one connected, and its writes reach the others when it is.
+one connected, and its writes reach the others when it is. *A seat lasts
+on a secure origin, and is new on each load elsewhere.* The store holds
+a seat with Web Locks, which only a secure context has. On `localhost` a
+device's seats stay at the most tabs it had open at once, and a crashed
+tab gives its seat back; on a plain `http://` LAN address every page
+load is a new seat (S297). pine·trie's invite links are such addresses
+today (`planInvites`, `apps/pinetrie/host/admission.ts`). A page there
+works as it does now, with less held between loads; nothing waits on
+HTTPS. HTTPS comes with the mesh's names (below), not with certificates
+a collaborator must click past.
 
 *What an authority acts on is an intent log.* A merge after a partition
 reaches a subscriber as its net change: a write added and removed, or
@@ -130,13 +166,19 @@ only ever appended to loses nothing, so whatever an authority must act on
 is a record appended to a log, never edited or deleted in place, in one
 batch with the state it changes. Each record describes itself: its kind,
 its author, a per-author sequence number, its parent (what the writer
-had seen), and any value it replaces. An edit or a retraction is a new
-record naming the one it changes. The changefeed is a trigger, and the
+had seen). An edit or a retraction is a new record naming the one it
+changes; it does not carry the text it replaces, which is already in the
+log or in the agent's record. The changefeed is a trigger, and the
 log is the source of truth: an authority keeps the ids of the intents it
 has taken, reads the whole log on a restart or a load from its store, and
 skips its own appends (`replay: false`). List order converges but is not
 causal, so an authority orders by the records' own fields. A log is a
-thread's history and is kept.
+thread's history and is kept. It costs about 161 bytes an intent beyond
+its text: 10,000 messages and 1,000 edits made 5.4 MB, which loaded in
+about 110 ms in Node, beside 7.0 MB for the same messages in the agent's
+record (S297). A log is kept whole. Trimming one, by starting a new log
+from a snapshot of the old, is taken up only if logs come near ten times
+that.
 
 *An agent is tethered to one machine.* The machine holding a lane's
 disk, harness and runs is its tether, named by principal in the lane's
@@ -146,16 +188,58 @@ append-only by construction. The agent reads only its record (S3, S19).
 A thread's members write the thread's log: any of them can write any
 record of it, the agent's words included. The tether judges each intent
 it has not taken against its record, one at a time, and turns the valid
-ones into entries. An edit made to a message after the tether took it
-changes only the log, and the page says it was edited after the agent
-read it. Moving a tether to another machine is a handover of its own,
-still to be decided (ADR-0119).
+ones into entries, through `@pinetrie/pi` as it is (S295):
+
+- **pi reads them as its context, in order.** Chats taken where there is
+  no lane go in through the scribe's append to the tree; with a lane, a
+  turn's messages but its last go in with an append, and the last with
+  a run.
+- **The record is the cursor.** An intent's id is its message's send id
+  in pi's tree, so the tree is both the agent's record and the list of
+  what was taken: a tether stopped and started again from its store took
+  each intent exactly once, and an edit never.
+- **Takes are ordered by the intents' ids**, minted by the page as
+  uuidv7, never by the log's order: Yjs gave back two messages written at
+  once with the later first (S295).
+- **The framing is what the model reads, not the words kept.** It goes in
+  the message's content, and its details keep the words as written.
+
+An edit made to a message after the tether took it changes only the log.
+The page draws the thread as one pure projection of the record and the
+log (S295): the record's path as a column draws it now, each message's
+latest text from the log, marked edited after the agent read it, its
+framing worked out again from the record's order, so the case needs no
+storing, and every message not yet taken as pending, as a queued card
+shows now. What the agent said comes from its record only: a forged edit
+of a reply changed nothing drawn. A turn takes what is ready when it
+starts and waits for nothing: messages written at once are framed as
+such, and whoever wants several taken together holds the queue.
 
 *An intent's author is the peer that wrote it*, not the field that names
 one: the tether checks the field against the writer of the record, a Yjs
 item's `clientID` mapped to its seat and person, as the host does for a
-card's text now (ADR-0037). Until intents are signed, which is later
-work, this holds for honest peers only.
+card's text now (ADR-0037). What that takes, and where it holds (S296):
+
+- **The writer is read through `unwrap`**: a Yjs item's `id.client` is
+  the `clientID` that inserted it. Kyneta has no API for who wrote what.
+- **A `clientID` leads back to a person only through a table of seats.**
+  `yjsClientId` hashes a seat's id one way, so the reader needs the
+  seats it has seen connect, kept after they leave, as the host's seat
+  records are. With seats that last (S290), the mapping is the same
+  between visits.
+- **So the check holds only where the reader saw the writer connect.** A
+  write made while partitioned is named, since a writer's records travel
+  over its own connection. A write relayed by another peer is named only
+  by that peer, and is only as trustworthy as it is. Today every writer
+  connects to the host, so every write is named.
+- **It guards against bugs, not adversaries.** Any peer can write under
+  another seat's `clientID` through the native document. Its record is
+  then credited to that seat, and two records written at once under one
+  `clientID` leave the copies diverged for good.
+
+So intents are signed before peers relay one another's writes. Signing
+removes the table of seats and makes a forged `clientID` harmless. It is
+later work, and until then this holds for honest peers only.
 
 *A message written against an older tip is taken, framed by what its
 writer had seen.* It is never a branch: a branch is an act of its own.
@@ -186,6 +270,34 @@ do is an intent in the project's log. The authority the thing's record
 names takes it, judges it against what holds when it is taken, and
 answers in its own record.
 
+*An intent names what it saw of its target, and its authority refuses
+it when that has changed*, naming who changed it: a version, a value or
+an id. One rule for every kind, so an intent taken late does what was
+meant or is refused with words, and none needs its authority connected
+(S294). Most commands carry it already (a move's `from`, a send's
+`seen`, an accept's). Those that do not yet: a stop and a carry-on (the
+run or ask the sender saw), a queue's hold and unqueue-all (the hold
+and the cards seen), the proposed actions other than accept, setup,
+publish and resolve (the state of your repo seen), a lane's ssh access
+(the owner's answer seen: an allow made before a deny elsewhere must not
+grant it again), and a command set on a card.
+
+- **A late send is carried out with words**, the only kind that is: the
+  framing of a message written against an older tip.
+- **A time is used to order, never to judge.** A version the host stamps
+  at the take would make a late one the newest over versions made after
+  it, so a version carries when it was made.
+- **An intent that uses a blob waits for it**, as a send waits for its
+  card's text (S96).
+- **An intent the authority mints an id for is taken once by the
+  intent's own id.**
+- **What merges is no longer a request**: moves, reorders, a card's
+  width and tick, and likely titles and the workflow's names, where
+  lateness is a merge (S289). What stays one is the agent's runs (send,
+  stop, carry-on, queueing and its hold, a card's command), a lane's
+  access, and your repo (proposed changes, setup, publish, restore,
+  resolve).
+
 **Consequences.**
 
 - Typing, placing and starting things need no host. Only what the agent
@@ -196,27 +308,84 @@ answers in its own record.
   at start. So do its stacks of people's moves (ADR-0066).
 - Card texts and roots stop going to every client.
 - A seat lasts, so who wrote what is the same between visits, and seat
-  records stop growing with each.
-- The same policies hold on a relay, on a peer reached directly (WebRTC),
-  and on another person's host, so federation needs no new rules for
-  documents. It does need a principal that is proven, not just stated:
-  until then, every rule here holds for honest peers only, as now.
+  records stop growing with each. A seat record is about 114 bytes.
+- **Nothing tells the host that a seat will not return** (S297): Kyneta's
+  departure is not "gone for good", and what ends a seat (site data
+  cleared, a profile deleted) never reaches the host. So anything kept
+  per seat is swept by the time since it was last seen, and a sweep is
+  safe for a seat that comes back.
+- **Requests as intents remove the per-seat growth of `Line`s.** A seat
+  that opens a `Line` and leaves keeps two documents, about 2.4 kB with
+  one request and 1.3 kB more for each, until a compaction brings them to
+  about 390 bytes (S297). Any `Line` that stays is compacted and swept.
+- **A document that merges holds the same policies on every link**: a
+  relay, a peer reached directly, another person's host. Two of your
+  devices sync your own documents with no host, both ways, across
+  restarts, and refuse what the host refuses; Bea is never sent them;
+  over WebRTC as over WebSocket (S293).
+- **A document with one writer travels only on links to its writer**, or
+  to a peer the policy names as one of its writers. Kyneta judges an
+  offer by the peer that sent it, not by who wrote its operations, so a
+  peer that is not a writer refuses another's relay of it (S293). That
+  covers the places today and the agent's record. So every reader of an
+  agent's record links to its tether, or to the host that holds the
+  record, which the policy names a writer of it. While the tether is the
+  host, as now, this changes nothing.
+- **Carrying the agent's record across members' peers needs signed
+  operations**, judged by their author rather than their sender. Kyneta's
+  `canWrite` sees only the sender. Signing intents and records is later
+  work; until then the record goes only where its writer is linked.
+- Federation needs a principal that is proven, not just stated: until
+  then, every rule here holds for honest peers only, as now.
+- WebRTC needs a signalling path for every pairing, a reload's included:
+  the data channel does not survive one (S293).
 - The winner of a concurrent move is whichever seat's `clientID` orders
   last: arbitrary, consistent, and the same between visits once seats
   last.
-- ADR-0168 proposes shelving a lane's record naming its host. This
-  decision needs that record, as the tether.
+- ADR-0168 shelves relocation but for a lane's record naming its host,
+  which this decision takes up as the tether.
 - Every message is stored twice: as written in the thread's log, and as
   the agent took it in its record. The page draws what the agent said
   from its record, so a forged edit of the agent's words shows as an
   edit, never as what it said.
-- Before a plan, each of these is a spike: whether Kyneta announces a
-  document to a peer added to its audience after it connected, and stops
-  pushing to one removed; two peers syncing with no host; which intents
-  must not be carried out late; the tether taking from a thread's log,
-  and the page drawing the log and the record as one thread; finding the
-  writer of a log's record by its `clientID` through Kyneta; and the
-  store's growth once seats last.
+- **The shared directories** (`.plans`, `sandbox`, `media`) stay one
+  machine's mounts (ADR-0035): the tether's machine's. Files do not
+  become CRDTs.
+- **The budget of asks between agents** (ADR-0128) is the asked thread's
+  tether's: it takes an ask as an intent in its log, and the budget is
+  its own state.
+- **Whose ssh a lane may use** (ADR-0140) follows its tether's owner.
+- **How a tether moves**, built when relocation is: the lane's record
+  holds the tether and an epoch; a move is an intent in the thread's log,
+  taken by the old tether only between runs; it writes its last record,
+  then the next epoch and the new tether. A tether gone for good is taken
+  over by a member with the right, as a branch: whatever the old tether
+  never synced is not taken.
+
+**Directions, not decided here.**
+
+- **A mesh between hosts** (WireGuard: Headscale, Netbird or Nebula),
+  with Kyneta's WebSocket transport over it and WebRTC for browsers only.
+  Its node keys would prove a principal, so the author check would hold
+  against adversaries on direct links, every member's peer could link to
+  a tether (lifting S293's limit on documents with one writer), and its
+  names would give the host's page HTTPS. It is the next spike (S299).
+- **Three ways things travel**: what is addressed by its content (blobs,
+  git objects, derived outputs) from any holder, checked by its hash;
+  what merges, over any link; what has one writer, on links to it. Only
+  names and pointers need an authority.
+- **A cache of derived outputs** keyed by ADR-0135's recipe key with the
+  image and CPU type, so a forked or moved lane fetches what a peer
+  already made, or makes it again. Local files never travel.
+- **Capacity as each machine's own record** (CPU type and OS, GPU,
+  models, the states it holds, free lane slots), where a tether goes as a
+  pure plan over those records, chosen by one authority.
+- **The model call apart from the tether**: the tether stays with the
+  disk, and the call can go to a peer offering a model.
+- **A lane's surfaces** (http, tty, display, artifacts) in its tether's
+  record, granted to members.
+- **A hub is a member that never sleeps**: it stores and relays what
+  merges for members who are away.
 
 **Alternatives rejected.**
 
@@ -224,6 +393,9 @@ answers in its own record.
   place by construction, but cost ten times Yjs's size, wasm, and a
   10 MB ceiling, for a guarantee against cycles that shallow places do
   not need.
+- **Naming every relay a writer of a document with one writer**, so it
+  crosses members' peers. A relay could then forge the agent's record,
+  and every peer would take the forgery.
 - **The host keeps every place, with drafts made local only while it is
   away.** It stops the empty box, but a draft stays in one tab, a reload
   loses it, and every other placement still waits for the host.

@@ -1,6 +1,7 @@
 # S296 — can a peer find who wrote a record of a log from the record's Yjs `clientID`, through Kyneta?
 
 - **Status:** Answered
+- **Led to:** ADR-0202
 
 For ADR-0202, under which an intent's author is the peer that wrote it,
 not the field that names one, until intents are signed. Today the host

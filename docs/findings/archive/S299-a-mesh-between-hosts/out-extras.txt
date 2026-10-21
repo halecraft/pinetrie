@@ -1,0 +1,20 @@
+== a container not on the mesh, to the tether's bridge address 172.20.0.3
+{"principal":"ada@s299.test","url":"ws://172.20.0.3:7000/","status":"not ready: Error: Timeout waiting for state after 8000ms","draftWrite":"ok","adaDraftWrite"
+upgrade from 172.20.0.11: mesh says nobody
+  refused at upgrade: not a node of the mesh
+== tailscale serve in front of the tether, identity in its headers
+{"principal":"ada@s299.test","url":"ws://tether.mesh.test:8080/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":true,"record":["agent: hell
+{"principal":"ada@s299.test","url":"ws://tether.mesh.test:8080/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":false,"record":[],"peers":[
+  accepted: stated ada@s299.test = mesh ada@s299.test
+upgrade from 127.0.0.1: mesh says bea ((serve header))
+  refused at establish: stated ada@s299.test, mesh proved bea@s299.test
+== bea's node sends from ada's mesh address
+tailscale, spoofed source: curl exit 28
+s299 tailscale, own source: curl exit 0
+nebula, spoofed source: curl exit 28
+s299 nebula, own source: curl exit 0
+== a certificate for the tether's mesh name, from Headscale
+500 Internal Server Error: your Tailscale account does not support getting TLS certs
+error enabling https feature: error 501 Not Implemented: Not implemented yet: 
+== whois for a user registered with an email
+{'ID': 4, 'LoginName': 'dan@s299.test', 'DisplayName': 'dan@s299.test'}

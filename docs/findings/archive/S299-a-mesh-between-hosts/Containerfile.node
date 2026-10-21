@@ -1,0 +1,2 @@
+FROM tailscale/tailscale:latest
+RUN apk add --no-cache nodejs npm curl

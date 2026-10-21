@@ -1,6 +1,7 @@
 # S295 — can the tether take a thread's intent log into pi, and can the page draw the log and the record as one thread?
 
 - **Status:** Answered
+- **Led to:** ADR-0202
 
 For ADR-0202: a thread's members append messages to its intent log (a Yjs
 list, never edited in place, S291); the machine a lane is tethered to

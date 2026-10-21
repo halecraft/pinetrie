@@ -1,0 +1,51 @@
+== headscale stopped
+-- ada pings the tether
+pong from tether (100.64.0.1) via 172.20.0.3:36723 in 0s
+-- ada syncs with the tether
+{"principal":"ada@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":true,"record":["agent: hello from the tether"],"peers":["host@s299.test"]
+-- the tether names bea from its own netmap
+  Name:          bea.mesh.test
+-- bea lies, refused
+{"principal":"ada@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"ok","gotRecord":false,"record":[],"peers":[],"syncedWithTether":[]}
+  refused at establish: stated ada@s299.test, mesh proved bea@s299.test
+-- cal joins with a valid key
+-- bea's node restarts
+-- cal, after 25 s
+Logged out.
+-- bea, restarted, after 25 s
+# Health check:
+#     - You are logged out. The last login error was: fetch control key: Get "https://headscale:443/key?v=148": failed to resolve "headscale": no DNS fallback candidates remain for "headscale"
+-- bea pings the tether
+unexpected state: NoState
+-- the tether sees
+100.64.0.1  tether  host  linux  offline                                           
+100.64.0.2  ada     ada   linux  active; direct 172.20.0.4:36283, tx 9916 rx 9956  
+100.64.0.3  bea     bea   linux  active; relay "den", tx 7604 rx 7572              
+
+== headscale started
+-- tether, 40 s after
+100.64.0.1  tether  host  linux  -                                                 
+100.64.0.2  ada     ada   linux  idle, tx 9916 rx 9956                             
+100.64.0.3  bea     bea   linux  active; direct 172.20.0.5:40475, tx 8100 rx 7760  
+100.64.0.4  cal     bea   linux  -                                                 
+
+-- ada, 40 s after
+100.64.0.2  ada     ada   linux  -                       
+100.64.0.3  bea     bea   linux  -                       
+100.64.0.4  cal     bea   linux  -                       
+100.64.0.1  tether  host  linux  idle, tx 10476 rx 9404  
+
+-- bea, 40 s after
+100.64.0.3  bea     bea   linux  -                    
+100.64.0.2  ada     ada   linux  -                    
+100.64.0.4  cal     bea   linux  -                    
+100.64.0.1  tether  host  linux  idle, tx 204 rx 308  
+
+-- cal, 40 s after
+100.64.0.4  cal     bea   linux  -  
+100.64.0.2  ada     ada   linux  -  
+100.64.0.3  bea     bea   linux  -  
+100.64.0.1  tether  host  linux  -  
+
+-- bea syncs again
+{"principal":"bea@s299.test","url":"ws://100.64.0.1:7000/","status":"ready","draftWrite":"ok","adaDraftWrite":"NotAWriterError","gotRecord":true,"record":["agent: hello from the tether"],"peers":["hos

@@ -1,0 +1,28 @@
+pki:
+  ca: /neb/ca.crt
+  cert: /neb/ada.crt
+  key: /neb/ada.key
+static_host_map:
+  "192.168.100.1": ["s299-neb-tether:4242"]
+lighthouse:
+  am_lighthouse: false
+  interval: 10
+  hosts: ["192.168.100.1"]
+listen:
+  host: 0.0.0.0
+  port: 4242
+punchy:
+  punch: true
+tun:
+  dev: nebula1
+logging:
+  level: info
+firewall:
+  outbound:
+    - port: any
+      proto: any
+      host: any
+  inbound:
+    - port: any
+      proto: any
+      group: members

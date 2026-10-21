@@ -1,0 +1,7 @@
+-- the new node says
+Logged out.
+Log in at: https://headscale:443/register/hskey-authreq-a6w5V0j_7vqvRYs3cH4lIX1Y
+-- the admin approves it
+Node eve registered
+-- the node, after
+100.64.0.7  eve     eve@   linux  -  

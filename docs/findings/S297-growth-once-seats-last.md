@@ -1,6 +1,7 @@
 # S297 — what grows in the host's store, and how fast, once seats last and requests are intents
 
 - **Status:** Answered
+- **Led to:** ADR-0202
 
 For ADR-0202. With a browser store a tab keeps its seat across reloads
 (S290), so seats stop being new on every visit; Kyneta keeps `Line`

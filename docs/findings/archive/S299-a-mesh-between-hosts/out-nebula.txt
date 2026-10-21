@@ -1,0 +1,7 @@
+tether (nebula) listening on 192.168.100.1:7000, seat ed555252930302a782b107a52b92a209
+upgrade from 192.168.100.2: mesh says ada@s299.test (ada)
+  accepted: stated ada@s299.test = mesh ada@s299.test
+canConnect: stated ada@s299.test
+canConnect: stated ada@s299.test
+upgrade from 192.168.100.3: mesh says bea@s299.test (bea)
+  refused at establish: stated ada@s299.test, mesh proved bea@s299.test

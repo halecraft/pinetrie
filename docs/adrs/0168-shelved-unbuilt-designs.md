@@ -13,9 +13,10 @@ Numbered 0164 until 2026-10-17, when two files held that number.
     `/sources/<name>`, and accepted work and proposed changes per source. What
     is built of it stays: the session kept outside the project, the extra
     slots, and the folder project.
-  - ADR-0119: a lane's record naming its host, the runner, and the check that
-    a lane rebuilt from its revisions runs are shelved. One host holds a lane
-    at a time and alone writes its thread's end, as built.
+  - ADR-0119: the runner, and the check that a lane rebuilt from its revisions
+    runs, are shelved. A lane's record naming its host is not: ADR-0202 takes
+    it up as the lane's tether. One host holds a lane at a time and alone
+    writes its thread's end, as built.
   - ADR-0116: a file card names a file of the project, the one source a host
     has, as accepted work holds it.
 
@@ -58,8 +59,10 @@ file of a source, so shelving sources changes what it names.
 - **Fold is shelved** (ADR-0005, ADR-0010). Nothing is built toward it.
   The vision keeps merge as an aim, without a design in force. S5's
   findings stand as evidence for whoever takes it up.
-- **Sources and relocation are shelved** (ADR-0118, ADR-0119). The host
-  serves one project. What is built of either ADR stays, as built.
+- **Sources and relocation are shelved** (ADR-0118, ADR-0119), but for a
+  lane's record naming its host, which ADR-0202 takes up as the tether.
+  The host serves one project. What is built of either ADR stays, as
+  built.
 - **A file card names a file of the project** (ADR-0116), the one source a
   host has. It shows the file as accepted work holds it: a jj project's at
   its accepted bookmark, a folder project's in its folder (ADR-0142),

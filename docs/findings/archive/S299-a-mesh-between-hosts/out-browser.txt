@@ -1,0 +1,4 @@
+{"url":"http://100.64.0.1:7000/","status":200,"body":"s299","isSecureContext":false,"webLocks":false,"ws":"opened, first frame \"ready\""}
+{"url":"http://localhost:9000/","status":200,"body":"s299","isSecureContext":true,"webLocks":true,"ws":"opened, first frame \"ready\""}
+upgrade from 100.64.0.6: mesh says lane@s299.test (lane.mesh.test.)
+upgrade from 100.64.0.6: mesh says lane@s299.test (lane.mesh.test.)
