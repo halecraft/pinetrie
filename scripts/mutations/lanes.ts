@@ -628,7 +628,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a bash call runs in the image's sh",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "        shell: RUNTIME_SHELL_PATH,\n",
+    from: "        shell: RUNTIME_SHELL_PATHS,\n",
     to: '        shell: "/bin/sh",\n',
     suite: "lanes",
     scenario: "images",
@@ -874,7 +874,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the runtime takes the image's bash for pine·trie's",
     file: "packages/lanes/runtime.ts",
-    from: '      : `p=${IMAGE_SHELL}; [ -x "$p" ]`',
+    from: '      : `p=${IMAGE_SHELL_DIR}/${entry.name}; [ -x "$p" ]`',
     to: "      : `p=$(command -v ${entry.name})`",
     command: unit,
     expect: "EXTRACT copies pine·trie's bash to shell/, off the PATH's bin/",

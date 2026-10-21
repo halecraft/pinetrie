@@ -899,8 +899,10 @@ const quietSh = (script: string): Promise<string> => sh(script).catch(() => "")
  * exec` into the observer, or the helper's connection inside a lane), so
  * no scenario running beside it is counted.
  */
+// The class keeps the pattern from matching the shell that runs it, a child
+// of this process too, whose own arguments hold it.
 const observerConnections = async (): Promise<number> =>
-  (await quietSh(`pgrep -P ${process.pid} -f observer-connect || true`))
+  (await quietSh(`pgrep -P ${process.pid} -f 'observer-connec[t]' || true`))
     .trim()
     .split("\n")
     .filter(l => l !== "").length

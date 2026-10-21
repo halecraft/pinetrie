@@ -75,7 +75,10 @@ test("laneToolContext: no access is no lane, named by the project's root, whose 
       facts: facts(),
       hostPaths: ["/skills"],
       programs: "/pinetrie-runtime/bin",
-      shell: "/pinetrie-runtime/shell/bash",
+      shell: {
+        bash: "/pinetrie-runtime/shell/bash",
+        mkfifo: "/pinetrie-runtime/shell/mkfifo",
+      },
       gate: () => new Promise(() => {}),
       onShellStarted: () => () => {},
     },
@@ -93,7 +96,10 @@ test("laneToolContext: a lane of its own runs the runtime's programs by path", a
       facts: facts(),
       hostPaths: [],
       programs: "/pinetrie-runtime/bin",
-      shell: "/pinetrie-runtime/shell/bash",
+      shell: {
+        bash: "/pinetrie-runtime/shell/bash",
+        mkfifo: "/pinetrie-runtime/shell/mkfifo",
+      },
       gate: () => new Promise(() => {}),
       onShellStarted: () => () => {},
     },
@@ -530,7 +536,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
-      shell: "bash",
+      shell: { bash: "bash", mkfifo: "mkfifo" },
       gate: async () => {
         await ready
         return { channel, observation: null }
@@ -607,7 +613,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir, shared: [".plans"] }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
-      shell: "bash",
+      shell: { bash: "bash", mkfifo: "mkfifo" },
       gate: async () => ({ channel, observation: null }),
       onShellStarted: () => () => {},
     })
@@ -658,7 +664,7 @@ describe("lanes in a harness", () => {
       facts: facts({ dir }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
-      shell: "bash",
+      shell: { bash: "bash", mkfifo: "mkfifo" },
       gate: async () => ({ channel, observation: null }),
       onShellStarted: () => () => {},
     })

@@ -10,6 +10,7 @@ import { ROOT, rootDocId, threadIdFor } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readOutputSplits,
   readParticipantNames,
   readPlaces,
   readThreadName,
@@ -214,6 +215,42 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(ranBytes / 1024)} KB root (${Math.round(printed / 1024)} KB printed)`,
     )
 
+    // 3b. A bash call's output, stored by statement. The background job
+    // prints once the fourth statement made `go`, after the third printed,
+    // from the second's process; `wait` holds the call open until it lands.
+    script.use([
+      {
+        tool: "bash",
+        args: {
+          command:
+            "echo one\n{ until [ -e go ]; do :; done; echo late; } &\necho three\n: > go\nwait",
+        },
+      },
+      { text: "split" },
+    ])
+    const l3b = tlane()
+    await u.send("split it", at(l3b?.tip ?? null), { thread: l3b?.name })
+    await tidle()
+    await th.quiet()
+    const splitCall = projectSpine(ttree(), tlane()?.tip ?? null)
+      .spine.flatMap(transcriptCalls)
+      .at(-1)
+    const splitRoot = l3b === undefined ? null : th.docs.rootOfLane(l3b.name)
+    const splitDoc = splitRoot === null ? null : th.rootsRead().get(splitRoot)
+    const split =
+      splitDoc == null || splitCall === undefined
+        ? undefined
+        : readOutputSplits(splitDoc).get(splitCall.id)
+    check(
+      "a bash call's stored split puts each statement's output under it, a background job's late line under the statement that started it",
+      JSON.stringify(split?.statements.map(s => s.text)) ===
+        JSON.stringify(["one\n", "late\n", "three\n", "", ""]),
+      JSON.stringify({
+        statements: split?.statements ?? null,
+        result: splitCall?.result?.text ?? null,
+      }),
+    )
+
     // 4. Two assistant messages in one run: two reply streams, one at a time.
     script.use([
       { text: "First.", tool: "read", args: { path: "notes.txt" } },
@@ -376,10 +413,21 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     opened = openStore(dbFile)
     stored = opened.store
     const restartLog: string[] = []
-    th = await open(
+    const reopened = await open(
       m => restartLog.push(m),
       slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS),
+    ).then(
+      h => h,
+      (error: unknown) =>
+        error instanceof Error ? error : new Error(String(error)),
     )
+    check(
+      "a host started after another's shutdown serves the same project: the last let go of its lanes",
+      !(reopened instanceof Error),
+      reopened instanceof Error ? reopened.message.slice(0, 160) : "started",
+    )
+    if (reopened instanceof Error) throw reopened
+    th = reopened
     const linesAfter = await storedLines(stored)
     check(
       "a starting host keeps no command Line from before: no client can resume one",

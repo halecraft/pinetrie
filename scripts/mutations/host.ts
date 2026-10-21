@@ -11,6 +11,16 @@ const command = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a host's shutdown leaves its lanehost roles running",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "    close: () => runtime.close(),\n",
+    to: "    close: async () => {},\n",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "a host started after another's shutdown serves the same project: the last let go of its lanes",
+  },
   // ── the Machine page's reads ──
   {
     name: "a host in a lane keeps the machine's reclaim as its own",

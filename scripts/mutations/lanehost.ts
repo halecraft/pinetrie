@@ -8,6 +8,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanehost"]
 const disks = "packages/lanehost/disks.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a client's close settles before its roles exit",
+    file: "packages/lanehost/client.ts",
+    from: "              channel.close()\n              return channel.closed\n",
+    to: "              channel.close()\n",
+    command: unit,
+    expect:
+      "close settles once each role's server has exited, not when it is asked to",
+  },
   // ── the machine's sample ──
   {
     name: "a cgroup is read by any name it is asked",

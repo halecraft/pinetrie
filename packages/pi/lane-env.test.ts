@@ -263,10 +263,15 @@ describe("the gate", () => {
   test("a held bash call ends as aborted when its signal fires, and was never started", async () => {
     const { gate } = heldGate()
     const said: string[] = []
-    const shell = laneShell("bash", dir, gate, command => {
-      said.push(`started ${command}`)
-      return outcome => said.push(`ended ${outcome}`)
-    })
+    const shell = laneShell(
+      { bash: "bash", mkfifo: "mkfifo" },
+      dir,
+      gate,
+      command => {
+        said.push(`started ${command}`)
+        return outcome => said.push(`ended ${outcome}`)
+      },
+    )
     const control = new AbortController()
     const run = shell("echo held", ASK, control.signal)
     control.abort()
@@ -277,10 +282,15 @@ describe("the gate", () => {
   test("a held bash call runs once allowed, told started after its gate and ended at its end", async () => {
     const { allow, gate } = heldGate()
     const said: string[] = []
-    const shell = laneShell("bash", dir, gate, command => {
-      said.push(`started ${command}`)
-      return outcome => said.push(`ended ${outcome}`)
-    })
+    const shell = laneShell(
+      { bash: "bash", mkfifo: "mkfifo" },
+      dir,
+      gate,
+      command => {
+        said.push(`started ${command}`)
+        return outcome => said.push(`ended ${outcome}`)
+      },
+    )
     const run = shell("echo allowed", ASK, undefined)
     await new Promise(r => setTimeout(r, 20))
     expect(said).toEqual([])

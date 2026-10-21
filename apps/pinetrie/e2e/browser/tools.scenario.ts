@@ -976,7 +976,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               const more = d.querySelector(".tool-more")
               return {
                 open: d.hasAttribute("data-open"),
-                command: lines(".tool-command").length,
+                // Its lines, not its text: a split's detail draws each
+                // statement's output under its line, inside the command.
+                command: d.querySelectorAll(".tool-command .tool-line").length,
                 output: lines(".tool-output"),
                 more: more?.textContent ?? null,
                 expanded: more?.getAttribute("aria-expanded") ?? null,
@@ -1016,6 +1018,59 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               quicks > 0 &&
               quickToggles === 0,
             `${JSON.stringify({ summary: { ...summary, output: summary.output.length }, detail: { ...detail, output: detail.output.length }, folded: folded.more, quicks, quickToggles })}`,
+          )
+        }
+
+        // A split call's detail draws each statement's output under its
+        // line, stderr's as stdout's, and nothing under one that printed
+        // nothing. Six statements: more than the summary's five lines, so
+        // its toggle opens the detail.
+        {
+          const SPLIT = [
+            "echo alpha",
+            "echo beta >&2",
+            "true",
+            "echo gamma",
+            "echo delta",
+            "echo epsilon",
+          ].join("\n")
+          script.use([
+            { tool: "bash", args: { command: SPLIT } },
+            { text: "split" },
+          ])
+          await sayToEnd("split them")
+          const row = tp
+            .locator(`${col(0)} .tool[data-tool="bash"][data-status="ok"]`)
+            .filter({ hasText: "echo alpha" })
+            .last()
+          await row
+            .locator(".tool-more")
+            .click({ timeout: 10_000 })
+            .catch(() => {})
+          await row
+            .locator(".tool-statement-output")
+            .first()
+            .waitFor({ timeout: 10_000 })
+            .catch(() => null)
+          const under = await row.evaluate(d =>
+            [...d.querySelectorAll(".tool-command .tool-line")].map(line =>
+              [...line.querySelectorAll(".tool-statement-output")].map(o =>
+                (o.textContent ?? "").trim(),
+              ),
+            ),
+          )
+          check(
+            "a split call's detail shows each statement's output under its line, and none under one that printed nothing",
+            JSON.stringify(under) ===
+              JSON.stringify([
+                ["alpha"],
+                ["beta"],
+                [],
+                ["gamma"],
+                ["delta"],
+                ["epsilon"],
+              ]),
+            JSON.stringify(under),
           )
         }
 
@@ -1484,10 +1539,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               top: (tag?.getBoundingClientRect().top ?? 0) - box.top,
               beside:
                 (command?.getBoundingClientRect().top ?? box.bottom) - box.top,
-              lines:
-                command instanceof HTMLElement
-                  ? command.innerText.split("\n").length
-                  : 0,
+              // Its lines, not its text, which holds each statement's output.
+              lines: r.querySelectorAll(".tool-command .tool-line").length,
               commands: [
                 ...r.querySelectorAll(".tool-command .sh-command"),
               ].map(c => c.textContent ?? ""),

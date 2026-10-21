@@ -43,7 +43,7 @@ afterAll(async () => {
 /** A lane's shell, its helper's side run in this process. */
 const localShell = (observation: ShellObservation | null = null) =>
   laneShell(
-    "bash",
+    { bash: "bash", mkfifo: "mkfifo" },
     dir,
     async () => ({
       observation,

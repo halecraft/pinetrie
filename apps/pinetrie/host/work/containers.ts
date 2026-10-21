@@ -21,7 +21,7 @@ import {
   laneNote,
   nestedLaneDockerNote,
   RUNTIME_BIN,
-  RUNTIME_SHELL_PATH,
+  RUNTIME_SHELL_PATHS,
   type Step,
 } from "@pinetrie/lanes"
 import type { SnapshotTaking } from "@pinetrie/machine"
@@ -286,7 +286,7 @@ export function createContainers(deps: {
         }),
         hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,
-        shell: RUNTIME_SHELL_PATH,
+        shell: RUNTIME_SHELL_PATHS,
         // The queue's wait too settles on the call's abort: a held start
         // holds the queue.
         gate: async signal => {

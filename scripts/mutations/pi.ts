@@ -1327,6 +1327,50 @@ export const mutations: readonly Mutation[] = [
       "the model meets pi's bash tool: its name, description and parameters",
   },
   {
+    name: "a bash call's output runs on Node's sockets, in a lane",
+    file: "packages/pi/lane-shell.ts",
+    from: "  const pipes = await outputPipes(request.shell.mkfifo)\n",
+    to: "  const pipes = null as Awaited<ReturnType<typeof outputPipes>>\n",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "a bash call's stored split puts each statement's output under it, a background job's late line under the statement that started it",
+  },
+  {
+    name: "an abort while a bash call's pipes are made is missed",
+    file: "packages/pi/lane-shell.ts",
+    from: "  // An abort while the pipes were made: nothing listened for it yet.\n  if (context.signal.aborted) {\n",
+    to: "  if (false) {\n",
+    command: unit,
+    expect:
+      "a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails",
+  },
+  {
+    name: "a bash call's output runs on Node's sockets",
+    file: "packages/pi/lane-shell.ts",
+    from: "  const pipes = await outputPipes(request.shell.mkfifo)\n",
+    to: "  const pipes = null as Awaited<ReturnType<typeof outputPipes>>\n",
+    command: unit,
+    expect: "a call's stdout and stderr are pipes",
+  },
+  {
+    name: "a bash call whose pipes cannot be made fails",
+    file: "packages/pi/lane-shell.ts",
+    from: "    for (const fd of opened) closeSync(fd)\n    return null\n",
+    to: '    for (const fd of opened) closeSync(fd)\n    throw new Error("no pipes")\n',
+    command: unit,
+    expect:
+      "where its pipes cannot be made, a call runs on sockets, its output whole",
+  },
+  {
+    name: "the helper keeps a bash call's write ends",
+    file: "packages/pi/lane-shell.ts",
+    from: "      closeSync(pipes.stdout.write)\n      closeSync(pipes.stderr.write)\n",
+    to: "",
+    command: unit,
+    expect: "a call leaves no descriptor of its pipes open in the helper",
+  },
+  {
     name: "a background job holds a bash call to its end",
     file: "packages/pi/lane-shell.ts",
     from: "      else waitQuiet()",

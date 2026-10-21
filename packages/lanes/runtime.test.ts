@@ -8,7 +8,7 @@ import {
 import { expect, test } from "vitest"
 import {
   EXTRACT,
-  IMAGE_SHELL,
+  IMAGE_SHELL_DIR,
   RUNTIME_NODE,
   runtimeComplete,
 } from "./runtime.ts"
@@ -29,11 +29,21 @@ test("runtimeComplete: a runtime without pine·trie's bash is not complete", () 
   expect(runtimeComplete(ALL.filter(f => f !== "shell/bash"))).toBe(false)
 })
 
+test("runtimeComplete: a runtime without the shell's mkfifo is not complete", () => {
+  expect(runtimeComplete(ALL.filter(f => f !== "shell/mkfifo"))).toBe(false)
+})
+
 test("EXTRACT copies pine·trie's bash to shell/, off the PATH's bin/", () => {
-  expect(EXTRACT).toContain(`p=${IMAGE_SHELL}`)
+  expect(EXTRACT).toContain(`p=${IMAGE_SHELL_DIR}/bash`)
   expect(EXTRACT).toContain(`cp "$p" /out/shell/bash`)
   expect(EXTRACT).toContain("the lane image has no bash")
   expect(EXTRACT).not.toContain("/out/bin/bash")
+})
+
+test("EXTRACT copies the shell's mkfifo to shell/, off the PATH's bin/", () => {
+  expect(EXTRACT).toContain(`p=${IMAGE_SHELL_DIR}/mkfifo`)
+  expect(EXTRACT).toContain(`cp "$p" /out/shell/mkfifo`)
+  expect(EXTRACT).not.toContain("/out/bin/mkfifo")
 })
 
 test("EXTRACT copies the loader ldd names to node/ld.so, which RUNTIME_NODE starts", () => {

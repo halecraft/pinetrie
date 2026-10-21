@@ -373,7 +373,7 @@ paths are its diff." would compare a function with itself.
   `ensureRuntime` keeps a runtime only when its `bin/` holds every program
   (`runtimeComplete`), not only jj. sd 1.1.0 reports itself as 1.0.0.
 - **pine·trie's bash is the shell of every `bash` call (ADR-0204)**, on
-  every image, at `RUNTIME_SHELL_PATH` (`spec.ts`), off the `PATH`: a
+  every image, at `RUNTIME_SHELL_PATHS.bash` (`spec.ts`), off the `PATH`: a
   command's own `bash`, a script's `#!/bin/bash` and a nested shell stay the
   image's. It is GNU bash `RUNTIME_BASH` (core, `lane-env.ts`: a release and
   how many of GNU's official patches), the one place the version is named:
@@ -386,9 +386,17 @@ paths are its diff." would compare a function with itself.
   at anchors, not a diff: each anchor must match exactly once, so a
   release that moved one fails the image's build, naming it, rather than
   building a shell that never signals. The build is static against
-  glibc, without bash's own allocator, and the image keeps it at
-  `IMAGE_SHELL`, which `EXTRACT` copies to `shell/bash`. A new version is
+  glibc, without bash's own allocator, and the image keeps it in
+  `IMAGE_SHELL_DIR`, which `EXTRACT` copies to `shell/bash`. A new version is
   a deliberate bump of `RUNTIME_BASH` and `SHA256SUMS` together.
+- **Beside it, `shell/mkfifo`** (`image/bash/mkfifo.c`, built static in the
+  same stage, copied out from `IMAGE_SHELL_DIR`), with which the helper
+  makes a `bash` call's stdout and stderr pipes (`packages/pi/TECHNICAL.md`,
+  "The `shell` call"). It is the runtime's, not the image's, so a call's
+  output is a pipe the observer reads on every image, whether or not the
+  image has a `mkfifo` (S341). Off the `PATH`, as the shell is: a command's
+  `mkfifo` stays the image's. `runtimeComplete` requires it, so a runtime
+  extracted before it existed is extracted again.
 - **pine·trie's bash, gotchas:**
   - It is glibc's, static, so it reads the image's own locale data: on a
     glibc image it reads text as the image's bash does. On a project's musl

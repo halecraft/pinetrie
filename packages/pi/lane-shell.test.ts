@@ -1,7 +1,7 @@
 // The helper's side of a `bash` call, run as the helper runs it, against
 // real processes; and through a real helper, its run recorded for drains.
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, expect, test } from "vitest"
@@ -30,7 +30,7 @@ async function shell(
   let spills = 0
   const end: ShellEnd = await runShell(
     {
-      shell: "bash",
+      shell: { bash: "bash", mkfifo: "mkfifo" },
       command,
       cwd: dir,
       timeout: null,
@@ -76,6 +76,32 @@ test("each pipe's chunks join to exactly the bytes written to it", async () => {
   expect(r.end).toEqual({ kind: "exited", code: 0, spill: null })
   expect(r.piped("stdout").equals(out)).toBe(true)
   expect(r.piped("stderr").equals(err)).toBe(true)
+})
+
+test("a call's stdout and stderr are pipes", async () => {
+  const r = await shell(
+    "[ -p /dev/stdout ] && echo out-pipe; [ -p /dev/stderr ] && echo err-pipe >&2",
+  )
+  expect(r.piped("stdout").toString()).toBe("out-pipe\n")
+  expect(r.piped("stderr").toString()).toBe("err-pipe\n")
+})
+
+test("where its pipes cannot be made, a call runs on sockets, its output whole", async () => {
+  const r = await shell("[ -p /dev/stdout ] || echo not-a-pipe; echo err >&2", {
+    shell: { bash: "bash", mkfifo: path.join(dir, "no-such-mkfifo") },
+  })
+  expect(r.end).toEqual({ kind: "exited", code: 0, spill: null })
+  expect(r.piped("stdout").toString()).toBe("not-a-pipe\n")
+  expect(r.piped("stderr").toString()).toBe("err\n")
+})
+
+test("a call leaves no descriptor of its pipes open in the helper", async () => {
+  const open = async () => (await readdir("/proc/self/fd")).length
+  await shell("true")
+  const before = await open()
+  await shell("echo out; echo err >&2")
+  await shell("exit 3")
+  expect(await open()).toBe(before)
 })
 
 test("the run is started once, with its command, and named first", async () => {
@@ -142,7 +168,7 @@ test("through the helper, a bash call's run is in the next drain, with its comma
     await channel.ready
     const end = await channel.shell(
       {
-        shell: "bash",
+        shell: { bash: "bash", mkfifo: "mkfifo" },
         command: "echo hi",
         cwd: dir,
         timeout: null,

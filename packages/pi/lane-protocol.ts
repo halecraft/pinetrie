@@ -1,7 +1,7 @@
 // pi/lane-protocol — the calls between the host and a lane's helper,
 // carried by `@pinetrie/channel`.
 
-import type { OutputFd, Recipe } from "@pinetrie/core"
+import type { OutputFd, Recipe, RuntimeShell } from "@pinetrie/core"
 import type { IgnoreFile } from "@pinetrie/rules/ignores"
 
 /**
@@ -124,8 +124,8 @@ export interface LaneHello {
 
 /** What pine·trie's `bash` tool asks the helper to run. */
 export interface ShellRequest {
-  /** pine·trie's bash, as the lane sees it. */
-  readonly shell: string
+  /** pine·trie's bash and its `mkfifo`, as the lane sees them. */
+  readonly shell: RuntimeShell
   readonly command: string
   readonly cwd: string
   /** Seconds, or null for none. */

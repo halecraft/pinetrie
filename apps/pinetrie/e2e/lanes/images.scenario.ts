@@ -3,7 +3,7 @@
 
 import { ROOT, RUNTIME_BASH } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/install"
-import { RUNTIME_SHELL_PATH } from "@pinetrie/lanes"
+import { RUNTIME_SHELL_PATHS } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import { HostRefused } from "../../host/host-refused.ts"
 import type { Checks } from "../checks.ts"
@@ -69,7 +69,7 @@ async function imagesSection(
       `${JSON.stringify(ran.at(-1))}`,
     )
     // The image has no bash: only the runtime's can say this.
-    const bash = `shell ${RUNTIME_SHELL_PATH} ${RUNTIME_BASH.version}.${RUNTIME_BASH.patches}(1)-release`
+    const bash = `shell ${RUNTIME_SHELL_PATHS.bash} ${RUNTIME_BASH.version}.${RUNTIME_BASH.patches}(1)-release`
     check(
       "on Alpine, a bash call runs in pine·trie's own bash, of its pinned version",
       ran.at(-1)?.split("\n").includes(bash) === true,

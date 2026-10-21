@@ -6,6 +6,16 @@ const markdown = "packages/web/markdown.ts"
 const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a split row's detail draws no statement's output",
+    file: "packages/web/message.tsx",
+    from: "              {line.outputs.map((text, j) => (\n",
+    to: "              {line.outputs.slice(0, 0).map((text, j) => (\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a split call's detail shows each statement's output under its line, and none under one that printed nothing",
+  },
   // ── the Machine page, in the browser suite ──
   {
     name: "the footer's status opens no page",

@@ -24,6 +24,35 @@ function fakeChannel(role: Role, refused: string | null = null) {
 }
 
 describe("lanehostClient", () => {
+  test("close settles once each role's server has exited, not when it is asked to", async () => {
+    let exit: () => void = () => {}
+    const exited = new Promise<void>(r => {
+      exit = r
+    })
+    let asked = false
+    const client = lanehostClient({
+      open: async role => ({
+        ready: Promise.resolve({ role, refused: null }),
+        closed: exited,
+        call: async (c: LanehostCall) => c.kind,
+        close: () => {
+          asked = true
+        },
+      }),
+      facts: async () => ({ rootless: false }),
+    })
+    await client.call({ kind: "projects" })
+    let settled = false
+    const closing = client.close().then(() => {
+      settled = true
+    })
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(true)
+    expect(settled).toBe(false)
+    exit()
+    await closing
+    expect(settled).toBe(true)
+  })
   test("a server that refused is let go with its words, and the next call opens another", async () => {
     const made: ReturnType<typeof fakeChannel>[] = []
     const client = lanehostClient({

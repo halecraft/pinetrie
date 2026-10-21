@@ -948,7 +948,8 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
   the capture, the spill's counts and the stored split all take it.
 - **The command runs through `ToolContext.shell`** (`laneShell`,
   `lane-env.ts`), the lane's own capability, as the search tools find their
-  programs: pine·trie's bash at `RUNTIME_SHELL_PATH`, once the lane's gate
+  programs: pine·trie's bash and its `mkfifo` (`RUNTIME_SHELL_PATHS`), as
+  one value, `RuntimeShell`, once the lane's gate
   opens. The gate gives the lane's channel and its observation from one
   link (`OpenedLane`), so a call never pairs one link's channel with
   another's events.
@@ -960,6 +961,15 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
   - the shell is spawned detached with `-c`, stdin closed, in the call's
     directory; a timeout or an abort (the channel's `{ abort }`) kills its
     process group;
+  - its stdout and stderr are pipes (`outputPipes`): two FIFOs the
+    runtime's `mkfifo` makes, both ends opened and the names removed at
+    once, so each is a pipe as `pipe()` makes one. Node's own `stdio:
+    "pipe"` gives a child Unix sockets, which the observer cannot attribute
+    (S341). The helper's read end opens non-blocking, so it needs no
+    writer yet; the shell's end blocks, as libuv makes a child's
+    descriptors 0 to 2, whatever their flags. Where the pipes
+    cannot be made, the call runs on Node's sockets, and shows undivided:
+    the observer sees no byte of it, so its counts never match;
   - each read is one update, `{ fd, bytes }`, never split or joined: one
     message per read keeps the count low, as the channel carries bytes as
     base64 in JSON;

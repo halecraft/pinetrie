@@ -4,7 +4,9 @@
 
 import {
   isThreadId,
+  RUNTIME_MKFIFO,
   RUNTIME_SHELL,
+  type RuntimeShell,
   type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -12,13 +14,16 @@ import {
 /**
  * pine·trie's lane runtime, read-only: Node and its libraries, and what
  * core's `RUNTIME_ENTRIES` lists: in `bin/` the static programs, in
- * `shell/` pine·trie's bash.
+ * `shell/` pine·trie's bash and the `mkfifo` that makes its output pipes.
  */
 export const RUNTIME_MOUNT = "/pinetrie-runtime"
 /** The runtime's programs, as a lane sees them: on its `PATH`, last. */
 export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
-/** pine·trie's bash, as a lane sees it: the `bash` tool's shell, off the `PATH`. */
-export const RUNTIME_SHELL_PATH = `${RUNTIME_MOUNT}/${RUNTIME_SHELL}`
+/** What runs a `bash` call, as a lane sees it, off the `PATH`. */
+export const RUNTIME_SHELL_PATHS: RuntimeShell = {
+  bash: `${RUNTIME_MOUNT}/${RUNTIME_SHELL}`,
+  mkfifo: `${RUNTIME_MOUNT}/${RUNTIME_MKFIFO}`,
+}
 /** The lane's own jj config, on its disk so that forks inherit it. */
 export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pinetrie-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`

@@ -14,9 +14,12 @@
 //   the default image downloads release builds instead.
 // - `shell/bash`: pine·trie's bash, static against glibc, built by the
 //   default image (`image/bash/`); the `bash` tool's shell.
+// - `shell/mkfifo`: a static `mkfifo`, built beside it, with which the
+//   helper makes a `bash` call's stdout and stderr pipes: Node gives a child
+//   sockets, which the observer cannot attribute.
 // Every lane mounts it read-only at `/pinetrie-runtime`. Only `bin/` goes on a
-// lane's `PATH`: pinetrie's `node` cannot start without its loader, and the
-// shell is the tool's, never a command's `bash`.
+// lane's `PATH`: pinetrie's `node` cannot start without its loader, and
+// `shell/` is the tool's, never a command's `bash` or `mkfifo`.
 
 import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
@@ -37,8 +40,8 @@ export const RUNTIME_NODE: readonly string[] = [
   `${RUNTIME_MOUNT}/node/node`,
 ]
 
-/** Where the default image keeps pine·trie's bash, which `EXTRACT` copies to the runtime's shell. */
-export const IMAGE_SHELL = "/usr/local/libexec/pinetrie/bash"
+/** Where the default image keeps each `shell` entry by its name, which `EXTRACT` copies to `shell/`. */
+export const IMAGE_SHELL_DIR = "/usr/local/libexec/pinetrie"
 
 /**
  * The script that copies the runtime out of the default image, as a tar on
@@ -64,7 +67,7 @@ function entryCopy(entry: RuntimeEntry): string {
   const from =
     entry.kind === "program"
       ? `p=$(command -v ${entry.name})`
-      : `p=${IMAGE_SHELL}; [ -x "$p" ]`
+      : `p=${IMAGE_SHELL_DIR}/${entry.name}; [ -x "$p" ]`
   return `mkdir -p "$(dirname ${to})"; ${from} || { echo "the lane image has no ${entry.name}" >&2; exit 1; }; cp "$p" ${to}`
 }
 

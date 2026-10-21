@@ -4,7 +4,7 @@
 - **Area:** `docs/01-architecture.md`, `docs/06-interface.md`,
   `packages/lanes/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
   `packages/pi/TECHNICAL.md`
-- **Evidence:** S283, S281, S298, S304, S300
+- **Evidence:** S283, S281, S298, S304, S300, S341
 - **Amends:**
   - ADR-0064: the lane runtime also carries pine·trie's bash, one pinned
     version, static against glibc, off `PATH`, as the shell of tool calls.
@@ -57,6 +57,13 @@
 - **A run's output pipes are found where the run is**: its first task's
   descriptors 1 and 2 at its `exec` with `PINETRIE_RUN`, each kept if its
   inode is a pipe (S304). Nothing is registered for them.
+- **A call's stdout and stderr are pipes the helper makes**, not what
+  Node gives a child, which is Unix sockets the observer never sees
+  (S341). The runtime carries a static `mkfifo` beside its bash; the
+  helper makes two FIFOs with it, opens both ends of each, removes the
+  names, and gives the write ends to the shell. A FIFO's writes go through
+  `anon_pipe_write`, as an anonymous pipe's do. Where the pipes cannot be
+  made, the call runs on sockets and shows undivided.
 - **The statement is a field of the run tag the observer already keeps**
   for every task (ADR-0135). A task takes its parent's tag at birth, and
   keeps it across `exec`, a move or a new namespace, so a script, a nested
@@ -112,6 +119,10 @@
   or, where the attribution cannot be trusted, the output whole, as now.
 - **The same shell in every project:** the agent can be told which bash
   it has, and an image with no bash gets one.
+- **A command's stdout and stderr are pipes, where pi's own tool gives
+  sockets:** the bytes are the same, and `[ -p /dev/stdout ]` is true, as
+  in `cmd | cat`. A program that tells the two apart sees what a shell
+  pipeline gives it (S341).
 - **A tool call's outer shell can differ from the project's own bash**:
   in its version; on a project's musl image, in reading text as bytes
   and in warning of an `LC_ALL` the image lacks; in `$BASH`; and in

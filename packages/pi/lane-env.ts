@@ -23,6 +23,7 @@ import type {
   OutputEvent,
   Recipe,
   RecipeCheck,
+  RuntimeShell,
   Settled,
 } from "@pinetrie/core"
 import {
@@ -314,7 +315,7 @@ export type LaneShell = (
  * and let go once the flush after the call has answered.
  */
 export function laneShell(
-  shell: string,
+  shell: RuntimeShell,
   cwd: string,
   gate: (signal: AbortSignal | undefined) => Promise<OpenedLane>,
   onShellStarted: (command: string) => (outcome: string) => void,

@@ -16,6 +16,7 @@ import {
   PRODUCT_NAME,
   RUNTIME_BASH,
   type RuntimeProgram,
+  type RuntimeShell,
   type ThreadId,
 } from "@pinetrie/core"
 import {
@@ -64,8 +65,8 @@ export interface LaneAccess {
   readonly hostPaths: readonly string[]
   /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
   readonly programs: string
-  /** Where pine·trie's bash is in the lane (`RUNTIME_SHELL_PATH`). */
-  readonly shell: string
+  /** What runs a `bash` call in the lane (`RUNTIME_SHELL_PATHS`). */
+  readonly shell: RuntimeShell
   /**
    * Settles with the lane once its tools may run: its queue drained and
    * the machine letting it call. Rejects with `signal`'s reason when the

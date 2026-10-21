@@ -46,6 +46,7 @@ export const RUNTIME_ENTRIES = [
   { kind: "program", name: "fd" },
   { kind: "program", name: "sd" },
   { kind: "shell", name: "bash" },
+  { kind: "shell", name: "mkfifo" },
 ] as const
 export type RuntimeEntry = (typeof RUNTIME_ENTRIES)[number]
 export type RuntimeProgram = Extract<RuntimeEntry, { kind: "program" }>["name"]
@@ -54,12 +55,30 @@ export type RuntimeProgram = Extract<RuntimeEntry, { kind: "program" }>["name"]
 export const RUNTIME_PROGRAMS: readonly RuntimeProgram[] =
   RUNTIME_ENTRIES.flatMap(e => (e.kind === "program" ? [e.name] : []))
 
-/** Where an entry is under the runtime: a program in `bin/`, the shell in `shell/`. */
+/**
+ * Where an entry is under the runtime: a program in `bin/`, on a lane's
+ * `PATH`; what runs a `bash` call in `shell/`, off it.
+ */
 export const runtimeEntryPath = (entry: RuntimeEntry): string =>
   entry.kind === "program" ? `bin/${entry.name}` : `shell/${entry.name}`
 
 /** The runtime's shell, under the runtime. */
 export const RUNTIME_SHELL = runtimeEntryPath({ kind: "shell", name: "bash" })
+
+/** The runtime's `mkfifo`, under the runtime: it makes a `bash` call's output pipes. */
+export const RUNTIME_MKFIFO = runtimeEntryPath({
+  kind: "shell",
+  name: "mkfifo",
+})
+
+/**
+ * What runs a `bash` call, as the lane sees it: pine·trie's bash, and the
+ * `mkfifo` that makes its stdout and stderr pipes, which the observer reads.
+ */
+export interface RuntimeShell {
+  readonly bash: string
+  readonly mkfifo: string
+}
 
 /**
  * The GNU bash the runtime's shell is built from: a release and how many of
