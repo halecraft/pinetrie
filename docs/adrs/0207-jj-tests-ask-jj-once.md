@@ -1,6 +1,6 @@
 # ADR-0207 — Only the jj adapter's tests run jj, each asking it once; accepted work's facts are two reads
 
-- **Status:** Proposed
+- **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `packages/jj/TECHNICAL.md`
 - **Evidence:** S306, S305
 
