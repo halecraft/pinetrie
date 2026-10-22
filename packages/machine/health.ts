@@ -47,6 +47,7 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "filesystem-low": "amber",
   "memory-stalls": "amber",
   "lane-oom-killed": "amber",
+  "service-oom-killed": "amber",
   "host-stalls": "amber",
   unsampled: "amber",
 }
@@ -60,8 +61,16 @@ const ORDER: readonly MachineCauseKind[] = [
   "filesystem-low",
   "memory-stalls",
   "lane-oom-killed",
+  "service-oom-killed",
   "host-stalls",
 ]
+
+/** The causes that are events: seen on a sample, not measured against a threshold. */
+const EVENT_KINDS: ReadonlySet<MachineCauseKind> = new Set([
+  "lane-oom-killed",
+  "service-oom-killed",
+  "host-stalls",
+])
 
 /**
  * One cause's count. Inactive, `count` is samples in a row over its
@@ -109,9 +118,17 @@ type LevelReading =
   /** Not measured this sample: counts stay as they are. */
   | { readonly kind: "unmeasured" }
 
-/** A cause's identity: its kind, and the lane it names. */
-const causeKey = (cause: MachineCause): string =>
-  cause.kind === "lane-oom-killed" ? `${cause.kind}:${cause.lane}` : cause.kind
+/** A cause's identity: its kind, and the lane or service it names. */
+const causeKey = (cause: MachineCause): string => {
+  switch (cause.kind) {
+    case "lane-oom-killed":
+      return `${cause.kind}:${cause.lane}`
+    case "service-oom-killed":
+      return `${cause.kind}:${cause.service}`
+    default:
+      return cause.kind
+  }
+}
 
 const UNMEASURED: LevelReading = { kind: "unmeasured" }
 
@@ -293,26 +310,31 @@ export function planHealth(
 
   const { lanes } = sample
   const oomKills = new Map(lanes.map(l => [l.lane, l.oomKills]))
-  const killed = new Map<string, MachineCause>()
-  for (const lane of lanes) {
-    const before = memory.oomKills.get(lane.lane)
-    if (before !== undefined && lane.oomKills > before) {
-      const cause = { kind: "lane-oom-killed", lane: lane.lane } as const
-      killed.set(causeKey(cause), cause)
-    }
-  }
-  const stalled: MachineCause | null =
-    sample.hostStalledMs > HOST_STALL_MS
-      ? { kind: "host-stalls", stalledMs: sample.hostStalledMs }
-      : null
+  const events: MachineCause[] = [
+    ...lanes
+      .filter(lane => {
+        const before = memory.oomKills.get(lane.lane)
+        return before !== undefined && lane.oomKills > before
+      })
+      .map(lane => ({ kind: "lane-oom-killed", lane: lane.lane }) as const),
+    ...sample.serviceKills.map(
+      service => ({ kind: "service-oom-killed", service }) as const,
+    ),
+  ]
+  if (sample.hostStalledMs > HOST_STALL_MS)
+    events.push({ kind: "host-stalls", stalledMs: sample.hostStalledMs })
+  const seen = new Map(events.map(c => [causeKey(c), c]))
   const eventKeys = new Set([
-    ...killed.keys(),
-    ...[...memory.causes.keys()].filter(k => k.startsWith("lane-oom-killed:")),
-    "host-stalls",
+    ...seen.keys(),
+    ...[...memory.causes]
+      .filter(([, t]) => EVENT_KINDS.has(t.cause.kind))
+      .map(([key]) => key),
   ])
   for (const key of eventKeys) {
-    const seen = key === "host-stalls" ? stalled : (killed.get(key) ?? null)
-    const stepped = nextEventState(memory.causes.get(key), seen)
+    const stepped = nextEventState(
+      memory.causes.get(key),
+      seen.get(key) ?? null,
+    )
     if (stepped !== null) next.set(key, stepped)
   }
 

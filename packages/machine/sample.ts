@@ -1,9 +1,10 @@
-// machine/sample — what one sample of the machine measured, as a value. It
-// holds only what was measured: what a backend cannot read is null or
+// machine/sample — what one sample of the machine measured, and what was
+// heard since the last, as a value. What a backend cannot read is null or
 // empty.
 
 import type {
   CgroupMemory,
+  MachineService,
   Pressure,
   StoreRoom,
   ThreadId,
@@ -26,6 +27,11 @@ export interface MachineSample {
   readonly store: StoreRoom | null
   /** The filesystem holding the store, in bytes. */
   readonly filesystem: { readonly size: number; readonly free: number } | null
+  /**
+   * Each service killed for memory since the last sample, once per kill.
+   * Heard, not counted: the observer's container goes with its kill.
+   */
+  readonly serviceKills: readonly MachineService[]
   /** The longest stall of the host's event loop since the last sample, in ms. */
   readonly hostStalledMs: number
 }

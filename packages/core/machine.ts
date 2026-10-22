@@ -37,6 +37,8 @@ export type MachineCause =
   /** The machine's tasks all stalled on memory, `full avg10`, a percentage. */
   | { readonly kind: "memory-stalls"; readonly fullAvg10: number }
   | { readonly kind: "lane-oom-killed"; readonly lane: ThreadId }
+  /** A process in a service's container was killed at its memory limit. */
+  | { readonly kind: "service-oom-killed"; readonly service: MachineService }
   /** The host's event loop stalled, the longest in ms. */
   | { readonly kind: "host-stalls"; readonly stalledMs: number }
   /**
@@ -48,6 +50,11 @@ export type MachineCause =
       readonly reason: UnsampledReason
       readonly error: string | null
     }
+
+export const MACHINE_SERVICES = ["disks", "privileged", "observer"] as const
+
+/** A process pine·trie runs beside the lanes: a lanehost role, or the observer. */
+export type MachineService = (typeof MACHINE_SERVICES)[number]
 
 export const UNSAMPLED_REASONS = ["waiting", "stopped", "failed"] as const
 

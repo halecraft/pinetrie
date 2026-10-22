@@ -1,9 +1,11 @@
 // host/machine/sensor — the machine's `MachineSensor`, composed here and
 // nowhere else: the runtime's raw reads, the store's filesystem's free
-// space, and the host's own stalls, mapped into the sample's values.
+// space, the services' kills heard from Docker, and the host's own stalls,
+// mapped into the sample's values.
 
 import { statfs } from "node:fs/promises"
-import type { RunningLane } from "@pinetrie/docker"
+import type { MachineService } from "@pinetrie/core"
+import type { RunningLane, ServiceKillWatch } from "@pinetrie/docker"
 import type { MachineRead } from "@pinetrie/lanehost"
 import type {
   LaneSample,
@@ -21,6 +23,7 @@ export function planSample(input: {
   readonly running: readonly RunningLane[]
   readonly read: MachineRead
   readonly filesystem: MachineSample["filesystem"]
+  readonly serviceKills: readonly MachineService[]
   readonly hostStalledMs: number
 }): MachineSample {
   const { running, read } = input
@@ -38,6 +41,7 @@ export function planSample(input: {
     lanes,
     store: read.store,
     filesystem: input.filesystem,
+    serviceKills: input.serviceKills,
     hostStalledMs: input.hostStalledMs,
   }
 }
@@ -52,8 +56,15 @@ async function readFilesystem(
     : { size: fs.blocks * fs.bsize, free: fs.bavail * fs.bsize }
 }
 
-/** The sensor over `reach`; `hearStall` takes each of the host's stalls. */
-export function createSensor(reach: MachineReach): MachineSensor & {
+/**
+ * The sensor over `reach` and `kills`; `hearStall` takes each of the host's
+ * stalls. Kills are taken after the reads, so a sample whose read fails
+ * leaves them for the next.
+ */
+export function createSensor(
+  reach: MachineReach,
+  kills: Pick<ServiceKillWatch, "take">,
+): MachineSensor & {
   hearStall(stall: Stall): void
 } {
   /** The longest stall since the last sample, in ms. */
@@ -68,9 +79,16 @@ export function createSensor(reach: MachineReach): MachineSensor & {
         reach.machineSample(running.map(r => r.id)),
         readFilesystem(reach.storeVolume),
       ])
+      const serviceKills = await kills.take()
       const hostStalledMs = longest
       longest = 0
-      return planSample({ running, read, filesystem, hostStalledMs })
+      return planSample({
+        running,
+        read,
+        filesystem,
+        serviceKills,
+        hostStalledMs,
+      })
     },
   }
 }

@@ -3,6 +3,7 @@
 // host's start and at its stop, so no tab reads a stopped host's.
 
 import {
+  MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,
   type MachineHealth,
@@ -41,6 +42,10 @@ const CauseSchema = Type.Union([
   }),
   Type.Object({ kind: Type.Literal("memory-stalls"), fullAvg10: Bytes }),
   Type.Object({ kind: Type.Literal("lane-oom-killed"), lane: ThreadIdSchema }),
+  Type.Object({
+    kind: Type.Literal("service-oom-killed"),
+    service: choiceSchema(MACHINE_SERVICES),
+  }),
   Type.Object({ kind: Type.Literal("host-stalls"), stalledMs: Bytes }),
   Type.Object({
     kind: Type.Literal("unsampled"),

@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a service's kill heard is no cause",
+    file: "packages/machine/health.ts",
+    from: "    ...sample.serviceKills.map(\n",
+    to: "    ...sample.serviceKills.slice(0, 0).map(\n",
+    command: unit,
+    expect:
+      "a service's kill heard is a cause naming it, until LEAVE_AFTER samples without one",
+  },
+  {
+    name: "every service's kill is one cause",
+    file: "packages/machine/health.ts",
+    from: "      return `${cause.kind}:${cause.service}`\n",
+    to: "      return cause.kind\n",
+    command: unit,
+    expect: "two services killed are two causes",
+  },
+  {
     name: "a level enters on its first sample over its threshold",
     file: "packages/machine/health.ts",
     from: "    const count = (was?.count ?? 0) + 1\n",

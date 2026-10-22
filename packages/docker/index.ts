@@ -16,5 +16,10 @@ export {
   type RunningLane,
   SLOT_LABEL,
 } from "./plan.ts"
-export { type DockerRuntime, dockerRuntime, sweepSlot } from "./runtime.ts"
+export {
+  type DockerRuntime,
+  dockerRuntime,
+  type ServiceKillWatch,
+  sweepSlot,
+} from "./runtime.ts"
 export type { DockerTarget } from "./target.ts"

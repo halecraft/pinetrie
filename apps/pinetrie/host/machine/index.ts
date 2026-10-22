@@ -1,6 +1,7 @@
 // host/machine — the machine lanes run on, watched: the manager composed
-// from the runtime's reads, and the timer that asks it for a sample. The
-// timer is the host's: the manager reads no clock.
+// from the runtime's reads, the stream of Docker's events it hears the
+// services' kills on, and the timer that asks it for a sample. The timer is
+// the host's: the manager reads no clock.
 
 import { machineWords } from "@pinetrie/interface"
 import {
@@ -35,7 +36,7 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
 export interface MachineWatch {
   /** Takes each of the host's stalls, for the next sample. */
   hearStall(stall: Stall): void
-  /** Stops the timer, then the manager, which writes `unsampled`. */
+  /** Stops the timer, then the manager, which writes `unsampled`, then the events stream. */
   close(): Promise<void>
 }
 
@@ -48,7 +49,8 @@ export async function startMachineWatch(deps: {
   readonly settings: StoreSettings
   readonly log: (line: string) => void
 }): Promise<MachineWatch> {
-  const sensor = createSensor(deps.reach)
+  const kills = deps.reach.watchServiceKills()
+  const sensor = createSensor(deps.reach, kills)
   const manager = createMachineManager({
     sensor,
     sink: createHealthSink(deps),
@@ -63,6 +65,7 @@ export async function startMachineWatch(deps: {
     async close() {
       clearInterval(timer)
       await manager.close()
+      kills.close()
     },
   }
 }

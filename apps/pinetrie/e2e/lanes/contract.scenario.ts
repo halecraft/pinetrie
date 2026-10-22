@@ -600,6 +600,34 @@ async function dockerContract(
         "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
         "the Mac's lane VM only",
       )
+
+    // ── a service killed for memory, heard from Docker's events ──
+    // Last: the kill may take the disks role's server, which the next call
+    // starts again.
+    if (existsSync(NESTED_MOUNT))
+      skip(
+        "Docker's events name lanehost's disks role killed for memory",
+        "no spike has measured rootless Docker's oom events",
+      )
+    else {
+      const kills = a.machine.watchServiceKills()
+      try {
+        const heard: string[] = [...(await kills.take())]
+        // Past the role's 256 MiB: busybox's tail holds a line with no end.
+        const hog = await inDisks(projA, "tail /dev/zero")
+        await waitFor(async () => {
+          heard.push(...(await kills.take()))
+          return heard.includes("disks")
+        }, 30_000).catch(() => -1)
+        check(
+          "Docker's events name lanehost's disks role killed for memory",
+          heard.includes("disks"),
+          `heard ${JSON.stringify(heard)} | the hog: ${hog.trim().slice(-200)}`,
+        )
+      } finally {
+        kills.close()
+      }
+    }
   } finally {
     for (const l of lanes) {
       const on = laneRuntimes.get(l) ?? runtime

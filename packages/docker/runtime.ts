@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { commandStream, openChannel } from "@pinetrie/channel"
-import { OBSERVER_SOCKET } from "@pinetrie/core"
+import { type MachineService, OBSERVER_SOCKET } from "@pinetrie/core"
 import {
   type Install,
   inMount,
@@ -49,6 +49,8 @@ import {
   containerImageIds,
   containerPid,
   createNetwork,
+  daemonTime,
+  followEvents,
   imageEnv,
   imageExists,
   inspectContainer,
@@ -74,13 +76,17 @@ import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
   type ContainerSpec,
   cgroupMount,
+  eventsSince,
   imageEnvPath,
+  isNewEvent,
+  killedService,
   labelled,
   lanehostContainer,
   NESTED_DISK,
   observerContainer,
   observerImage,
   PROJECT_LABEL,
+  parseOomEvent,
   planProjectSweep,
   planSlotSweep,
   projectKey,
@@ -187,6 +193,24 @@ export interface DockerRuntime extends LaneRuntime {
    * lanes directory's room, and each container's cgroup, by full id.
    */
   machineSample(containers: readonly string[]): Promise<MachineRead>
+  /**
+   * Docker's events followed for the kills of this project's lanehost roles
+   * and the machine's observer, held until `close`.
+   */
+  watchServiceKills(): ServiceKillWatch
+}
+
+export interface ServiceKillWatch {
+  /**
+   * Each kill heard since the last `take`, once per kill. Opens the stream
+   * when none is open: at first, and after one ended (the lane VM or Docker
+   * restarted), from the last event heard. Never rejects: a stream that
+   * cannot open is tried again at the next `take`, and nothing is heard
+   * until it does.
+   */
+  take(): Promise<readonly MachineService[]>
+  /** Ends the stream; a `take` after it hears nothing. */
+  close(): void
 }
 
 /** Docker, at `target`, keeping the lanes of the project at `root` under `lanesDir`. */
@@ -534,6 +558,53 @@ export function dockerRuntime(input: {
       runningLanes(await listLabelled(target, `${PROJECT_LABEL}=${key}`)),
     machineSample: containers =>
       lanehost.call({ kind: "machine-sample", containers }),
+    watchServiceKills() {
+      let heard: MachineService[] = []
+      /**
+       * Where a stream opened again resumes, and at or before which nothing
+       * is new: the last event's time or, before any, the first stream's
+       * start, so a kill while none was open is replayed.
+       */
+      let resume: bigint | null = null
+      let stream: ReturnType<typeof followEvents> | null = null
+      let closed = false
+      const open = async () => {
+        // The daemon's own clock: the stream sends no headers until its
+        // first event, so it cannot say when it began.
+        const from = resume ?? (await daemonTime(target))
+        if (from === null || closed) return
+        resume = from
+        const observer =
+          input.observer === "forwarded"
+            ? null
+            : observerContainer(await version)
+        const opened = followEvents(target, eventsSince(from), line => {
+          const event = parseOomEvent(line)
+          if (event === null || !isNewEvent(event, resume ?? from)) return
+          resume = event.timeNano
+          const service = killedService(event, { project: key, observer })
+          if (service !== null) heard.push(service)
+        })
+        stream = opened
+        void opened.ended.then(() => {
+          if (stream === opened) stream = null
+        })
+      }
+      return {
+        async take() {
+          if (!closed && stream === null) await open().catch(() => {})
+          const taken = heard
+          heard = []
+          return taken
+        },
+        close() {
+          closed = true
+          stream?.close()
+          stream = null
+          heard = []
+        },
+      }
+    },
     vmRestarted() {
       lanehost.reset()
       observer?.reset()

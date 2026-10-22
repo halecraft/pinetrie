@@ -40,6 +40,7 @@ const calm: MachineSample = {
     metadata: { total: 4 * GiB, used: GiB },
   },
   filesystem: { size: 1000 * GiB, free: 500 * GiB },
+  serviceKills: [],
   hostStalledMs: 0,
 }
 
@@ -186,6 +187,29 @@ describe("events", () => {
     ])
     expect(kinds(plans.at(-2))).toEqual(["lane-oom-killed"])
     expect(kinds(plans.at(-1))).toEqual([])
+  })
+
+  test("a service's kill heard is a cause naming it, until LEAVE_AFTER samples without one", () => {
+    const plans = run([
+      { ...calm, serviceKills: ["observer"] },
+      ...times(LEAVE_AFTER, calm),
+    ])
+    expect(plans[0]?.health).toEqual({
+      state: "amber",
+      causes: [{ kind: "service-oom-killed", service: "observer" }],
+    })
+    expect(kinds(plans.at(-2))).toEqual(["service-oom-killed"])
+    expect(kinds(plans.at(-1))).toEqual([])
+  })
+
+  test("two services killed are two causes", () => {
+    const plans = run([
+      { ...calm, serviceKills: ["disks", "observer", "disks"] },
+    ])
+    expect(plans[0]?.health.causes).toEqual([
+      { kind: "service-oom-killed", service: "disks" },
+      { kind: "service-oom-killed", service: "observer" },
+    ])
   })
 
   test("a host stall over a second is a cause on its one sample", () => {

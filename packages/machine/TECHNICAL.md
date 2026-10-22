@@ -48,9 +48,15 @@ and the words share one.
   stalls) enters after `ENTER_AFTER` samples in a row over its threshold
   and leaves after `LEAVE_AFTER` in a row clear of a lower one, so a value
   crossing one threshold back and forth never flaps. An **event** cause (a
-  lane's OOM kill, a host stall) is never seen twice running: it enters on
-  the sample it is seen in and leaves after `LEAVE_AFTER` without it. A
-  level not measured in a sample keeps its count.
+  lane's OOM kill, a service's, a host stall) is never seen twice running:
+  it enters on the sample it is seen in and leaves after `LEAVE_AFTER`
+  without it. A level not measured in a sample keeps its count.
+- **A lane's kill is counted; a service's is heard.** A lane's is a rise in
+  its cgroup's `oom_kill` between two samples: its container outlives the
+  kill. A service's (a lanehost role's, the observer's) is in the sample's
+  `serviceKills`, each kill heard from Docker's events since the last
+  sample, since the observer's container is removed with its kill and its
+  count with it (S324, ADR-0210). Each service is its own cause.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
   when the state, or the set of causes by kind and lane, differs from the
   value last written; a cause's measures changing alone is not. So the

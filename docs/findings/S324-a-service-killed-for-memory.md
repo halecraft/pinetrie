@@ -1,6 +1,7 @@
 # S324 — Docker's `oom` event names every container killed for memory and outlives its removal; a poll of the events loses it behind 256 later events, a held stream filtered to `oom` does not
 
 - **Status:** Answered
+- **Led to:** ADR-0210
 
 **Question.** A lanehost role or the observer killed at its container's
 memory limit usually takes its container with it (the observer is removed

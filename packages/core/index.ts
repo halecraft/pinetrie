@@ -198,10 +198,12 @@ export {
 } from "./lanes.ts"
 export {
   type CgroupMemory,
+  MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,
   type MachineCauseKind,
   type MachineHealth,
+  type MachineService,
   type MachineState,
   type Pressure,
   type StoreRoom,

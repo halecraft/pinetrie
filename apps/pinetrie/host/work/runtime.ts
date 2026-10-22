@@ -78,7 +78,10 @@ export interface Found {
 
 /** The machine's raw reads, from the runtime, and where its store is on this host. */
 export interface MachineReach
-  extends Pick<DockerRuntime, "runningLanes" | "machineSample"> {
+  extends Pick<
+    DockerRuntime,
+    "runningLanes" | "machineSample" | "watchServiceKills"
+  > {
   /**
    * A path on the filesystem holding the store, on this host: the lane VM's
    * state directory, which holds its data disk, on the Mac; the lanes
@@ -94,6 +97,7 @@ const machineReach = (
 ): MachineReach => ({
   runningLanes: () => runtime.runningLanes(),
   machineSample: containers => runtime.machineSample(containers),
+  watchServiceKills: () => runtime.watchServiceKills(),
   storeVolume,
 })
 

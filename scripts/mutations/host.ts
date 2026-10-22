@@ -3007,6 +3007,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a stall is the longest sample less the sampling interval",
   },
   {
+    name: "the sensor takes the kills heard before its reads",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: "      const running = await reach.runningLanes()\n",
+    to: "      const early = await kills.take()\n      const running = await reach.runningLanes()\n      void early\n",
+    command: unit,
+    expect: "a sample whose read fails leaves the kills heard for the next",
+  },
+  {
     name: "every check clears the delay histogram",
     file: "apps/pinetrie/host/stalls.ts",
     from: "  if (stalled === null) return\n  const stall",

@@ -16,6 +16,7 @@ const calm: MachineSample = {
   lanes: [],
   store: null,
   filesystem: null,
+  serviceKills: [],
   hostStalledMs: 0,
 }
 

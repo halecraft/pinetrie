@@ -5,7 +5,11 @@
   `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
   `packages/machine/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
-  S317, S318, S319, S320, S321, S322, S323
+  S317, S318, S319, S320, S321, S322, S323, S324
+- **Revised:**
+  - 2026-10-22 (S324): a lanehost role or the observer killed for memory is an
+    amber cause, heard from Docker's `oom` events on one held stream, not read
+    from its cgroup: the observer's container goes with its kill.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of
@@ -191,12 +195,22 @@ admitted by their limits: two would run on a 12 GiB VM.
 - **One health value** (`state`, `causes`, `actions`), planned from
   samples by a pure function. `neutral`: lanes and the host keep up.
   `amber`: work waits or slows but goes (a rung from 2 up, the room low, a
-  lane OOM-killed, the host's event loop stalling). `red`: work cannot go
+  lane OOM-killed, a lanehost role or the observer killed for memory, the
+  host's event loop stalling). `red`: work cannot go
   (a lane killed for memory, the room at its floor, a repair running or
-  failed, Docker not answering, lanehost's roles down). Its type is
+  failed, Docker not answering, lanehost's roles down: not answering, which
+  a role killed for memory is not, since the next call starts its server
+  again). Its type is
   core's, its record rules', and its words one function of
   `@pinetrie/interface`'s, as every label's are. It is written as the session's `pinetrie.machine` record
   when it changes (S315), and automation and the interface both read it.
+- **A service's kill is heard, not counted** (S324). A lane's kill is a rise
+  in its cgroup's `oom_kill`: its container outlives the kill. The
+  observer's server is its container's main process, removed with it, so
+  its count goes too. Docker's `oom` event names every container killed,
+  by its name and labels, and outlives it; the daemon keeps 256 events, so
+  a poll loses one behind about 85 `docker exec`s, and the host holds one
+  stream of them, filtered to `oom`, resuming from the last event heard.
 - **The footer shows it, on everyone's side, before publish**: a machine
   glyph drawn always, the footer's grey when neutral, amber or red with
   a shape of its own otherwise, never a badge and never moving; its title

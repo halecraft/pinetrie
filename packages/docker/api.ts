@@ -1,13 +1,19 @@
 // docker/api — Docker's HTTP API over the target's socket: a call costs about
 // 0.2 ms, where the CLI's own start costs 11–13 ms. The CLI stays for
-// what streams or builds: `buildx build`, `exec -i` and `runInImage`.
+// what streams or builds (`buildx build`, `exec -i` and `runInImage`), but
+// for the events stream, a `GET` whose body never ends.
 
 import { readFile } from "node:fs/promises"
 import http from "node:http"
 import { parseSize } from "@pinetrie/core"
 import type { ContainerFacts } from "@pinetrie/lanes"
 import { SPEC_LABEL } from "@pinetrie/lanes"
-import type { ContainerSpec, Listed, ListedImage } from "./plan.ts"
+import {
+  type ContainerSpec,
+  type Listed,
+  type ListedImage,
+  systemTimeNanos,
+} from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
 export interface Answered {
@@ -53,6 +59,68 @@ export function request(
     if (data !== undefined) req.write(data)
     req.end()
   })
+}
+
+/** The events the host follows: a container's kill for memory, and nothing else. */
+const OOM_EVENTS = JSON.stringify({ type: ["container"], event: ["oom"] })
+
+/**
+ * Docker's events from `since` (`eventsSince`), replayed from its ring and
+ * then as they come, each line to `onLine`. `ended` resolves when the
+ * stream ends or fails, never rejecting. Its socket is unref'd: a stream
+ * held for the host's life must not keep the host from exiting.
+ */
+export function followEvents(
+  target: Pick<DockerTarget, "socket">,
+  since: string,
+  onLine: (line: string) => void,
+): { readonly ended: Promise<void>; close(): void } {
+  let req: http.ClientRequest | null = null
+  const ended = new Promise<void>(resolve => {
+    req = http.request(
+      {
+        socketPath: target.socket,
+        method: "GET",
+        path: `/events?since=${since}&filters=${at(OOM_EVENTS)}`,
+      },
+      res => {
+        if (res.statusCode !== 200) {
+          res.resume()
+          resolve()
+          return
+        }
+        let rest = ""
+        res.setEncoding("utf8")
+        res.on("data", (chunk: string) => {
+          const lines = (rest + chunk).split("\n")
+          rest = lines.pop() ?? ""
+          for (const line of lines) if (line !== "") onLine(line)
+        })
+        res.on("close", () => resolve())
+        res.on("error", () => resolve())
+      },
+    )
+    req.on("error", () => resolve())
+    req.on("socket", socket => socket.unref())
+    req.end()
+  })
+  return { ended, close: () => req?.destroy() }
+}
+
+/** The daemon's clock, in nanoseconds (`/info`'s `SystemTime`); null when it does not answer. */
+export async function daemonTime(
+  target: Pick<DockerTarget, "socket">,
+): Promise<bigint | null> {
+  const answered = await request(target, "GET", "/info").catch(() => null)
+  if (answered === null || !ok(answered)) return null
+  try {
+    const info = JSON.parse(answered.body) as { SystemTime?: unknown }
+    return typeof info.SystemTime === "string"
+      ? systemTimeNanos(info.SystemTime)
+      : null
+  } catch {
+    return null
+  }
 }
 
 /** Docker's own words for a failed request: its `message`, else the body. */

@@ -16,16 +16,23 @@ import {
   cgroupMount,
   type DockerHostFacts,
   dockerWords,
+  eventsSince,
   HOST_CGROUP,
   INNER_DOCKER_DATA_ROOT_DIR,
   imageEnvPath,
+  isNewEvent,
   isRootless,
+  killedService,
+  LANEHOST_LABEL,
   type Listed,
   labelled,
   laneCommand,
   lanehostContainer,
   NESTED_MOUNT,
+  observerContainer,
+  PROJECT_LABEL,
   parseMountinfo,
+  parseOomEvent,
   planDockerHost,
   planProjectSweep,
   planSlotSweep,
@@ -33,6 +40,7 @@ import {
   renderHelper,
   renderRun,
   runningLanes,
+  systemTimeNanos,
   unneededImageTags,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
@@ -583,4 +591,77 @@ test("the running lanes are the running containers named for a thread", () => {
       listed(`pinetrie-base-scratch-${key}`, "running"),
     ]),
   ).toEqual([{ lane: thread, id }])
+})
+
+describe("the events a service's kill is heard from", () => {
+  const line = (action: string, attributes: Record<string, string>) =>
+    `{"status":"${action}","Type":"container","Action":"${action}","Actor":{"ID":"c1","Attributes":${JSON.stringify(attributes)}},"scope":"local","time":1792686556,"timeNano":1792686556215607848}`
+
+  test("an oom's time is kept to the nanosecond", () => {
+    expect(parseOomEvent(line("oom", { name: "x", image: "i" }))).toEqual({
+      timeNano: 1792686556215607848n,
+      name: "x",
+      labels: { name: "x", image: "i" },
+    })
+  })
+
+  test("a line that is not a container's oom is no kill", () => {
+    expect(parseOomEvent(line("die", { name: "x" }))).toBeNull()
+    expect(parseOomEvent("not json")).toBeNull()
+  })
+
+  const ours = { project: "p1", observer: observerContainer("v1") }
+  const event = (name: string, labels: Record<string, string> = {}) => ({
+    timeNano: 1n,
+    name,
+    labels: { name, ...labels },
+  })
+
+  test("each role of this project, and this version's observer, is named", () => {
+    expect([
+      killedService(
+        event("r", { [PROJECT_LABEL]: "p1", [LANEHOST_LABEL]: "disks" }),
+        ours,
+      ),
+      killedService(
+        event("r", { [PROJECT_LABEL]: "p1", [LANEHOST_LABEL]: "privileged" }),
+        ours,
+      ),
+      killedService(event(observerContainer("v1")), ours),
+    ]).toEqual(["disks", "privileged", "observer"])
+  })
+
+  test("a lane, another project's role and another version's observer are none", () => {
+    expect([
+      killedService(event("pinetrie-t-1", { [PROJECT_LABEL]: "p1" }), ours),
+      killedService(
+        event("r", { [PROJECT_LABEL]: "p2", [LANEHOST_LABEL]: "disks" }),
+        ours,
+      ),
+      killedService(event(observerContainer("v0")), ours),
+      killedService(event(observerContainer("v1")), {
+        ...ours,
+        observer: null,
+      }),
+    ]).toEqual([null, null, null, null])
+  })
+
+  test("a resume's since pads its nanoseconds", () => {
+    expect(eventsSince(1792686556000000042n)).toBe("1792686556.000000042")
+  })
+
+  test("the event at the last one heard is not new", () => {
+    expect([
+      isNewEvent({ timeNano: 5n }, 5n),
+      isNewEvent({ timeNano: 6n }, 5n),
+    ]).toEqual([false, true])
+  })
+
+  test("the daemon's clock is read to the nanosecond", () => {
+    expect(systemTimeNanos("2026-10-22T16:29:00.08483309Z")).toBe(
+      1792686540084833090n,
+    )
+    expect(systemTimeNanos("2026-10-22T16:29:00Z")).toBe(1792686540000000000n)
+    expect(systemTimeNanos("yesterday")).toBeNull()
+  })
 })

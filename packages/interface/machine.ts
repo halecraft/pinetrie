@@ -6,6 +6,7 @@ import {
   assertNever,
   type MachineCause,
   type MachineHealth,
+  type MachineService,
   type MachineState,
   type ThreadId,
   type ThreadName,
@@ -34,6 +35,20 @@ export function sizeWords(bytes: number): string {
 /** A share of 100, as a percentage with no decimals. */
 const percentWords = (share: number) => `${Math.round(share)}%`
 
+/** A service, as the subject of a clause. */
+function serviceWords(service: MachineService): string {
+  switch (service) {
+    case "disks":
+      return "lanehost's disk service"
+    case "privileged":
+      return "lanehost's privileged service"
+    case "observer":
+      return "the file observer"
+    default:
+      return assertNever(service)
+  }
+}
+
 /** One cause, as a clause. */
 function causeWords(
   cause: MachineCause,
@@ -52,6 +67,8 @@ function causeWords(
       return `lanes are short of memory: every task waited on it ${percentWords(cause.fullAvg10)} of the last 10 seconds`
     case "lane-oom-killed":
       return `a command in ${nameOf(cause.lane)} was killed for using too much memory`
+    case "service-oom-killed":
+      return `${serviceWords(cause.service)} was killed for using too much memory`
     case "host-stalls":
       return `the host stalled for ${(cause.stalledMs / 1000).toFixed(1)} seconds`
     case "unsampled":

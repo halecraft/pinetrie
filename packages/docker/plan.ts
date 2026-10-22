@@ -6,7 +6,11 @@
 // do everything to the disks.
 
 import { createHash } from "node:crypto"
-import { type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
+import {
+  type MachineService,
+  type ThreadId,
+  WORKSPACE_ROOT,
+} from "@pinetrie/core"
 import {
   type Install,
   inMount,
@@ -20,6 +24,7 @@ import {
   type NestedDisk,
   OBSERVER_LOADER,
   type ProjectDisks,
+  ROLE_NAMES,
   ROLES,
   type Role,
 } from "@pinetrie/lanehost"
@@ -562,6 +567,79 @@ export const runningLanes = (
       ? [{ lane, id: c.id }]
       : []
   })
+
+/** One `oom` from Docker's events: the container's name and labels, and when. */
+export interface OomEvent {
+  /** Nanoseconds since the epoch, the daemon's clock. */
+  readonly timeNano: bigint
+  readonly name: string
+  /** The container's labels, among Docker's own attributes (`image`, `name`). */
+  readonly labels: Readonly<Record<string, string>>
+}
+
+/**
+ * One line of the events stream, if it is a container's `oom`. `timeNano`
+ * is read from the text: its 19 digits are past what a JSON number keeps,
+ * and a rounded time would make a resume replay or skip an event.
+ */
+export function parseOomEvent(line: string): OomEvent | null {
+  const time = /"timeNano":(\d+)/.exec(line)
+  if (time === null) return null
+  try {
+    const e = JSON.parse(line) as {
+      Type?: string
+      Action?: string
+      Actor?: { Attributes?: Record<string, unknown> | null }
+    }
+    if (e.Type !== "container" || e.Action !== "oom") return null
+    const labels = Object.fromEntries(
+      Object.entries(e.Actor?.Attributes ?? {}).filter(
+        (kv): kv is [string, string] => typeof kv[1] === "string",
+      ),
+    )
+    const name = labels.name
+    return name === undefined
+      ? null
+      : { timeNano: BigInt(time[1] ?? "0"), name, labels }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The service a container's kill was in: a lanehost role of `project`, by
+ * its labels, or the observer, by its name (null where this host's observer
+ * is not a container); null for anything else, another project's roles
+ * among it.
+ */
+export function killedService(
+  event: OomEvent,
+  ours: { readonly project: string; readonly observer: string | null },
+): MachineService | null {
+  if (ours.observer !== null && event.name === ours.observer) return "observer"
+  if (event.labels[PROJECT_LABEL] !== ours.project) return null
+  const role = event.labels[LANEHOST_LABEL]
+  return ROLE_NAMES.find(r => r === role) ?? null
+}
+
+/** The `since` that resumes the events stream at `timeNano`: `<s>.<9 digits>`. */
+export const eventsSince = (timeNano: bigint): string =>
+  `${timeNano / 1_000_000_000n}.${(timeNano % 1_000_000_000n).toString().padStart(9, "0")}`
+
+/** Whether `event` is after `since`: a resume replays the event at its `since`. */
+export const isNewEvent = (
+  event: Pick<OomEvent, "timeNano">,
+  since: bigint,
+): boolean => event.timeNano > since
+
+/** `/info`'s `SystemTime` (`2026-10-22T16:29:00.08483309Z`) in nanoseconds; null if it is not one. */
+export function systemTimeNanos(text: string): bigint | null {
+  const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(text)
+  const seconds = m === null ? Number.NaN : Date.parse(`${m[1]}Z`)
+  if (m === null || Number.isNaN(seconds)) return null
+  const fraction = BigInt((m[2] ?? "").padEnd(9, "0"))
+  return BigInt(seconds) * 1_000_000n + fraction
+}
 
 /** Whether `bind` is `root` or a path inside it, by whole path segments. */
 export const isBindUnder = (root: string, bind: string): boolean => {

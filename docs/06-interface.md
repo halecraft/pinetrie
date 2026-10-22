@@ -205,8 +205,9 @@ While the page syncs, "syncing…" leads its right end.
   VM on the Mac, Linux's own). It is the footer's grey while lanes and the
   host keep up; amber, with a triangle at its corner, when work slows (the
   lanes' disk low, the disk holding it low, lanes short of memory, a
-  command killed for memory, the host stalling, or no reading from the
-  host); red, with a barred disc, when work stops (the lanes' disk full,
+  command killed for memory, lanehost's disk or privileged service or the
+  file observer killed for memory, the host stalling, or no reading from
+  the host); red, with a barred disc, when work stops (the lanes' disk full,
   or its metadata). Shape and colour both, never colour alone; never a
   badge, never moving. Its title, which is also its accessible name, names
   the worst cause in words, with how many more ("The machine lanes run on:

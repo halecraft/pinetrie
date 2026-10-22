@@ -25,7 +25,9 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   `ContainerSpec`), `renderHelper` (a lanehost role's), the labels both
   carry (`projectLabels`), `planDockerHost` and `dockerWords` (startup
   refusals), the sweeps (`planSlotSweep`, `planProjectSweep`), the
-  project's running lanes from Docker's list (`runningLanes`), and the
+  project's running lanes from Docker's list (`runningLanes`), what an
+  `oom` event names (`parseOomEvent`, `killedService`, `eventsSince`,
+  `isNewEvent`, `systemTimeNanos`), and the
   readers of `docker info`'s options and of the lanes directory's mount
   (`parseMountinfo`, over lanehost's `holdingMount`).
 - `api.ts`: Docker's HTTP API over the target's socket, and a spec as its
@@ -122,10 +124,32 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   rootless Docker (a nested lane's) neither is: no spike has shown it
   grants the bind, and a bind it refused would stop the role.
 - **The machine is read through the runtime as raw values:**
-  `runningLanes`, one listing of the project's containers, and
-  `machineSample`, one lanehost call. Docker never imports
-  `@pinetrie/machine`: the host maps both into its sample
-  (`apps/pinetrie/host/machine/`).
+  `runningLanes`, one listing of the project's containers,
+  `machineSample`, one lanehost call, and `watchServiceKills`, the
+  services killed for memory. Docker never imports `@pinetrie/machine`:
+  the host maps them into its sample (`apps/pinetrie/host/machine/`).
+- **A service's kill is heard on one held stream of Docker's events**
+  (`followEvents`, `api.ts`; S324). The observer's container is removed
+  with its kill, so no count of its outlives it; Docker's `oom` event does,
+  naming the container. A role is named by its labels and this project's;
+  the observer, which carries no project label, by its name for this
+  host's version (none under a forwarded observer, which has no
+  container). The daemon keeps its last 256 events, of every kind, so a
+  poll each sample would lose an `oom` behind about 85 `docker exec`s; a
+  stream filtered to `oom` loses nothing while connected. Its gotchas:
+  - `timeNano` is read from the line's text: its 19 digits are past a JSON
+    number's, and a rounded time would replay or skip an event.
+  - A stream opened with `since` replays from it, the event *at* `since`
+    included, so a resume skips what is not after the last heard.
+  - Docker writes no headers until the first event, so before one the
+    stream cannot say when it began: the first `since` is the daemon's
+    clock, `/info`'s `SystemTime`, never the host's.
+  - The socket is unref'd, and the machine watch closes it: a stream held
+    for the host's life must not hold the host open.
+  - It is opened again at the next sample after it ends (the lane VM or
+    Docker restarted), from the last event heard or, before any, the first
+    stream's start; a kill while it is down is heard if fewer than 256
+    events pass first.
 - **Every script it starts is the install's** (`dockerRuntime`'s
   `install`, `@pinetrie/install`'s `scriptCommand`): lanehost's server and
   its readers, the observer's server and its connection, each in the

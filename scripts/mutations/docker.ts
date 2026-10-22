@@ -16,6 +16,47 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an oom's time is read as a JSON number",
+    file: plan,
+    from: '      : { timeNano: BigInt(time[1] ?? "0"), name, labels }',
+    to: '      : { timeNano: BigInt(Number(time[1] ?? "0")), name, labels }',
+    command: unit("packages/docker"),
+    expect: "an oom's time is kept to the nanosecond",
+  },
+  {
+    name: "the observer's kill is not named",
+    file: plan,
+    from: '  if (ours.observer !== null && event.name === ours.observer) return "observer"\n',
+    to: "",
+    command: unit("packages/docker"),
+    expect: "each role of this project, and this version's observer, is named",
+  },
+  {
+    name: "a role of any project is named",
+    file: plan,
+    from: "  if (event.labels[PROJECT_LABEL] !== ours.project) return null\n",
+    to: "",
+    command: unit("packages/docker"),
+    expect:
+      "a lane, another project's role and another version's observer are none",
+  },
+  {
+    name: "a resume's since is not padded",
+    file: plan,
+    from: '(timeNano % 1_000_000_000n).toString().padStart(9, "0")',
+    to: "(timeNano % 1_000_000_000n).toString()",
+    command: unit("packages/docker"),
+    expect: "a resume's since pads its nanoseconds",
+  },
+  {
+    name: "the event at the last one heard is heard again",
+    file: plan,
+    from: "): boolean => event.timeNano > since",
+    to: "): boolean => event.timeNano >= since",
+    command: unit("packages/docker"),
+    expect: "the event at the last one heard is not new",
+  },
+  {
     name: "the disks role's cgroup tree is bound read-write",
     file: plan,
     from: '        : [{ source: "/sys/fs/cgroup", target: cgroup, readonly: true }]),',
@@ -180,6 +221,15 @@ export const mutations: readonly Mutation[] = [
     scenario: "contract",
     expect:
       "lanehost's disks role reads each running lane's memory from its cgroup",
+  },
+  {
+    name: "the events stream asks for a container's death, not its kill",
+    file: "packages/docker/api.ts",
+    from: 'const OOM_EVENTS = JSON.stringify({ type: ["container"], event: ["oom"] })',
+    to: 'const OOM_EVENTS = JSON.stringify({ type: ["container"], event: ["die"] })',
+    suite: "lanes",
+    scenario: "contract",
+    expect: "Docker's events name lanehost's disks role killed for memory",
   },
   // ── the lanes suite, proven in a lane ──
   {
