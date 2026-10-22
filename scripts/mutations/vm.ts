@@ -260,7 +260,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the builder boots a kernel the manifest does not name",
     file: "packages/vm/builder/pins.json",
-    from: '    "version": "6.18.57-r0",',
+    from: '    "version": "6.18.58-r0",',
     to: '    "version": "6.18.52-r0",',
     command: unit,
     expect:
