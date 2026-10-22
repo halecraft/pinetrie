@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { SnapshotId, ThreadId } from "@pinetrie/core"
+import { type SnapshotId, snapshotId, type ThreadId } from "@pinetrie/core"
 import {
   LANEHOST_LABEL,
   NESTED_DISK,
@@ -131,16 +131,24 @@ export const inDisks = async (
     ...args,
   ])
 
-/** Whether snapshot `id` of the project at `root` is there. */
-export const snapshotExists = async (
+/**
+ * Every snapshot of the project at `root`, by one listing: each
+ * `lanehostOnce` is a Node process in the disks role's 256 MiB, so a check
+ * asks once, not once a snapshot.
+ */
+export async function projectSnapshots(
   root: string,
-  id: SnapshotId,
-): Promise<boolean> =>
-  (await lanehostOnce(root, {
-    kind: "snapshot-exists",
+): Promise<ReadonlySet<SnapshotId>> {
+  const names = await lanehostOnce(root, {
+    kind: "snapshots",
     project: projectKey(root),
-    snapshot: id,
-  })) === true
+  })
+  return new Set(
+    Array.isArray(names)
+      ? names.filter(n => typeof n === "string").map(snapshotId)
+      : [],
+  )
+}
 
 export async function deleteSnapshot(
   root: string,

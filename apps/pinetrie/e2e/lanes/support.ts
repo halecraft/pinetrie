@@ -67,10 +67,10 @@ export {
   dockerDisks,
   inDisks,
   isRunning,
+  projectSnapshots,
   removeLane,
   restoreDisk,
   runtimeCli,
-  snapshotExists,
 } from "../lane-runtime.ts"
 
 /** The names in `dir` of snapshot `id`'s disk. */

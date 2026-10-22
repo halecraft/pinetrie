@@ -72,10 +72,10 @@ import {
   deleteSnapshot,
   jj,
   jjRefusal,
+  projectSnapshots,
   queueCommand,
   removeLane,
   restoreDisk,
-  snapshotExists,
 } from "./support.ts"
 
 export const scenario: Scenario = {
@@ -1272,10 +1272,9 @@ async function mainSection(
     if (rootOne !== null)
       await moveCanvasOnBoard(wu, entryId(rootOne), "archive")
     await wh.quiet()
-    const kept = await filterAsync(
-      before,
-      async r =>
-        r.snapshot !== null && (await snapshotExists(project, r.snapshot)),
+    const there = await projectSnapshots(project)
+    const kept = before.filter(
+      r => r.snapshot !== null && there.has(r.snapshot),
     )
     const lanesInRoot = new Set(before.map(r => r.lane))
     const newestKept = [...lanesInRoot].every(lane => {

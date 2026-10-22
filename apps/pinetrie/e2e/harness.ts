@@ -168,7 +168,12 @@ export function refusedWrite(write: () => void): boolean {
   }
 }
 
-/** The elements of `xs` whose `keep` holds, in order: `filter` for an async test. */
+/**
+ * The elements of `xs` whose `keep` holds, in order: `filter` for an async
+ * test. Every `keep` runs at once, so one that starts a process in a
+ * lanehost role belongs in one call of that role's instead: the role's
+ * memory limit holds them all together.
+ */
 export async function filterAsync<T>(
   xs: readonly T[],
   keep: (x: T) => Promise<boolean>,
