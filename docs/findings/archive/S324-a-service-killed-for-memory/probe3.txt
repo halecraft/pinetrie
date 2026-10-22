@@ -1,0 +1,2 @@
+./probe3.sh: line 12: 90097 Terminated: 15          curl -sN --unix-socket "$SOCK" "http://d/events?filters=$F" > stream.out
+300 execs between two ooms; the held stream read 2 oom events

@@ -1,0 +1,101 @@
+== the parent's count at the start
+oom 0 oom_kill 0 
+   local: oom 0 oom_kill 0 
+== (a) the main process killed, --rm
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+   exit 137
+
+   (container gone)
+== (b) a child killed, the main process exits 1, --rm (the observer's shape)
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+Killed
+   exit 1
+
+   (container gone)
+== (c) an exec'd child killed, the main process lives
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+   exec exit 137
+   running=true OOMKilled=true exit=0
+oom_kill 1
+== (d) the main process killed, no --rm, then started again
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+   running=true OOMKilled=true exit=0
+oom_kill 1
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+   running=false OOMKilled=true exit=137
+   after start:
+   running=false OOMKilled=true exit=137
+   (no cgroup)
+== events since the start, read once, every container's
+   start s-a exitCode=- role=a
+   oom s-a exitCode=- role=a
+   die s-a exitCode=137 role=a
+   destroy s-a exitCode=- role=a
+   start s-b exitCode=- role=b
+   oom s-b exitCode=- role=b
+   die s-b exitCode=1 role=b
+   destroy s-b exitCode=- role=b
+   start s-c exitCode=- role=c
+   oom s-c exitCode=- role=c
+   start quizzical_mcnulty exitCode=- role=-
+   die quizzical_mcnulty exitCode=0 role=-
+   destroy quizzical_mcnulty exitCode=- role=-
+   start s-d exitCode=- role=d
+   oom s-d exitCode=- role=d
+   start modest_tesla exitCode=- role=-
+   die modest_tesla exitCode=0 role=-
+   destroy modest_tesla exitCode=- role=-
+   start s-d2 exitCode=- role=d2
+   oom s-d2 exitCode=- role=d2
+   die s-d2 exitCode=137 role=d2
+   start s-d2 exitCode=- role=d2
+   oom s-d2 exitCode=- role=d2
+   die s-d2 exitCode=137 role=d2
+   start dreamy_banzai exitCode=- role=-
+   die dreamy_banzai exitCode=0 role=-
+   destroy dreamy_banzai exitCode=- role=-
+== the parent's count now
+oom 6 oom_kill 6 
+   local: oom 0 oom_kill 0 
+== the parent's count after every probe container is removed
+oom 6 oom_kill 6 
+   local: oom 0 oom_kill 0 
+== events since the start, read again after removal
+   start s-a exitCode=- role=a
+   oom s-a exitCode=- role=a
+   die s-a exitCode=137 role=a
+   destroy s-a exitCode=- role=a
+   start s-b exitCode=- role=b
+   oom s-b exitCode=- role=b
+   die s-b exitCode=1 role=b
+   destroy s-b exitCode=- role=b
+   start s-c exitCode=- role=c
+   oom s-c exitCode=- role=c
+   start quizzical_mcnulty exitCode=- role=-
+   die quizzical_mcnulty exitCode=0 role=-
+   destroy quizzical_mcnulty exitCode=- role=-
+   start s-d exitCode=- role=d
+   oom s-d exitCode=- role=d
+   start modest_tesla exitCode=- role=-
+   die modest_tesla exitCode=0 role=-
+   destroy modest_tesla exitCode=- role=-
+   start s-d2 exitCode=- role=d2
+   oom s-d2 exitCode=- role=d2
+   die s-d2 exitCode=137 role=d2
+   start s-d2 exitCode=- role=d2
+   oom s-d2 exitCode=- role=d2
+   die s-d2 exitCode=137 role=d2
+   start dreamy_banzai exitCode=- role=-
+   die dreamy_banzai exitCode=0 role=-
+   destroy dreamy_banzai exitCode=- role=-
+   start jovial_chatelet exitCode=- role=-
+   die jovial_chatelet exitCode=0 role=-
+   destroy jovial_chatelet exitCode=- role=-
+   destroy s-d2 exitCode=- role=d2
+   die s-c exitCode=137 role=c
+   destroy s-c exitCode=- role=c
+   die s-d exitCode=137 role=d
+   destroy s-d exitCode=- role=d
+   start nice_albattani exitCode=- role=-
+   die nice_albattani exitCode=0 role=-
+   destroy nice_albattani exitCode=- role=-

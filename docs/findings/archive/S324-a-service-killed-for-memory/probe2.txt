@@ -1,0 +1,9 @@
+== a role's main process killed, then started as ensureContainer does
+   stopped:       running=false OOMKilled=true exit=137
+   started again: running=true OOMKilled=false exit=0
+== 60 execs after an oom: events since then 188, ooms still read 1
+== 80 execs after an oom: events since then 248, ooms still read 1
+== 84 execs after an oom: events since then 256, ooms still read 1
+== 85 execs after an oom: events since then 256, ooms still read 0
+== 90 execs after an oom: events since then 256, ooms still read 0
+== 120 execs after an oom: events since then 256, ooms still read 0
