@@ -926,7 +926,11 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   writes to the repo while an owner is live: the watch merges two heads, so
   a test that counts them makes them (`diverge`) before an owner starts, or
   after it is closed and idle. Otherwise, the count races the watch, and
-  the test fails under load.
+  the test fails under load. Likewise a test that counts a step's commands
+  after commands of yours calls the owner's `observe` before it counts:
+  `idle` can settle before the watch's event comes, and the step then
+  observes your operation itself, two commands more
+  (`apps/pinetrie/host/jj/proposed/refresh.test.ts`).
 - **Only this package and the host's jj adapter (`apps/pinetrie/host/jj/`)
   run jj in a test** (ADR-0209). A test that runs jj checks what jj
   answers: a merge, a conflict, immutability, a revset or a template read

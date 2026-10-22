@@ -86,6 +86,13 @@ export interface RepoOwner {
   importLane(lane: ThreadId, bundle: string, stack: boolean): Promise<void>
   /** What moved, each time an observation finds a new head. */
   onMoved(listener: (moved: Moved) => void): () => void
+  /**
+   * The head observed, unless it is the one last observed, as upkeep. A
+   * command of yours is otherwise observed when the watch hears it, which
+   * no caller can wait for: `idle` can settle before the watch's event
+   * comes.
+   */
+  observe(): Promise<void>
   /** Hold `work` in `idle` until it settles: a request outside the owner, say. */
   track<T>(work: Promise<T>): Promise<T>
   idle(): Promise<void>
@@ -342,6 +349,7 @@ export function startRepoOwner(input: {
         })
       return () => listeners.delete(listener)
     },
+    observe: () => queueObserve(),
     track: work => keeper.track(work),
     idle: () => keeper.idle(),
     close() {

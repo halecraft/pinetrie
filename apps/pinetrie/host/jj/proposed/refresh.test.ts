@@ -491,8 +491,13 @@ test("a refresh runs as many jj and git processes as its case needs: two unchang
         baseChanged: () => {},
       }),
     )
-    /** One refresh, with every observation it leaves queued: its processes. */
+    /**
+     * One refresh, with every observation it leaves queued: its processes.
+     * Your commands before it are observed first, as the watch would, so
+     * the refresh's count does not hang on whether the watch's event came.
+     */
     const count = async () => {
+      await owner.observe()
       await owner.idle()
       ran.length = 0
       await owner.command(ops => refresh.refresh(ops, LANE))
