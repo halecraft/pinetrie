@@ -16,6 +16,31 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the disks role's cgroup tree is bound read-write",
+    file: plan,
+    from: '        : [{ source: "/sys/fs/cgroup", target: cgroup, readonly: true }]),',
+    to: '        : [{ source: "/sys/fs/cgroup", target: cgroup, readonly: false }]),',
+    command: unit("packages/docker"),
+    expect:
+      "the disks role reads the machine's cgroup tree read-only, and the privileged role has none",
+  },
+  {
+    name: "a nested lane's disks role is given the cgroup tree",
+    file: plan,
+    from: '  role === "disks" && !rootless ? HOST_CGROUP : null',
+    to: '  role === "disks" ? HOST_CGROUP : null',
+    command: unit("packages/docker"),
+    expect: "under rootless Docker no role is given the cgroup tree",
+  },
+  {
+    name: "a stopped lane is sampled as running",
+    file: plan,
+    from: '    return lane !== null && c.state === "running" && c.id !== ""',
+    to: '    return lane !== null && c.id !== ""',
+    command: unit("packages/docker"),
+    expect: "the running lanes are the running containers named for a thread",
+  },
+  {
     name: "a runtime's base lane is not its project's",
     file: "packages/docker/runtime.ts",
     from: "    baseLane: baseLane(key),\n",
@@ -135,6 +160,26 @@ export const mutations: readonly Mutation[] = [
     to: "    unlistedNetworks: [...unlisted].sort(),\n",
     command: unit("packages/docker"),
     expect: "an unlisted project's network stays while it has a container left",
+  },
+  // ── the machine's health ──
+  {
+    name: "(Mac) the lane VM boots without pressure stall information",
+    file: launcher,
+    from: '"console=hvc0 quiet psi=1 lane.slots=',
+    to: '"console=hvc0 quiet lane.slots=',
+    suite: "lanes",
+    scenario: "contract",
+    expect: "the lane VM's kernel reports memory pressure",
+  },
+  {
+    name: "a lane's cgroup is looked for where no driver puts it",
+    file: "packages/lanehost/machine.ts",
+    from: "  `docker/${id}`,\n",
+    to: "  `moby/${id}`,\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "lanehost's disks role reads each running lane's memory from its cgroup",
   },
   // ── the lanes suite, proven in a lane ──
   {

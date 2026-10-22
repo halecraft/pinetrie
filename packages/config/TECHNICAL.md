@@ -9,7 +9,7 @@ typed, and export the value parsers the table's kinds wrap.
 
 | file | what it holds |
 |---|---|
-| `kinds.ts` | a kind: how one value decodes, and whether it narrows (`meet`) or adds up (`join`, `empty`); `hostCode` |
+| `kinds.ts` | a kind: how one value decodes, and whether it narrows (`meet`) or adds up (`join`, `empty`); `hostCode`; `size`, a size read by core's `parseSize` (binary units, a bare `B` refused), whose limit is the smaller |
 | `setting.ts` | a setting's rule and layers; `pick`, `join`, `limited`, `defineTable`; `admits` |
 | `decode.ts` | a layer's file decoded (`decodeLayer`, `decodeProject`, `decodeEnv`), and its refusals |
 | `settle.ts` | `settle`: every setting's value, its origins and its limits, with every refusal, in one report |

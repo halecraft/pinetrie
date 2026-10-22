@@ -7,6 +7,7 @@
 import { readFile, stat } from "node:fs/promises"
 import os, { homedir } from "node:os"
 import path from "node:path"
+import { sizeWords } from "@pinetrie/interface"
 import {
   BUILDER,
   buildVmImageInVm,
@@ -120,7 +121,7 @@ console.log(
 )
 for (const name of IMAGE_OUTPUTS) {
   const { size } = await stat(path.join(dir, name))
-  console.log(`  ${name}: ${(size / 1e6).toFixed(1)} MB`)
+  console.log(`  ${name}: ${sizeWords(size)}`)
 }
 process.stdout.write(await readFile(path.join(dir, "SHA256SUMS"), "utf8"))
 const pruned = await pruneVmState(stateDir)

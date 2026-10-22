@@ -17,6 +17,7 @@ import {
   projectCopy,
   record,
   settle,
+  size,
   text,
 } from "./index.ts"
 import type { AnySetting } from "./setting.ts"
@@ -297,6 +298,22 @@ describe("settling", () => {
     expect(
       settle(TABLE, { ...NO, project: { working, accepted } }).refusals.length,
     ).toBe(1)
+  })
+})
+
+describe("a size", () => {
+  test("a size decodes from Docker's units, binary, and a bare B is refused", () => {
+    expect(size().decode("50G")).toEqual({ ok: true, value: 50 * 1024 ** 3 })
+    expect(size().decode("512MiB")).toEqual({
+      ok: true,
+      value: 512 * 1024 ** 2,
+    })
+    expect(size().decode("50GB").ok).toBe(false)
+    expect(size().decode(1024).ok).toBe(false)
+  })
+
+  test("a size's limit is the smaller", () => {
+    expect(size().meet(4 * 1024 ** 3, 1024 ** 4)).toBe(4 * 1024 ** 3)
   })
 })
 

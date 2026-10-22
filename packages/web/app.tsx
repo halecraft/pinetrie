@@ -80,6 +80,7 @@ import {
   type ListWidth,
   laneRootEntries,
   layoutReducer,
+  machineStatus,
   marginCounts,
   mediaColumns,
   messageCount,
@@ -450,6 +451,7 @@ export function App({
     outputSplits,
     histories,
     traces,
+    machine,
   } = useSelector(heldView, readSessionFacts)
   // Every card's record: the host's places, with this tab's moves
   // drawn over them until its copy holds them. An unchanged card keeps its
@@ -2023,6 +2025,7 @@ export function App({
               onIntent,
             }}
             accepted={workFacts.accepted}
+            machine={machineStatus(machine, workFacts.names)}
             onIntent={onIntent}
             me={{ writer: session.writer, email: session.principal }}
             session={session}

@@ -1,9 +1,9 @@
-import { snapshotId } from "@pinetrie/core"
+import { snapshotId, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { spec } from "./fixtures.ts"
 import { planFork } from "./fork.ts"
 import { forkSetup } from "./history-port.ts"
-import { baseLane, laneContainer } from "./spec.ts"
+import { baseLane, containerLane, laneContainer } from "./spec.ts"
 
 const KEY = "0123456789abcdef"
 
@@ -30,4 +30,12 @@ test("each project's base is made in a container of its own, named by its key", 
     `pinetrie-base-scratch-${other}`,
     `pinetrie-base-scratch-${KEY}`,
   ])
+})
+
+test("a lane's container names its thread back; no other container names one", () => {
+  const thread = threadIdFor("0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e6f")
+  expect(containerLane(laneContainer(thread))).toBe(thread)
+  expect(containerLane(laneContainer(baseLane(KEY)))).toBeNull()
+  expect(containerLane(`pinetrie-lanehost-disks-${KEY}`)).toBeNull()
+  expect(containerLane("pinetrie-observer-1")).toBeNull()
 })

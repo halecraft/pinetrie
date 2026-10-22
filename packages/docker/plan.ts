@@ -6,7 +6,7 @@
 // do everything to the disks.
 
 import { createHash } from "node:crypto"
-import { WORKSPACE_ROOT } from "@pinetrie/core"
+import { type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
 import {
   type Install,
   inMount,
@@ -15,6 +15,7 @@ import {
 } from "@pinetrie/install"
 import {
   FOLDER_MOUNT,
+  holdingMount,
   MACHINE_SOCKET,
   type NestedDisk,
   OBSERVER_LOADER,
@@ -24,6 +25,7 @@ import {
 } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
+  containerLane,
   type DiskBind,
   diskBinds,
   type Mount,
@@ -249,9 +251,23 @@ export const lanehostContainer = (
   return `pinetrie-lanehost-${role}-${project}${slot === undefined ? "" : `-${slot}`}`
 }
 
+/** Where a role given the cgroup tree finds it, read-only. */
+export const HOST_CGROUP = "/host-cgroup"
+
+/**
+ * Where a role's container has the machine's cgroup tree: the disks role,
+ * which samples lanes' memory, at `HOST_CGROUP`. Under rootless Docker (a
+ * nested lane's) none: no spike has shown it grants the bind, and a bind it
+ * refused would stop the role.
+ */
+export const cgroupMount = (role: Role, rootless: boolean): string | null =>
+  role === "disks" && !rootless ? HOST_CGROUP : null
+
 /** What a lanehost role's container is made from. */
 interface HelperShape {
   readonly role: Role
+  /** Docker runs rootless (a nested lane's). */
+  readonly rootless: boolean
   readonly project: string
   readonly image: string
   readonly lanesDir: string
@@ -266,14 +282,16 @@ interface HelperShape {
  * A lanehost role's container, without its spec label: its grant (`ROLES`),
  * the lanes directory at its own path, and the install and the runtime
  * read-only where a lane has them; the disks role, the project's root
- * read-only at `FOLDER_MOUNT`, which a read of the project's folder copies from. It only waits: the host starts the
- * server in it with `exec -i`.
+ * read-only at `FOLDER_MOUNT`, which a read of the project's folder copies
+ * from, and the cgroup tree read-only where `cgroupMount` says. It only
+ * waits: the host starts the server in it with `exec -i`.
  */
 export function renderHelper(
   shape: HelperShape,
   target: Pick<DockerTarget, "labels" | "pathOf">,
 ): ContainerSpec {
   const spec = ROLES[shape.role]
+  const cgroup = cgroupMount(shape.role, shape.rootless)
   return {
     name: lanehostContainer(shape.role, shape.project, target),
     hostname: null,
@@ -305,7 +323,10 @@ export function renderHelper(
               target.pathOf,
             ),
           ]
-        : []),
+        : []), // The machine's own tree, in the VM on the Mac: no host path to map.
+      ...(cgroup === null
+        ? []
+        : [{ source: "/sys/fs/cgroup", target: cgroup, readonly: true }]),
     ],
     network: spec.network,
     memory: spec.memory,
@@ -432,27 +453,17 @@ export function imageEnvPath(env: readonly string[] | null): string {
 
 /**
  * Whether `dir` is on btrfs mounted with `user_subvol_rm_allowed`, from
- * `/proc/self/mountinfo`: the mount whose point is the longest prefix of it.
- * Null when no mount holds it.
+ * `/proc/self/mountinfo`. Null when no mount holds it.
  */
 export function parseMountinfo(
   text: string,
   dir: string,
 ): { readonly btrfs: boolean; readonly rmAllowed: boolean } | null {
-  let best: { point: string; fs: string; options: string } | null = null
-  for (const line of text.split("\n")) {
-    const [left, right] = line.split(" - ")
-    if (left === undefined || right === undefined) continue
-    const point = (left.split(" ")[4] ?? "").replace(/\\040/g, " ")
-    const [fs = "", , superOptions = ""] = right.split(" ")
-    const holds = point === "/" || dir === point || dir.startsWith(`${point}/`)
-    if (holds && (best === null || point.length >= best.point.length))
-      best = { point, fs, options: superOptions }
-  }
-  if (best === null) return null
+  const mount = holdingMount(text, dir)
+  if (mount === null) return null
   return {
-    btrfs: best.fs === "btrfs",
-    rmAllowed: best.options.split(",").includes("user_subvol_rm_allowed"),
+    btrfs: mount.fs === "btrfs",
+    rmAllowed: mount.options.includes("user_subvol_rm_allowed"),
   }
 }
 
@@ -526,10 +537,31 @@ export function dockerWords(r: DockerRefusal): string {
 
 /** A container as `docker ps` lists it: its name, labels and bind sources. */
 export interface Listed {
+  /** Its full id. */
+  readonly id: string
   readonly name: string
+  /** Docker's word for it: `running`, `exited`, `created`, … */
+  readonly state: string
   readonly labels: Readonly<Record<string, string>>
   readonly binds: readonly string[]
 }
+
+/** A lane's container that runs, by its thread and its full id. */
+export interface RunningLane {
+  readonly lane: ThreadId
+  readonly id: string
+}
+
+/** The containers listed that are lanes' and running: no role, no base's scratch lane, nothing stopped. */
+export const runningLanes = (
+  containers: readonly Listed[],
+): readonly RunningLane[] =>
+  containers.flatMap(c => {
+    const lane = containerLane(c.name)
+    return lane !== null && c.state === "running" && c.id !== ""
+      ? [{ lane, id: c.id }]
+      : []
+  })
 
 /** Whether `bind` is `root` or a path inside it, by whole path segments. */
 export const isBindUnder = (root: string, bind: string): boolean => {

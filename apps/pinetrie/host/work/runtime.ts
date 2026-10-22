@@ -8,6 +8,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 import { errorText, OBSERVER_SOCKET } from "@pinetrie/core"
 import {
+  type DockerRuntime,
   type DockerTarget,
   dockerRootless,
   dockerRuntime,
@@ -71,7 +72,30 @@ export interface Found {
   shareAndGrant(wanted: Wanted): Promise<void>
   /** After the lanes stop, at shutdown: on the Mac, the lease ends and the slot empties. */
   close(): Promise<void>
+  /** What the machine lanes run on is read through, for its health. */
+  readonly machine: MachineReach
 }
+
+/** The machine's raw reads, from the runtime, and where its store is on this host. */
+export interface MachineReach
+  extends Pick<DockerRuntime, "runningLanes" | "machineSample"> {
+  /**
+   * A path on the filesystem holding the store, on this host: the lane VM's
+   * state directory, which holds its data disk, on the Mac; the lanes
+   * directory on Linux. Its free space is what the store leaves.
+   */
+  readonly storeVolume: string
+}
+
+/** The runtime's reads, with the store's place on this host. */
+const machineReach = (
+  runtime: DockerRuntime,
+  storeVolume: string,
+): MachineReach => ({
+  runningLanes: () => runtime.runningLanes(),
+  machineSample: containers => runtime.machineSample(containers),
+  storeVolume,
+})
 
 /** Why a host with tools cannot run its lanes here, worded with its fix. */
 export interface Refused {
@@ -230,6 +254,7 @@ async function hostDockerFound(
     },
     shareAndGrant,
     close: async () => {},
+    machine: machineReach(runtime, lanesDir),
   }
 }
 
@@ -340,6 +365,7 @@ async function vmFound(
       await held.close()
       await kept.close()
     },
+    machine: machineReach(runtime, stateDir),
   }
 }
 

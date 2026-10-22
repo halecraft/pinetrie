@@ -42,7 +42,8 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
 - **`init`, PID 1:** drivers by modalias, then the manifest's modules;
   `/dev/net/tun` made 0666 (no udev, S127); the btrfs data disk with
   `user_subvol_rm_allowed`, formatted on first boot and grown to fill
-  `data.img` at every boot; each slot's share at
+  `data.img` at every boot, a resize that fails logging why on the
+  console (`data disk not resized: …`); each slot's share at
   `/mnt/host-shares/<i>`; Docker on vsock 2375, started with
   `--config-file /etc/pinetrie/daemon.json` (the image's `daemon.json`,
   which caps BuildKit's cache beside its images: its defaults are
@@ -139,8 +140,10 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   `bin/launcher-<hash of the source and entitlements>`. Without Xcode's
   command line tools the lease is refused, naming `xcode-select --install`.
 - **The machine:** `VZLinuxBootLoader` with `Image`, `stage1.cpio` and
-  `lane.slots=<n>`; `system.erofs` read-only and `data.img` (256 GiB
-  sparse) as disks; NAT; a console to `console.log`; entropy; vsock; and
+  `psi=1 lane.slots=<n>` (the kernel is built with pressure stall
+  information off by default, and the host reads the machine's and each
+  lane's for its health, S308); `system.erofs` read-only and `data.img`
+  (256 GiB sparse) as disks; NAT; a console to `console.log`; entropy; vsock; and
   `<n>` share devices `slot0` … `slot<n-1>`, each an empty directory at
   boot. Its memory is a quarter of the Mac's, between 4 and 16 GiB
   (`vmMemory`), and it has every CPU.
@@ -298,7 +301,7 @@ sweep of what binds into it.
   stopped, `truncate -s <size> data.img` on the Mac (the launcher makes
   the file only when it is missing), and `init` grows the filesystem at
   the next boot. That resize failed once, on a disk of 36,000 subvolumes,
-  and `init` throws its error away; a boot of the builder's machine on
+  and `init` logs why to the console; a boot of the builder's machine on
   `data.img` with `btrfs` and `btrfs-progs` grew it and balanced it
   (S314, its `recovery-init`).
 - **Space freed in the guest goes back to the Mac** within seconds: the

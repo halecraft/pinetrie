@@ -20,6 +20,7 @@ import {
   lanehostClient,
   lanehostDisks,
   MACHINE_SOCKET,
+  type MachineRead,
   OBSERVER_CONTAINERFILE,
   type ObserverChannel,
   type ObserverClient,
@@ -72,6 +73,7 @@ import {
 import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
   type ContainerSpec,
+  cgroupMount,
   imageEnvPath,
   labelled,
   lanehostContainer,
@@ -83,9 +85,11 @@ import {
   planSlotSweep,
   projectKey,
   projectNetwork,
+  type RunningLane,
   renderHelper,
   renderObserver,
   renderRun,
+  runningLanes,
   unneededImageTags,
 } from "./plan.ts"
 import { NESTED_PROFILE } from "./seccomp-nested.ts"
@@ -176,6 +180,13 @@ export interface DockerRuntime extends LaneRuntime {
    * call that needs them, as they were at the first.
    */
   vmRestarted(): void
+  /** The project's lanes whose containers run, by one listing of Docker's. */
+  runningLanes(): Promise<readonly RunningLane[]>
+  /**
+   * The machine read by lanehost's disks role: its memory and pressure, the
+   * lanes directory's room, and each container's cgroup, by full id.
+   */
+  machineSample(containers: readonly string[]): Promise<MachineRead>
 }
 
 /** Docker, at `target`, keeping the lanes of the project at `root` under `lanesDir`. */
@@ -311,8 +322,10 @@ export function dockerRuntime(input: {
         "lanehost cannot start yet: setup has not named pine·trie's install and the lane runtime",
       )
     const name = lanehostContainer(role, key, target)
+    const { rootless } = await facts()
     const shape = {
       role,
+      rootless,
       project: key,
       image: await lanehostImage(),
       lanesDir,
@@ -323,7 +336,13 @@ export function dockerRuntime(input: {
     return openChannel(
       execArgv(name, [
         ...inContainer("lanehostServer"),
-        ...serverArgs(role, lanesDir, await facts(), NESTED_DISK),
+        ...serverArgs(
+          role,
+          lanesDir,
+          { rootless },
+          NESTED_DISK,
+          cgroupMount(role, rootless),
+        ),
       ]),
       `lanehost's ${role} role`,
     )
@@ -511,6 +530,10 @@ export function dockerRuntime(input: {
         await removeNetwork(target, projectNetwork(k))
       return planned.projects
     },
+    runningLanes: async () =>
+      runningLanes(await listLabelled(target, `${PROJECT_LABEL}=${key}`)),
+    machineSample: containers =>
+      lanehost.call({ kind: "machine-sample", containers }),
     vmRestarted() {
       lanehost.reset()
       observer?.reset()

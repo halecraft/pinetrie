@@ -13,6 +13,7 @@ export {
   planDockerHost,
   projectKey,
   ROOTLESS_UID,
+  type RunningLane,
   SLOT_LABEL,
 } from "./plan.ts"
 export { type DockerRuntime, dockerRuntime, sweepSlot } from "./runtime.ts"

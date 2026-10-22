@@ -86,6 +86,9 @@ importers:
       '@pinetrie/lanes':
         specifier: workspace:*
         version: link:../../packages/lanes
+      '@pinetrie/machine':
+        specifier: workspace:*
+        version: link:../../packages/machine
       '@pinetrie/pi':
         specifier: workspace:*
         version: link:../../packages/pi
@@ -245,6 +248,15 @@ importers:
       '@pinetrie/install':
         specifier: workspace:*
         version: link:../install
+
+  packages/machine:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pinetrie/keeper':
+        specifier: workspace:*
+        version: link:../keeper
 
   packages/pi:
     dependencies:

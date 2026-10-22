@@ -197,6 +197,17 @@ export {
   type RunnableLane,
 } from "./lanes.ts"
 export {
+  type CgroupMemory,
+  MACHINE_STATES,
+  type MachineCause,
+  type MachineCauseKind,
+  type MachineHealth,
+  type MachineState,
+  type Pressure,
+  type StoreRoom,
+  UNSAMPLED_REASONS,
+} from "./machine.ts"
+export {
   type Attribution,
   decodeOutputEvent,
   encodeOutputEvent,
@@ -295,6 +306,7 @@ export {
   type TurnShared,
   wideningWords,
 } from "./runs.ts"
+export { parseSize } from "./size.ts"
 export { firstLine } from "./text.ts"
 export {
   ADJECTIVES,

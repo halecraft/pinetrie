@@ -24,8 +24,10 @@ hosts lanehost's roles; its disks are lanehost's client, spread
 - `plan.ts`: every decision, pure: `renderRun` (a lane's shape as a
   `ContainerSpec`), `renderHelper` (a lanehost role's), the labels both
   carry (`projectLabels`), `planDockerHost` and `dockerWords` (startup
-  refusals), the sweeps (`planSlotSweep`, `planProjectSweep`), and the
-  readers of `docker info`'s options and `/proc/self/mountinfo`.
+  refusals), the sweeps (`planSlotSweep`, `planProjectSweep`), the
+  project's running lanes from Docker's list (`runningLanes`), and the
+  readers of `docker info`'s options and of the lanes directory's mount
+  (`parseMountinfo`, over lanehost's `holdingMount`).
 - `api.ts`: Docker's HTTP API over the target's socket, and a spec as its
   create (`createBody`, pure). `cli.ts`: the docker CLI with `-H
   unix://<socket>`, for what streams or builds. `facts.ts` gathers;
@@ -43,7 +45,8 @@ hosts lanehost's roles; its disks are lanehost's client, spread
 - **What the CLI did for a flag, `createBody` does:** `seccomp=<path>`
   becomes the profile's content, read when the container is made, and
   `systempaths=unconfined` empties the masked and read-only paths. A
-  mount is JSON, so any path can be named.
+  mount is JSON, so any path can be named. A memory limit is read by
+  core's `parseSize` (`memoryBytes`), the one parser of a size.
 - **An image that is not here is built or pulled** at a container's
   create: built again from how this host built it when it is one of its
   own (another host removed it, below), else pulled, as `docker run` would
@@ -112,7 +115,17 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   the projects' sweeps take it. It mounts the lanes directory at its own
   path, and the host's install and lane runtime read-only at `/pinetrie`
   and `/pinetrie-runtime`, through `pathOf`, as a lane does: each host runs
-  its own version of the server.
+  its own version of the server. The disks role also has the machine's
+  `/sys/fs/cgroup` read-only at `HOST_CGROUP` (`cgroupMount`), with no
+  `pathOf`: it is the VM's own on the Mac. It reads lanes' cgroups there
+  for the machine's health; the privileged role is given none. Under
+  rootless Docker (a nested lane's) neither is: no spike has shown it
+  grants the bind, and a bind it refused would stop the role.
+- **The machine is read through the runtime as raw values:**
+  `runningLanes`, one listing of the project's containers, and
+  `machineSample`, one lanehost call. Docker never imports
+  `@pinetrie/machine`: the host maps both into its sample
+  (`apps/pinetrie/host/machine/`).
 - **Every script it starts is the install's** (`dockerRuntime`'s
   `install`, `@pinetrie/install`'s `scriptCommand`): lanehost's server and
   its readers, the observer's server and its connection, each in the

@@ -256,6 +256,22 @@ test("jj declares only core, keeper and lanes: it runs jj and git on your repo, 
   ])
 })
 
+test("machine declares only core and keeper: it decides about the machine lanes run on, and does none of its I/O", () => {
+  // No lane package, runtime or pi: the host hands it ports
+  // (`packages/machine/TECHNICAL.md`).
+  assert.deepEqual(allDeps(read("packages/machine")).sort(), [
+    "@pinetrie/core",
+    "@pinetrie/keeper",
+  ])
+})
+
+test("only the app declares machine: it composes the manager from the adapters", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/machine"),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie"])
+})
+
 test("config declares only core: it decodes files and settles values, and knows no setting", () => {
   assert.deepEqual(deps(read("packages/config")), ["@pinetrie/core"])
 })

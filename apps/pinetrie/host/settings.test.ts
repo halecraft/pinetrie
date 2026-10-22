@@ -17,6 +17,7 @@ import {
   SETTINGS,
   settleHost,
   sshChoice,
+  storeSettings,
 } from "./settings.ts"
 
 const read = (values: Record<string, unknown>): FileRead => ({
@@ -112,6 +113,26 @@ describe("defaults", () => {
 })
 
 describe("where each setting may come from", () => {
+  test("a project's settings of the lanes' store are refused: the store is the machine's", () => {
+    const copy = decodeProject(
+      SETTINGS,
+      projectCopy(
+        "accepted",
+        "pinetrie.json",
+        read({
+          "lanes.store.max": "100G",
+          "lanes.store.leaveFree": "1%",
+          "lanes.store.snapshotMetadata": "8G",
+        }),
+      ),
+    )
+    expect(copy.refusals.map(r => [r.key, r.why])).toEqual([
+      ["lanes.store.max", "not-here"],
+      ["lanes.store.leaveFree", "not-here"],
+      ["lanes.store.snapshotMetadata", "not-here"],
+    ])
+  })
+
   test("a project's lanes.vm.slots is refused", () => {
     const copy = decodeProject(
       SETTINGS,
@@ -290,5 +311,62 @@ describe("the model", () => {
 
   test("none, when nothing names one", () => {
     expect(settleHost(START, {}).settled.model.value).toBeNull()
+  })
+})
+
+describe("the lanes' store", () => {
+  const GiB = 1024 ** 3
+
+  test("by default the store has no ceiling of its own, and leaves 10% or 50 GiB", () => {
+    expect(storeSettings(settleHost(START, {}).settled)).toEqual({
+      max: null,
+      leaveFree: [{ percent: 10 }, { bytes: 50 * GiB }],
+      snapshotMetadata: GiB,
+    })
+  })
+
+  test("the machine's maximum holds over yours, and over none", () => {
+    const settledMax = (
+      u: Record<string, unknown>,
+      s: Record<string, unknown>,
+    ) =>
+      storeSettings(
+        settleHost({ ...START, user: user(u), system: system(s) }, {}).settled,
+      ).max
+    expect(
+      settledMax({ "lanes.store.max": "800G" }, { "lanes.store.max": "500G" }),
+    ).toBe(500 * GiB)
+    expect(
+      settledMax({ "lanes.store.max": "200G" }, { "lanes.store.max": "500G" }),
+    ).toBe(200 * GiB)
+    expect(settledMax({}, { "lanes.store.max": "500G" })).toBe(500 * GiB)
+    expect(settledMax({ "lanes.store.max": null }, {})).toBeNull()
+  })
+
+  test("the machine's amounts to leave free are kept under yours", () => {
+    const report = settleHost(
+      {
+        ...START,
+        user: user({ "lanes.store.leaveFree": "5%" }),
+        system: system({ "lanes.store.leaveFree": ["100G", "5%"] }),
+      },
+      {},
+    )
+    expect(storeSettings(report.settled).leaveFree).toEqual([
+      { percent: 5 },
+      { bytes: 100 * GiB },
+    ])
+  })
+
+  test("an amount to leave free that is no size nor share, or a share over 100%, is refused", () => {
+    for (const leaveFree of ["50GB", "150%", ["10%", "lots"], []]) {
+      const report = settleHost(
+        { ...START, user: user({ "lanes.store.leaveFree": leaveFree }) },
+        {},
+      )
+      expect(report.refusals.map(r => [r.key, r.why])).toEqual([
+        ["lanes.store.leaveFree", "malformed"],
+      ])
+    }
   })
 })

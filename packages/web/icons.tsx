@@ -2,7 +2,8 @@
 // rest, hover and pressed colours are its CSS alone: the footer corner's inbox
 // and inventory, copy (two sheets) wherever a copy is offered, the
 // inventory's box with an arrow into it (take) or out of it (put), the same
-// wherever take and put are offered, and a bin wherever a card is trashed.
+// wherever take and put are offered, a bin wherever a card is trashed, and
+// the footer's machine, marked by its state.
 // Drawn, not a character: U+1F5D1 is missing from common fonts.
 
 const ICON = {
@@ -39,6 +40,30 @@ export const InventoryIcon = ({ way }: { way?: "take" | "put" }) => (
     ) : (
       <path d="M8 11.5v-4M6.5 9 8 7.5 9.5 9" />
     )}
+  </svg>
+)
+
+/**
+ * A machine: a box with two drives. Amber adds a triangle at its corner,
+ * red a disc with a bar, so a state is told by its shape as well as its
+ * colour.
+ */
+export const MachineIcon = ({
+  state,
+}: {
+  state: "neutral" | "amber" | "red"
+}) => (
+  <svg {...ICON} aria-hidden="true" className="icon">
+    <rect height="9" rx="1" width="10" x="1.5" y="2" />
+    <path d="M4 5h5M4 8h5" />
+    {state === "amber" ? (
+      <path d="M12 8.5 15 14H9Z" fill="currentColor" />
+    ) : state === "red" ? (
+      <>
+        <circle cx="12" cy="11.5" fill="currentColor" r="3.25" />
+        <path d="M10.5 11.5h3" stroke="var(--surface)" />
+      </>
+    ) : null}
   </svg>
 )
 

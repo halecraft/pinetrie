@@ -16,6 +16,7 @@ import {
 } from "@pinetrie/core"
 import {
   builtInIconUrl,
+  machineWords,
   matchCountWords,
   toolWord,
   workingWords,
@@ -195,6 +196,30 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             (await inView(msg("Read it eight times."))) &&
             (await ap.$(`${work1} .ask-fold[data-first]`)) !== null,
           `${JSON.stringify({ openWhileRunning, ended, running, after })}`,
+        )
+
+        // The footer's machine status: once the host has sampled the lane
+        // VM, a status named for a machine keeping up. A suite's load can
+        // stall the host for a moment, which leaves after a few samples.
+        const keepingUp = machineWords({ state: "neutral", causes: [] }, l => l)
+        const status = await ap
+          .waitForSelector(
+            `footer .machine-status[role="img"][aria-label="${keepingUp}"]`,
+            { timeout: 60_000 },
+          )
+          .then(
+            () => "",
+            async () =>
+              (await ap
+                .$eval("footer .machine-status", n =>
+                  n.getAttribute("aria-label"),
+                )
+                .catch(() => null)) ?? "no status",
+          )
+        check(
+          "the footer shows the machine lanes run on, keeping up",
+          status === "",
+          status,
         )
 
         // 2. Scrolled up into a running ask's work, it stays open under the

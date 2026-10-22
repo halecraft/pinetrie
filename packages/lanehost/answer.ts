@@ -31,6 +31,7 @@ import {
   checkedDiskName as named,
   projectDisks,
 } from "./layout.ts"
+import { readMachine } from "./machine.ts"
 import { listProjects, recordProject, removeProject } from "./projects.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
 import {
@@ -51,6 +52,8 @@ export interface Serving {
   readonly folder: string
   /** What the runtime says of a nested lane's disk. */
   readonly nested: NestedDisk
+  /** Where the cgroup tree is bound read-only; null when the role was not given it. */
+  readonly cgroup: string | null
 }
 
 const disksOf = (serving: Serving, key: string) => {
@@ -175,6 +178,12 @@ async function answerAny(
       await applyGrant(grant)
       return null
     }
+    case "machine-sample":
+      return readMachine({
+        lanesDir: serving.lanesDir,
+        cgroup: serving.cgroup,
+        containers: call.containers,
+      })
     case "diff": {
       const disks = disksOf(serving, call.project)
       const from = disks.snapshot(named(call.from))

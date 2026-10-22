@@ -1,8 +1,9 @@
 // e2e/lanes/contract — what the Docker runtime must hold that no unit test can
 // show: snapshots under writes, the working copy read-only on the Mac's side, a
 // half-close through the launcher, no vsock from a lane, two hosts' slots
-// apart, and the images a host keeps: Docker's refusal to remove one a
-// container uses, and a create refused for a missing image. On the Mac it runs a VM of its own, from this checkout's launcher and
+// apart, the images a host keeps: Docker's refusal to remove one a
+// container uses, and a create refused for a missing image; and the machine
+// as lanehost's disks role reads it: the lane VM's pressure, a lane's cgroup. On the Mac it runs a VM of its own, from this checkout's launcher and
 // the built image, so a change to the launcher is what runs, and the person's
 // hosts are untouched.
 
@@ -19,12 +20,13 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  errorText,
   type SnapshotId,
   snapshotId,
   type ThreadId,
   threadIdFor,
 } from "@pinetrie/core"
-import { LANEHOST_LABEL, projectKey } from "@pinetrie/docker"
+import { LANEHOST_LABEL, NESTED_MOUNT, projectKey } from "@pinetrie/docker"
 import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
 import {
   ensureRuntime,
@@ -311,6 +313,47 @@ async function dockerContract(
         wrote.trim(),
       )
     }
+
+    // ── the machine, as lanehost's disks role reads it for its health ──
+    const sampled = await a.machine
+      .runningLanes()
+      .then(async running => ({
+        running,
+        read: await a.machine.machineSample(running.map(r => r.id)),
+      }))
+      .catch((error: unknown) => errorText(error))
+    const sampleDetail = (
+      words: (s: Exclude<typeof sampled, string>) => string,
+    ): string => (typeof sampled === "string" ? sampled : words(sampled))
+    if (onMac)
+      check(
+        "the lane VM's kernel reports memory pressure",
+        typeof sampled !== "string" && sampled.read.pressure !== null,
+        sampleDetail(s => JSON.stringify(s.read.pressure)),
+      )
+    else
+      skip(
+        "the lane VM's kernel reports memory pressure",
+        "the lane VM is the Mac's: on Linux the kernel is the machine's, and pine·trie sets none of it",
+      )
+    if (existsSync(NESTED_MOUNT))
+      skip(
+        "lanehost's disks role reads each running lane's memory from its cgroup",
+        "under rootless Docker no role is given the cgroup tree",
+      )
+    else
+      check(
+        "lanehost's disks role reads each running lane's memory from its cgroup",
+        typeof sampled !== "string" &&
+          sampled.running.length > 0 &&
+          sampled.read.containers.every(
+            c => c.memory !== null && c.memory.current > 0,
+          ),
+        sampleDetail(
+          s =>
+            `${s.running.length} running: ${JSON.stringify(s.read.containers.map(c => c.memory?.current ?? null))}`,
+        ),
+      )
 
     // ── snapshots under writes ──
     const writerLane = await lane(NODE_IMAGE)

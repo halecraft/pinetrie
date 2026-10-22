@@ -343,6 +343,7 @@ export {
 export { baseMovedOn, latestSourceName, mergedFrom } from "./latest-from.ts"
 export { addressLink, type LinkedQuote, pastMarkdown } from "./links.ts"
 export { isCurrentReply, planClear, planEndRun, planStream } from "./live.ts"
+export { MACHINE, MACHINE_KEY } from "./machine.ts"
 export {
   entryMarginCounts,
   type MarginCard,

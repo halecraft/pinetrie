@@ -15,6 +15,7 @@ import type {
   TextMerged,
 } from "@pinetrie/core"
 import type { Grant } from "./grants.ts"
+import type { MachineRead } from "./machine.ts"
 
 export type LanehostCall =
   | { readonly kind: "disk"; readonly project: string; readonly op: DiskOp }
@@ -125,6 +126,11 @@ export type LanehostCall =
       readonly paths: readonly ReadPath[]
       readonly deleted: readonly string[]
     }
+  /**
+   * The machine's memory and pressure, the lanes directory's room, and each
+   * container's cgroup, by its full id (`machine.ts`).
+   */
+  | { readonly kind: "machine-sample"; readonly containers: readonly string[] }
   /** A change to a lane's states directory (`<project>/states/<lane>`). */
   | {
       readonly kind: "states"
@@ -159,6 +165,7 @@ export interface LanehostResults {
   readonly "apply-merge": readonly TextMerged[]
   readonly states: null
   readonly "read-in": ReadInAnswer
+  readonly "machine-sample": MachineRead
 }
 
 export type LanehostResult<C extends LanehostCall> = LanehostResults[C["kind"]]

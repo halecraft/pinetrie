@@ -23,6 +23,7 @@ export {
   record,
   refused,
   shaped,
+  size,
   text,
 } from "./kinds.ts"
 export { type ConfigPlaces, configPlaces, ownDirs } from "./places.ts"

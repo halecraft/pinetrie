@@ -38,6 +38,8 @@ server loads (`scripts/shipped.test.ts`).
 | `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`read-in`) |
 | `projects.ts` | a project's root recorded, the listing, a project's removal |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
+| `machine.ts` | `machine-sample`: the machine's memory and pressure, the lanes directory's btrfs room, and each container's cgroup, read; the parsers of their files and `planBtrfsRoom`, pure |
+| `mountinfo.ts` | the mount holding a directory (`holdingMount`), from `/proc/self/mountinfo`; Docker's check of the lanes directory reads it too |
 | `send-stream.ts` | btrfs's send stream read as one change per path, pure |
 | `walk.ts` | two trees' entries compared, pure; the walk that reads them, and the diff by a walk; an entry's kind (`statKind`) |
 | `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `git`, `iptables` |
@@ -58,6 +60,11 @@ server loads (`scripts/shipped.test.ts`).
     files of that user's), no network. It creates, snapshots and deletes
     subvolumes on a filesystem mounted with `user_subvol_rm_allowed`
     (S122, S125, S148).
+    It reads the machine for its health (`machine-sample`), and lanes'
+    cgroups through the cgroup tree, which the runtime binds into it
+    read-only and names in its arguments (`serverArgs`' `cgroup`; S323):
+    it reads every lane's cgroup and writes none. Under rootless Docker it
+    is given no tree, and reads no lane.
   - `privileged`: the lanes directory read-only, every capability dropped
     but `NET_ADMIN`, `NET_RAW` and `SYS_ADMIN`, the host's network.
 - **`planRoles(facts)` decides which role serves each module,** from what
@@ -274,6 +281,23 @@ host, whatever their projects.
 - **Under rootless Docker nothing can load it:** a host there is observed
   through its lane's helper when the socket is there (`planObserver`),
   and refuses lanes when it is not.
+
+## The machine's sample (`machine.ts`)
+
+- **What it reads, it reads where any container can** (S322, S323):
+  `/proc/meminfo`, `/proc/pressure/memory` (absent where the kernel's PSI
+  is off: no pressure), and btrfs's counters under
+  `/sys/fs/btrfs/<fsid>/`. The filesystem is the one whose `devices/`
+  lists the device the lanes directory is mounted from (`holdingMount`); a
+  device not named by its path under `/dev` (a mapper's) is not found,
+  and the sample has no room.
+- **The room is never `df`'s.** Unallocated is the devices' size less
+  each kind of chunk's `disk_total` (`planBtrfsRoom`): `df` showed 37 GB
+  free while every write failed (S314).
+- **A container is named by its full id,** refused otherwise, since the id
+  builds a path. Its cgroup is looked for under the tree where cgroupfs
+  puts it, then systemd (`cgroupCandidates`), and the one found is kept
+  in the role's memory while the container is still asked for.
 
 ## Calls name names, never paths
 

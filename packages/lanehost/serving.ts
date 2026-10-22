@@ -5,13 +5,22 @@ import type { Serving } from "./answer.ts"
 import { FOLDER_MOUNT, isNestedDisk, type NestedDisk } from "./layout.ts"
 import { isRole, type Role, type RoleFacts } from "./roles.ts"
 
-/** The arguments a role's server is started with. */
+/**
+ * The arguments a role's server is started with. `cgroup` is where the
+ * runtime bound the cgroup tree into the role's container; null where it
+ * bound none.
+ */
 export const serverArgs = (
   role: Role,
   lanesDir: string,
   facts: RoleFacts,
   nested: NestedDisk,
-): readonly string[] => [role, lanesDir, JSON.stringify({ ...facts, nested })]
+  cgroup: string | null = null,
+): readonly string[] => [
+  role,
+  lanesDir,
+  JSON.stringify({ ...facts, nested, ...(cgroup === null ? {} : { cgroup }) }),
+]
 
 /**
  * `serverArgs` back; throws on arguments that are not a role's, or that name
@@ -28,6 +37,7 @@ export function servingFrom(args: readonly string[]): Serving {
     rootless?: unknown
     folder?: unknown
     nested?: unknown
+    cgroup?: unknown
   }
   if (!isNestedDisk(parsed.nested))
     throw new Error(
@@ -42,5 +52,9 @@ export function servingFrom(args: readonly string[]): Serving {
         ? parsed.folder
         : FOLDER_MOUNT,
     nested: parsed.nested,
+    cgroup:
+      typeof parsed.cgroup === "string" && parsed.cgroup.startsWith("/")
+        ? parsed.cgroup
+        : null,
   }
 }

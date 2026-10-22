@@ -1,5 +1,11 @@
 import { expect, test } from "vitest"
-import { checkStalls, type DelayHistogram, stallToReport } from "./stalls.ts"
+import {
+  checkStalls,
+  type DelayHistogram,
+  type Stall,
+  stallToReport,
+  stallWords,
+} from "./stalls.ts"
 
 const ms = (n: number) => n * 1e6
 
@@ -28,11 +34,14 @@ test("a stall under the threshold is not reported", () => {
   ).toBeNull()
 })
 
+/** The lines a log listener would write. */
+const logging = (lines: string[]) => [(s: Stall) => lines.push(stallWords(s))]
+
 test("a reported stall is logged once, and the histogram cleared", () => {
   const h = histogram(2_820)
   const lines: string[] = []
-  checkStalls(h, l => lines.push(l), 2_900)
-  checkStalls(h, l => lines.push(l), 0)
+  checkStalls(h, logging(lines), 2_900)
+  checkStalls(h, logging(lines), 0)
   expect(lines).toEqual([
     "[host] the event loop stalled for 2800 ms, 2800 ms of it on the CPU: anything the host awaited meanwhile, a command among them, was timed that much longer",
   ])
@@ -41,14 +50,29 @@ test("a reported stall is logged once, and the histogram cleared", () => {
 
 test("a check that finds no stall leaves the histogram as it is", () => {
   const h = histogram(25)
-  checkStalls(h, () => {}, 900)
+  checkStalls(h, [() => {}], 900)
   expect(h.resets).toBe(0)
 })
 
 test("a stall spent off the CPU is told as a pause, not as work", () => {
   const lines: string[] = []
-  checkStalls(histogram(1_042_066), l => lines.push(l), 3)
+  checkStalls(histogram(1_042_066), logging(lines), 3)
   expect(lines).toEqual([
     "[host] the host was paused for 1042046 ms, 3 ms of it on the CPU: the machine slept, or a synchronous call waited",
   ])
+})
+
+test("every listener hears each stall, and the histogram is cleared once", () => {
+  const h = histogram(1_520)
+  const heard: [string, number][] = []
+  checkStalls(
+    h,
+    [s => heard.push(["log", s.ms]), s => heard.push(["machine", s.ms])],
+    100,
+  )
+  expect(heard).toEqual([
+    ["log", 1_500],
+    ["machine", 1_500],
+  ])
+  expect(h.resets).toBe(1)
 })

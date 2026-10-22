@@ -3009,10 +3009,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every check clears the delay histogram",
     file: "apps/pinetrie/host/stalls.ts",
-    from: "  if (stalled === null) return\n  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))\n  histogram.reset()\n",
-    to: "  histogram.reset()\n  if (stalled === null) return\n  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))\n",
+    from: "  if (stalled === null) return\n  const stall",
+    to: "  histogram.reset()\n  if (stalled === null) return\n  const stall",
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
+  },
+  {
+    name: "each listener clears the delay histogram after it hears a stall",
+    file: "apps/pinetrie/host/stalls.ts",
+    from: "  for (const listener of listeners) listener(stall)\n  histogram.reset()\n",
+    to: "  for (const listener of listeners) {\n    listener(stall)\n    histogram.reset()\n  }\n",
+    command: unit,
+    expect:
+      "every listener hears each stall, and the histogram is cleared once",
   },
   {
     name: "a stall off the CPU is told as work",

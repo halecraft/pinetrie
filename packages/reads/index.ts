@@ -14,6 +14,7 @@ import {
   isCanvasId,
   isThreadId,
   type LaneRecord,
+  type MachineHealth,
   type PointId,
   type ProposedChangesRecord,
   type RevisionRecord,
@@ -61,6 +62,8 @@ import {
   LANE,
   LANE_FORK,
   type LaneForkRecord,
+  MACHINE,
+  MACHINE_KEY,
   MARK,
   type MarkRecord,
   NAME,
@@ -803,6 +806,11 @@ export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
 /** What the host read of its config (`pinetrie.setup`); null before a host wrote it. */
 export const readSetup = (doc: SessionDocHandle): SetupRecord | null =>
   readRecords(doc, SETUP).get(SETUP_KEY) ?? null
+
+/** The machine's health, as the host last planned it (`pinetrie.machine`); null before a host wrote it. */
+export const readMachineHealth = (
+  doc: SessionDocHandle,
+): MachineHealth | null => readRecords(doc, MACHINE).get(MACHINE_KEY) ?? null
 
 /** The host's icon source (`pinetrie.icons`); null before a host wrote it. */
 export const readIcons = (doc: SessionDocHandle): IconsRecord | null =>

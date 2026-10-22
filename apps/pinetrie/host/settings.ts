@@ -30,11 +30,13 @@ import {
   type StartLayers,
   settle,
   shaped,
+  size,
   text,
 } from "@pinetrie/config"
 import {
   type ConfigLayer,
   PROJECT_CONFIG_FILE,
+  parseSize,
   type RepoConfig,
   type WriterId,
   writerOfPrincipal,
@@ -48,6 +50,11 @@ import {
   parseMount,
   parsePort,
 } from "@pinetrie/lanes"
+import {
+  LEAVE_FREE_DEFAULT,
+  type LeaveFree,
+  type StoreSettings,
+} from "@pinetrie/machine"
 import type { ListedFolder } from "@pinetrie/pi"
 import {
   DEFAULT_ALLOWANCE,
@@ -98,6 +105,59 @@ const absolutePath = text(
   s => (path.isAbsolute(s) ? s : null),
   "is not an absolute path",
 )
+
+/** A size, or null for none: a limit is the smaller, and null limits nothing. */
+const sizeOrNone = {
+  ...shaped<number | null>(json =>
+    json === null ? decoded(null) : size().decode(json),
+  ),
+  meet: (a: number | null, b: number | null) =>
+    a === null ? b : b === null ? a : Math.min(a, b),
+}
+
+/** Free space to leave: a share of the filesystem (`"10%"`) or a size. */
+function parseLeaveFree(json: unknown): LeaveFree | null {
+  if (typeof json !== "string") return null
+  const percent = /^(\d+(?:\.\d+)?)%$/.exec(json.trim())
+  if (percent !== null) {
+    const n = Number(percent[1])
+    return n <= 100 ? { percent: n } : null
+  }
+  const bytes = parseSize(json)
+  return bytes === null ? null : { bytes }
+}
+
+const isSameLeaveFree = (a: LeaveFree, b: LeaveFree): boolean =>
+  "percent" in a
+    ? "percent" in b && a.percent === b.percent
+    : "bytes" in b && a.bytes === b.bytes
+
+/**
+ * Amounts of free space to leave, one or a list; the largest holds once
+ * the filesystem's size is known. A limit adds its amounts, so an
+ * administrator's always count.
+ */
+const leaveFreeList = {
+  ...shaped<readonly LeaveFree[]>(json => {
+    const items = Array.isArray(json) ? json : [json]
+    const out: LeaveFree[] = []
+    for (const item of items) {
+      const amount = parseLeaveFree(item)
+      if (amount === null)
+        return refused(
+          'is not a size ("50G"), a share ("10%"), nor a list of them',
+        )
+      if (!out.some(f => isSameLeaveFree(f, amount))) out.push(amount)
+    }
+    return out.length === 0 ? refused("names no amount") : decoded(out)
+  }),
+  meet: (a: readonly LeaveFree[], b: readonly LeaveFree[]) => [
+    ...a,
+    ...b.filter(f => !a.some(g => isSameLeaveFree(f, g))),
+  ],
+  same: (a: readonly LeaveFree[], b: readonly LeaveFree[]) =>
+    a.length === b.length && a.every(f => b.some(g => isSameLeaveFree(f, g))),
+}
 
 // ── the table ────────────────────────────────────────────────────────────
 
@@ -197,6 +257,30 @@ export const SETTINGS = defineTable({
   "lanes.vm.slots": pick(count({ min: 1, max: MAX_VM_SLOTS }), {
     fallback: DEFAULT_VM_SLOTS,
     describe: "how many folders the lane VM shares, at most",
+    order: ["system", "user"],
+  }),
+  "lanes.store.max": limited(
+    pick(sizeOrNone, {
+      fallback: null,
+      describe:
+        "the most the lanes' store may hold: every lane's disk and snapshot, and on the Mac the lane VM's images",
+      order: ["user"],
+    }),
+    ["system"],
+  ),
+  "lanes.store.leaveFree": limited(
+    pick(leaveFreeList, {
+      fallback: LEAVE_FREE_DEFAULT,
+      describe:
+        "the free space the lanes' store leaves on the disk holding it: the largest of each size or share given",
+      order: ["user"],
+    }),
+    ["system"],
+  ),
+  "lanes.store.snapshotMetadata": pick(size(), {
+    fallback: 1024 ** 3,
+    describe:
+      "how much metadata open threads' turn snapshots may hold, estimated",
     order: ["system", "user"],
   }),
   "lanes.shared": join(list(text(s => s, "is not text")), {
@@ -406,6 +490,13 @@ export const settleHost = (
   })
 
 // ── settled values, as the deciding packages take them ───────────────────
+
+/** The lanes' store's settings, as `@pinetrie/machine` takes them. */
+export const storeSettings = (settled: HostSettled): StoreSettings => ({
+  max: settled["lanes.store.max"].value,
+  leaveFree: settled["lanes.store.leaveFree"].value,
+  snapshotMetadata: settled["lanes.store.snapshotMetadata"].value,
+})
 
 /** Your repo's names. */
 export const repoNames = (settled: HostSettled): RepoConfig => ({

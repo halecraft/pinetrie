@@ -12,7 +12,7 @@ export const isRole = (name: string): name is Role =>
   (ROLE_NAMES as readonly string[]).includes(name)
 
 /** A responsibility of lanehost's: one module of the server. */
-export type Module = "disks" | "projects" | "grants" | "diff"
+export type Module = "disks" | "projects" | "grants" | "diff" | "machine"
 
 /** The grant a role's container is made with. */
 export interface RoleSpec {
@@ -56,6 +56,8 @@ export function callModule(call: LanehostCall): Module {
       return "grants"
     case "diff":
       return "diff"
+    case "machine-sample":
+      return "machine"
     default:
       return "disks"
   }
@@ -90,5 +92,7 @@ export function planRoles(facts: RoleFacts): ReadonlyMap<Module, Role> {
     ["projects", "disks"],
     ["grants", "privileged"],
     ["diff", planDiff(facts).role],
+    // Reads only: the disks role, given the cgroup tree read-only.
+    ["machine", "disks"],
   ])
 }

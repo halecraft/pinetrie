@@ -110,9 +110,11 @@ test("the machine role's container is made with its grant and nothing more", () 
 })
 
 describe("parseListed: the API's container list", () => {
-  test("each container's name, labels and bind sources", () => {
+  test("each container's id, name, state, labels and bind sources", () => {
     const body = JSON.stringify([
       {
+        Id: "abc123",
+        State: "running",
         Names: ["/pinetrie-t-1"],
         Labels: { "pinetrie.project": "k" },
         Mounts: [
@@ -124,11 +126,13 @@ describe("parseListed: the API's container list", () => {
     ])
     expect(parseListed(body)).toEqual([
       {
+        id: "abc123",
         name: "pinetrie-t-1",
+        state: "running",
         labels: { "pinetrie.project": "k" },
         binds: ["/mnt/host-shares/2/abc", "/l/t"],
       },
-      { name: "bare", labels: {}, binds: [] },
+      { id: "", name: "bare", state: "", labels: {}, binds: [] },
     ])
   })
   test("an answer that is not a list lists nothing", () => {

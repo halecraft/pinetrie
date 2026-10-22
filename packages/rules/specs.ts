@@ -22,6 +22,7 @@ import { CONFLICT_ASK } from "./conflict-ask.ts"
 import { DIGEST } from "./digest.ts"
 import { FOCUS } from "./focus.ts"
 import { CONFLICT, FOLDER_WRITE_JOURNAL, STATE } from "./folder-records.ts"
+import { MACHINE } from "./machine.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
@@ -59,6 +60,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   LANE,
   LANE_FORK,
   ACCEPTED,
+  MACHINE,
   MARK,
   NAME,
   OUTPUT_SPLIT,

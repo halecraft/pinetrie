@@ -437,6 +437,12 @@ export {
   type StatementStreams,
 } from "./live.ts"
 export {
+  type MachineStatusView,
+  machineStatus,
+  machineWords,
+  sizeWords,
+} from "./machine.ts"
+export {
   addCommentWords,
   COMMENT,
   type MarginBeside,

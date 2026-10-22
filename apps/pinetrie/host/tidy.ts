@@ -6,6 +6,7 @@ import { existsSync } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import type { RegistryProblem } from "@pinetrie/config"
+import { sizeWords } from "@pinetrie/interface"
 import type { RepoStep, TidyPlan, TidyRefusal } from "@pinetrie/jj"
 import { sessionFiles } from "@pinetrie/lanes"
 import { storeChoice } from "./invocation.ts"
@@ -105,9 +106,6 @@ type TidySaying =
       readonly keep: number
     }
 
-const MB = 1024 * 1024
-const megabytes = (bytes: number) =>
-  `${(bytes / MB).toFixed(bytes < 10 * MB ? 1 : 0)} MB`
 const seconds = (ms: number) =>
   ms < 60_000 ? `${Math.ceil(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`
 const count = (n: number) => n.toLocaleString("en-US")
@@ -148,7 +146,7 @@ export function tidyWords(saying: TidySaying): string {
     case "done": {
       const { before, after } = saying
       return [
-        `Done: ${count(before.operations)} operations to ${count(after.operations)}; .jj/repo ${megabytes(before.jj)} to ${megabytes(after.jj)}; .git ${megabytes(before.git)} to ${megabytes(after.git)}.`,
+        `Done: ${count(before.operations)} operations to ${count(after.operations)}; .jj/repo ${sizeWords(before.jj)} to ${sizeWords(after.jj)}; .git ${sizeWords(before.git)} to ${sizeWords(after.git)}.`,
         "What was cut leaves the disk at the first tidy two weeks from now, when jj's gc may collect it.",
         ...(saying.raced
           ? [

@@ -2,7 +2,8 @@
 
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `docs/06-interface.md`, `packages/vm/TECHNICAL.md`,
-  `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`
+  `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
+  `packages/machine/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
   S317, S318, S319, S320, S321, S322, S323
 

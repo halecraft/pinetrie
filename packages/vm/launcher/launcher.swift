@@ -122,7 +122,9 @@ config.memorySize = max(
   min(memoryBytes / (1 << 20) * (1 << 20), VZVirtualMachineConfiguration.maximumAllowedMemorySize))
 let boot = VZLinuxBootLoader(kernelURL: url("\(image)/Image"))
 boot.initialRamdiskURL = url("\(image)/stage1.cpio")
-boot.commandLine = "console=hvc0 quiet lane.slots=\(slotCount)"
+// psi=1: the kernel is built with pressure stall information off by
+// default, and the host reads the machine's and each lane's.
+boot.commandLine = "console=hvc0 quiet psi=1 lane.slots=\(slotCount)"
 config.bootLoader = boot
 
 do {

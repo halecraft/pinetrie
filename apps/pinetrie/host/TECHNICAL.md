@@ -26,7 +26,7 @@ knows of.
 | `start-terminal.ts` | the checklist on its way out: redrawn in place on a terminal, owning its writes while it draws (`terminalProgress`), else a line per step (`lineProgress`) |
 | `host-refused.ts` | `HostRefused`, the one error a start throws as a refusal |
 | `replace-file.ts` | a file of the host's own written whole, through a temporary file renamed over it: the session registry, a folder's stamps, the start's times |
-| `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
+| `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `storeSettings`, `listedFolders`). The lanes' store's settings (`lanes.store.*`) are the machine's and yours only: a system file's `max` is a ceiling (null limits nothing) and its `leaveFree` amounts are added to yours |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded, who shapes a subscription's requests among it |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
@@ -60,6 +60,7 @@ knows of.
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs, its ledger and what each document stores beside its whole record (`storedSizes`) as one `OpenedStore`, which is what `startHost` takes |
+| `machine/` | the machine lanes run on, watched (ADR-0210): `sensor.ts`, the one `MachineSensor`, composed from the runtime's raw reads (`runningLanes`, `machineSample`), the `statfs` of the filesystem holding the store (`Found.machine`'s `storeVolume`: the lane VM's state directory on the Mac, the lanes directory on Linux) and the longest stall since the last sample, mapped by `planSample`; `sink.ts`, the `pinetrie.machine` record written in a step of the documents' keeper, only when it differs; `index.ts`, the manager started in the start's `agent` step, its first sample queued and not awaited, and the timer (`MACHINE_SAMPLE_MS`, unref'd) that asks it for each sample. A host with no tools runs none. It closes in shutdown's `intake` step, before the documents' keeper closes, since its last write (`unsampled`) is a step there; on a start that throws, its closer runs before the keeper's |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
 | `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`@pinetrie/folder`'s `planKeep`, carried out in `index.ts`), its reviews (`review.ts`), its records written (`record-writes.ts`), the only code that touches the project's folder (ADR-0142); it takes the runtime's disks (`LaneDisks`, or a `Pick` of it), and a whole runtime only where it runs steps (`history.ts`) |
@@ -122,9 +123,12 @@ knows of.
   (`[host] your repo: … ran <n> ms`) from a stalled host. Node samples the
   loop from a native timer (`monitorEventLoopDelay`), and a check reads it
   once a second. A sample is the time since the last one, so the sampling
-  interval is taken off. The histogram is reset only after a logged stall:
-  a reset drops the sample that spans it (measured, Node 24), so a reset on
-  every check would miss a stall that began just after one.
+  interval is taken off. The histogram is reset only after a stall, once,
+  after every listener has heard it: a reset drops the sample that spans it
+  (measured, Node 24), so a reset on every check would miss a stall that
+  began just after one. The watch has one reader of the histogram and many
+  listeners (`watchStalls`' `listen`): the log line is one, the machine's
+  sample another, so no listener clears what another has not heard.
 - **A stall names its CPU time, and one mostly off the CPU is a pause**
   (`stallWords`): a machine that sleeps stops every timer, and Node's
   histogram reads its sleep as a stall (Duane's host logged 1,042 s). The

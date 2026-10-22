@@ -6,6 +6,16 @@ const markdown = "packages/web/markdown.ts"
 const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the machine's status, in the browser suite ──
+  {
+    name: "the footer leaves out the machine's status",
+    file: "packages/web/footer.tsx",
+    from: "        <MachineStatus view={machine} />\n",
+    to: "",
+    suite: "browser",
+    scenario: "tools",
+    expect: "the footer shows the machine lanes run on, keeping up",
+  },
   // ── a folder project's history, in the browser suite ──
   {
     name: "the history page draws no entry's words",

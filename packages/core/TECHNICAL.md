@@ -82,6 +82,7 @@ A type lives in the highest package that all its users can import
 | `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded; proposed changes' facts and decisions; the commit trailers |
 | `folder.ts`, `runs.ts`, `output.ts`, `images.ts` | a folder project's history; what a command did to a disk; what a `bash` call wrote, by statement; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
+| `size.ts`, `machine.ts` | a size, read (`parseSize`); the machine's health (`MachineHealth`, `MachineCause`) and what lanehost reads of it (`Pressure`, `CgroupMemory`, `StoreRoom`), which `@pinetrie/machine` plans from, rules stores and interface words |
 
 ## Output apart from runs (`output.ts`)
 
@@ -113,6 +114,17 @@ the disk events' ring, batches or held notices.
   POSIX does: a `..` at `/` stays at `/`. It reads strings, so a symbolic
   link is not followed. A relative path is null: there is no working
   directory in the browser to resolve it against.
+
+## Sizes (`size.ts`)
+
+- **One parser reads every size** (`parseSize`): a setting's
+  (`lanes.store.*`) and a container's memory limit (`LANE_MEMORY`, a
+  role's), so a size means one thing in `pinetrie.json` and in Docker. A
+  unit is `K`, `M`, `G` or `T`, alone or with `iB`, in any case, binary as
+  Docker reads `-m`. A unit with a bare `B` (`GB`, `gb`) is refused:
+  people read it as decimal, Docker as binary, and a size that means two
+  things is worse than one refused. A bare number is bytes, and only a
+  whole one.
 
 ## Ids (`ids.ts`)
 

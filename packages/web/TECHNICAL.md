@@ -310,6 +310,18 @@ bar, each column's matches, and the rail's marks.
 - **The bar slides in only.** It unmounts as it closes, which has no frame to
   slide out in.
 
+## The machine's status (`footer.tsx`, `icons.tsx`, ADR-0210)
+
+- **A status, not a control:** `role="img"`, named and titled by
+  `machineStatus`' words, until the Machine page it will open exists; the
+  footer offers no button that does nothing. Never a badge, never moving.
+- **Shape and colour, never colour alone:** `MachineIcon` is a machine,
+  with a triangle at its corner when amber and a barred disc when red. The
+  stylesheet names a state by what it does to work (`data-health`:
+  `keeping-up`, `slowed`, `stopped`), the footer's grey, `--caution` and
+  `--danger`: a state's own name would read as a colour literal to
+  `stylesheet.test.ts`.
+
 ## The page's colours (`index.html`, ADR-0081, ADR-0195, ADR-0196)
 
 The first `:root` rule in the stylesheet names every colour the page draws,

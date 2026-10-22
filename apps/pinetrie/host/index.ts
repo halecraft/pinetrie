@@ -112,6 +112,7 @@ import { HostRefused } from "./host-refused.ts"
 import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
+import { startMachineWatch } from "./machine/index.ts"
 import {
   migrate,
   planStoredStart,
@@ -150,6 +151,7 @@ import {
   listedFolders,
   SETTINGS,
   settleHost,
+  storeSettings,
   titleSettings,
 } from "./settings.ts"
 import { createSettle } from "./settle.ts"
@@ -157,7 +159,7 @@ import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
 import { createSshNews } from "./ssh-news.ts"
-import { watchStalls } from "./stalls.ts"
+import { stallWords, watchStalls } from "./stalls.ts"
 import {
   laneMachine,
   planStartSteps,
@@ -759,6 +761,23 @@ async function openHost(
   })
   progress.begin("agent")
 
+  // --- the machine lanes run on, watched for its health ---------------------
+  // Only where lanes run: a host without tools reads no machine. Its first
+  // sample is queued, not awaited.
+  const machine =
+    found?.kind === "found"
+      ? await startMachineWatch({
+          reach: found.machine,
+          session,
+          keeper,
+          records,
+          settings: storeSettings(settled),
+          log,
+        })
+      : null
+  // Its `unsampled` is a step on the documents' keeper: it closes first.
+  if (machine !== null) closers.defer(() => machine.close())
+
   // `put_image` acts through the commands, and the agent's tools ask the
   // relays, which start runs over the agent: each bound once what carries it
   // out exists. Only a run calls them, and none runs before.
@@ -1102,7 +1121,9 @@ async function openHost(
   })
 
   // From here, not the start: the start's checklist times its own steps.
-  const stalls = watchStalls(log)
+  const stalls = watchStalls()
+  stalls.listen(stall => log(stallWords(stall)))
+  if (machine !== null) stalls.listen(stall => machine.hearStall(stall))
 
   const stop = async (): Promise<void> => {
     const carry = async (step: ShutdownStep): Promise<void> => {
@@ -1111,7 +1132,8 @@ async function openHost(
           seats.stop()
           control.stop()
           stalls.stop()
-          return
+          // Before the documents' keeper closes: its `unsampled` is a step there.
+          return machine?.close()
         case "close":
           // The documents' upkeep compacts: it finishes before the store closes.
           keeper.close("finish")

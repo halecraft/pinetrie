@@ -291,7 +291,8 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
   `.footer-you` (your avatar and name, then your inbox and inventory as
   icons; folded, your avatar alone, ADR-0098), the board's strip
-  (`BoardStrip`), then `.footer-right` (sync note, publish).
+  (`BoardStrip`), then `.footer-right` (sync note, the machine's status,
+  publish).
 - **The sidebar folds to icons** (ADR-0088). The width is a value
   (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
   small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
@@ -709,6 +710,18 @@ The footer (`footer.tsx`, `#bottom`) is you, then the rest of the session,
 from live data; nothing in it opens a root until you choose. Its right end
 leads with "syncing…" (`.sync-note`) while the document's status is
 pending.
+
+- **The machine's health** (`machine.ts`, ADR-0210): the session's facts
+  carry the `pinetrie.machine` value (`SessionFacts.machine`), and
+  `machineStatus` decides what the footer draws: the state, and its words
+  (`machineWords`), which are its accessible name, its title and the
+  host's log line alike. They name the worst cause and count the rest;
+  one `switch` over core's `MachineCause` with `assertNever`, so a cause
+  added there fails the type check here until it is worded. Before a host
+  wrote it, or on a host with no lanes, it is neutral and says the host
+  has said nothing. `sizeWords` is the one wording of a size: binary, `KB`
+  to `TB` as people read them, one decimal under 10; `pnpm tidy` and
+  `vm:build` word theirs with it.
 
 - **People:** `peopleHere` (`here.ts`) groups `othersReading` by
   person, in `writerOrder`. An end's canvas is its thread's (`entryThread`,

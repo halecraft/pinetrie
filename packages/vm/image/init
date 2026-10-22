@@ -45,9 +45,11 @@ if ! mount -t btrfs -o user_subvol_rm_allowed /dev/vdb /var/lib/lanehost 2>/dev/
 fi
 # A data.img grown on the Mac (`truncate -s`) is used from this boot on.
 # Before Docker: a full disk stops dockerd starting, and no shell reaches
-# the guest to free it, so growing the file is the way back.
-btrfs filesystem resize max /var/lib/lanehost >/dev/null 2>&1 ||
-  t "data disk not resized"
+# the guest to free it, so growing the file is the way back. A full
+# disk's metadata can refuse the resize itself: why is on the console.
+if ! out=$(btrfs filesystem resize max /var/lib/lanehost 2>&1); then
+  t "data disk not resized: $out"
+fi
 mkdir -p /var/lib/lanehost/docker
 t "data disk mounted: $(df -h /var/lib/lanehost | awk 'NR==2 {print $3 " of " $2 " used"}')"
 

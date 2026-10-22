@@ -7,6 +7,14 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "parseSize reads a unit as decimal",
+    file: "packages/core/size.ts",
+    from: "    Number(amount) * 1024 ** ",
+    to: "    Number(amount) * 1000 ** ",
+    command: unit,
+    expect: "a unit alone, with iB, and in any case read alike, binary",
+  },
+  {
     name: "writeContent answers a restore's own id",
     file: "packages/core/folder.ts",
     from: '  r.made.kind === "restore" ? r.made.of : r.id\n',
@@ -345,7 +353,7 @@ export const mutations: readonly Mutation[] = [
     expect: "parseNewThread: only t- and a lowercase uuidv7",
   },
   {
-    name: "a shell word keeps its quotes unescaped",
+    name: "a shell word keeps its quotes unescapeField",
     file: "packages/core/lane-env.ts",
     from: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll(\"'\", `'\\\\''`)}'`",
     to: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s}'`",

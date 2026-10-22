@@ -8,6 +8,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanehost"]
 const disks = "packages/lanehost/disks.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the machine's sample ──
+  {
+    name: "a cgroup is read by any name it is asked",
+    file: "packages/lanehost/machine.ts",
+    from: "export const isContainerId = (id: string): boolean => /^[0-9a-f]{64}$/.test(id)",
+    to: 'export const isContainerId = (id: string): boolean => id !== ""',
+    command: unit,
+    expect: "only a full container id names a cgroup",
+  },
+  {
+    name: "the room counts only data's chunks",
+    file: "packages/lanehost/machine.ts",
+    from: "    input.data.diskTotal + input.metadata.diskTotal + input.system.diskTotal",
+    to: "    input.data.diskTotal",
+    command: unit,
+    expect: "a full 2 GiB disk's room is its 1 MiB unallocated",
+  },
   // ── the observer's client ──
   {
     name: "connect opens no channel",

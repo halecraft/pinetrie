@@ -121,6 +121,7 @@ export {
 } from "./shared.ts"
 export {
   baseLane,
+  containerLane,
   LANE_CONFIG_DIR,
   LANE_JJ_CONFIG,
   type LaneAttached,

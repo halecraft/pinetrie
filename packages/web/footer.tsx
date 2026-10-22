@@ -5,8 +5,9 @@
 // your avatar alone, carrying the inbox's badge, and both are in its menu. To
 // the right, what is everyone's: the board's strip (`board.tsx`), which counts
 // where the agent works and what is ready to accept, then "syncing…" while the
-// document is pending and the publish button. The inbox carries the page's only
-// badge. Nothing here opens a root until you choose, and nothing closes a menu
+// document is pending, the machine's health, and the publish button. The
+// inbox carries the page's only badge; the machine's status is a mark, never
+// a badge, and never moves. Nothing here opens a root until you choose, and nothing closes a menu
 // you opened: an open menu keeps a section whose rows have gone, and says so.
 
 import type { WriterId } from "@pinetrie/core"
@@ -14,6 +15,7 @@ import {
   type AcceptedRecord,
   historyLink,
   type Intent,
+  type MachineStatusView,
   publishToast,
   publishView,
   publishWords,
@@ -23,6 +25,7 @@ import { hashOfPage, type Theme } from "@pinetrie/web-core"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
 import { Button } from "./button.tsx"
+import { MachineIcon } from "./icons.tsx"
 import { InboxMenu, type InboxMenuProps } from "./inbox-menu.tsx"
 import {
   InventoryToggle,
@@ -39,6 +42,7 @@ export function Footer({
   colorOf,
   inbox,
   accepted: line,
+  machine,
   onIntent,
   inventory,
   me,
@@ -56,6 +60,8 @@ export function Footer({
   inbox: InboxMenuProps
   /** Accepted work, as the host last read it. */
   accepted: AcceptedRecord | null
+  /** The machine lanes run on, as the host last said (`machineStatus`). */
+  machine: MachineStatusView
   /** Where the account menu's choices go. */
   onIntent: (intent: Intent) => void
   /** Your inventory's toggle: whether its panel is open, and its cards. */
@@ -92,10 +98,36 @@ export function Footer({
       {strip}
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
+        <MachineStatus view={machine} />
         <HistoryLink accepted={line} />
         <PublishButton accepted={line} session={session} />
       </div>
     </footer>
+  )
+}
+
+/** Each state, as the stylesheet names it: what it does to work. */
+const HEALTH = {
+  neutral: "keeping-up",
+  amber: "slowed",
+  red: "stopped",
+} as const
+
+/**
+ * The machine's health: a status, not a control, until there is a page it
+ * opens. Its words are its accessible name and its title.
+ */
+function MachineStatus({ view }: { view: MachineStatusView }) {
+  return (
+    <span
+      aria-label={view.text}
+      className="machine-status"
+      data-health={HEALTH[view.state]}
+      role="img"
+      title={view.text}
+    >
+      <MachineIcon state={view.state} />
+    </span>
   )
 }
 

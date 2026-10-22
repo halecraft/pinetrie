@@ -148,8 +148,8 @@ hover fill. Your name is cut short before anything else gives way. While
 the sidebar is folded, the cell holds only your avatar, which carries the
 inbox's badge on its corner, and the inbox and the inventory are in its
 menu. To the right is everyone's, from live data only: the board's strip,
-then publish. Your inbox carries the page's only badge: one place asks you
-for something, the other reports.
+the machine's health, then publish. Your inbox carries the page's only
+badge: one place asks you for something, the other reports.
 While the page syncs, "syncing…" leads its right end.
 
 - **You:** your avatar and name open a menu headed by who you are: your
@@ -200,6 +200,22 @@ While the page syncs, "syncing…" leads its right end.
   session": the messages in the roots this browser tab holds, of every
   root's. Nothing in the footer animates: the sidebar, the column, the rail
   and the board show where the agent works.
+- **The machine's health** (ADR-0210): a machine glyph before publish, on
+  everyone's side and drawn always, for the machine lanes run on (the lane
+  VM on the Mac, Linux's own). It is the footer's grey while lanes and the
+  host keep up; amber, with a triangle at its corner, when work slows (the
+  lanes' disk low, the disk holding it low, lanes short of memory, a
+  command killed for memory, the host stalling, or no reading from the
+  host); red, with a barred disc, when work stops (the lanes' disk full,
+  or its metadata). Shape and colour both, never colour alone; never a
+  badge, never moving. Its title, which is also its accessible name, names
+  the worst cause in words, with how many more ("The machine lanes run on:
+  work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least"). It is
+  a status, not a control, until the Machine page it will open (Deferred,
+  below). The host plans it from samples every few seconds, each cause
+  entering and leaving by counts of samples so it does not flap, and writes
+  it only when it changes, at its start and at its stop, so no tab reads a
+  stopped host's (`packages/machine/TECHNICAL.md`).
 - **Publish** (ADR-0104, ADR-0076, ADR-0090, ADR-0099): one button, no
   menu. **Accepted work** is where finished work goes (ADR-0100,
   `docs/glossary.md`); its bookmark (`accepted.bookmark`) is in titles only. Before accepted work
@@ -1637,12 +1653,9 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
-- **The machine's health** (ADR-0210, accepted, not yet built): a glyph in the footer
-  before publish, drawn always, amber or red when the machine lanes run
-  on slows or stops their work, naming the cause in its title; it opens a
-  Machine page (`#machine`) of each thread's lane, the machine, the host,
-  and what can be done. A red cause that needs a choice is in the inbox
-  too.
+- **The Machine page** (ADR-0210): the footer's machine status (above)
+  opens it (`#machine`): each thread's lane, the machine, the host, and
+  what can be done. A red cause that needs a choice is in the inbox too.
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file. Threads from any root, note columns and media columns (ADR-0182)
   are built (above).

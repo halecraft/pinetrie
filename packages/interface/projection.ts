@@ -12,7 +12,13 @@
 //
 // Pure reads: no subscription, no pi.
 
-import type { CanvasId, EntryId, RootId, ThreadId } from "@pinetrie/core"
+import type {
+  CanvasId,
+  EntryId,
+  MachineHealth,
+  RootId,
+  ThreadId,
+} from "@pinetrie/core"
 import {
   readAccepted,
   readAccess,
@@ -33,6 +39,7 @@ import {
   readLaneForks,
   readLaneRecords,
   readLanes,
+  readMachineHealth,
   readMarks,
   readNames,
   readOutputSplits,
@@ -134,6 +141,8 @@ export interface SessionFacts {
   readonly traces: ReadonlyMap<string, TraceRecord>
   /** What a column says of its threads' work; its forks are the page's `CanvasIndex`'. */
   readonly workFacts: Omit<WorkFacts, "forks">
+  /** The machine lanes run on, as the host last said; null before it did. */
+  readonly machine: MachineHealth | null
 }
 
 /**
@@ -226,6 +235,7 @@ function readFacts(view: HeldView): SessionFacts {
       states: readStates(doc),
       conflicts: readConflicts(doc),
     },
+    machine: readMachineHealth(doc),
   }
 }
 

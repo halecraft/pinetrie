@@ -13,8 +13,10 @@ import { describe, expect, test } from "vitest"
 import { createBody } from "./api.ts"
 import { buildError } from "./cli.ts"
 import {
+  cgroupMount,
   type DockerHostFacts,
   dockerWords,
+  HOST_CGROUP,
   INNER_DOCKER_DATA_ROOT_DIR,
   imageEnvPath,
   isRootless,
@@ -30,6 +32,7 @@ import {
   projectKey,
   renderHelper,
   renderRun,
+  runningLanes,
   unneededImageTags,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
@@ -239,6 +242,7 @@ describe("renderHelper: a lanehost role's container", () => {
     root: "/Users/ada/p",
     install: "/opt/pinetrie",
     runtime: "/Users/ada/p/.pinetrie/runtime/abc",
+    rootless: false,
   }
   test("the disks role: Docker's default capabilities, no network, the lanes directory read-write", () => {
     const made = renderHelper({ ...shape, role: "disks" }, mac)
@@ -286,8 +290,26 @@ describe("renderHelper: a lanehost role's container", () => {
         target: "/pinetrie-folder",
         readonly: true,
       },
+      { source: "/sys/fs/cgroup", target: "/host-cgroup", readonly: true },
     ])
     expect([made.image, made.cmd]).toEqual([shape.image, ["sleep", "infinity"]])
+  })
+  test("the disks role reads the machine's cgroup tree read-only, and the privileged role has none", () => {
+    const disks = renderHelper({ ...shape, role: "disks" }, mac)
+    expect(disks.mounts.filter(m => m.source === "/sys/fs/cgroup")).toEqual([
+      { source: "/sys/fs/cgroup", target: HOST_CGROUP, readonly: true },
+    ])
+    expect(cgroupMount("disks", false)).toBe(HOST_CGROUP)
+    const privileged = renderHelper({ ...shape, role: "privileged" }, mac)
+    expect(privileged.mounts.map(m => m.source)).not.toContain("/sys/fs/cgroup")
+    expect(cgroupMount("privileged", false)).toBeNull()
+  })
+  test("under rootless Docker no role is given the cgroup tree", () => {
+    for (const role of ["disks", "privileged"] as const) {
+      const made = renderHelper({ ...shape, role, rootless: true }, mac)
+      expect(made.mounts.map(m => m.source)).not.toContain("/sys/fs/cgroup")
+      expect(cgroupMount(role, true)).toBeNull()
+    }
   })
   test("on Linux, no slot in its name", () => {
     expect(lanehostContainer("disks", key, { labels: {} })).toBe(
@@ -373,7 +395,7 @@ describe("the sweeps", () => {
     name: string,
     labels: Record<string, string>,
     binds: readonly string[] = [],
-  ): Listed => ({ name, labels, binds })
+  ): Listed => ({ id: "", name, state: "running", labels, binds })
   test("a slot's sweep takes every container with a bind into it, whatever its labels", () => {
     expect(
       planSlotSweep("/mnt/host-shares/3/", [
@@ -541,4 +563,24 @@ describe("a project's grant of the host's ports", () => {
     const linux: DockerTarget = { ...mac, hostAddress: null }
     expect(render(granted, linux).env.join(" ")).not.toContain("PINETRIE_HOST")
   })
+})
+
+test("the running lanes are the running containers named for a thread", () => {
+  const id = "a".repeat(64)
+  const thread = "t-0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e6f"
+  const listed = (name: string, state: string) => ({
+    id,
+    name,
+    state,
+    labels: {},
+    binds: [],
+  })
+  expect(
+    runningLanes([
+      listed(`pinetrie-${thread}`, "running"),
+      listed(`pinetrie-${thread.replace("6f", "70")}`, "exited"),
+      listed(`pinetrie-lanehost-disks-${key}`, "running"),
+      listed(`pinetrie-base-scratch-${key}`, "running"),
+    ]),
+  ).toEqual([{ lane: thread, id }])
 })

@@ -4,6 +4,7 @@
 
 import { readFile } from "node:fs/promises"
 import http from "node:http"
+import { parseSize } from "@pinetrie/core"
 import type { ContainerFacts } from "@pinetrie/lanes"
 import { SPEC_LABEL } from "@pinetrie/lanes"
 import type { ContainerSpec, Listed, ListedImage } from "./plan.ts"
@@ -94,12 +95,11 @@ async function requestOrThrow(
 
 const at = (name: string) => encodeURIComponent(name)
 
-/** `4G`, `256m`, `1g` in bytes, as the CLI reads `-m`: units of 1024. */
+/** A container's memory limit in bytes; throws on one that is no size. */
 export function memoryBytes(memory: string): number {
-  const found = /^(\d+(?:\.\d+)?)\s*([bkmgt]?)b?$/i.exec(memory.trim())
-  if (found === null) throw new Error(`not an amount of memory: ${memory}`)
-  const power = "bkmgt".indexOf((found[2] || "b").toLowerCase())
-  return Math.floor(Number(found[1]) * 1024 ** power)
+  const bytes = parseSize(memory)
+  if (bytes === null) throw new Error(`not an amount of memory: ${memory}`)
+  return bytes
 }
 
 /**
@@ -288,6 +288,8 @@ export async function listLabelled(
 export function parseListed(body: string): readonly Listed[] {
   try {
     const rows = JSON.parse(body) as {
+      Id?: string
+      State?: string
       Names?: string[]
       Labels?: Record<string, string> | null
       Mounts?: { Source?: string }[] | null
@@ -298,7 +300,15 @@ export function parseListed(body: string): readonly Listed[] {
       const binds = (r.Mounts ?? []).flatMap(m =>
         typeof m.Source === "string" ? [m.Source] : [],
       )
-      return [{ name, labels: r.Labels ?? {}, binds }]
+      return [
+        {
+          id: r.Id ?? "",
+          name,
+          state: r.State ?? "",
+          labels: r.Labels ?? {},
+          binds,
+        },
+      ]
     })
   } catch {
     return []

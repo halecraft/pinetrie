@@ -2,7 +2,12 @@
 // base's scratch lane), its container's name, its grants, what is attached
 // to it, and where the lane runtime and its jj config are inside it.
 
-import { RUNTIME_SHELL, type ThreadId, WORKSPACE_ROOT } from "@pinetrie/core"
+import {
+  isThreadId,
+  RUNTIME_SHELL,
+  type ThreadId,
+  WORKSPACE_ROOT,
+} from "@pinetrie/core"
 
 /**
  * pine·trie's lane runtime, read-only: Node and its libraries, and what
@@ -44,6 +49,14 @@ export type LaneOwner = ThreadId | BaseLane
 
 /** A lane's container's name. */
 export const laneContainer = (lane: LaneOwner): string => `pinetrie-${lane}`
+
+/** The thread whose lane a container is, by its name; null for any other container, the base's scratch lane's among them. */
+export function containerLane(name: string): ThreadId | null {
+  const lane = name.startsWith("pinetrie-")
+    ? name.slice("pinetrie-".length)
+    : ""
+  return isThreadId(lane) ? lane : null
+}
 
 /** What a project lets cross a lane's boundary, from `pinetrie.json`. */
 export interface LaneGrants {

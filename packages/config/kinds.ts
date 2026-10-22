@@ -3,6 +3,8 @@
 // and a join adds with `join`, so a kind without `meet` cannot be limited
 // and one without `join` cannot be joined (`setting.ts`).
 
+import { parseSize } from "@pinetrie/core"
+
 /** A decoded value, or why the JSON was refused. */
 export type Decoded<T> =
   | { readonly ok: true; readonly value: T }
@@ -97,6 +99,23 @@ export const count = (bounds: {
             ? `is not a whole number of at least ${bounds.min}`
             : `is not a whole number from ${bounds.min} to ${bounds.max}`,
         ),
+  meet: (a, b) => Math.min(a, b),
+  same: (a, b) => a === b,
+})
+
+/**
+ * A size, written as Docker writes a memory limit (`"50G"`, `"512MiB"`),
+ * read by core's one parser: binary units, and a bare `B` refused. A limit
+ * is the smaller.
+ */
+export const size = (): Kind<number, "anywhere"> & Meets<number> => ({
+  reach: "anywhere",
+  decode: v => {
+    const bytes = typeof v === "string" ? parseSize(v) : null
+    return bytes === null
+      ? refused('is not a size: a number and K, M, G or T ("50G")')
+      : decoded(bytes)
+  },
   meet: (a, b) => Math.min(a, b),
   same: (a, b) => a === b,
 })

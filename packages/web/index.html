@@ -1447,6 +1447,12 @@
       .inventory-count { font-size: var(--font-xs); font-variant-numeric: tabular-nums; }
       .footer-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-8); }
       .sync-note { font-size: var(--font-sm); color: var(--text-quiet); }
+      /* The machine's health: the footer's grey while it keeps up; slowed
+         and stopped each with its own mark (icons.tsx), so colour is never
+         all it says. */
+      .machine-status { display: inline-flex; align-items: center; color: var(--text-quiet); }
+      .machine-status[data-health="slowed"] { color: var(--caution); }
+      .machine-status[data-health="stopped"] { color: var(--danger); }
       /* The board's strip: ▦, then each state's name, count, readers and
          mark; while the board is open, its search and "mine" in their place
          (ADR-0115). */
