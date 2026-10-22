@@ -1,0 +1,10 @@
+idle: footprint 607 MB
+after 6000 MiB of tmpfs written and freed: footprint 6650 MB
+balloon target 2048 MiB, 20 s later: footprint 6781 MB
+Mem:           7935        6326        1429           0         180        1462
+balloon target 8192 MiB, 10 s later: footprint 6813 MB
+Mem:           7935         168        7585           0         182        7620
+5000 MiB written after deflating
+after 5000 MiB written again: footprint 6832 MB
+launcher: balloon target 2048 MiB
+launcher: balloon target 8192 MiB

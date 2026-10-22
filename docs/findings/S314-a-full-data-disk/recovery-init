@@ -1,0 +1,27 @@
+#!/bin/sh
+# Recovery boot for the lane VM's data disk (/dev/vda here): diagnose, grow, balance.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc proc /proc; mount -t sysfs sysfs /sys; mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp /mnt && mount -t devpts devpts /dev/pts
+say() { echo "[recovery] $*"; }
+for m in $(cat /m/order); do insmod "/m/$m" || say "insmod $m failed"; done
+ip link set lo up; ip link set eth0 up
+udhcpc -i eth0 -q -n -t 10 >/dev/null 2>&1 || say "no address from DHCP"
+apk add -q btrfs-progs || { say "apk add failed"; poweroff -f; }
+say "device bytes: $(blockdev --getsize64 /dev/vda)"
+btrfs filesystem show /dev/vda
+btrfs device scan 2>&1; mount -t btrfs -o user_subvol_rm_allowed /dev/vda /mnt || { say "mount failed"; dmesg | tail -25 | sed "s/^/[dmesg] /"; poweroff -f; }
+say "mounted"
+btrfs filesystem usage -T /mnt | head -12
+say "resize max:"
+btrfs filesystem resize max /mnt 2>&1; say "resize exit $?"
+dmesg | grep -i btrfs | tail -8 | sed "s/^/[dmesg] /"
+btrfs filesystem usage /mnt | sed -n '3,7p'
+for u in 0 5 10 20 40; do
+  say "balance dusage=$u"
+  btrfs balance start -dusage=$u /mnt 2>&1 | tail -2
+done
+btrfs filesystem usage -T /mnt | head -30
+umount /mnt; sync
+say "done"
+poweroff -f

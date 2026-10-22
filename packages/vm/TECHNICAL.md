@@ -291,11 +291,19 @@ sweep of what binds into it.
 
 - **A full data disk stops the VM serving any host:** dockerd cannot
   write its metadata, never answers, and every lease fails waiting for
-  it. No shell reaches the guest, so the way back is a bigger file:
-  with the launcher stopped, `truncate -s <size> data.img` on the Mac
-  (the launcher makes the file only when it is missing), and `init`
-  grows the filesystem at the next boot. Nothing trims the file, so
-  space freed in the guest is reused there and never returned to the Mac.
+  it. Full is btrfs's, not `df`'s: once every chunk is allocated, a full
+  metadata fails every write while `df` still shows the free space inside
+  data chunks (S314), and a balance cannot run to free one. No shell
+  reaches the guest, so the way back is a bigger file: with the launcher
+  stopped, `truncate -s <size> data.img` on the Mac (the launcher makes
+  the file only when it is missing), and `init` grows the filesystem at
+  the next boot. That resize failed once, on a disk of 36,000 subvolumes,
+  and `init` throws its error away; a boot of the builder's machine on
+  `data.img` with `btrfs` and `btrfs-progs` grew it and balanced it
+  (S314, its `recovery-init`).
+- **Space freed in the guest goes back to the Mac** within seconds: the
+  data disk takes discards and btrfs sends them (`discard=async`), so
+  `data.img`'s size on the Mac follows what the guest holds (S312).
 - **socat's `-t`:** without it, socat cuts a stream 0.5 s after its input
   ends (S128, S129).
 - **`/dev/net/tun` is 0600 without udev;** the init makes it 0666 for

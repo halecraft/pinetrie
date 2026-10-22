@@ -1,0 +1,7 @@
+idle: rss 4978 MiB, footprint 2713 MB
+after 6000 MiB of tmpfs written and freed: rss 8918 MiB, footprint 6653 MB
+Mem:           7935         180        7560           0         195        7608
+Mem:           7935         178        1490           0        6267        7604
+after 6 GiB read through the guest page cache: rss 13318 MiB, footprint 6880 MB
+Mem:           7935         173        7650           0         112        7617
+after the guest dropped its caches: rss 13322 MiB, footprint 6882 MB

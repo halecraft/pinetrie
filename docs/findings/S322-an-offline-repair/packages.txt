@@ -1,0 +1,7 @@
+libeconf 0.8.3-r0
+libblkid 2.41.6-r1
+lzo 2.10-r5
+eudev-libs 3.2.14-r6
+libuuid 2.41.6-r1
+zstd-libs 1.5.7-r2
+btrfs-progs 6.17.1-r0

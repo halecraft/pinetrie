@@ -1,0 +1,6 @@
+squeezed use from 180 to 22 MiB in 0 ms
+round 1: busy alone 1631 ms, busy during the squeeze 1655 ms
+squeezed use from 180 to 22 MiB in 0 ms
+round 2: busy alone 1649 ms, busy during the squeeze 1703 ms
+squeezed use from 181 to 24 MiB in 0 ms
+round 3: busy alone 1578 ms, busy during the squeeze 1672 ms

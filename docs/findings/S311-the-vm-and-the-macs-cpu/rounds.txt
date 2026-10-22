@@ -1,0 +1,13 @@
+round 1, load 20.01 10.08 7.85
+  idle:               mac work: 4.47 s
+  busy:               mac work: 4.50 s
+  busy, taskpolicy -b: mac work: 4.46 s
+round 2, load 31.67 13.56 9.16
+  idle:               mac work: 4.42 s
+  busy:               mac work: 4.47 s
+  busy, taskpolicy -b: mac work: 4.47 s
+round 3, load 34.66 15.53 9.98
+  idle:               mac work: 4.52 s
+  busy:               mac work: 4.50 s
+  busy, taskpolicy -b: mac work: 4.43 s
+busy, renice 20:      mac work: 4.44 s

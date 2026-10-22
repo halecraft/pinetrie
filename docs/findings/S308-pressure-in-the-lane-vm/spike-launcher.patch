@@ -1,0 +1,49 @@
+--- packages/vm/launcher/launcher.swift	2026-10-19 08:19:15
++++ sandbox/machine-spikes/spike-launcher.swift	2026-10-21 19:29:03
+@@ -122,7 +122,7 @@
+   min(memoryBytes / (1 << 20) * (1 << 20), VZVirtualMachineConfiguration.maximumAllowedMemorySize))
+ let boot = VZLinuxBootLoader(kernelURL: url("\(image)/Image"))
+ boot.initialRamdiskURL = url("\(image)/stage1.cpio")
+-boot.commandLine = "console=hvc0 quiet lane.slots=\(slotCount)"
++boot.commandLine = "console=hvc0 quiet lane.slots=\(slotCount) " + (env["SPIKE_CMDLINE_EXTRA"] ?? "")
+ config.bootLoader = boot
+ 
+ do {
+@@ -211,6 +211,7 @@
+ // gvproxy's DHCP has one lease, for this address (its default config).
+ net.macAddress = VZMACAddress(string: "5a:94:ef:e4:0c:ee")!
+ config.networkDevices = [net]
++if env["SPIKE_BALLOON"] != nil { config.memoryBalloonDevices = [VZVirtioTraditionalMemoryBalloonDeviceConfiguration()] }
+ 
+ FileManager.default.createFile(atPath: "\(state)/console.log", contents: nil)
+ guard let consoleOut = FileHandle(forWritingAtPath: "\(state)/console.log") else {
+@@ -638,6 +639,7 @@
+ stopSignal.setEventHandler { stopVM("SIGTERM") }
+ stopSignal.resume()
+ 
++var spikeTimers: [DispatchSourceTimer] = []
+ // --- start --------------------------------------------------------------------
+ 
+ // A VM without its network serves no lane: it stops with gvproxy.
+@@ -663,6 +665,21 @@
+       }
+     }
+     for lease in waiting { grant(lease) }
++    if env["SPIKE_BALLOON"] != nil {
++      let balloonTimer = DispatchSource.makeTimerSource(queue: .main)
++      balloonTimer.schedule(deadline: .now() + 1, repeating: 1)
++      balloonTimer.setEventHandler {
++        guard let t = try? String(contentsOfFile: "\(state)/balloon-target", encoding: .utf8),
++          let mib = UInt64(t.trimmingCharacters(in: .whitespacesAndNewlines)),
++          let b = vm.memoryBalloonDevices.first as? VZVirtioTraditionalMemoryBalloonDevice else { return }
++        if b.targetVirtualMachineMemorySize != mib << 20 {
++          b.targetVirtualMachineMemorySize = mib << 20
++          log("balloon target \(mib) MiB")
++        }
++      }
++      balloonTimer.resume()
++      spikeTimers.append(balloonTimer)
++    }
+     waiting = []
+   case .failure(let error):
+     log("start: \(error)")

@@ -1,0 +1,19 @@
+== D-two-lanes (none), 240 s
+[always] madvise never
+lane1: file passes: 23992 vm bogo ops: 42921832  oom-killed=false
+lane2: file passes: 23992 vm bogo ops: 43944172  oom-killed=false
+workingset_refault_anon               0
+workingset_refault_file               0
+pswpin                                0
+pswpout                               0
+allocstall_normal                     0
+allocstall_movable                    0
+pgmajfault                           13
+oom_kill                              0
+compact_stall                         0
+compact_fail                          0
+thp_fault_alloc                    1644
+thp_fault_fallback                    0
+memory psi before/after: full avg10=0.00 avg60=0.00 avg300=0.00 total=0	full avg10=0.00 avg60=0.00 avg300=0.00 total=29
+io psi before/after: some avg10=0.00 avg60=0.00 avg300=0.00 total=9766	some avg10=0.00 avg60=0.00 avg300=0.02 total=303761
+soft lockups: 0

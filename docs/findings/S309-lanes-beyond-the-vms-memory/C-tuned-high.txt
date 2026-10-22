@@ -1,0 +1,21 @@
+== C-tuned-high (tuned-high), 240 s
+always [madvise] never
+lane1: file passes: 381 vm bogo ops: 28336291  oom-killed=false
+lane2: file passes: 488 vm bogo ops: 27982138  oom-killed=false
+lane3: file passes: 487 vm bogo ops: 28783310  oom-killed=false
+lane4: file passes: 1290 vm bogo ops: 16823981  oom-killed=false
+workingset_refault_anon        33938171
+workingset_refault_file       443408488
+pswpin                         32471694
+pswpout                        32986078
+allocstall_normal                  2228
+allocstall_movable               141327
+pgmajfault                     33939552
+oom_kill                              0
+compact_stall                        28
+compact_fail                         20
+thp_fault_alloc                       0
+thp_fault_fallback                    0
+memory psi before/after: full avg10=0.00 avg60=0.00 avg300=0.00 total=0	full avg10=18.47 avg60=15.24 avg300=9.44 total=43685469
+io psi before/after: some avg10=0.00 avg60=0.00 avg300=0.00 total=12213	some avg10=8.45 avg60=8.69 avg300=5.05 total=22604947
+soft lockups: 0

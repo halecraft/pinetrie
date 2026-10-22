@@ -1,0 +1,2 @@
+swap.max 0, after reclaim: holds 1111 MiB, swapped 0 MiB
+swap.max max, after reclaim: holds 1022 MiB, swapped 101 MiB

@@ -1,0 +1,29 @@
+subvolumes before ENOSPC: 2462 (sh: can't create mnt/v2462/1: No space left on device
+sh: can't create mnt/v2462/2: No space left on device
+sh: can't create mnt/v2462/3: No space left on device
+sh: can't create mnt/v2462/4: No space left on device
+sh: can't create mnt/v2462/5: No space left on device
+sh: can't create mnt/v2462/6: No space left on device
+sh: can't create mnt/v2462/7: No space left on device
+sh: can't create mnt/v2462/8: No space left on device)
+deleted 1231
+    Device size:		   1.00GiB
+    Device allocated:		1023.00MiB
+    Device unallocated:		   1.00MiB
+
+              Data      Metadata  System                            
+Id Path       single    DUP       DUP      Unallocated Total   Slack
+-- ---------- --------- --------- -------- ----------- ------- -----
+ 1 /dev/loop0 904.62MiB 102.38MiB 16.00MiB     1.00MiB 1.00GiB     -
+-- ---------- --------- --------- -------- ----------- ------- -----
+   Total      904.62MiB  51.19MiB  8.00MiB     1.00MiB 1.00GiB 0.00B
+--- resize max right after mount:
+Resize device id 1 (/dev/loop0) from 1.00GiB to max
+exit 0
+[  210.087371] BTRFS info (device loop0): enabling ssd optimizations
+[  210.087379] BTRFS info (device loop0): turning on async discard
+[  210.087381] BTRFS info (device loop0): enabling free space tree
+[  210.108784] BTRFS info (device loop0): resize device /dev/loop0 (devid 1) from 1073741824 to 2147483648
+    Device size:		   2.00GiB
+    Device allocated:		1023.00MiB
+    Device unallocated:		   1.00GiB

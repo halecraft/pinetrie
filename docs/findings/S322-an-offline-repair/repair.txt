@@ -1,0 +1,14 @@
+[repair] found size=2147483647 unallocated=1048576 metadata-size=107347968 metadata-used=97583104
+[repair] grown: Resize device id 1 (/dev/vda) from 2.00GiB to max
+[repair] repacked at 0%: Done, had to relocate 0 out of 13 chunks
+[repair] repacked at 5%: Done, had to relocate 0 out of 13 chunks
+[repair] repacked at 10%: Done, had to relocate 0 out of 13 chunks
+[repair] repacked at 20%: Done, had to relocate 0 out of 13 chunks
+[repair] repacked at 40%: Done, had to relocate 0 out of 13 chunks
+[repair] left size=2147483647 unallocated=1074790400 metadata-size=107347968 metadata-used=97583104
+[repair] done
+a container ran
+unprivileged read: data total_bytes=1914961920 bytes_used=963874816
+unprivileged read: metadata total_bytes=107347968 bytes_used=97550336
+device size=
+error_stats fsid in_fs_metadata missing replace_target scrub_speed_max writeable 

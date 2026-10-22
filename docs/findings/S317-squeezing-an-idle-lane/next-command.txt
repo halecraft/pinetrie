@@ -1,0 +1,18 @@
+round 1 (Mac load 12.34)
+  use, warm:           1629 ms   before: workingset_refault_file=7993 pgmajfault=39   after: workingset_refault_file=7993 pgmajfault=39    holds 101 MiB
+  squeezed use to 25 MiB
+  use, after squeeze:  1670 ms   before: workingset_refault_file=7993 pgmajfault=39   after: workingset_refault_file=21540 pgmajfault=52    holds 101 MiB
+  busy, alone:         1593 ms
+  busy, while use is squeezed: 3208 ms
+round 2 (Mac load 11.05)
+  use, warm:           1672 ms   before: workingset_refault_file=21540 pgmajfault=52   after: workingset_refault_file=35087 pgmajfault=65    holds 101 MiB
+  squeezed use to 25 MiB
+  use, after squeeze:  1696 ms   before: workingset_refault_file=35087 pgmajfault=65   after: workingset_refault_file=48634 pgmajfault=78    holds 101 MiB
+  busy, alone:         1575 ms
+  busy, while use is squeezed: 3203 ms
+round 3 (Mac load 9.72)
+  use, warm:           1667 ms   before: workingset_refault_file=48634 pgmajfault=78   after: workingset_refault_file=62181 pgmajfault=91    holds 101 MiB
+  squeezed use to 25 MiB
+  use, after squeeze:  1728 ms   before: workingset_refault_file=62181 pgmajfault=91   after: workingset_refault_file=75728 pgmajfault=104    holds 101 MiB
+  busy, alone:         1665 ms
+  busy, while use is squeezed: 3232 ms

@@ -1637,6 +1637,12 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
+- **The machine's health** (ADR-0210, accepted, not yet built): a glyph in the footer
+  before publish, drawn always, amber or red when the machine lanes run
+  on slows or stops their work, naming the cause in its title; it opens a
+  Machine page (`#machine`) of each thread's lane, the machine, the host,
+  and what can be done. A red cause that needs a choice is in the inbox
+  too.
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file. Threads from any root, note columns and media columns (ADR-0182)
   are built (above).

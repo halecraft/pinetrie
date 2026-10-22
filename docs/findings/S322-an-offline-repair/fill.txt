@@ -1,0 +1,17 @@
+sh: can't create /var/lib/lanehost/fill/small/60/60492: No space left on device
+data files 1813, inline files 60492
+    Device size:		   2.00GiB
+    Device allocated:		   2.00GiB
+    Device unallocated:		   1.00MiB
+
+            Data      Metadata  System                            
+Id Path     single    DUP       DUP      Unallocated Total   Slack
+-- -------- --------- --------- -------- ----------- ------- -----
+ 1 /dev/vdb   1.78GiB 204.75MiB 16.00MiB     1.00MiB 2.00GiB     -
+-- -------- --------- --------- -------- ----------- ------- -----
+   Total      1.78GiB 102.38MiB  8.00MiB     1.00MiB 2.00GiB 0.00B
+
+Run 'docker run --help' for more information
+docker: Error response from daemon: failed to rename: rename /var/lib/lanehost/docker/containerd/daemon/io.containerd.snapshotter.v1.overlayfs/snapshots/new-1295277571 /var/lib/lanehost/docker/containerd/daemon/io.containerd.snapshotter.v1.overlayfs/snapshots/4: no space left on device
+
+Run 'docker run --help' for more information

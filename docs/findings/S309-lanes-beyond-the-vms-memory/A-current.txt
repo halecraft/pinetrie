@@ -1,0 +1,21 @@
+== A-current (none), 240 s
+[always] madvise never
+lane1: file passes: 675 vm bogo ops: 36667024  oom-killed=false
+lane2: file passes: 453 vm bogo ops: 36622453  oom-killed=false
+lane3: file passes: 422 vm bogo ops: 35064321  oom-killed=false
+lane4: file passes: 417 vm bogo ops: 34906167  oom-killed=false
+workingset_refault_anon               0
+workingset_refault_file       584477512
+pswpin                                0
+pswpout                               0
+allocstall_normal                  7608
+allocstall_movable               173628
+pgmajfault                          956
+oom_kill                              0
+compact_stall                        10
+compact_fail                         10
+thp_fault_alloc                    1647
+thp_fault_fallback                 2914
+memory psi before/after: full avg10=0.00 avg60=0.00 avg300=0.00 total=0	full avg10=9.67 avg60=9.49 avg300=5.46 total=24431930
+io psi before/after: some avg10=0.00 avg60=0.00 avg300=0.00 total=9970	some avg10=13.64 avg60=13.59 avg300=7.95 total=35855907
+soft lockups: 0

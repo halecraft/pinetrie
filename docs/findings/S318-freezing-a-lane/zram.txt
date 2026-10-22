@@ -1,0 +1,9 @@
+with zram 4 GiB (lz4):
+frozen holds 1680 MiB; zram (orig compr) MiB: 0 0; free: 2214 MiB
+frozen 1
+/bin/bash: line 4: /tmp/passes: No such file or directory
+pressure: 1 held  oom-killed=false
+frozen holds 1542 MiB; zram (orig compr) MiB: 968 266; free: 141 MiB
+frozen holds 1465 MiB; zram (orig compr) MiB: 219 59; free: 5713 MiB
+frozen lane, thawed, its passes since the freeze:
+/bin/bash: line 10: ?: syntax error: operand expected (error token is "?")

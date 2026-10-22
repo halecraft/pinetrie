@@ -1,0 +1,21 @@
+== E-zram-swappiness-1 (zram-low-swappiness), 240 s
+[always] madvise never
+lane1: file passes: 99 vm bogo ops: 7242442  oom-killed=false
+lane2: file passes: 80 vm bogo ops: 7661215  oom-killed=false
+lane3: file passes: 129 vm bogo ops: 7242442  oom-killed=false
+lane4: file passes: 59 vm bogo ops: 19683000  oom-killed=false
+workingset_refault_anon          686684
+workingset_refault_file        79941004
+pswpin                           680651
+pswpout                          689598
+allocstall_normal                   743
+allocstall_movable                35355
+pgmajfault                       687292
+oom_kill                              0
+compact_stall                         0
+compact_fail                          0
+thp_fault_alloc                    1349
+thp_fault_fallback                 1725
+memory psi before/after: full avg10=0.00 avg60=0.00 avg300=0.00 total=0	full avg10=46.24 avg60=46.01 avg300=23.27 total=97677266
+io psi before/after: some avg10=0.00 avg60=0.00 avg300=0.00 total=12760	some avg10=8.20 avg60=7.43 avg300=5.60 total=27670618
+soft lockups: 0

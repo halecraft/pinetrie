@@ -1,0 +1,9 @@
+idle-fresh               peak     50 MiB  anon      0 MiB  file     35 MiB  last     50 MiB
+install                  peak   1375 MiB  anon    762 MiB  file    513 MiB  last   1336 MiB
+idle-after-install       peak    632 MiB  anon      0 MiB  file    514 MiB  last    632 MiB
+unit-tests               peak   1430 MiB  anon    746 MiB  file    546 MiB  last   1021 MiB
+typecheck                peak   2664 MiB  anon   1932 MiB  file    594 MiB  last   2664 MiB
+idle-after-typecheck     peak    714 MiB  anon      0 MiB  file    594 MiB  last    714 MiB
+dev-server               peak    816 MiB  anon     96 MiB  file    595 MiB  last    815 MiB
+idle-with-dev-server     peak    816 MiB  anon     96 MiB  file    595 MiB  last    816 MiB
+done                     peak    815 MiB  anon     96 MiB  file    595 MiB  last    814 MiB

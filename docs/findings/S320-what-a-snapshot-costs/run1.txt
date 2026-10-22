@@ -1,0 +1,4 @@
+lane files: 25606, 473 MiB
+200 light turns (5 files edited each): metadata +57 KiB a snapshot
+50 heavy turns (2000 files rewritten each): metadata +6551 KiB a snapshot
+after deleting the 200 light snapshots: metadata -17 MiB

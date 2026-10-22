@@ -1,0 +1,13 @@
+normal passes: pass 7.318084 ms pass 7.518625 ms pass 6.758542 ms 
+frozen holds 1663 MiB; zram orig/compressed: 5/1 MiB
+reclaim exit 1, took 840 ms
+after freeze + reclaim:
+frozen holds 6 MiB; zram orig/compressed: 1654/446 MiB
+/bin/bash: line 10: OCI runtime exec failed: exec failed: cannot exec in a paused container (use --ignore-paused to override): syntax error in expression (error token is "runtime exec failed: exec failed: cannot exec in a paused container (use --ignore-paused to override)")
+thawed; its passes since the freeze: 
+frozen holds 1595 MiB; zram orig/compressed: 66/14 MiB
+15.420833
+19.220084
+620.45375
+1309.784751
+passes: 2260, median: 6.716667 ms

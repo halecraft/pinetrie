@@ -1,0 +1,8 @@
+VM busy, alone: 179.7%
+VM busy, during mac work: 0.0 %
+mac work: 4.40 s
+taskpolicy -b, alone: 193.2%
+taskpolicy -b, during mac work: 0.0 %
+mac work: 4.53 s
+taskpolicy -B (restored), alone: 196.3%
+VM idle: mac work: 4.47 s

@@ -1,0 +1,37 @@
+======================================================================
+com.apple.Virtualization.VirtualMachine [80569]: 64-bit    Footprint: 6838 MB (16384 bytes per page)
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+6791 MB        0 B          0 B         64    app-specific tag 1
+  35 MB        0 B          0 B          1    MALLOC_LARGE
+5328 KB        0 B          0 B          4    MALLOC_SMALL
+4390 KB        0 B          0 B          1    page table
+ 624 KB        0 B          0 B         59    stack
+ 608 KB        0 B          0 B          9    MALLOC metadata
+ 565 KB        0 B          0 B        433    __DATA_DIRTY
+ 256 KB        0 B          0 B         16    tag 28
+ 224 KB        0 B          0 B         20    untagged (VM_ALLOCATE)
+ 160 KB        0 B          0 B          1    MALLOC_TINY
+ 159 KB        0 B          0 B       1349    unused dyld shared cache area
+ 140 KB        0 B          0 B        462    __DATA
+ 128 KB        0 B        80 KB          1    libdispatch
+  48 KB        0 B          0 B          2    __TPRO_CONST
+  32 KB        0 B          0 B          1    Activity Tracing
+  16 KB     128 KB          0 B        512    __DATA_CONST
+  16 KB        0 B          0 B          1    os_alloc_once
+  16 KB        0 B          0 B          1    tag 22
+  432 B        0 B          0 B        267    __AUTH
+Physical footprint:         6.7G
+Physical footprint (peak):  6.7G
+MALLOC guard page                 3888K       0K       0K       0K       0K       0K       0K        4 
+MALLOC metadata                   1056K     608K     608K       0K       0K       0K       0K        5 
+MALLOC_LARGE (empty)              34.6M    34.6M    34.6M       0K       0K       0K       0K        1         see MALLOC ZONE table below
+MALLOC_SMALL                      16.0M    5328K    5328K       0K       0K       0K       0K        6         see MALLOC ZONE table below
+MALLOC_TINY                       4096K     160K     160K       0K       0K       0K       0K        1         see MALLOC ZONE table below
+VM_ALLOCATE                        528K      16K      16K       0K       0K       0K       0K        2 
+TOTAL                              9.7G     7.1G     6.7G       0K       0K      32K       0K     2988 
+MALLOC ZONE                         SIZE       SIZE       SIZE       SIZE      COUNT  ALLOCATED  FRAG SIZE  % FRAG   COUNT
+DefaultMallocZone_0x104a2c000      20.8M      5840K      5840K         0K       3465       580K      5260K     91%       8
+TOTAL                              20.8M      5856K      5856K         0K       3466       580K      5276K     91%       9
