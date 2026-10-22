@@ -1,0 +1,33 @@
+== A: held, then the holder killed with SIGKILL
+holder pid 334, child pid 346
+child says held
+processes:
+  334     0 {MainThread} /pinetrie-runtime/node/ld.so --library-path /pinetrie-runtime/nod
+  346   334 flock -n /var/lib/lanehost/s326/host.lock sh -c echo held; exec cat
+  347   346 cat
+locks: 1 FLOCK line(s)
+the other container takes it: exit=1 
+a second holder in the other container:
+  holder pid 66, child pid 78
+  child exit 1 null
+  stdin ended
+  holder exits
+after the holder's SIGKILL, processes:
+the other container takes it: held exit=0 
+== B: the holder's stdin ends, and it does nothing about its child
+holder pid 372, child pid 384
+child says held
+stdin ended
+3 s after its stdin ended, processes:
+  372     0 {MainThread} /pinetrie-runtime/node/ld.so --library-path /pinetrie-runtime/nod
+  384   372 flock -n /var/lib/lanehost/s326/host.lock sh -c echo held; exec cat
+  385   384 cat
+the other container takes it: exit=1 
+== C: the holder's stdin ends, and it ends its child's
+holder pid 398, child pid 410
+child says held
+stdin ended
+child exit 0 null
+holder exits
+3 s after its stdin ended, processes:
+the other container takes it: held exit=0 

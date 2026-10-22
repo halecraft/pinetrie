@@ -1,0 +1,2 @@
+idle before: 1 server(s); its first line: {"ready":true,"hello":{"role":"privileged"}}
+idle: back to 0 server(s) after 0.0s of polling

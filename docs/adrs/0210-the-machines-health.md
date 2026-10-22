@@ -3,13 +3,20 @@
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `docs/06-interface.md`, `packages/vm/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
-  `packages/machine/TECHNICAL.md`
+  `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
-  S317, S318, S319, S320, S321, S322, S323, S324
+  S317, S318, S319, S320, S321, S322, S323, S324, S326
 - **Revised:**
   - 2026-10-22 (S324): a lanehost role or the observer killed for memory is an
     amber cause, heard from Docker's `oom` events on one held stream, not read
     from its cgroup: the observer's container goes with its kill.
+  - 2026-10-22 (S326): a project's lanes are served by one host at a time, so
+    the disk upkeep's "a snapshot no record names" reads one store's records.
+    The disks role's server holds an exclusive `flock` on the project's
+    `host.lock` for its whole life, through a child the kernel frees with it:
+    a second host's start is refused, and a dead host's lock is taken by the
+    next, with no time judged. A server outlives its host only for its call in
+    flight.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

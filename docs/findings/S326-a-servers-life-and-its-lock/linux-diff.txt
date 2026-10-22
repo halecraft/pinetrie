@@ -1,0 +1,2 @@
+diff before: 1 server(s); its first line: {"ready":true,"hello":{"role":"privileged"}}
+diff: back to 0 server(s) after 7.8s of polling

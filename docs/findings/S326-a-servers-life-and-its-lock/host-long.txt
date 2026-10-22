@@ -1,0 +1,4 @@
+1.6s [vm] Docker answered 1322 ms after the launcher started
+19.2s one diff of 400000 files took 9.6s
+19.2s calling
+28.8s the second diff answered
