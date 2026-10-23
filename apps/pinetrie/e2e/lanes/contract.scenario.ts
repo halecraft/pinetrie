@@ -20,12 +20,13 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  deletableSnapshot,
   errorText,
   type SnapshotId,
-  snapshotId,
   type ThreadId,
   threadIdFor,
 } from "@pinetrie/core"
+import { entrySnapshotId } from "@pinetrie/core/fixtures"
 import { LANEHOST_LABEL, NESTED_MOUNT, projectKey } from "@pinetrie/docker"
 import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
 import {
@@ -386,7 +387,7 @@ async function dockerContract(
     }
     const promised: [SnapshotId, number][] = []
     for (let i = 0; i < SNAPSHOTS; i++) {
-      const id = snapshotId(`contract-${process.pid}-${i}`)
+      const id = entrySnapshotId(i, process.pid)
       const count = written()
       snapshots.push(id)
       await executeOrThrow(
@@ -420,8 +421,8 @@ async function dockerContract(
 
     // ── a diff between two snapshots ──
     await exec(writerLane, "echo gone > /workspace/gone.txt")
-    const diffFrom = snapshotId(`contract-${process.pid}-before`)
-    const diffTo = snapshotId(`contract-${process.pid}-after`)
+    const diffFrom = entrySnapshotId(SNAPSHOTS, process.pid)
+    const diffTo = entrySnapshotId(SNAPSHOTS + 1, process.pid)
     snapshots.push(diffFrom, diffTo)
     await executeOrThrow(
       planSnapshot({ lane: writerLane, snapshot: diffFrom }),
@@ -642,7 +643,10 @@ async function dockerContract(
     closedPort.stop()
     grantedPort.stop()
     await runtime
-      .disk({ kind: "delete-snapshots", ids: snapshots })
+      .disk({
+        kind: "delete-snapshots",
+        ids: snapshots.map(s => deletableSnapshot("entry", s)),
+      })
       .catch(() => {})
     await a.close()
     if (own !== null) {

@@ -1,7 +1,13 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { isDiskName, snapshotId } from "@pinetrie/core"
+import {
+  type Deletable,
+  deletableSnapshot,
+  isDiskName,
+  snapshotId,
+} from "@pinetrie/core"
+import { entrySnapshotId } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import { subvolumesDeepestFirst } from "./btrfs.ts"
@@ -15,6 +21,9 @@ import { isProjectKey, nestedDataRoot, projectDisks } from "./layout.ts"
 import { planProjectRemoval } from "./projects.ts"
 import { planDiff, planRoles } from "./roles.ts"
 import { servingFrom } from "./serving.ts"
+
+const A = entrySnapshotId(1)
+const B = entrySnapshotId(2)
 
 const KEY = "0123456789abcdef"
 const disks = projectDisks("/var/lib/lanehost", KEY)
@@ -47,7 +56,8 @@ describe("names: every path is built from names checked first", () => {
       planDisk(
         {
           kind: "delete-snapshots",
-          ids: [snapshotId("ok"), snapshotId("../../x")],
+          // As the wire may carry them: lanehost checks each name itself.
+          ids: [snapshotId("ok"), snapshotId("../../x")] as Deletable[],
         },
         disks,
       ),
@@ -106,12 +116,15 @@ describe("planDisk: each disk operation as steps", () => {
     ])
     expect(
       planDisk(
-        { kind: "delete-snapshots", ids: [snapshotId("a"), snapshotId("b")] },
+        {
+          kind: "delete-snapshots",
+          ids: [A, B].map(id => deletableSnapshot("entry", id)),
+        },
         disks,
       ),
     ).toEqual([
-      { kind: "drop", path: disks.snapshot("a") },
-      { kind: "drop", path: disks.snapshot("b") },
+      { kind: "drop", path: disks.snapshot(A) },
+      { kind: "drop", path: disks.snapshot(B) },
     ])
   })
   describe("a nested lane's inner Docker data root", () => {

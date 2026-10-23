@@ -15,7 +15,6 @@ import {
   type PointId,
   PRODUCT_NAME,
   pointId,
-  snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
 import { planKeep } from "@pinetrie/folder"
@@ -233,10 +232,10 @@ export function startFolderProject(dir: {
                 stored ?? undefined,
               ),
             )
-            if (planned.gone.length > 0)
+            if (planned.toDelete.length > 0)
               await runtime.disk({
                 kind: "delete-snapshots",
-                ids: planned.gone.map(snapshotId),
+                ids: planned.toDelete,
               })
           }
           let refreshing: Promise<void> = Promise.resolve()

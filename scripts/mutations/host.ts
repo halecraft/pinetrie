@@ -3471,4 +3471,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a run's start moves its canvas as the host's own write, with no one's name",
   },
+  {
+    name: "an archive deletes any name a record holds",
+    file: "apps/pinetrie/host/work/archive.ts",
+    from: '        snapshotOwner(s) === "entry" ? [deletableSnapshot("entry", s)] : [],',
+    to: '        true ? [deletableSnapshot("entry", s)] : [],',
+    command: unit,
+    expect:
+      "an archive deletes only entries' snapshots, and skips any other name",
+  },
 ]

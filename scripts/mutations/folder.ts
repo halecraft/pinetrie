@@ -55,11 +55,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planKeep sweeps what the live set keeps not, whether or not it exists",
     file: "packages/folder/keep.ts",
-    from: "      id => input.exists.has(id) && !live.has(id),\n",
-    to: "      id => !live.has(id),\n",
+    from: "      input.exists.has(id) &&\n      !live.has(id) &&\n",
+    to: "      !live.has(id) &&\n",
     command: unit,
     expect:
       "planKeep: a state whose snapshot is gone already is not swept again",
+  },
+  {
+    name: "planKeep offers a name no folder state holds",
+    file: "packages/folder/keep.ts",
+    from: '      !live.has(id) &&\n      snapshotOwner(id) === "folder-state"\n',
+    to: "      !live.has(id)\n",
+    command: unit,
+    expect: "planKeep: a state named as no folder state is left",
   },
   {
     name: "planKeep keeps a live state whose snapshot is gone",

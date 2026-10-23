@@ -3,7 +3,8 @@
 - **Status:** Accepted (Duane, 2026-10-21)
 - **Area:** `docs/06-interface.md`, `packages/vm/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
-  `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`
+  `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
+  `packages/core/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
   S317, S318, S319, S320, S321, S322, S323, S324, S326
 - **Revised:**
@@ -17,6 +18,12 @@
     a second host's start is refused, and a dead host's lock is taken by the
     next, with no time judged. A server outlives its host only for its call in
     flight.
+  - 2026-10-22: the delete takes core's `Deletable`, not an `Evictable` of
+    `@pinetrie/machine`'s: a project's snapshots hold the names of four owners
+    (an entry's, a folder state's, the base, no one's), and only
+    `deletableSnapshot`, checking the name's owner, makes one. So the upkeep's
+    rule deletes only entries, the folder code's only folder states, and
+    nothing the base or a name no owner holds.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

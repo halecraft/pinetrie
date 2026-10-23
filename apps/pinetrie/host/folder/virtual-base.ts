@@ -7,6 +7,7 @@
 
 import {
   type BasePlan,
+  deletableSnapshot,
   type PointId,
   pointId,
   snapshotId,
@@ -86,7 +87,7 @@ export async function baseState(
     if (made.length > 0)
       await r.runtime.disk({
         kind: "delete-snapshots",
-        ids: made.map(snapshotId),
+        ids: made.map(m => deletableSnapshot("folder-state", snapshotId(m))),
       })
   }
 }

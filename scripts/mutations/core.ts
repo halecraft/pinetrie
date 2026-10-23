@@ -5,7 +5,40 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/core"]
 const ids = "packages/core/ids.ts"
 const trailers = "packages/core/trailers.ts"
 
+const snapshots = "packages/core/snapshots.ts"
+
 export const mutations: readonly Mutation[] = [
+  {
+    name: "snapshotOwner takes a folder state's name for an entry",
+    file: snapshots,
+    from: "  /^[0-9a-f]{8}-[0-9a-f]{4}-7",
+    to: "  /[0-9a-f]{8}-[0-9a-f]{4}-7",
+    command: unit,
+    expect: "a name made for an owner is that owner's",
+  },
+  {
+    name: "snapshotOwner asks isFolderStateId before the UUID",
+    file: snapshots,
+    from: '  if (UUIDV7.test(name)) return "entry"\n  if (isFolderStateId(name)) return "folder-state"\n',
+    to: '  if (isFolderStateId(name)) return "folder-state"\n  if (UUIDV7.test(name)) return "entry"\n',
+    command: unit,
+    expect: "a name made for an owner is that owner's",
+  },
+  {
+    name: "deletableSnapshot checks no owner",
+    file: snapshots,
+    from: "  if (found !== owner)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "each rule takes its own owner's names and throws for every other",
+  },
+  {
+    name: "delete-snapshots takes a bare snapshot id",
+    file: "packages/core/disks.ts",
+    from: 'readonly kind: "delete-snapshots"; readonly ids: readonly Deletable[] }',
+    to: 'readonly kind: "delete-snapshots"; readonly ids: readonly SnapshotId[] }',
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
   {
     name: "parseSize reads a unit as decimal",
     file: "packages/core/size.ts",

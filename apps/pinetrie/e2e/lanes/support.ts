@@ -63,7 +63,7 @@ export {
   cli,
   container,
   containerExists,
-  deleteSnapshot,
+  deleteEntrySnapshot,
   dockerDisks,
   inDisks,
   isRunning,

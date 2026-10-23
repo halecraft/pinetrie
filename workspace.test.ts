@@ -48,6 +48,8 @@ const ROOT_TOOLING = [
   "@biomejs/biome",
   "@types/node",
   "esbuild",
+  // Property tests' generators, for tests and `fixtures.ts` alone.
+  "fast-check",
   "oxc-parser",
   "typescript",
   "vitest",

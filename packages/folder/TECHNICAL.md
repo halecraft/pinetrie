@@ -66,6 +66,9 @@ package and its tests use is imported from its module.
 - **What is kept** (`planKeep`, `keep.ts`): the snapshots the live set
   keeps not, to delete, and accepted work's states the history may show,
   newest first, each concurrent save before the accept it was made on.
+  What it deletes is `Deletable<"folder-state">` (core's `Deletable`):
+  folder states are the folder code's alone, no other rule deletes one,
+  and a state whose name is no folder state's is left, not offered.
 
 ## The graph (`graph.ts`)
 

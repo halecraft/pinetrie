@@ -7,6 +7,7 @@
 
 import {
   type BasePlan,
+  deletableSnapshot,
   type PointId,
   snapshotId,
   type TextMerged,
@@ -152,6 +153,6 @@ export async function dropUnrecordedBase(
   if (plan.kind === "virtual" && !recorded(plan.name))
     await runtime.disk({
       kind: "delete-snapshots",
-      ids: [snapshotId(plan.name)],
+      ids: [deletableSnapshot("folder-state", snapshotId(plan.name))],
     })
 }

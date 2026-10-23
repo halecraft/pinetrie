@@ -10,6 +10,7 @@
 
 import {
   type ConflictRecord,
+  deletableSnapshot,
   type ForkStart,
   folderCopyReady,
   getLatestStateId,
@@ -113,7 +114,7 @@ export function folderHistory(
     if (paths.length === 0) {
       await runtime.disk({
         kind: "delete-snapshots",
-        ids: [snapshotId(state)],
+        ids: [deletableSnapshot("folder-state", snapshotId(state))],
       })
       return { committed: null, newest, paths }
     }

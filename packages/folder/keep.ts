@@ -8,11 +8,15 @@
 
 import {
   type ConflictRecord,
+  type Deletable,
+  deletableSnapshot,
   lineStates,
   type PointId,
   type ProjectKind,
   type ProposedChangesRecord,
   type StateRecord,
+  snapshotId,
+  snapshotOwner,
   type ThreadId,
   type WriteJournal,
   writeContent,
@@ -28,8 +32,11 @@ import { liveStates } from "./live.ts"
 
 /** What a folder project keeps, decided: the snapshots that go, and accepted work's states kept. */
 export interface KeepPlanned {
-  /** States whose snapshots exist and that the live set keeps not. */
-  readonly gone: readonly PointId[]
+  /**
+   * States whose snapshots exist and that the live set keeps not. Only
+   * folder states' names: a record naming another owner's is left alone.
+   */
+  readonly toDelete: readonly Deletable<"folder-state">[]
   /**
    * Accepted work's line states and concurrent saves the live set keeps
    * and whose snapshots exist, newest first: accepted work's record's
@@ -56,7 +63,7 @@ export function planKeep(input: {
 }): KeepPlanned {
   const graph = stateGraph(input.states)
   const newest = folderNewest(graph)
-  if (newest === null) return { gone: [], kept: [], newest }
+  if (newest === null) return { toDelete: [], kept: [], newest }
   const lanes = input.lanes.flatMap(l => {
     const tip = laneNewest(graph, l.lane)
     const start = tip === null ? null : folderStateHeld(graph, tip)
@@ -97,8 +104,12 @@ export function planKeep(input: {
       : [],
   )
   return {
-    gone: [...graph.states.keys()].filter(
-      id => input.exists.has(id) && !live.has(id),
+    toDelete: [...graph.states.keys()].flatMap(id =>
+      input.exists.has(id) &&
+      !live.has(id) &&
+      snapshotOwner(id) === "folder-state"
+        ? [deletableSnapshot("folder-state", snapshotId(id))]
+        : [],
     ),
     kept,
     newest,

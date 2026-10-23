@@ -4,8 +4,9 @@
 // fails reported and passed; their history in the destination moved
 // (`lanesMoved`), which follows each lane's proposed changes (withdrawn, or
 // built again); the snapshots no one will branch from deleted in the
-// background.
+// background, entries' only.
 
+import { deletableSnapshot, snapshotOwner } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"
 import type { ArchiveTeardown } from "@pinetrie/rules"
@@ -43,10 +44,15 @@ export function createArchive(deps: {
         await destination
           .lanesMoved(refs)
           .catch(failed(basics, "moving archived or restored lanes' history"))
-      if (snapshots.length > 0)
+      // A record's snapshot is an entry's; any other name is left, never
+      // thrown over, so a teardown always finishes.
+      const entries = snapshots.flatMap(s =>
+        snapshotOwner(s) === "entry" ? [deletableSnapshot("entry", s)] : [],
+      )
+      if (entries.length > 0)
         void keeper.track(
           runtime
-            .disk({ kind: "delete-snapshots", ids: snapshots })
+            .disk({ kind: "delete-snapshots", ids: entries })
             .catch(failed(basics, "deleting snapshots")),
         )
     },

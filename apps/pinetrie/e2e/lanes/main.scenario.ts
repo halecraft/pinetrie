@@ -69,7 +69,7 @@ import {
   cli,
   container,
   containerExists,
-  deleteSnapshot,
+  deleteEntrySnapshot,
   jj,
   jjRefusal,
   projectSnapshots,
@@ -1339,7 +1339,7 @@ async function mainSection(
       await removeLane(project, two.name)
       for (const r of heldRootRecords(wh, readRevisions).values())
         if (r.lane === two.name && r.snapshot !== null)
-          await deleteSnapshot(project, r.snapshot)
+          await deleteEntrySnapshot(project, r.snapshot)
     }
     script.use([
       { tool: "bash", args: { command: "echo still" } },

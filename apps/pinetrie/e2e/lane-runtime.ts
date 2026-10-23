@@ -6,7 +6,12 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { type SnapshotId, snapshotId, type ThreadId } from "@pinetrie/core"
+import {
+  deletableSnapshot,
+  type SnapshotId,
+  snapshotId,
+  type ThreadId,
+} from "@pinetrie/core"
 import {
   LANEHOST_LABEL,
   NESTED_DISK,
@@ -150,14 +155,15 @@ export async function projectSnapshots(
   )
 }
 
-export async function deleteSnapshot(
+/** Delete an entry's snapshot, as the archive does: a revision record's. */
+export async function deleteEntrySnapshot(
   root: string,
   id: SnapshotId,
 ): Promise<void> {
   await lanehostOnce(root, {
     kind: "disk",
     project: projectKey(root),
-    op: { kind: "delete-snapshots", ids: [id] },
+    op: { kind: "delete-snapshots", ids: [deletableSnapshot("entry", id)] },
   })
 }
 

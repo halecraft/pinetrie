@@ -11,6 +11,7 @@ import path from "node:path"
 import {
   type BaseMerge,
   type ConflictRecord,
+  deletableSnapshot,
   ERR,
   entryId,
   type FolderProposedChangesRecord,
@@ -329,10 +330,10 @@ async function makeRig(): Promise<FolderRig> {
         exists: new Set((await runtime.snapshots()).map(pointId)),
       })
       kept = planned.kept
-      if (planned.gone.length > 0)
+      if (planned.toDelete.length > 0)
         await runtime.disk({
           kind: "delete-snapshots",
-          ids: planned.gone.map(snapshotId),
+          ids: planned.toDelete,
         })
       return planned
     },
@@ -359,7 +360,10 @@ async function makeRig(): Promise<FolderRig> {
     fileBytes: (state, file) => readFolderFile(reader, state, file),
     snapshotExists: state => runtime.snapshotExists(snapshotId(state)),
     deleteSnapshot: state =>
-      runtime.disk({ kind: "delete-snapshots", ids: [snapshotId(state)] }),
+      runtime.disk({
+        kind: "delete-snapshots",
+        ids: [deletableSnapshot("folder-state", snapshotId(state))],
+      }),
     graph,
     states: lane => laneStates(store.states(), lane),
 
@@ -556,7 +560,7 @@ describe.skipIf(!onBtrfs)(
         await recorded(branch, 2)
         await parent.write("a.txt", lines("P", "PP", "3", "4"))
         const p2 = await recorded(parent, 3)
-        expect((await rig.sweep()).gone).toContain(p1)
+        expect((await rig.sweep()).toDelete).toContain(p1)
         const merged = await merge(branch, withParent(parent, p2, p1))
         expect(merged.kind).toBe("clean")
         expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))

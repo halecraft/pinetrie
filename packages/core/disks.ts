@@ -2,6 +2,7 @@
 // two, and what a turn did to it beyond its commit.
 
 import type { TurnShared } from "./runs.ts"
+import type { Deletable } from "./snapshots.ts"
 
 declare const snapshotIdBrand: unique symbol
 /**
@@ -28,7 +29,8 @@ export type DiskOp<L extends string = string> =
       readonly snapshot: SnapshotId
     }
   | { readonly kind: "delete"; readonly lane: L }
-  | { readonly kind: "delete-snapshots"; readonly ids: readonly SnapshotId[] }
+  /** Only names their owner's rule said can go (`deletableSnapshot`). */
+  | { readonly kind: "delete-snapshots"; readonly ids: readonly Deletable[] }
   /**
    * A nested lane's inner Docker data root: a clone of `cloneFromLane`'s in
    * place of its own when that one is there, else its own as it is; the

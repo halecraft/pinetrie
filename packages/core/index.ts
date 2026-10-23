@@ -309,6 +309,11 @@ export {
   wideningWords,
 } from "./runs.ts"
 export { parseSize } from "./size.ts"
+export {
+  type Deletable,
+  deletableSnapshot,
+  snapshotOwner,
+} from "./snapshots.ts"
 export { firstLine } from "./text.ts"
 export {
   ADJECTIVES,

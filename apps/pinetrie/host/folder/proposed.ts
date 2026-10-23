@@ -11,6 +11,7 @@
 // the project's folder (`writes.ts`).
 
 import {
+  deletableSnapshot,
   ERR,
   type FolderProposedChangesRecord,
   type PointId,
@@ -103,7 +104,7 @@ export async function makeShownMerge(
   if (made)
     await reader.runtime.disk({
       kind: "delete-snapshots",
-      ids: [snapshotId(shown)],
+      ids: [deletableSnapshot("folder-state", snapshotId(shown))],
     })
   try {
     const { paths } = await withScratch(
@@ -207,7 +208,7 @@ export function startFolderProposedChanges(deps: {
     if (planned.drop !== null)
       await reader.runtime.disk({
         kind: "delete-snapshots",
-        ids: [snapshotId(planned.drop)],
+        ids: [deletableSnapshot("folder-state", snapshotId(planned.drop))],
       })
     deps.baseChanged(lane)
   }

@@ -78,7 +78,7 @@ A type lives in the highest package that all its users can import
 | `thread-names.ts` | a thread's name and its words |
 | `config.ts` | config as other packages name it |
 | `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
-| `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk, its snapshots and the operations on it (`DiskOp`) |
+| `lanes.ts`, `bases.ts`, `disks.ts`, `snapshots.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk, its snapshots and the operations on it (`DiskOp`); whose rule decides a snapshot's name, and the proof a deletion carries (`Deletable`) |
 | `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded; proposed changes' facts and decisions; the commit trailers |
 | `folder.ts`, `runs.ts`, `output.ts`, `images.ts` | a folder project's history; what a command did to a disk; what a `bash` call wrote, by statement; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
@@ -201,6 +201,28 @@ the disk events' ring, batches or held notices.
   timeout (S36).
 - The search tools run programs carried into every lane
   (`RUNTIME_PROGRAMS`, ADR-0064).
+
+## Snapshots and their owners (`snapshots.ts`)
+
+- **A project's `snapshots/` holds the names of four owners**
+  (`snapshotOwner`, total, ADR-0210): a bare UUIDv7 is an entry's (a turn's
+  or a merge's snapshot, in jj and folder projects alike); any other
+  `isFolderStateId` name is a folder state's; `base` is the base's; anything
+  else is no one's. The UUID is tested first: `isFolderStateId` accepts any
+  disk name with a dash, a UUID's too.
+- **A deletion needs its owner's proof.** `delete-snapshots` takes only
+  `Deletable` ids, and only `deletableSnapshot` makes one, throwing unless
+  the name is the owner's it is made for. `Deletable<"base">` and
+  `Deletable<"unknown">` cannot be written. So a rule written for one owner
+  cannot delete another's, and no one deletes the base or a name nothing
+  decided about. A caller that may meet another owner's name filters with
+  `snapshotOwner` first (the archive, `planKeep`), rather than throw.
+- **The pattern, for any destructive operation that gains a second
+  decider:** the operation takes a branded value, and the one maker of the
+  brand checks whose decision it is.
+- **Tests name snapshots of the owner they mean:** `@pinetrie/core/fixtures`
+  gives fixed entry names (`entrySnapshotId`) and `fast-check` generators of
+  each owner's (`SNAPSHOT_NAMES`, `OWNED_SNAPSHOT_NAME`).
 
 ## Proposed changes and accepted work (`proposed.ts`, `trailers.ts`)
 

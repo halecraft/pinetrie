@@ -18,7 +18,8 @@ import {
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import type { DiskChange } from "@pinetrie/core"
-import { snapshotId } from "@pinetrie/core"
+import { deletableSnapshot, snapshotId } from "@pinetrie/core"
+import { entrySnapshotId } from "@pinetrie/core/fixtures"
 import { afterAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import { isSubvolume } from "./btrfs.ts"
@@ -27,6 +28,9 @@ import { nestedDataRoot, projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
 import { streamChanges } from "./send-stream.ts"
 import { servingFrom } from "./serving.ts"
+
+/** A read-only snapshot the tests make and delete, an entry's. */
+const RO = entrySnapshotId(1)
 
 const BTRFS_MAGIC = 0x9123683e
 const HERE = path.join(import.meta.dirname, "node_modules", ".disks-test")
@@ -94,25 +98,25 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "l", snapshot: snapshotId("ro") },
+        op: { kind: "snapshot", lane: "l", snapshot: RO },
       })
       await expect(
-        writeFile(path.join(disks.snapshot("ro"), "x"), "no"),
+        writeFile(path.join(disks.snapshot(RO), "x"), "no"),
       ).rejects.toThrow()
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "restore", lane: "w", from: snapshotId("ro") },
+        op: { kind: "restore", lane: "w", from: RO },
       })
       await writeFile(path.join(disks.lane("w"), "x"), "yes")
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "delete-snapshots", ids: [snapshotId("ro")] },
+        op: { kind: "delete-snapshots", ids: [deletableSnapshot("entry", RO)] },
       })
       expect(
         await answer(
-          { kind: "snapshot-exists", project: KEY, snapshot: "ro" },
+          { kind: "snapshot-exists", project: KEY, snapshot: RO },
           serving,
         ),
       ).toBe(false)

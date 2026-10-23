@@ -28,6 +28,9 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   start. A lane's work reaches your repo as proposed changes, a revision
   or a stack you review before you accept it.
 
+Property tests use `fast-check`, a root dev dependency for tests and
+`fixtures.ts` alone. A failure prints its seed and path, which rerun it.
+
 ## Packages
 
 | package | role |

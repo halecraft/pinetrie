@@ -54,7 +54,7 @@ test("planKeep: a lane's tip and start, and accepted work's newest states kept; 
     ),
     state("line-2", { kind: "read" }, "line-1"),
   ]
-  expect(keep(states).gone).toEqual(["line-0", "start-a", "turn-a"])
+  expect(keep(states).toDelete).toEqual(["line-0", "start-a", "turn-a"])
 })
 
 test("planKeep: a branch's base with its parent kept, once the parent moved past it", () => {
@@ -75,7 +75,7 @@ test("planKeep: a branch's base with its parent kept, once the parent moved past
     state("start-b", { kind: "start", lane: BRANCH }, "turn-a"),
   ]
   expect(
-    keep(states, { lanes: [{ lane: BRANCH, history: "folder" }] }).gone,
+    keep(states, { lanes: [{ lane: BRANCH, history: "folder" }] }).toDelete,
   ).toEqual(["start-a", "turn-b"])
 })
 
@@ -85,7 +85,7 @@ test("planKeep: a state whose snapshot is gone already is not swept again", () =
     state("line-1", { kind: "read" }, "line-0"),
   ]
   expect(
-    keep(states, { lanes: [], exists: new Set([pointId("line-1")]) }).gone,
+    keep(states, { lanes: [], exists: new Set([pointId("line-1")]) }).toDelete,
   ).toEqual([])
 })
 
@@ -115,5 +115,14 @@ test("planKeep: kept names no state whose snapshot is gone, nor one swept", () =
     exists: new Set(["line-0", "line-2", "line-3"].map(pointId)),
   })
   expect(planned.kept).toEqual(["line-3", "line-2"])
-  expect(planned.gone).toEqual(["line-0"])
+  expect(planned.toDelete).toEqual(["line-0"])
+})
+
+test("planKeep: a state named as no folder state is left, never offered to delete", () => {
+  const states = [
+    state("base", { kind: "read" }),
+    state("line-1", { kind: "read" }, "base"),
+    state("line-2", { kind: "read" }, "line-1"),
+  ]
+  expect(keep(states).toDelete).toEqual(["line-1"])
 })
