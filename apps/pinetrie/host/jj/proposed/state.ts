@@ -20,7 +20,6 @@ import {
 import type { ProposedChangesInput, RepoOwner } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
 import {
-  readArchived,
   readBases,
   readNames,
   readProposedByLane,
@@ -28,7 +27,6 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  archivedIn,
   BASE,
   type BaseRecord,
   deleteRecord,
@@ -39,7 +37,7 @@ import {
 import { readLaneTip } from "@pinetrie/schema"
 import { laneFirstPrompt, projectTranscript } from "@pinetrie/threads"
 import type { LeaseBasics } from "../../basics.ts"
-import { canvasesNow } from "../../canvases.ts"
+import { isLaneArchived } from "../../canvases.ts"
 import type { Records } from "../../records.ts"
 
 /** What the documents say of a lane, for what your repo cannot say. */
@@ -113,18 +111,8 @@ export function createProposedChangesDeps(input: {
   const nameOf = (lane: ThreadId) => readNames(doc).get(lane)
   const proposedDocs: ProposedChangesDocs = {
     nameOf,
-    archived(lane) {
-      const canvas = canvasesNow({
-        places: basics.places,
-        session: doc,
-      }).canvasOfThread.get(lane)
-      return (
-        archivedIn(
-          canvas === undefined ? [] : [canvas],
-          readArchived(doc, basics.places),
-        ) !== null
-      )
-    },
+    archived: lane =>
+      isLaneArchived({ places: basics.places, session: doc }, lane),
     input: lane => ({
       lane,
       name: nameOf(lane),

@@ -49,12 +49,30 @@ describe("a lane's fork: owed with its record, begun at its end", () => {
   test("a fork record round-trips owed, and begun with or without lost", () => {
     for (const fork of [
       { lane: LANE, base: "wip", state: "owed" },
-      { lane: LANE, base: null, state: "begun", lost: snapshotId("e1") },
-      { lane: LANE, base: null, state: "begun", lost: null },
+      {
+        lane: LANE,
+        base: null,
+        state: "begun",
+        lost: snapshotId("e1"),
+        instead: "point",
+      },
+      {
+        lane: LANE,
+        base: null,
+        state: "begun",
+        lost: snapshotId("e1"),
+        instead: "base",
+      },
+      { lane: LANE, base: null, state: "begun", lost: null, instead: null },
     ] as const) {
       const w = setRecord(LANE_FORK, fork)
       expect(LANE_FORK.decode(w.value, w.key)).toEqual(fork)
     }
+  })
+  test("a fork begun before it was said where its files came from lost them to its base", () => {
+    expect(
+      LANE_FORK.decode({ base: null, state: "begun", lost: "e1" }, LANE),
+    ).toMatchObject({ lost: "e1", instead: "base" })
   })
   test("a begun fork with no lost does not decode", () => {
     expect(
@@ -294,8 +312,17 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
   })
   const lanes = new Map([[LANE, record(LANE, "jj")]])
   const fork = (
-    input: Pick<Parameters<typeof forkSource>[0], "above" | "begin" | "kept">,
-  ) => forkSource({ ...input, lane: record(NEW, "jj"), lanes, kind: "jj" })
+    input: Pick<Parameters<typeof forkSource>[0], "above" | "begin" | "kept"> &
+      Partial<Parameters<typeof forkSource>[0]>,
+  ) =>
+    forkSource({
+      pointKept: false,
+      nearestKept: null,
+      lane: record(NEW, "jj"),
+      lanes,
+      kind: "jj",
+      ...input,
+    })
   test("from a turn: its snapshot and the commit above", () => {
     expect(
       fork({
@@ -314,9 +341,54 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
       snapshot: S,
       start: { kind: "recorded", points: [C2] },
       lost: null,
+      instead: null,
     })
   })
-  test("from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost", () => {
+  test("from a turn whose snapshot is gone in an open lane: the nearest older snapshot, and the turn's commit", () => {
+    const older = snapshotId("e0")
+    expect(
+      fork({
+        above: {
+          lane: LANE,
+          point: C2,
+          pointLane: LANE,
+          snapshot: S,
+          snapshotLane: LANE,
+        },
+        begin,
+        kept: false,
+        pointKept: true,
+        nearestKept: older,
+      }),
+    ).toEqual({
+      kind: "source",
+      snapshot: older,
+      start: { kind: "recorded", points: [C2] },
+      lost: S,
+      instead: "point",
+    })
+  })
+  test("from a folder turn whose snapshot is gone: its state's own snapshot, and the state", () => {
+    expect(
+      fork({
+        above: {
+          lane: LANE,
+          point: pointId("turn-1"),
+          pointLane: LANE,
+          snapshot: S,
+          snapshotLane: LANE,
+        },
+        begin,
+        kept: false,
+        pointKept: true,
+        nearestKept: snapshotId("e0"),
+        lane: record(NEW, "folder"),
+        lanes: new Map([[LANE, record(LANE, "folder")]]),
+        kind: "folder",
+      }),
+    ).toMatchObject({ snapshot: "turn-1", lost: S, instead: "point" })
+  })
+  test("from a turn whose snapshot is gone and whose point is not (an archived lane's): the base snapshot and where agent work begins, its snapshot named lost", () => {
     expect(
       fork({
         above: {
@@ -334,6 +406,7 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
       snapshot: BASE_SNAPSHOT,
       start: begin,
       lost: S,
+      instead: "base",
     })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
@@ -354,6 +427,7 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
       snapshot: BASE_SNAPSHOT,
       start: { kind: "recorded", points: [C2] },
       lost: null,
+      instead: null,
     })
   })
   test("from nothing: the base snapshot, and where agent work begins", () => {
@@ -374,6 +448,7 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
       snapshot: BASE_SNAPSHOT,
       start: begin,
       lost: null,
+      instead: null,
     })
   })
   test("a disk of another kind than the new lane's record is refused", () => {
@@ -390,6 +465,8 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
         above,
         begin,
         kept: true,
+        pointKept: false,
+        nearestKept: null,
         lane: record(NEW, "jj"),
         lanes: folder,
         kind: "jj",
@@ -562,11 +639,12 @@ test("planForkEnd: the history's start records, then the fork begun, its lost ca
   const writes = planForkEnd({
     fork: { lane, base: "wip", state: "owed" },
     lost: snapshotId("e1"),
+    instead: "point",
     start: { writes: [start] },
   })
   expect(writes.map(w => ("value" in w ? w.value : null))).toEqual([
     start.value,
-    { base: "wip", state: "begun", lost: "e1" },
+    { base: "wip", state: "begun", lost: "e1", instead: "point" },
   ])
 })
 
@@ -574,6 +652,12 @@ test("planForkRedo: a fork run again is owed until its end; a first one writes n
   const lane = threadIdFor("2")
   expect(planForkRedo({ lane, base: "wip", state: "owed" })).toEqual([])
   expect(
-    planForkRedo({ lane, base: "wip", state: "begun", lost: null }),
+    planForkRedo({
+      lane,
+      base: "wip",
+      state: "begun",
+      lost: null,
+      instead: null,
+    }),
   ).toEqual([setRecord(LANE_FORK, { lane, base: "wip", state: "owed" })])
 })

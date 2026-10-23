@@ -317,6 +317,11 @@ paths are its diff." would compare a function with itself.
   folder, `laneIgnores` does not list it, and the adapter's first command
   could snapshot it into the working copy the clone carries. jj's setup is
   `packages/jj/TECHNICAL.md`'s (A lane's repo).
+- **A fork whose source vanishes before its clone gathers again, once**
+  (the host's `fork`, `apps/pinetrie/host/work/create.ts`): the disk
+  upkeep can delete a snapshot between a fork's gather and its clone, and
+  a second gather finds the nearest still there. A source the fork marks
+  branched before its clone is never the upkeep's to take.
 - **The base snapshot is made in a scratch lane that is no thread's**
   (a `BaseLane`): a container, a disk and snapshots are named by
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and

@@ -630,6 +630,7 @@ export {
   LANE,
   LANE_FORK,
   type LaneForkRecord,
+  type LostInstead,
   PROJECT,
   PROJECT_KEY,
   type ProjectRecord,

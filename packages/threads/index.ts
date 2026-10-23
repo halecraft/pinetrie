@@ -366,6 +366,7 @@ export {
   type Above,
   forkParent,
   laneFirstPrompt,
+  nearestKeptSnapshot,
   nearestRevision,
   pointConflicts,
 } from "./work.ts"

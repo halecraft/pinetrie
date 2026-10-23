@@ -898,4 +898,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an image's margin keeps the version a comment was written on, which its key compares by no rule",
   },
+  {
+    name: "nearestKeptSnapshot passes over nothing gone",
+    file: "packages/threads/work.ts",
+    from: "    if (snapshot !== null && !gone.has(snapshot)) return snapshot\n",
+    to: "    if (snapshot !== null) return snapshot\n",
+    command: unit,
+    expect: "each gone one passed over, to the next above",
+  },
 ]

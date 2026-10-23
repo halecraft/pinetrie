@@ -3513,4 +3513,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a restore keeps its lanes' snapshots marked to delete",
   },
+  {
+    name: "forkFacts forgets what the index knows is gone",
+    file: "apps/pinetrie/host/work/create.ts",
+    from: "  const nearest = ports.nearestKept(new Set([...ports.gone(), above.snapshot]))\n",
+    to: "  const nearest = ports.nearestKept(new Set([above.snapshot]))\n",
+    command: unit,
+    expect:
+      "forkFacts, the snapshot above gone, finds the nearest older one still there",
+  },
 ]

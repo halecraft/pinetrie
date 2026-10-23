@@ -12,6 +12,7 @@ import {
   type ProjectKind,
   ROOT,
   type SnapshotId,
+  snapshotId,
   type ThreadId,
   type ValueWrite,
   type WriterId,
@@ -38,6 +39,7 @@ import {
   foreignLaneWords,
   forkSource,
   type LaneForkRecord,
+  type LostInstead,
   planForkEnd,
   planForkRedo,
   planLaneRecords,
@@ -45,10 +47,12 @@ import {
 } from "@pinetrie/rules"
 import {
   forkEntry,
+  nearestKeptSnapshot,
   nearestRevision,
   type ThreadOrigin,
 } from "@pinetrie/threads"
 import type { Basics, LeaseBasics } from "../basics.ts"
+import { isLaneArchived } from "../canvases.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
 import type { InnerDockerDataRootsHeld } from "./inner-docker-data-roots.ts"
@@ -65,10 +69,22 @@ export async function forkFacts(ports: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly nearest: () => ReturnType<typeof nearestRevision>
   readonly begin: () => Promise<ForkBegin | ErrCode>
-  /** Whether a snapshot is still there: archiving deletes some. */
+  /** Whether a snapshot is still there: the disk upkeep deletes some a record names. */
   readonly exists: (snapshot: SnapshotId) => Promise<boolean>
+  /** The nearest snapshot above not `gone` (`nearestKeptSnapshot`). */
+  readonly nearestKept: (gone: ReadonlySet<SnapshotId>) => SnapshotId | null
+  /** What the index knows is gone: its rows marked to delete or deleted. */
+  readonly gone: () => ReadonlySet<SnapshotId>
+  /** Whether the point above can still be checked out, its snapshot gone (`forkSource`'s `pointKept`). */
+  readonly pointKept: (
+    above: ReturnType<typeof nearestRevision>,
+  ) => Promise<boolean>
 }): Promise<
-  Pick<Parameters<typeof forkSource>[0], "above" | "begin" | "kept"> | ErrCode
+  | Pick<
+      Parameters<typeof forkSource>[0],
+      "above" | "begin" | "kept" | "pointKept" | "nearestKept"
+    >
+  | ErrCode
 > {
   await ports.pendingRecords()
   const above = ports.nearest()
@@ -78,7 +94,19 @@ export async function forkFacts(ports: {
     above.snapshot === null ||
     above.snapshot === BASE_SNAPSHOT ||
     (await ports.exists(above.snapshot))
-  return { above, begin, kept }
+  if (kept || above.snapshot === null)
+    return { above, begin, kept, pointKept: false, nearestKept: null }
+  const nearest = ports.nearestKept(new Set([...ports.gone(), above.snapshot]))
+  // The index can lag: the one found is checked, and none is the base.
+  const nearestKept =
+    nearest !== null && (await ports.exists(nearest)) ? nearest : null
+  return {
+    above,
+    begin,
+    kept,
+    pointKept: above.point !== null && (await ports.pointKept(above)),
+    nearestKept,
+  }
 }
 
 export interface NewLanes {
@@ -173,6 +201,7 @@ export async function prepareLane(
 export const forkEnd = (input: {
   readonly fork: LaneForkRecord
   readonly lost: SnapshotId | null
+  readonly instead: LostInstead | null
   readonly forked: Forked
   readonly start: StartRecords
 }): readonly ValueWrite<"session">[] => planForkEnd(input)
@@ -196,7 +225,7 @@ export function createNewLanes(deps: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly destination: Pick<Destination, "begin">
   readonly innerDockerDataRoots: InnerDockerDataRootsHeld
-  readonly snapshots: Pick<SnapshotTaking, "markUsed">
+  readonly snapshots: Pick<SnapshotTaking, "markUsed" | "rows">
 }): NewLanes {
   const { basics, setup, destination } = deps
   const { session } = basics
@@ -228,52 +257,105 @@ export function createNewLanes(deps: {
       if (held === null) throw new Error(`${lane} is in no root`)
       const doc = await held.ready
       const at = forkPosition(readThreads(session).get(lane)?.origin)
-      const facts = await forkFacts({
-        pendingRecords: deps.pendingRecords,
-        nearest: () =>
-          nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-        begin: () => destination.begin(fork.base),
-        exists: id => runtime.snapshotExists(id),
-      })
-      if (typeof facts === "string")
-        throw new Error(`the lane cannot begin: ${facts}`)
-      // plan
-      const source = forkSource({
-        ...facts,
-        lane: record,
-        lanes: readLaneRecords(session),
-        kind,
-      })
-      if (source.kind === "foreign") throw new Error(foreignLaneWords(source))
-      // Before the clone: a branched snapshot is never deleted while its lane
-      // lives, so none is taken from under the fork. Unrecorded, the fork
-      // still runs.
-      try {
-        deps.snapshots.markUsed(source.snapshot, true)
-      } catch {}
-      const forkSetup = h.forkSteps(source.start)
-      const dataRoot = deps.innerDockerDataRoots.sourceAtFork(
-        lane,
-        facts.above.snapshotLane,
-      )
-      const steps = planFork({
-        source,
-        spec: setup.specOf(lane),
-        env: process.env,
-        setup: forkSetup,
-        innerDockerDataRoot: dataRoot,
-      })
+      const exists = (id: SnapshotId) => runtime.snapshotExists(id)
+      /** Gathered and planned; the source checked again before the clone. */
+      const planned = async () => {
+        // gather
+        const facts = await forkFacts({
+          pendingRecords: deps.pendingRecords,
+          nearest: () =>
+            nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
+          begin: () => destination.begin(fork.base),
+          exists,
+          nearestKept: gone =>
+            nearestKeptSnapshot(
+              readTreeIndex(doc),
+              readRevisions(doc),
+              at,
+              gone,
+            ),
+          gone: () =>
+            new Set(
+              deps.snapshots
+                .rows()
+                .filter(r => r.state === "to-delete" || r.state === "deleted")
+                .map(r => r.snapshot),
+            ),
+          pointKept: above =>
+            kind === "jj"
+              ? Promise.resolve(
+                  above.pointLane !== null &&
+                    !isLaneArchived(
+                      { places: basics.places, session },
+                      above.pointLane,
+                    ),
+                )
+              : above.point === null
+                ? Promise.resolve(false)
+                : exists(snapshotId(above.point)),
+        })
+        if (typeof facts === "string")
+          throw new Error(`the lane cannot begin: ${facts}`)
+        // plan
+        const source = forkSource({
+          ...facts,
+          lane: record,
+          lanes: readLaneRecords(session),
+          kind,
+        })
+        if (source.kind === "foreign") throw new Error(foreignLaneWords(source))
+        // Before the clone: a branched snapshot is never deleted while its
+        // lane lives, so none is taken from under the fork. Unrecorded, the
+        // fork still runs.
+        try {
+          deps.snapshots.markUsed(source.snapshot, true)
+        } catch {}
+        const forkSetup = h.forkSteps(source.start)
+        const dataRoot = deps.innerDockerDataRoots.sourceAtFork(
+          lane,
+          facts.above.snapshotLane,
+        )
+        const steps = planFork({
+          source,
+          spec: setup.specOf(lane),
+          env: process.env,
+          setup: forkSetup,
+          innerDockerDataRoot: dataRoot,
+        })
+        return { source, forkSetup, steps }
+      }
       // execute
       const redo = planForkRedo(fork)
       if (redo.length > 0) await deps.records.writeValues(redo)
-      if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
-        await setup.baseAtAccepted()
-      const forked = await executeFork(steps, handle.runners)
+      let plan = await planned()
+      const run = async (p: typeof plan) => {
+        if (p.forkSetup.from === null && p.source.snapshot === BASE_SNAPSHOT)
+          await setup.baseAtAccepted()
+        return executeFork(p.steps, handle.runners)
+      }
+      let forked: Awaited<ReturnType<typeof executeFork>>
+      try {
+        forked = await run(plan)
+      } catch (error) {
+        // Its source deleted between the gather and the clone: gathered
+        // again, once, from what is still there.
+        const cloned = plan.forkSetup.from ?? plan.source.snapshot
+        if (cloned === BASE_SNAPSHOT || (await exists(cloned))) throw error
+        plan = await planned()
+        forked = await run(plan)
+      }
+      const { source, steps } = plan
       if (steps.dataRoot !== null)
         deps.innerDockerDataRoots.made(lane, steps.dataRoot)
       const start = await h.startRecords(source.start)
       await deps.records.writeValues(
-        forkEnd({ fork, lost: source.lost, forked, start }),
+        forkEnd({
+          fork,
+          lost: source.lost,
+          instead: source.instead,
+          forked,
+          start,
+        }),
       )
       // The fork's `run` made it, and started it.
       await handle.start("running")

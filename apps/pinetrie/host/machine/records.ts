@@ -9,15 +9,9 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { RecordedSnapshot, StoreRecords } from "@pinetrie/machine"
-import {
-  readArchived,
-  readLaneRecords,
-  readRevisions,
-  readRoots,
-} from "@pinetrie/reads"
-import { archivedIn } from "@pinetrie/rules"
+import { readLaneRecords, readRevisions, readRoots } from "@pinetrie/reads"
 import type { LeaseBasics } from "../basics.ts"
-import { canvasesNow } from "../canvases.ts"
+import { isLaneArchived } from "../canvases.ts"
 import type { MachineReach } from "../work/runtime.ts"
 
 /** The paths a record says its turn changed, those its disk lists among them: what its snapshot's cost follows. */
@@ -52,18 +46,8 @@ export function createStoreRecords(deps: {
 }): StoreRecords {
   const { basics } = deps
   const { session } = basics
-  const isArchived = (lane: ThreadId) => {
-    const canvas = canvasesNow({
-      places: basics.places,
-      session,
-    }).canvasOfThread.get(lane)
-    return (
-      archivedIn(
-        canvas === undefined ? [] : [canvas],
-        readArchived(session, basics.places),
-      ) !== null
-    )
-  }
+  const isArchived = (lane: ThreadId) =>
+    isLaneArchived({ places: basics.places, session }, lane)
   return {
     roots: async () => [...readRoots(session).keys()],
     async snapshotsOf(root) {

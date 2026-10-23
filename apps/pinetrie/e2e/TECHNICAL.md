@@ -182,6 +182,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |
+| `lanes/store-upkeep` | the disk upkeep under a budget no snapshot fits: a lane's old turns' snapshots evicted, its newest and the base kept, a branch from an evicted turn keeping that turn's files in a jj project, and a folder project's states left to the folder code (ADR-0210) |
 | `lanes/ssh` | a lane's ssh through its host: service identities, the owner's approval, the broker and a revoke (ADR-0140, S174) |
 | `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147), its Docker's cache capped (ADR-0169) |
 | `observer/kernel` | the observer that attributes a lane's file calls to its runs, on the lane VM's own kernel (ADR-0135; S172, S176) |

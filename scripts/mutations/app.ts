@@ -24,7 +24,7 @@ export const mutations: readonly Mutation[] = [
     to: "        await removeLane(runtime, lane)\n",
     command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/work"],
     expect:
-      "a lane whose removal fails leaves the other lanes removed and the snapshots deleted",
+      "a lane whose removal fails leaves the other lanes removed and the snapshots marked to delete",
   },
 
   // ── agents talking, the host suite's agents scenario ──
@@ -80,8 +80,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new lane forks from the root, not where it branched",
     file: "apps/pinetrie/host/work/create.ts",
-    from: "          nearestRevision(readTreeIndex(doc), readRevisions(doc), at),\n        begin:",
-    to: '          nearestRevision(readTreeIndex(doc), readRevisions(doc), { kind: "root" }),\n        begin:',
+    from: "            nearestRevision(readTreeIndex(doc), readRevisions(doc), at),\n          begin:",
+    to: '            nearestRevision(readTreeIndex(doc), readRevisions(doc), { kind: "root" }),\n          begin:',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -3514,5 +3514,33 @@ export const mutations: readonly Mutation[] = [
     scenario: "package",
     expect:
       "a lane runs its command through the installed package's bundled helper",
+  },
+  {
+    name: "a jj fork never keeps a lost turn's point",
+    file: "apps/pinetrie/host/work/create.ts",
+    from: "                  above.pointLane !== null &&\n",
+    to: "                  false &&\n",
+    suite: "lanes",
+    scenario: "store-upkeep",
+    expect: "a branch from an evicted turn keeps that turn's files",
+  },
+  {
+    name: "the upkeep evicts nothing under its budget",
+    file: "packages/machine/retention.ts",
+    from: "    if (!(cost > facts.budget || roomLow())) break\n",
+    to: "    break\n",
+    suite: "lanes",
+    scenario: "store-upkeep",
+    expect:
+      "the upkeep evicts a lane's old turns' snapshots under its budget, and keeps its newest and the base",
+  },
+  {
+    name: "the store's adapter deletes everything listed, not what it is given",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: '    deleteSnapshots: ids => runtime.disk({ kind: "delete-snapshots", ids }),\n',
+    to: '    deleteSnapshots: async () =>\n      runtime.disk({\n        kind: "delete-snapshots",\n        ids: (await runtime.storeListing()).snapshots as never,\n      }),\n',
+    suite: "lanes",
+    scenario: "store-upkeep",
+    expect: "the upkeep never deletes a folder state",
   },
 ]

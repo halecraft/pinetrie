@@ -70,6 +70,26 @@ export function nearestRevision(
   return { lane, point, pointLane, snapshot, snapshotLane }
 }
 
+/**
+ * The nearest snapshot above `at` that is not `gone`: what a fork clones for
+ * the files a lost snapshot's commit leaves untracked. `gone` is what the
+ * host knows is: the lost one, and the index's rows marked to delete or
+ * deleted; the host still checks the one found is there.
+ */
+export function nearestKeptSnapshot(
+  index: TreeIndex,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
+  at: Position,
+  gone: ReadonlySet<SnapshotId>,
+): SnapshotId | null {
+  if (at.kind === "root") return null
+  for (const id of ancestry(index, at.id).path) {
+    const snapshot = revisions.get(id)?.snapshot ?? null
+    if (snapshot !== null && !gone.has(snapshot)) return snapshot
+  }
+  return null
+}
+
 /** The thread a lane's copy was cloned from, and the state it was cloned at. */
 interface ForkParent {
   readonly lane: ThreadId

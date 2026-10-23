@@ -31,6 +31,7 @@ import {
 import { Type } from "typebox"
 import type { ForkBegin } from "./base.ts"
 import {
+  choiceSchema,
   decodeRecord,
   entryKey,
   fixedKey,
@@ -354,6 +355,14 @@ export function sourceHistory(input: {
   return input.lanes.get(snapshotLane)?.history ?? input.kind
 }
 
+/**
+ * Where a lost snapshot's files came from instead: `point`, the lost turn's
+ * tracked files from its recorded point and the rest from an earlier
+ * snapshot, or none; `base`, the thread's base.
+ */
+const LOST_INSTEAD = ["point", "base"] as const
+export type LostInstead = (typeof LOST_INSTEAD)[number]
+
 /** Where a fork starts: the snapshot it clones and the state it starts on. */
 interface ForkSource {
   readonly kind: "source"
@@ -361,11 +370,20 @@ interface ForkSource {
   readonly start: ForkStart
   /** The snapshot it should have cloned and could not: gone. Null when its files were kept. */
   readonly lost: SnapshotId | null
+  /** Where the lost one's files came from instead; null when nothing was lost. */
+  readonly instead: LostInstead | null
 }
 
 /**
  * Where `lane`, a new lane of its own, starts. With a revision above it: the
  * nearest snapshot above, else the base snapshot, and that revision's state.
+ * A snapshot above that is gone, whatever removed it (the disk upkeep, a
+ * failed snapshot, a person), keeps the revision's state while its point
+ * can still be checked out: a jj fork clones the nearest older snapshot still
+ * there for the files the commit leaves untracked, and starts on the commit;
+ * a folder fork clones the state's own snapshot. Otherwise (an archived
+ * lane's ref is deleted, a folder state its history no longer keeps) the
+ * fork starts from its base, and says so.
  * With none (a root thread, or a branch above any agent work): the base
  * snapshot, which is accepted work's, and `begin`: accepted work, or a WIP's
  * copy. Either way the fork starts on a commit of its own, because a cloned
@@ -377,12 +395,16 @@ interface ForkSource {
 export function forkSource(input: {
   readonly above: Above
   readonly begin: ForkBegin
-  /**
-   * Whether the snapshot above is still there. Archiving deletes snapshots
-   * its revision records still name (`planRetention`), so one that is gone
-   * is read as missing: the fork starts from its base.
-   */
+  /** Whether the snapshot above is still there: the disk upkeep deletes some a record names. */
   readonly kept: boolean
+  /**
+   * Whether the revision's point above can still be checked out, should its
+   * snapshot be gone: for jj, its lane's ref is there (no archived canvas);
+   * for a folder project, its state's snapshot is.
+   */
+  readonly pointKept: boolean
+  /** The nearest snapshot above still there, other than the one gone; null for none. */
+  readonly nearestKept: SnapshotId | null
   /** The new lane's record, its history decided when it was written. */
   readonly lane: OwnLane
   readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
@@ -392,25 +414,40 @@ export function forkSource(input: {
   const history = sourceHistory(input)
   if (history !== input.lane.history)
     return { kind: "foreign", lane: input.lane.lane, history }
-  if (above.snapshot !== null && !input.kept)
+  if (above.snapshot !== null && !input.kept) {
+    if (above.point !== null && input.pointKept)
+      return {
+        kind: "source",
+        snapshot:
+          input.kind === "folder"
+            ? snapshotId(above.point)
+            : (input.nearestKept ?? BASE_SNAPSHOT),
+        start: { kind: "recorded", points: [above.point] },
+        lost: above.snapshot,
+        instead: "point",
+      }
     return {
       kind: "source",
       snapshot: BASE_SNAPSHOT,
       start: input.begin,
       lost: above.snapshot,
+      instead: "base",
     }
+  }
   return above.point === null
     ? {
         kind: "source",
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: input.begin,
         lost: null,
+        instead: null,
       }
     : {
         kind: "source",
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: { kind: "recorded", points: [above.point] },
         lost: null,
+        instead: null,
       }
 }
 
@@ -430,6 +467,8 @@ export type LaneForkRecord = {
       readonly state: "begun"
       /** The snapshot its source would have cloned, when that was not kept: its fork row says so. */
       readonly lost: SnapshotId | null
+      /** Where the lost one's files came from instead (`LostInstead`); null when nothing was lost. */
+      readonly instead: LostInstead | null
     }
 )
 
@@ -442,6 +481,11 @@ const LaneForkSchema = Type.Union([
     state: Type.Literal("begun"),
     base: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
     lost: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    // Absent from a fork begun before it: one that lost its snapshot then
+    // started from its base.
+    instead: Type.Optional(
+      Type.Union([choiceSchema(LOST_INSTEAD), Type.Null()]),
+    ),
   }),
 ])
 
@@ -460,6 +504,7 @@ export const LANE_FORK: RecordSpec<LaneForkRecord, ThreadId, "session"> = {
             base: r.base,
             state: "begun",
             lost: r.lost === null ? null : snapshotId(r.lost),
+            instead: r.instead ?? (r.lost === null ? null : "base"),
           },
     ),
 }
@@ -488,6 +533,7 @@ export const planForkRedo = (
 export const planForkEnd = (input: {
   readonly fork: LaneForkRecord
   readonly lost: SnapshotId | null
+  readonly instead: LostInstead | null
   readonly start: { readonly writes: readonly ValueWrite<"session">[] }
 }): readonly ValueWrite<"session">[] => [
   ...input.start.writes,
@@ -496,6 +542,7 @@ export const planForkEnd = (input: {
     base: input.fork.base,
     state: "begun",
     lost: input.lost,
+    instead: input.instead,
   }),
 ]
 

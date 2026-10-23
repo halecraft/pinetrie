@@ -749,19 +749,28 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   if (parent === null) return null
   const link = origins.linkOf(parent)
   const copied = fork?.how === "copy"
-  // A branch whose parent is on this canvas names the message it forks from.
-  if (!copied && link.kind === "open" && link.canvas === origins.canvas)
+  const laneFork = f.work.laneForks.get(thread)
+  const begun = laneFork?.state === "begun" ? laneFork : null
+  const lost =
+    begun?.instead === "point"
+      ? ["started from an earlier turn's installed files; reinstall if needed"]
+      : copied && begun !== null && begun.lost !== null
+        ? ["its files could not be copied"]
+        : []
+  // A branch whose parent is on this canvas names the message it forks from,
+  // unless its files have something to say.
+  if (
+    !copied &&
+    lost.length === 0 &&
+    link.kind === "open" &&
+    link.canvas === origins.canvas
+  )
     return null
   const name = f.work.names.get(parent) ?? "a thread"
   const where =
     link.kind === "open" && link.canvas === origins.canvas
       ? []
       : [linkWords(link, origins.reader, origins.labelOf)]
-  const laneFork = f.work.laneForks.get(thread)
-  const lost =
-    copied && laneFork?.state === "begun" && laneFork.lost !== null
-      ? ["its files could not be copied"]
-      : []
   return {
     kind: "source",
     copied,

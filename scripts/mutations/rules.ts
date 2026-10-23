@@ -2417,8 +2417,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "forkPoint starts every fork from your @",
     file: "packages/rules/work.ts",
-    from: '        start: { kind: "recorded", points: [above.point] },',
-    to: '        start: { kind: "copy", ...input.yours },',
+    from: '        start: { kind: "recorded", points: [above.point] },\n        lost: null,',
+    to: '        start: { kind: "copy", ...input.yours },\n        lost: null,',
     command: unit,
     expect: "from a turn: its snapshot and the commit above",
   },
@@ -4613,11 +4613,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork clones a snapshot that is gone",
     file: "packages/rules/work.ts",
-    from: "  if (above.snapshot !== null && !input.kept)\n",
-    to: "  if (above.snapshot !== null && !input.kept && input.kept)\n",
+    from: "  if (above.snapshot !== null && !input.kept) {\n",
+    to: "  if (above.snapshot !== null && !input.kept && input.kept) {\n",
     command: unit,
     expect:
-      "from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost",
+      "from a turn whose snapshot is gone and whose point is not (an archived lane's): the base snapshot and where agent work begins, its snapshot named lost",
   },
   {
     name: "a copy leaves its source's title behind",
@@ -5541,5 +5541,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a canvas's stateChanged round-trips, and a row without it reads unchanged",
+  },
+  {
+    name: "forkSource starts from the base for an open lane's lost snapshot",
+    file: "packages/rules/work.ts",
+    from: "    if (above.point !== null && input.pointKept)\n",
+    to: "    if (false)\n",
+    command: unit,
+    expect:
+      "from a turn whose snapshot is gone in an open lane: the nearest older snapshot, and the turn's commit",
   },
 ]

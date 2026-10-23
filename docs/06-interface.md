@@ -604,6 +604,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   asks the agent, from the files of that end's turn (ADR-0021); if those
   were not kept, it starts from its base, and its fork row says so. An
   archived thread copies.
+- **A branch from a turn whose snapshot is gone keeps that turn's files
+  where its history can** (ADR-0210): in a jj project, while the turn's
+  lane is open, its tracked files are the turn's, and what the commit
+  leaves untracked (installed dependencies, build output) comes from an
+  earlier turn's snapshot; its fork row says "started from an earlier
+  turn's installed files; reinstall if needed", on its own canvas too.
+  Otherwise it starts from its base, as a copy does.
 - **A thread from another root shows its path from that root**, the part
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with

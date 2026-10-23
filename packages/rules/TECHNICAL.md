@@ -1616,7 +1616,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
-| a lane of its own's fork: the unfinished work it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`planForkEnd`, through the host's `forkEnd`, which takes a `Forked`) |
+| a lane of its own's fork: the unfinished work it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167), and `instead`, where its files came from then (`point` or `base`, ADR-0210) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`planForkEnd`, through the host's `forkEnd`, which takes a `Forked`) |
 | the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (a migration, since deleted, moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
@@ -1834,10 +1834,18 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   refuses a disk of another kind than the new lane's record
   (`ForeignLane`), never told apart by a missing field. The start is always named: a cloned disk carries its
   parent's working-copy change, and the fork must leave it (S42). A snapshot
-  that is gone (`kept` false, which the host asks the runtime) is read as
-  missing: the fork starts from its base, and names the snapshot `lost`;
-  the lane's begun fork record carries it (`LANE_FORK`), which a copy's
-  fork row reads (ADR-0124).
+  that is gone (`kept` false, which the host asks the runtime), whatever
+  removed it, keeps the revision's state while its point can still be
+  checked out (`pointKept`, ADR-0210, S320): a jj fork clones the nearest
+  older snapshot still there (`nearestKept`) for what the commit leaves
+  untracked, else the base, and starts on the commit; a folder fork clones
+  the state's own snapshot. Otherwise (an archived lane's ref is deleted; a
+  folder state its history no longer keeps, which `planKeep` sweeps at a
+  run's end but for a lane's tip and start) it starts from its base. Either
+  way it names the snapshot `lost`, and says where its files came from
+  instead (`instead`: `point` or `base`); the lane's begun fork record
+  carries both (`LANE_FORK`; a record from before `instead` read `base`),
+  which the fork row reads (ADR-0124).
 - **A project record of kind `workspaces` no longer decodes**; the host
   rewrites it at start.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's

@@ -16,10 +16,18 @@ import { expect, test } from "vitest"
 import { deferred } from "../fakes.ts"
 import { forkEnd, forkFacts } from "./create.ts"
 
+/** No snapshot the index knows is gone, none older still there, and no point kept. */
+const NONE_GONE = {
+  nearestKept: () => null,
+  gone: () => new Set<SnapshotId>(),
+  pointKept: async () => false,
+}
+
 test("forkFacts reads nothing before every pending turn record is written", async () => {
   const pending = deferred<void>()
   const read: string[] = []
   const facts = forkFacts({
+    ...NONE_GONE,
     pendingRecords: () => pending.promise,
     exists: async () => true,
     nearest: () => {
@@ -52,6 +60,7 @@ test("forkFacts asks whether the snapshot above is still there, and not of the b
   const asked: string[] = []
   const facts = (snapshot: SnapshotId | null) =>
     forkFacts({
+      ...NONE_GONE,
       pendingRecords: async () => {},
       nearest: () => ({
         lane: null,
@@ -76,6 +85,40 @@ test("forkFacts asks whether the snapshot above is still there, and not of the b
   expect(asked).toEqual(["s-1"])
 })
 
+test("forkFacts, the snapshot above gone, finds the nearest older one still there, passing over what is gone", async () => {
+  const gone = snapshotId("e2")
+  const older = snapshotId("e1")
+  const asked: unknown[] = []
+  const facts = await forkFacts({
+    pendingRecords: async () => {},
+    nearest: () => ({
+      lane: null,
+      point: pointId("c2"),
+      pointLane: threadIdFor("1"),
+      snapshot: snapshotId("e3"),
+      snapshotLane: null,
+    }),
+    begin: async () => ({
+      kind: "accepted",
+      acceptedBookmark: "pinetrie-accepted",
+      point: pointId("aaaa0000"),
+    }),
+    exists: async id => id === older,
+    gone: () => new Set([gone]),
+    nearestKept: g => {
+      asked.push([...g].sort())
+      return older
+    },
+    pointKept: async () => true,
+  })
+  expect(facts).toMatchObject({
+    kept: false,
+    nearestKept: older,
+    pointKept: true,
+  })
+  expect(asked).toEqual([[gone, snapshotId("e3")].sort()])
+})
+
 test("forkEnd: a fork's end, written only with the proof its steps ran", async () => {
   const lane = threadIdFor("1")
   const forked = await executeFork(
@@ -92,11 +135,12 @@ test("forkEnd: a fork's end, written only with the proof its steps ran", async (
   const writes = forkEnd({
     fork: { lane, base: "wip", state: "owed" },
     lost: snapshotId("e1"),
+    instead: "base",
     forked,
     start: recordedStart([start]),
   })
   expect(writes.map(w => ("value" in w ? w.value : null))).toEqual([
     start.value,
-    { base: "wip", state: "begun", lost: "e1" },
+    { base: "wip", state: "begun", lost: "e1", instead: "base" },
   ])
 })

@@ -22,6 +22,7 @@ import {
   indexTree,
   isBusy,
   laneFirstPrompt,
+  nearestKeptSnapshot,
   nearestRevision,
   pointConflicts,
   runPrompt,
@@ -171,6 +172,27 @@ const near = (id: string) =>
 test("nearestRevision: a thread's chat below where it forks finds what that entry finds", () => {
   expect(near("5-x1")).toEqual(near("3-r1"))
   expect(near("5-x1")).toMatchObject({ point: C2, snapshot: SNAP2 })
+})
+
+describe("nearestKeptSnapshot: the nearest snapshot above not gone", () => {
+  const kept = (id: string, gone: readonly string[]) =>
+    nearestKeptSnapshot(
+      index,
+      revisions,
+      atEntry(entryId(id)),
+      new Set(gone.map(snapshotId)),
+    )
+  test("with none gone, the nearest", () => {
+    expect(kept("4-m2", [])).toBe(SNAP4)
+  })
+  test("each gone one passed over, to the next above", () => {
+    expect(kept("4-m2", [SNAP4])).toBe(SNAP2)
+    expect(kept("4-m2", [SNAP4, SNAP2])).toBe(SNAP1)
+  })
+  test("none left above, or at the root: none", () => {
+    expect(kept("4-m2", [SNAP4, SNAP2, SNAP1])).toBeNull()
+    expect(nearestKeptSnapshot(index, revisions, ROOT, new Set())).toBeNull()
+  })
 })
 
 describe("laneFirstPrompt: a lane's own first prompt", () => {

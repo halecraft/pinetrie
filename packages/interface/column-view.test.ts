@@ -594,6 +594,7 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
             base: null,
             state: "begun",
             lost: lost === null ? null : snapshotId(lost),
+            instead: lost === null ? null : "base",
           } as const,
         ],
       ])
@@ -604,6 +605,29 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
     }
     expect(words("e1")).toContain("its files could not be copied")
     expect(words(null)).not.toContain("its files could not be copied")
+  })
+  test("a branch whose fork kept a lost turn's files from its point says it started from an earlier turn's installed files", () => {
+    if (thread === null) throw new Error("no thread")
+    const forks = new Map([
+      [thread, { kind: "fork", at: entryId("4"), how: "branch" } as const],
+    ])
+    const laneForks = new Map([
+      [
+        thread,
+        {
+          lane: thread,
+          base: null,
+          state: "begun",
+          lost: snapshotId("e1"),
+          instead: "point",
+        } as const,
+      ],
+    ])
+    const o = columnView(facts(1, { thread, work: work({ forks, laneForks }) }))
+      .head.origin
+    expect(o.kind === "source" ? o.words : "").toContain(
+      "started from an earlier turn's installed files; reinstall if needed",
+    )
   })
   test("a copy says it was copied; a branch, only where it is from", () => {
     expect(row("copy")).toMatchObject({ kind: "source", copied: true })
