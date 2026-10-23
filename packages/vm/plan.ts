@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto"
 import path from "node:path"
+import type { Pin } from "./pinned.ts"
 import type { ShareEntry } from "./protocol.ts"
 
 /** The files in `image/` the build reads. Each is part of the image's identity. */
@@ -622,6 +623,12 @@ export interface BuilderPins {
   }
   /** Paths under the kernel's `lib/modules/<kver>/kernel/`, in load order. */
   readonly modules: readonly string[]
+  /** What the repair boot adds to the builder's: `btrfs-progs` and its libraries, and the modules btrfs needs. */
+  readonly repair: {
+    readonly packages: readonly (Pin & { readonly name: string })[]
+    /** Paths as `modules`' are, in load order, loaded after them. */
+    readonly modules: readonly string[]
+  }
 }
 
 /** `linux-virt`'s modules directory for its package version: `6.18.56-r0` is `6.18.56-0-virt`. */
@@ -632,6 +639,28 @@ export function kernelRelease(version: string): string {
   return `${m[1]}-${m[2]}-virt`
 }
 
+/** A module in the kernel's package (`entry`), and the uncompressed name it is loaded as. */
+export interface KernelModule {
+  readonly entry: string
+  readonly as: string
+}
+
+/** `paths`, under the kernel's `lib/modules/<kver>/kernel/`, as the modules an initrd loads. */
+export function kernelModules(
+  kernelVersion: string,
+  paths: readonly string[],
+): readonly KernelModule[] {
+  const release = kernelRelease(kernelVersion)
+  return paths.map(m => ({
+    entry: `lib/modules/${release}/kernel/${m}`,
+    as: path.basename(m).replace(/\.gz$/, ""),
+  }))
+}
+
+/** `m/order`: the modules' file names, one a line, in load order. */
+export const moduleOrder = (modules: readonly KernelModule[]): string =>
+  `${modules.map(m => m.as).join("\n")}\n`
+
 /** Everything a build's executor does, as paths and arguments. */
 export interface VmBuildRun {
   readonly pinsDir: string
@@ -641,9 +670,7 @@ export interface VmBuildRun {
   /** What goes into the initrd beside the root: `m/`, `init`, `src/`. */
   readonly initrdDir: string
   readonly initrd: string
-  readonly modules: readonly { readonly entry: string; readonly as: string }[]
-  /** `m/order`: the modules' file names, one a line, in load order. */
-  readonly order: string
+  readonly modules: readonly KernelModule[]
   readonly disk: { readonly path: string; readonly bytes: number }
   readonly out: string
   /** The builder binary's arguments after its path. */
@@ -666,11 +693,7 @@ export function planVmBuildRun(f: {
 }): VmBuildRun {
   const image = imageDir(f.stateDir, f.key)
   const scratch = `${image}.tmp-${f.pid}`
-  const release = kernelRelease(f.pins.kernel.version)
-  const modules = f.pins.modules.map(m => ({
-    entry: `lib/modules/${release}/kernel/${m}`,
-    as: path.basename(m).replace(/\.gz$/, ""),
-  }))
+  const modules = kernelModules(f.pins.kernel.version, f.pins.modules)
   const initrd = path.join(scratch, "initrd.cpio")
   const disk = path.join(scratch, "out.img")
   return {
@@ -681,7 +704,6 @@ export function planVmBuildRun(f: {
     initrdDir: path.join(scratch, "initrd"),
     initrd,
     modules,
-    order: `${modules.map(m => m.as).join("\n")}\n`,
     disk: { path: disk, bytes: BUILD_DISK },
     out: path.join(scratch, "out"),
     builderArgs: [
@@ -693,6 +715,22 @@ export function planVmBuildRun(f: {
       "-",
     ],
   }
+}
+
+/** What `init` says when the data disk is full at its boot: no room left, and its metadata full. */
+export const DATA_DISK_FULL_LINE = "data disk full"
+
+/**
+ * Whether the console's last boot (from the last `stage 1` line, stage 1
+ * starting every boot) says its data disk was full. The launcher makes the
+ * console anew at each start; an earlier boot's word is not this one's.
+ */
+export function isDiskFullAtLastBoot(console: string): boolean {
+  const lines = console.split("\n")
+  const lastBoot = lines.findLastIndex(l => / stage 1: /.test(l))
+  return lines
+    .slice(Math.max(lastBoot, 0))
+    .some(l => /^T\+[\d.]+ /.test(l) && l.endsWith(` ${DATA_DISK_FULL_LINE}`))
 }
 
 /** A line of the builder's console worth a person's log: the build's own and the builder's. */

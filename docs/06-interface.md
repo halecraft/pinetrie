@@ -212,7 +212,12 @@ While the page syncs, "syncing…" leads its right end.
   not recorded, old turns' snapshots being deleted to free room, or no
   reading from the host); red, with a barred disc, when work stops (the
   lanes' disk full, or its metadata, or low with nothing left that may be
-  deleted). Shape and colour both, never colour alone; never a
+  deleted, which on Linux names the balance the person can run; the lane
+  VM's disk being repaired, "the lane VM's disk is full: repairing it",
+  with the repair's last step in brackets while its boot runs; or a repair
+  that failed, "the lane VM's disk could not be repaired: …; it is tried
+  again once the disk could grow: raise `lanes.store.max`, or free the
+  Mac's disk"). Shape and colour both, never colour alone; never a
   badge, never moving. Its title, which is also its accessible name, names
   the worst cause in words, with how many more ("The machine lanes run on:
   work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least", and,
@@ -495,7 +500,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   does nothing else. The status is a mark, not a button: its dot, and a
   word while something is raised for you (needs you, conflicts, ready,
   worth a read). Under the line, always, nothing behind a press: the run-end
-  reason while raised for you, else why its lane waits for memory, else the
+  reason while raised for you, else why its lane waits (for memory, or a repair), else the
   thread's title, else its focus; the
   fork row; and an ssh request for its owner. The column's ⋯ starts with
   how it reads (**brief**, **story**, **everything**, the current one
@@ -541,12 +546,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   word. A press brings the run's last entry into view. Read past or
   dismissed, it turns quiet and the focus shows again; the next run's start
   clears it. A run that was done, or a stop you made, shows nothing.
-- **Why a lane waits for memory** (ADR-0212), in the slowed colour of the
+- **Why a lane waits** (ADR-0212, ADR-0210), in the slowed colour of the
   footer's status, one line: "waits for room on the machine to start"
   while its run's start is held, "paused for memory: its next tool call
-  waits for room" while it is paused at its gate (`treatmentWords`), from
-  the lanes `pinetrie.machine` lists as held. A raised run-end reason
-  comes before it.
+  waits for room" while it is paused at its gate, "waits while the lane
+  VM's disk is repaired" while any host repairs it (`treatmentWords`),
+  from the lanes `pinetrie.machine` lists as held. A raised run-end reason
+  comes before it. A host's start that repairs the disk shows the repair
+  on its checklist, its boot's last line its progress.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
   its rail track's colour: its column's header carries a stripe of it and a dot
   beside its fork, and the fork point in the parent column shows a dot of it.

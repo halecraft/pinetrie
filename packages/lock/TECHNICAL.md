@@ -58,11 +58,16 @@ pine·trie's install.
   has let the lock go, and its holder must stop.
 - **Its users**: lanehost's project lock (`PROJECT_LOCK`), the host's
   session registry and each served session's lock
-  (`apps/pinetrie/host/sessions.ts`), and the lane VM's image build
-  (`BUILD_LOCK`, `packages/vm`).
+  (`apps/pinetrie/host/sessions.ts`), the lane VM's image build
+  (`BUILD_LOCK`, `packages/vm`), and its repair (`REPAIR_LOCK`,
+  `packages/vm/repair-lock.ts`), which every VM's start holds too.
 - **The launcher's `launcher.lock`** (`packages/vm/launcher/launcher.swift`)
   keeps the same contract in Swift, which cannot import this package: the
-  one lock outside it.
+  one lock outside it. A host repairing the lane VM's disk takes it through
+  this package (`awaitLauncherGone`) and holds it through the repair boot,
+  so no launcher of any version opens the disk beside it: macOS's perl
+  `flock` and libc's `flock(2)` refuse each other in both directions
+  (S327's note of 2026-10-23). It is only ever released, never removed.
 
 ## Tests
 

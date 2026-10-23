@@ -26,6 +26,12 @@ export type ToLauncher =
    * connection, taking no slot, so asking keeps no VM from its idle stop.
    */
   | { readonly kind: "status" }
+  /**
+   * Stop the VM and exit, whatever leases it holds, so its data disk can be
+   * repaired: answered on any connection, sent only by the repair lock's
+   * holder (`stopVmForRepair`). Every lease ends with it.
+   */
+  | { readonly kind: "stop-for-repair" }
 
 /** Why the launcher refused a message. */
 export type LauncherRefusal =
@@ -167,6 +173,7 @@ export function decodeToLauncher(line: string): ToLauncher | null {
   if (!isRecord(v)) return null
   if (v.kind === "retire") return { kind: "retire" }
   if (v.kind === "status") return { kind: "status" }
+  if (v.kind === "stop-for-repair") return { kind: "stop-for-repair" }
   if (v.kind === "lease")
     return v.agent === null || typeof v.agent === "string"
       ? { kind: "lease", agent: v.agent }

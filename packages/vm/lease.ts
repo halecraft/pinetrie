@@ -1,17 +1,20 @@
 // vm/lease — a host's lease on the lane VM. To a host the VM is a
 // Docker socket and a slot of shared directories: it gathers what decides
 // whether to start or join the VM (`planVm`), starts the launcher when need
-// be, takes a slot, and waits for Docker to answer. And what the VM runs,
-// asked without a lease (`gatherRunningVm`).
+// be, under the repair lock, takes a slot, and waits for Docker to answer;
+// after a start of its own, its console's word on the data disk is read.
+// And what the VM runs, asked without a lease (`gatherRunningVm`), and its
+// stop for a repair (`stopVmForRepair`).
 
 import { spawn } from "node:child_process"
 import { openSync } from "node:fs"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import http from "node:http"
 import net from "node:net"
 import os from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
+import type { OnWaiting } from "@pinetrie/lock"
 import {
   buildVmImageInVm,
   checkImageDir,
@@ -25,6 +28,7 @@ import {
   type Fill,
   imageDir,
   imageKey,
+  isDiskFullAtLastBoot,
   launcherArgs,
   launcherFromCommandLine,
   otherHolders,
@@ -49,6 +53,11 @@ import {
   type VmIdentity,
 } from "./protocol.ts"
 import { pruneVmState, runningLaunchers } from "./prune.ts"
+import {
+  type RepairLockHeld,
+  repairLockStateDir,
+  withRepairLock,
+} from "./repair-lock.ts"
 import { BUILDER, buildBinary, gatherBinary, LAUNCHER } from "./swift.ts"
 
 export interface Lease {
@@ -233,7 +242,7 @@ export type VmBuild =
       readonly fetch: boolean
     }
 
-interface LeaseInput {
+export interface LeaseInput {
   /** `vmStateDir`. */
   readonly stateDir: string
   /** The slots a VM this host starts boots with. */
@@ -245,6 +254,11 @@ interface LeaseInput {
   readonly building?: (build: VmBuild) => void
   /** How large the data disk should be at a start this host makes; absent, it is left as it is. */
   readonly growData?: DataDiskPlan
+  /**
+   * Told once when a start must wait for the repair lock: another host is
+   * starting the VM, or repairing its disk, which the caller words.
+   */
+  readonly onStartWaiting: OnWaiting
 }
 
 /**
@@ -259,7 +273,6 @@ async function leaseOnce(input: LeaseInput): Promise<{
 }> {
   const { stateDir } = input
   await mkdir(stateDir, { recursive: true })
-  const control = path.join(stateDir, "control.sock")
   const { first, image, launcher, planned, startRefusal } =
     await gatherVm(stateDir)
   if (planned.kind === "refused") throw refusedBy(planned.refusal)
@@ -286,35 +299,18 @@ async function leaseOnce(input: LeaseInput): Promise<{
     }
     // The VM's network stack: fetched and checked once, then kept.
     await ensureGvproxy(stateDir, pin)
-    // Before the launcher: the guest resizes into it at this boot.
-    if (input.growData !== undefined) {
-      const grown = await growDataDisk(
-        path.join(stateDir, "data.img"),
-        stateDir,
-        input.growData,
-      )
-      if (grown !== null)
-        input.log(
-          `[vm] the lanes' disk grows from ${gib(grown.from)} to ${gib(grown.to)} GiB at this start`,
-        )
-    }
-    const out = openSync(path.join(stateDir, "launcher.log"), "a")
-    started = Date.now()
-    spawn(launcher.binary, argv, {
-      detached: true,
-      stdio: ["ignore", out, out],
-    }).unref()
-    input.log("[vm] starting the lane VM")
-    socket = await until("the lane VM's launcher answering", 30_000, () =>
-      connect(control),
-    )
+    const startedVm = await startLaneVm(input, {
+      binary: launcher.binary,
+      argv,
+    })
+    socket = startedVm.socket
+    started = startedVm.started
   }
   if (socket === null) throw new Error("the lane VM's launcher is gone")
-  const lease = await leaseOn(socket, input)
-  if (started !== null)
-    input.log(
-      `[vm] Docker answered ${Date.now() - started} ms after the launcher started`,
-    )
+  const lease =
+    started === null
+      ? await leaseOn(socket, input)
+      : await leaseStartedVm(socket, input, started)
   return {
     lease,
     want: {
@@ -326,6 +322,136 @@ async function leaseOnce(input: LeaseInput): Promise<{
 }
 
 const refusedBy = (r: VmRefusal) => new VmRefused(vmWords(r))
+
+/**
+ * The VM this host started found its data disk full at boot (`init`'s
+ * `data disk full`): a repair's to deal with, not a lease's.
+ */
+export class DiskFullAtBoot extends Error {
+  constructor() {
+    super("the lane VM's data disk is full: its console says so at this boot")
+  }
+}
+
+/**
+ * A lease on the VM this host just started, its console read after,
+ * whether Docker answered or not: Docker may answer on a full disk and
+ * fail every write after (then the lease is closed), or stay silent. Its
+ * console's `data disk full` fails it as `DiskFullAtBoot`.
+ */
+export async function leaseStartedVm(
+  socket: net.Socket,
+  input: Pick<LeaseInput, "stateDir" | "agent" | "log"> & {
+    readonly dockerMs?: number
+  },
+  started: number,
+): Promise<Lease> {
+  const lease = await leaseOn(socket, input).catch(async (error: unknown) => {
+    if (await isDataDiskFull(input.stateDir)) throw new DiskFullAtBoot()
+    throw error
+  })
+  input.log(
+    `[vm] Docker answered ${Date.now() - started} ms after the launcher started`,
+  )
+  if (await isDataDiskFull(input.stateDir)) {
+    await lease.close()
+    throw new DiskFullAtBoot()
+  }
+  return lease
+}
+
+/** Whether the console's last boot says the data disk is full; a console not there says nothing. */
+const isDataDiskFull = async (stateDir: string): Promise<boolean> =>
+  isDiskFullAtLastBoot(
+    await readFile(path.join(stateDir, "console.log"), "utf8").catch(() => ""),
+  )
+
+/**
+ * The VM started, under the repair lock: waited for while another host
+ * starts the VM or repairs its disk (`onStartWaiting`), then `startVm`.
+ */
+export async function startLaneVm(
+  input: LeaseInput,
+  launcher: { readonly binary: string; readonly argv: readonly string[] },
+): Promise<{ readonly socket: net.Socket; readonly started: number | null }> {
+  const done = await withRepairLock(
+    input.stateDir,
+    input.onStartWaiting,
+    held => startVm(held, { input, ...launcher }),
+  )
+  if (done.kind === "failed")
+    throw new Error(
+      `the lane VM was not started: its repair lock could not be taken: ${done.detail}`,
+    )
+  return done.value
+}
+
+/**
+ * Grow the data disk and start the launcher, under the repair lock, so no
+ * VM starts, and no disk grows, while a repair has it. A launcher that
+ * answers by now was started by another host while this one waited: it is
+ * joined, and nothing grows. Returns the launcher's control socket, and
+ * when this host started it (null when it joined).
+ */
+async function startVm(
+  _held: RepairLockHeld,
+  f: {
+    readonly input: LeaseInput
+    readonly binary: string
+    readonly argv: readonly string[]
+  },
+): Promise<{ readonly socket: net.Socket; readonly started: number | null }> {
+  const { input } = f
+  const { stateDir } = input
+  const control = path.join(stateDir, "control.sock")
+  const answering = await connect(control)
+  if (answering !== null) return { socket: answering, started: null }
+  // Before the launcher: the guest resizes into it at this boot.
+  if (input.growData !== undefined) {
+    const grown = await growDataDisk(
+      path.join(stateDir, "data.img"),
+      stateDir,
+      input.growData,
+    )
+    if (grown !== null)
+      input.log(
+        `[vm] the lanes' disk grows from ${gib(grown.from)} to ${gib(grown.to)} GiB at this start`,
+      )
+  }
+  const out = openSync(path.join(stateDir, "launcher.log"), "a")
+  const started = Date.now()
+  spawn(f.binary, [...f.argv], {
+    detached: true,
+    stdio: ["ignore", out, out],
+  }).unref()
+  input.log("[vm] starting the lane VM")
+  const socket = await until("the lane VM's launcher answering", 30_000, () =>
+    connect(control),
+  )
+  return { socket, started }
+}
+
+/**
+ * Stop the VM and its launcher for a repair, whatever leases it holds:
+ * every host's lease ends. Settles once the launcher has closed this
+ * connection, as it does exiting; at once when none runs. A launcher
+ * older than the message refuses it, said.
+ */
+export async function stopVmForRepair(held: RepairLockHeld): Promise<void> {
+  const socket = await connect(
+    path.join(repairLockStateDir(held), "control.sock"),
+  )
+  if (socket === null) return
+  const channel = launcherChannel(socket)
+  try {
+    channel.send({ kind: "stop-for-repair" })
+    const m = await channel.next("a stop for a repair", 60_000)
+    if (m?.kind === "refused") throw new VmRefused(launcherWords(m))
+    await channel.closed
+  } finally {
+    socket.destroy()
+  }
+}
 
 /** Bytes as whole GiB, for the log. */
 const gib = (bytes: number) => Math.round(bytes / 1024 ** 3)
@@ -498,6 +624,8 @@ export async function leaseOn(
     readonly log: (l: string) => void
     /** How long a lease's reply may take: 30 s unless a test says. */
     readonly replyMs?: number
+    /** How long Docker may take to answer: 60 s unless a test says. */
+    readonly dockerMs?: number
   },
 ): Promise<Lease> {
   const { send, next, reply, closed } = launcherChannel(socket)
@@ -509,7 +637,7 @@ export async function leaseOn(
   })
   if (slot.kind !== "slot") throw new Error("the lane VM gave no slot")
   input.log(`[vm] this host has slot ${slot.slot} of the lane VM`)
-  await until("Docker answering in the lane VM", 60_000, () =>
+  await until("Docker answering in the lane VM", input.dockerMs ?? 60_000, () =>
     pings(slot.docker),
   )
   let filled = false

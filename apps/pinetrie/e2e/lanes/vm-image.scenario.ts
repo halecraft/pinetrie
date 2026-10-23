@@ -76,6 +76,7 @@ async function run(check: Checks["check"]): Promise<void> {
       slots: 2,
       agent: null,
       log: l => lines.push(l),
+      onStartWaiting: () => lines.push("[vm] waiting to start the lane VM"),
     }).then(
       async lease => {
         const os = (

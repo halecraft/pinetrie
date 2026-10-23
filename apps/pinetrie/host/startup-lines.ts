@@ -18,6 +18,7 @@ import {
   noModelWords,
   originWords,
   refusalWords,
+  repairProgressWords,
   subscriptionWords,
 } from "@pinetrie/interface"
 import type { ModelLine, SetupSubscription } from "@pinetrie/rules"
@@ -292,6 +293,8 @@ export function buildWords(build: Build): string {
       return "extracting the lane runtime"
     case "base-snapshot":
       return "making the base snapshot"
+    case "vm-disk-repair":
+      return repairProgressWords("booting-repair", build.progress)
     default:
       return assertNever(build)
   }

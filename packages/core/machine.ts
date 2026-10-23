@@ -60,7 +60,18 @@ export type MachineCause =
       readonly kind: "room-unrecoverable"
       readonly unallocated: number
       readonly minimum: number
+      /** Whether pine·trie repairs the disk here (the lane VM's), or the person must (Linux's). */
+      readonly isRepaired: boolean
     }
+  /** The lane VM's data disk is full and being repaired, offline: every lane waits. */
+  | {
+      readonly kind: "disk-being-repaired"
+      readonly step: "detected" | "stopping-vm" | "booting-repair"
+      /** The repair boot's last line, while it runs. */
+      readonly progress: string | null
+    }
+  /** A repair of the lane VM's data disk failed; none is tried again until the disk could grow. */
+  | { readonly kind: "disk-repair-failed"; readonly why: string }
   /**
    * No sample says how the machine is: none yet since the host started,
    * the host stopped, or the last sample failed, with its error.
@@ -87,20 +98,26 @@ export interface MachineHealth {
   readonly state: MachineState
   /** Worst first. */
   readonly causes: readonly MachineCause[]
-  /** Each lane held for memory, by id: those not listed are `normal`. */
+  /** Each lane held, by id: those not listed are `normal`. */
   readonly treatments: readonly HeldLane[]
 }
 
-export const LANE_TREATMENTS = ["normal", "waiting-to-start", "paused"] as const
+export const LANE_TREATMENTS = [
+  "normal",
+  "waiting-to-start",
+  "paused",
+  "waiting-for-repair",
+] as const
 
 /**
  * What the machine lets a lane do for now: `waiting-to-start`, its run's
- * container waits for room; `paused`, its next tool call waits. A treatment
- * added here fails the type check where what each allows is said.
+ * container waits for room; `paused`, its next tool call waits;
+ * `waiting-for-repair`, neither, while the lane VM's disk is repaired. A
+ * treatment added here fails the type check where what each allows is said.
  */
 export type LaneTreatment = { readonly kind: (typeof LANE_TREATMENTS)[number] }
 
-/** A lane held for memory, and how. */
+/** A lane held, and how. */
 export interface HeldLane {
   readonly lane: ThreadId
   readonly treatment: LaneTreatment

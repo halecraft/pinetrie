@@ -284,7 +284,7 @@ const facts = (
       reader: { me: ADA, nameOf: new Map() },
     },
     runEnds: new Map(),
-    memoryHeld: new Map(),
+    lanesHeld: new Map(),
     ...over,
   }
 }

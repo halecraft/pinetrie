@@ -72,6 +72,8 @@ export type Build =
   | { readonly kind: "image"; readonly image: ImageBuild }
   | { readonly kind: "runtime" }
   | { readonly kind: "base-snapshot" }
+  /** The lane VM's full disk repaired before it is leased, with the repair boot's last line. */
+  | { readonly kind: "vm-disk-repair"; readonly progress: string | null }
 
 /** How a step that is no longer running came out. */
 export type Ended =

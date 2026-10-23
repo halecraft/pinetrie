@@ -44,11 +44,33 @@ if ! mount -t btrfs -o user_subvol_rm_allowed /dev/vdb /var/lib/lanehost 2>/dev/
   t "data disk formatted (first boot)"
 fi
 # A data.img grown on the Mac (`truncate -s`) is used from this boot on.
-# Before Docker: a full disk stops dockerd starting, and no shell reaches
-# the guest to free it, so growing the file is the way back. A full
-# disk's metadata can refuse the resize itself: why is on the console.
+# Before Docker: a full disk can stop dockerd starting, or let it answer and
+# fail every write. A full disk's metadata can refuse the resize itself:
+# why is on the console.
 if ! out=$(btrfs filesystem resize max /var/lib/lanehost 2>&1); then
   t "data disk not resized: $out"
+fi
+# The disk's room after the resize, from btrfs's counters, and whether it
+# is full: the host reads `data disk full` after each start it makes, and
+# repairs the disk with the VM stopped. Full is unallocated under 1 GiB,
+# the host's own threshold for spent (a test holds it to the host's), not
+# metadata's share: a disk whose metadata refused every write read 91%
+# used by these counters, btrfs keeping its reserve. Shell arithmetic,
+# 64-bit: busybox awk's %d stops at 2^31-1.
+fs=$(ls -d /sys/fs/btrfs/*-*-*-*-* 2>/dev/null | head -1)
+if [ -n "$fs" ]; then
+  size=$(( $(cat /sys/block/vdb/size) * 512 ))
+  allocated=0
+  for k in data metadata system; do
+    allocated=$(( allocated + $(cat "$fs/allocation/$k/disk_total") ))
+  done
+  unallocated=$(( size - allocated ))
+  meta_used=$(cat "$fs/allocation/metadata/bytes_used")
+  meta_total=$(cat "$fs/allocation/metadata/total_bytes")
+  t "data disk room: unallocated=$unallocated metadata=$meta_used/$meta_total"
+  if [ "$unallocated" -lt $((1024 * 1024 * 1024)) ]; then
+    t "data disk full"
+  fi
 fi
 mkdir -p /var/lib/lanehost/docker
 t "data disk mounted: $(df -h /var/lib/lanehost | awk 'NR==2 {print $3 " of " $2 " used"}')"

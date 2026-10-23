@@ -20,6 +20,7 @@ import {
   sweepSlot,
 } from "@pinetrie/docker"
 import type { Install } from "@pinetrie/install"
+import { repairFailedWords, vmStartWaitWords } from "@pinetrie/interface"
 import { planObserver } from "@pinetrie/lanehost"
 import {
   createQueue,
@@ -29,17 +30,35 @@ import {
   removeLane,
   type Served,
 } from "@pinetrie/lanes"
-import type { StoreControls, StoreTarget } from "@pinetrie/machine"
+import {
+  isRepairRunning,
+  type ManageMode,
+  type RepairRead,
+  repairFacts,
+  repairStateNow,
+  runRepairSteps,
+  type StoreControls,
+  type StoreTarget,
+} from "@pinetrie/machine"
 import type { ProjectRecord } from "@pinetrie/rules"
 import {
   type DataDiskPlan,
+  DiskFullAtBoot,
+  ensureRepairBoot,
   GVPROXY_HOST_ADDRESS,
+  gatherDataDisk,
   keepLease,
+  type Lease,
   leaseExtra,
   leaseVm,
   slotRoot,
   vmStateDir,
 } from "@pinetrie/vm"
+import {
+  type LaneVmRepairControls,
+  laneVmRepairControls,
+  laneVmRepairRead,
+} from "../machine/repair.ts"
 import type { Build } from "../start-checklist.ts"
 import {
   createShares,
@@ -97,6 +116,11 @@ export interface MachineReach
   readonly target: StoreTarget
   /** Whose memory is the machine's: a host in a lane reads its own cgroup's. */
   readonly memorySource: MemorySource
+  /** The lane VM's repair: its shared state, and what repairs it; null where nothing is repaired. */
+  readonly repair: {
+    readonly read: () => Promise<RepairRead>
+    readonly controls: LaneVmRepairControls | null
+  } | null
 }
 
 /** The runtime's reads, with the store's place on this host. */
@@ -105,9 +129,11 @@ const machineReach = (
   storeVolume: string,
   target: StoreTarget,
   memorySource: MemorySource,
+  repair: MachineReach["repair"],
 ): MachineReach => ({
   target,
   memorySource,
+  repair,
   runningLanes: () => runtime.runningLanes(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
@@ -182,6 +208,8 @@ export async function findProject(input: {
   readonly building: (build: Build) => void
   /** How large the lane VM's data disk should be at a start this host makes; absent, as it is. */
   readonly growData?: DataDiskPlan
+  /** `lanes.manage`, from the machine's and your own file. */
+  readonly manage: ManageMode
 }): Promise<Found | Refused | null> {
   if (input.root === null) return null
   return runtimeFound(input.root, input, input.ownPort ?? null)
@@ -197,6 +225,8 @@ interface RuntimeInput {
   readonly log: (line: string) => void
   readonly building: (build: Build) => void
   readonly growData?: DataDiskPlan
+  /** Whether this host keeps the machine itself: only then does it repair the lane VM's disk. */
+  readonly manage: ManageMode
 }
 
 async function runtimeFound(
@@ -287,6 +317,7 @@ async function hostDockerFound(
       lanesDir,
       "docker-host",
       observed.kind === "forwarded" ? "own-cgroup" : "whole-machine",
+      null,
     ),
   }
 }
@@ -307,6 +338,13 @@ async function vmFound(
   const { root } = project
   const { install, slots, hostSocket, log } = input
   const stateDir = vmStateDir(process.env, homedir())
+  // Only a host that manages the machine repairs its disk: without
+  // controls, no path reaches a VM's stop.
+  const repairControls =
+    input.growData === undefined || input.manage !== "manage"
+      ? null
+      : laneVmRepairControls({ stateDir, growData: input.growData, log })
+  const readRepair = laneVmRepairRead(stateDir)
   const leaseNow = () =>
     leaseVm({
       stateDir,
@@ -315,10 +353,19 @@ async function vmFound(
       log,
       building: input.building,
       ...(input.growData === undefined ? {} : { growData: input.growData }),
+      onStartWaiting: () =>
+        void readRepair().then(read =>
+          log(`[vm] ${vmStartWaitWords(isRepairRunning(repairFacts(read)))}`),
+        ),
     })
-  const leased = await leaseNow().catch((error: unknown) =>
-    refusedWith(errorText(error)),
-  )
+  const leased = await leaseAtStart({
+    leaseNow,
+    controls: repairControls,
+    stateDir,
+    growData: input.growData ?? null,
+    building: input.building,
+    log,
+  }).catch((error: unknown) => refusedWith(errorText(error)))
   if ("words" in leased) return leased
   const first = leased
   /** A slot's containers left by a host that died holding it. */
@@ -374,6 +421,18 @@ async function vmFound(
     log,
   })
   shares = held
+  // Made ready ahead, beside the lanes: a repair never fetches or compiles
+  // when it runs. Awaited at close, so no half-made initrd is left.
+  const repairBootMade =
+    repairControls === null
+      ? Promise.resolve()
+      : ensureRepairBoot(stateDir).then(
+          () => {},
+          (error: unknown) =>
+            log(
+              `[vm] the repair boot could not be made ready: ${errorText(error)}; a repair of the lanes' disk fails until it is`,
+            ),
+        )
   const kept = keepLease({
     first,
     lease: leaseNow,
@@ -398,9 +457,70 @@ async function vmFound(
     async close() {
       await held.close()
       await kept.close()
+      await repairBootMade
     },
-    machine: machineReach(runtime, stateDir, "lane-vm", "whole-machine"),
+    machine: machineReach(runtime, stateDir, "lane-vm", "whole-machine", {
+      read: laneVmRepairRead(stateDir),
+      controls: repairControls,
+    }),
   }
+}
+
+/**
+ * The first lease, at the host's start. A VM whose data disk is full at its
+ * boot is repaired first, when this host may (`controls`), then leased
+ * again; a repair that fails, or one a recorded failure refuses, refuses the
+ * start, saying why and what would let it try again.
+ */
+async function leaseAtStart(f: {
+  readonly leaseNow: () => Promise<Lease>
+  readonly controls: LaneVmRepairControls | null
+  readonly stateDir: string
+  readonly growData: DataDiskPlan | null
+  readonly building: (build: Build) => void
+  readonly log: (line: string) => void
+}): Promise<Lease> {
+  try {
+    return await f.leaseNow()
+  } catch (error) {
+    if (!(error instanceof DiskFullAtBoot)) throw error
+  }
+  const { controls } = f
+  if (controls === null)
+    throw new Error(
+      "the lane VM's data disk is full, and this host only observes the machine: it repairs nothing",
+    )
+  const read = await controls.readRepair()
+  const disk = await gatherDataDisk(
+    path.join(f.stateDir, "data.img"),
+    f.stateDir,
+  )
+  const plannedSize =
+    (disk === null ? null : f.growData?.(disk)) ?? disk?.size ?? 0
+  f.building({ kind: "vm-disk-repair", progress: null })
+  const run = await runRepairSteps(
+    controls,
+    { trigger: "disk-full-at-boot", plannedSize, seen: read.text },
+    (_from, to) => {
+      if (to.kind === "booting-repair")
+        f.building({
+          kind: "vm-disk-repair",
+          progress: to.progress.at(-1) ?? null,
+        })
+    },
+  )
+  if (run.kind === "lock-failed")
+    throw new Error(
+      `the lane VM's data disk is full, and its repair lock could not be taken: ${run.detail}`,
+    )
+  const state =
+    run.kind === "ran"
+      ? run.state
+      : repairStateNow(repairFacts(await controls.readRepair()))
+  if (state.kind === "failed") throw new Error(repairFailedWords(state.why))
+  // Repaired, by this host or another: a start waits on the repair lock
+  // until any repair has let it go. Full again, it refuses.
+  return f.leaseNow()
 }
 
 const sweptLog = (keys: readonly string[], log: (line: string) => void) => {

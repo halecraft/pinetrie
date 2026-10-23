@@ -24,19 +24,19 @@ import {
   minimumUnallocated,
   type StoreSettings,
 } from "./store-settings.ts"
-import { planStoreSize } from "./store-size.ts"
+import { plannedStoreSize } from "./store-size.ts"
 
 const GiB = 1024 ** 3
 
 /** Unallocated space below which the store is spent: a write may fail. */
-const ROOM_SPENT = GiB
+export const ROOM_SPENT = GiB
 /** Unallocated space the store must regain before it is no longer spent. */
-const ROOM_SPENT_CLEAR = 2 * GiB
+export const ROOM_SPENT_CLEAR = 2 * GiB
 /** A low store, or filesystem, is clear again only this far above its threshold. */
 const CLEAR_MARGIN = 1.1
 /** Metadata's share used, with no room to grow it, at which it is full. */
-const METADATA_FULL = 0.95
-const METADATA_CLEAR = 0.9
+export const METADATA_FULL = 0.95
+export const METADATA_CLEAR = 0.9
 /** The host's event loop stalled longer than this, in ms. */
 const HOST_STALL_MS = 1000
 
@@ -45,6 +45,8 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "room-spent": "red",
   "metadata-full": "red",
   "room-unrecoverable": "red",
+  "disk-being-repaired": "red",
+  "disk-repair-failed": "red",
   "room-low": "amber",
   "filesystem-low": "amber",
   "memory-short": "amber",
@@ -58,6 +60,8 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
 
 /** Causes of one state, in the order they are listed: what stops work first. */
 const ORDER: readonly MachineCauseKind[] = [
+  "disk-repair-failed",
+  "disk-being-repaired",
   "room-spent",
   "room-unrecoverable",
   "metadata-full",
@@ -142,17 +146,8 @@ function roomReadings(
   // Planned from what the sample read: btrfs's chunks stand for what the
   // disk holds, and the store's filesystem for the volume holding it.
   const grows =
-    sample.filesystem !== null &&
-    planStoreSize(
-      {
-        size: store.size,
-        allocated: store.size - unallocated,
-        volumeFree: sample.filesystem.free,
-        volumeSize: sample.filesystem.size,
-      },
-      settings,
-      capabilities,
-    ) !== null
+    (plannedStoreSize(sample, settings, capabilities) ?? store.size) >
+    store.size
   const spent: CauseReading =
     unallocated < ROOM_SPENT
       ? { kind: "over", value: { kind: "room-spent", unallocated } }
@@ -209,6 +204,7 @@ function filesystemReading(
  */
 function upkeepReadings(
   sample: MachineSample,
+  capabilities: Capabilities,
 ): readonly [string, CauseReading][] {
   const { store } = sample
   const unrecoverable: CauseReading =
@@ -221,6 +217,7 @@ function upkeepReadings(
               kind: "room-unrecoverable",
               unallocated: store.unallocated,
               minimum: minimumUnallocated(store.size),
+              isRepaired: capabilities.repairDisk,
             },
           }
         : { kind: "clear" }
@@ -238,7 +235,7 @@ function upkeepReadings(
 /** The health value of `causes`: sorted worst first, and the worst one's state. */
 function rankedHealth(
   causes: readonly MachineCause[],
-  memory: MemoryShort,
+  { memory, repair }: Beside,
 ): MachineHealth {
   // A spent store is low too; saying both says one thing twice.
   const spent = causes.some(c => c.kind === "room-spent")
@@ -253,6 +250,7 @@ function rankedHealth(
           } as const,
         ]
       : []),
+    ...(repair === null ? [] : [repair]),
   ]
     .filter(c => !(spent && c.kind === "room-low"))
     .sort(
@@ -266,6 +264,16 @@ function rankedHealth(
     causes: sorted,
     treatments: memory.held,
   }
+}
+
+/**
+ * What is planned beside the samples' causes and added to the health value
+ * as it is, each sample: memory's rung and the lanes held, and the
+ * repair's cause (`repairCause`), read from the state every host shares.
+ */
+export interface Beside {
+  readonly memory: MemoryShort
+  readonly repair: MachineCause | null
 }
 
 /**
@@ -308,6 +316,8 @@ export interface MemoryShort {
 
 export const MEMORY_CALM: MemoryShort = { rung: 0, isHolding: true, held: [] }
 
+export const NOTHING_BESIDE: Beside = { memory: MEMORY_CALM, repair: null }
+
 export interface Planned {
   readonly health: MachineHealth
   readonly state: HealthPlanState
@@ -321,8 +331,8 @@ export interface Planned {
 
 /**
  * The health value after one sample, from what the samples before it left
- * in `state`, and memory's rung and holds as `memory` says, planned
- * beside it (`planRung`, `planTreatments`). A failed sample changes no
+ * in `state`, and what `beside` says, planned beside it (`planRung`,
+ * `planTreatments`, `repairCause`). A failed sample changes no
  * count: its causes stay as they were, with `unsampled` beside them until a
  * sample reads.
  */
@@ -331,7 +341,7 @@ export function planHealth(
   result: SampleResult,
   settings: Pick<StoreSettings, "leaveFree" | "max">,
   capabilities: Capabilities,
-  memory: MemoryShort,
+  beside: Beside,
 ): Planned {
   if (result.kind === "failed") {
     const health = rankedHealth(
@@ -339,7 +349,7 @@ export function planHealth(
         ...activeCauses(state.causes),
         { kind: "unsampled", reason: "failed", error: result.error },
       ],
-      memory,
+      beside,
     )
     return plannedHealth(state, state, health)
   }
@@ -348,7 +358,7 @@ export function planHealth(
   const levels: readonly [string, CauseReading][] = [
     ...roomReadings(sample, settings, capabilities),
     ["filesystem-low", filesystemReading(sample, settings)],
-    ...upkeepReadings(sample),
+    ...upkeepReadings(sample, capabilities),
   ]
   for (const [key, r] of levels) {
     const stepped = nextLevelState(state.causes.get(key), r)
@@ -384,7 +394,7 @@ export function planHealth(
     if (stepped !== null) next.set(key, stepped)
   }
 
-  const health = rankedHealth(activeCauses(next), memory)
+  const health = rankedHealth(activeCauses(next), beside)
   return plannedHealth(state, { causes: next, oomKills, health }, health)
 }
 

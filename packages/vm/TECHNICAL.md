@@ -43,7 +43,10 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
   `/dev/net/tun` made 0666 (no udev, S127); the btrfs data disk with
   `user_subvol_rm_allowed`, formatted on first boot and grown to fill
   `data.img` at every boot, a resize that fails logging why on the
-  console (`data disk not resized: …`); each slot's share at
+  console (`data disk not resized: …`); then its room from btrfs's
+  counters (`data disk room: unallocated=… metadata=…/…`), and `data disk
+  full` when unallocated is under 1 GiB, the host's own `ROOM_SPENT` (a
+  host test holds them alike); each slot's share at
   `/mnt/host-shares/<i>`; Docker on vsock 2375, started with
   `--config-file /etc/pinetrie/daemon.json` (the image's `daemon.json`,
   which caps BuildKit's cache beside its images: its defaults are
@@ -94,11 +97,13 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   the same in the guest, in shell, on purpose: the image's build stays
   self-contained, and `imageKey` covers it. The observer suite boots the
   same kernel (`pinnedKernel`).
-- **The initrd is three things concatenated,** made with what macOS ships:
-  the minirootfs as newc cpio (`bsdtar ... @tarball`, keeping root's
-  ownership without unpacking), then `m/` (the seven modules, gunzipped,
-  and `m/order`), `init` and `src/` (the image's sources) with uid and gid
-  0. Later entries win.
+- **The initrd is two parts concatenated,** made with what macOS ships
+  (`writeInitrd`): the minirootfs as newc cpio (`bsdtar ... @tarball`,
+  keeping root's ownership without unpacking), then every entry of its own
+  directory with uid and gid 0: `m/` (the modules, gunzipped, and
+  `m/order`, `writeInitrdDir`) and `init`, and the build's `src/` (the
+  image's sources). Later entries win. The repair boot's is made by the
+  same functions (below), as the builder is run by the same `runBuilder`.
 - **The guest (`builder/init`):** `insmod`s `m/order` in its order
   (busybox cannot read `.ko.gz`); DHCP; `build.sh`; the outputs as a tar
   written raw to `/dev/vda`; `[builder] built`; power off. The run is a
@@ -242,6 +247,60 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   stops the VM, and exits. A running VM keeps the image and launcher it
   started with until then.
 
+## The repair (`repair.ts`, `repair-lock.ts`, `builder/repair-init`)
+
+A lane VM whose data disk is full is repaired offline (ADR-0210, S314,
+S322): the builder's machine booted on `data.img`, with the VM stopped.
+When a host repairs is `@pinetrie/machine`'s; this is the boot and its locks.
+
+- **The boot is pinned and made ready ahead** (`ensureRepairBoot`): the
+  builder's kernel, root and modules, the six modules btrfs needs, and
+  `btrfs-progs` with its six libraries, each an apk pinned by version and
+  SHA-256 in `builder/pins.json`'s `repair` (a test holds `btrfs-progs` to
+  the manifest's). The apks are unpacked in Node, files and symlinks with
+  their modes (`apkEntries`): a library is found by its symlinked name.
+  The initrd is `builder/repair-<hash>.cpio`, the hash of everything in it,
+  `repair-init` included; a prune keeps it and the apks (`repairBootNames`),
+  so one remade for a changed `repair-init` needs no network. A host on the
+  Mac makes it ready at its start, beside the lanes, so a repair never
+  fetches or compiles when it runs; one not ready refuses
+  (`repairBootMissing`).
+- **Its `/init` speaks lines** (`builder/repair-init`): each starts
+  `[repair] ` (`REPAIR_LINE_PREFIX`), read by `parseRepairLine` and
+  `repairReport`: the room found, grown or not, each repack's chunks moved,
+  the room left, `done` or `failed`. Sizes are printed with awk's `%.0f`:
+  busybox awk's `%d` stops at 2³¹−1 (S322's correction). A boot that never
+  says `done` failed. It grows nothing: the caller grows `data.img` first,
+  by the plan a start grows it by.
+- **`REPAIR_LOCK` and `repair.state` are in the state directory**, beside
+  `data.img`, never `images/`, which a scenario's own lane VM shares. The
+  lock serves a repair and every VM's start: a start, its growth included,
+  runs under it (`startLaneVm`, the only taker of the proof `startVm`
+  needs), so no VM starts and no disk grows while a repair has it, and no
+  repair stops a VM mid-start. Its waiting words are the caller's
+  (`onStartWaiting`): vm cannot tell a repair from a start. `repair.state`
+  is text, written whole by the lock's holder alone (`writeRepairState`);
+  vm never reads its meaning, which is the machine package's.
+- **The proofs are made only when a lock is taken** (`RepairLockHeld`,
+  `LauncherLockHeld`). `stopVmForRepair` takes the first, and
+  `repairDataDisk` the second.
+- **`stop-for-repair`**: on any connection, the launcher stops the VM and
+  exits whatever leases it holds, as `retire` does without its refusal;
+  every host's lease ends, and each one kept leases again, its start
+  waiting on the repair lock. The repair then takes `launcher.lock`
+  (`awaitLauncherGone`): its holder's exit is the exact sign the disk is
+  free, and held through the boot it keeps any launcher out, of any
+  version, which finds it held and exits at once. A repair starts no VM:
+  it writes its state and lets both locks go, the launcher's first, and the
+  kept leases start the VM.
+- **After every start a host makes, the console's last boot is read**
+  (`leaseStartedVm`, `isDiskFullAtLastBoot`), whether Docker answered or
+  not: Docker may answer on a full disk and fail every write after (S322).
+  `data disk full` there fails the lease as `DiskFullAtBoot`, its lease
+  closed, for the host's repair.
+- **A repair with no room to grow still repacks**, which may itself fail
+  for want of room: the repair then fails, saying so.
+
 ## A host's lease (`lease.ts`, `keep.ts`)
 
 - **A host joins only a current VM** (`planVmVersion`). The `slot` reply
@@ -297,27 +356,25 @@ sweep of what binds into it.
 
 ## Gotchas
 
-- **A full data disk stops the VM serving any host:** dockerd cannot
-  write its metadata, never answers, and every lease fails waiting for
-  it. Full is btrfs's, not `df`'s: once every chunk is allocated, a full
-  metadata fails every write while `df` still shows the free space inside
-  data chunks (S314), and a balance cannot run to free one. No shell
-  reaches the guest, so the way back is a bigger file, which the lease
-  makes itself (below); by hand, with the launcher stopped, `truncate -s
-  <size> data.img` on the Mac (the launcher makes the file only when it is
-  missing), and `init` grows the filesystem at the next boot. That resize failed once, on a disk of 36,000 subvolumes,
-  and `init` logs why to the console; a boot of the builder's machine on
-  `data.img` with `btrfs` and `btrfs-progs` grew it and balanced it
-  (S314, its `recovery-init`).
+- **A full data disk stops the VM serving any host:** dockerd may never
+  answer, or answer and fail every write (S322). Full is btrfs's, not
+  `df`'s: once every chunk is allocated, a full metadata fails every write
+  while `df` still shows the free space inside data chunks (S314), and a
+  balance cannot run to free one. pine·trie repairs it, offline (above):
+  a host that manages the machine, when its samples find the room spent
+  with nothing left to delete, or a start whose console says so. `init`'s
+  own resize failed once, on a disk of 36,000 subvolumes, and logs why to
+  the console; the repair boot grew that one.
 - **The lease grows `data.img` at each start it makes** (`growDataDisk`,
-  `grow.ts`, ADR-0210), before the launcher starts, so `init`'s resize
+  `grow.ts`, ADR-0210), under the repair lock, before the launcher starts, so `init`'s resize
   takes it at that boot: to the size its host plans (`LeaseInput.growData`,
   the machine package's `planStoreSize` over the file's size and allocated
   bytes and its volume's free space), within `lanes.store.max` and never
   into `lanes.store.leaveFree`, and only ever larger. A sparse file grown
   costs the volume nothing until the guest writes into it. A lease on a VM
   already running grows nothing: growth waits for the next start (an idle
-  stop, an update, a repair), which `room-low`'s words say.
+  stop, an update), which `room-low`'s words say, or a repair, which
+  grows it by the same plan (`laneVmRepairControls`, the host's).
 - **Space freed in the guest goes back to the Mac** within seconds: the
   data disk takes discards and btrfs sends them (`discard=async`), so
   `data.img`'s size on the Mac follows what the guest holds (S312).
@@ -348,8 +405,11 @@ sweep of what binds into it.
 ## Tests
 
 `plan.test.ts` (among them the launcher's argv and its disk modes),
-`protocol.test.ts`, `build.test.ts`, `apk.test.ts`, `pinned.test.ts` and
-`lease.test.ts`, whose lease runs against a stand-in launcher; mutations in `scripts/mutations/vm.ts`. The real launcher and VM
-are checked by the `contract` scenario under Docker
-(`packages/docker/TECHNICAL.md`), and the image's build in a VM by the
-lanes suite's `vm-image` scenario, on the Mac.
+`protocol.test.ts`, `build.test.ts`, `apk.test.ts`, `pinned.test.ts`,
+`repair.test.ts` and `lease.test.ts`, whose lease runs against a stand-in
+launcher, and whose locks are held by another process
+(`childHoldingLock`); mutations in `scripts/mutations/vm.ts`. The real
+launcher and VM are checked by the `contract` scenario under Docker
+(`packages/docker/TECHNICAL.md`), the image's build in a VM by the lanes
+suite's `vm-image` scenario, and the repair by its `vm-repair` scenario,
+both on the Mac.

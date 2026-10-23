@@ -45,6 +45,20 @@
     from its thread's base, and its fork row says so. A store serves one
     folder, so no weighing between a jj and a folder project's turns could
     arise within one index.
+  - 2026-10-23: the repair's state is the one every host on the VM shares,
+    written only by the repair lock's holder, which every VM's start holds
+    too; a failure it records stops every host's repair until the disk could
+    grow past its size then, and a host's start does not pass it. It is asked
+    for while a host runs only when nothing is left to delete *and* the room
+    is spent (`room-unrecoverable` alone holds while gigabytes remain), never
+    by a `no space left on device`; at a start, by the console's `data disk
+    full` after every boot, Docker answering or not (S322). It is done only
+    when it leaves the room no longer spent; the metadata's share is not
+    asked, since a disk whose metadata refused every write reads 91% used by
+    btrfs's counters, and keeps that share after a repair that gained 37 GiB
+    (the `vm-repair` scenario). The repair boot holds the launcher's own lock
+    while it has `data.img` open, so no launcher of any version opens it
+    beside the repair.
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.

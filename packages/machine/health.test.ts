@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest"
 import {
   FIRST_HEALTH_STATE,
   type HealthPlanState,
-  MEMORY_CALM,
   type MemoryShort,
+  NOTHING_BESIDE,
   type Planned,
   planHealth,
 } from "./health.ts"
@@ -14,7 +14,7 @@ import { LEAVE_FREE_DEFAULT } from "./store-settings.ts"
 
 const GiB = 1024 ** 3
 const settings = { leaveFree: LEAVE_FREE_DEFAULT, max: null }
-const NO_GROW = { grow: false }
+const NO_GROW = { grow: false, repairDisk: false }
 const lane = threadIdFor("t-1")
 
 /** A calm machine: room to spare, no pressure, one lane. */
@@ -78,7 +78,7 @@ function run(
       { kind: "sampled", sample },
       settings,
       NO_GROW,
-      MEMORY_CALM,
+      NOTHING_BESIDE,
     )
     state = planned.state
     return planned
@@ -266,6 +266,7 @@ describe("events", () => {
           kind: "room-unrecoverable",
           unallocated: 10 * GiB,
           minimum: 20 * GiB,
+          isRepaired: false,
         },
         {
           kind: "room-low",
@@ -331,7 +332,7 @@ describe("the value", () => {
       { kind: "failed", error: "lanehost did not answer" },
       settings,
       NO_GROW,
-      MEMORY_CALM,
+      NOTHING_BESIDE,
     )
     expect(failed.changed).toBe(true)
     expect(failed.health.causes).toEqual([
@@ -343,7 +344,7 @@ describe("the value", () => {
       { kind: "sampled", sample: FILESYSTEM_LOW },
       settings,
       NO_GROW,
-      MEMORY_CALM,
+      NOTHING_BESIDE,
     )
     expect(back.changed).toBe(true)
     expect(kinds(back)).toEqual(["filesystem-low"])
@@ -352,13 +353,10 @@ describe("the value", () => {
 
 describe("memory", () => {
   const plan = (memory: MemoryShort, from = FIRST_HEALTH_STATE) =>
-    planHealth(
-      from,
-      { kind: "sampled", sample: calm },
-      settings,
-      NO_GROW,
+    planHealth(from, { kind: "sampled", sample: calm }, settings, NO_GROW, {
       memory,
-    )
+      repair: null,
+    })
 
   test("memory short from rung 2 is amber, with the lanes held listed beside it", () => {
     const held = [{ lane, treatment: { kind: "paused" } } as const]

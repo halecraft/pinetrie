@@ -7,6 +7,16 @@ import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a repair keeps its lock, and no VM starts after it",
+    file: "apps/pinetrie/host/machine/repair.ts",
+    from: "      await held.lock.release()\n",
+    to: "",
+    suite: "lanes",
+    scenario: "vm-repair",
+    expect:
+      "the VM starts again on the repaired disk, and a container writes to it",
+  },
+  {
     name: "a stop leaves the lane's held start waiting",
     file: "apps/pinetrie/host/runs.ts",
     from: "      work.abandonStart(lane)\n",

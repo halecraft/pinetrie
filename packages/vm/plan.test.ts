@@ -12,9 +12,11 @@ import {
   imageRefusal,
   imageSourceSums,
   isBuildLogLine,
+  isDiskFullAtLastBoot,
   kernelRelease,
   launcherArgs,
   launcherFromCommandLine,
+  moduleOrder,
   NOTHING_HELD,
   otherHolders,
   parseSums,
@@ -428,6 +430,7 @@ describe("planVmBuildRun: a build as paths and arguments", () => {
       "net/core/failover.ko.gz",
       "drivers/char/hw_random/virtio-rng.ko.gz",
     ],
+    repair: { packages: [], modules: [] },
   }
   const run = planVmBuildRun({
     stateDir: "/s",
@@ -449,7 +452,7 @@ describe("planVmBuildRun: a build as paths and arguments", () => {
         as: "virtio-rng.ko",
       },
     ])
-    expect(run.order).toBe("failover.ko\nvirtio-rng.ko\n")
+    expect(moduleOrder(run.modules)).toBe("failover.ko\nvirtio-rng.ko\n")
   })
   test("a scratch beside the image, and one build lock for every image", () => {
     expect(run.image).toBe("/s/images/k")
@@ -626,5 +629,26 @@ describe("vmVersionWords: both images and what differs, for a host and for vm:bu
     expect(vmNoneRunningWords("bbbb")).toBe(
       "no lane VM is running: the next host starts it from bbbb",
     )
+  })
+})
+
+describe("isDiskFullAtLastBoot", () => {
+  const boot = (lines: string) =>
+    `T+0.20 stage 1: system image mounted\n${lines}`
+  test("the last boot's word decides, not an earlier boot's", () => {
+    const full = boot(
+      "T+1.0 data disk room: unallocated=1\nT+1.0 data disk full\n",
+    )
+    const fine = boot("T+1.0 data disk room: unallocated=99999999999\n")
+    expect(isDiskFullAtLastBoot(full)).toBe(true)
+    expect(isDiskFullAtLastBoot(fine)).toBe(false)
+    expect(isDiskFullAtLastBoot(full + fine)).toBe(false)
+    expect(isDiskFullAtLastBoot(fine + full)).toBe(true)
+  })
+  test("a line only naming the words is not init's", () => {
+    expect(
+      isDiskFullAtLastBoot(boot("[  1.0] lanehost: data disk full\n")),
+    ).toBe(false)
+    expect(isDiskFullAtLastBoot("")).toBe(false)
   })
 })

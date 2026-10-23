@@ -100,6 +100,7 @@ async function withProbe<T>(
       hostSocket: path.join(dir, ".no-ssh.sock"),
       log: () => {},
       building: () => {},
+      manage: "manage",
     })
     try {
       return await body(found, dir)

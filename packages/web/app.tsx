@@ -64,7 +64,7 @@ import {
   foldMemory,
   type HeldView,
   heldByOthers,
-  heldForMemory,
+  heldLaneTreatments,
   historyView,
   type Identity,
   INVENTORY_CLOSED,
@@ -454,7 +454,7 @@ export function App({
     traces,
     machine,
   } = useSelector(heldView, readSessionFacts)
-  const memoryHeld = useMemo(() => heldForMemory(machine), [machine])
+  const lanesHeld = useMemo(() => heldLaneTreatments(machine), [machine])
   // Every card's record: the host's places, with this tab's moves
   // drawn over them until its copy holds them. An unchanged card keeps its
   // record object (`readPlaces`).
@@ -1723,7 +1723,7 @@ export function App({
     live,
     attention: session.attention,
     runEnds: attention.runEnds,
-    memoryHeld,
+    lanesHeld,
     statuses: attention.threads,
     threadArrivals: attention.threadArrivals,
     spots,

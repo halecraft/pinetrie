@@ -11,7 +11,7 @@ and the words share one.
 
 | module | holds |
 |---|---|
-| `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager`, `HostLaneFacts`, `MachineMeasurements` |
+| `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager`, `HostLaneFacts`, `MachineMeasurements`, `RepairControls` |
 | `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it |
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`) and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
@@ -27,7 +27,9 @@ and the words share one.
 | `upkeep.ts` | the next bounded step (`planUpkeepStep`): the index's fill, or deletions of entries, lanes no thread will run (`deletableLanes`) and stopped nested lanes' abandoned inner projects (`abandonedInnerProjects`) |
 | `fixtures.ts` | test support: the index in memory, a store and records to plan over |
 | `capabilities.ts` | what a backend can do to the store (`Capabilities`, `planCapabilities`): the lane VM grows; Linux does not |
-| `store-size.ts` | how large the store's disk should be (`planStoreSize`, the one maker of `StoreSize`) |
+| `store-size.ts` | how large the store's disk should be (`planStoreSize`, the one maker of `StoreSize`), and what it would grow to now (`plannedStoreSize`) |
+| `repair.ts` | the lane VM's repair: its states (`RepairState`), the moves between them (`REPAIR_NEXT`, `nextRepairState`), the shared state's text (`encodeRepairState`, `decodeRepairState`) and how every host reads it (`repairFacts`, `isRepairRunning`), when a sample calls for one (`isRepairCalledFor`), and its cause (`repairCause`) |
+| `repair-steps.ts` | the one executor of a repair's states (`runRepairSteps`), through the host's `RepairControls` |
 
 ## Rules
 
@@ -209,6 +211,56 @@ and the words share one.
   VM's lease grows it at its next start (`packages/vm/TECHNICAL.md`), and
   `room-low` says so (`grows`), planned from the sample's room and
   filesystem.
+- **The lane VM's disk is repaired offline, and only where it may be**
+  (ADR-0210). `Capabilities.repairDisk` is a fixed fact of the target, the
+  lane VM's; whether its repair boot is ready is found when it would run,
+  and a boot not ready fails the repair before the VM is stopped. The
+  manager takes `RepairControls | null`, generic over the host's proofs
+  of the locks it holds, and the host makes them only for the lane VM and
+  a host that manages: with none, no path reaches a VM's stop, so an
+  observing host and Linux are safe by construction.
+- **The repair's state is the shared one** (`repair.state`, in the lane
+  VM's state directory, written only by the repair lock's holder). Every
+  host reads it each sample, apart from its sample of the machine, which a
+  stopped VM fails, and the reducer starts from it, not from a host's
+  memory: a failure one host records stops every host's repair.
+  `REPAIR_NEXT` is the one table of moves; an event it does not allow
+  leaves the state as it was, so a trigger while a repair runs changes
+  nothing. A held lock is not a repair (`isRepairRunning`): every VM's
+  start holds it too, so only a held lock *and* a running state is one. A
+  running state with the lock free (its holder died) or text no host can
+  read is `interrupted`: unsure, it holds no lane, says nothing, and the
+  triggers are read afresh.
+- **What leaves `failed` is a change that could succeed**: a trigger whose
+  planned size (`plannedStoreSize`: `planStoreSize` over the sample's
+  room, the size it is when it would not grow) exceeds the failure's
+  `sizeAtFailure`. A host's start does not pass it either, so a restart
+  never stops the VM again for a repair that cannot gain room; `room-low`'s
+  "grows" reads the same function.
+- **`done` means no longer spent**: what the repair left has at least
+  `ROOM_SPENT_CLEAR` unallocated, the health value's own clear, else it is
+  `failed`, so a repair that gained a little never makes a loop of repairs.
+  Metadata's share is not asked: with unallocated room btrfs gives
+  metadata another chunk, and a disk whose metadata refused every write
+  read 91% used by btrfs's counters, kept at the same share after its
+  repair gained 37 GiB (the `vm-repair` scenario).
+- **One trigger while the host runs, from a fresh sample**
+  (`isRepairCalledFor`): the upkeep found nothing left to delete *and* the
+  room is spent. Never `room-unrecoverable` alone, which holds while
+  gigabytes remain. A `no space left on device` is not one: it may come
+  from the Mac's volume or a container's tmpfs, and the next sample's room
+  decides. The other, at a start, is the host's (`DiskFullAtBoot`).
+- **A repair runs beside the loop, never inside a sample**: the sample
+  that asks starts `runRepairSteps` and returns, and the next samples hold
+  this host's lanes as every other host's do; `repairInFlight` keeps a
+  sample taken before `detected` is written from asking again. The
+  manager's close waits for it: a repair is never left half done by its
+  host's close. After it, the upkeep's last word is dropped, being of the
+  disk before it.
+- **While any host repairs, every lane waits** (`heldForRepair`): each
+  lane, listed or unseen, is `waiting-for-repair`, which allows nothing,
+  though this host's own sample failed with its VM stopped. The next plan
+  after the repair gives the lanes back; nothing releases them by hand.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
   when the state, the set of causes by kind and lane, memory's rung, or the
   lanes held and how, differs from the value last written; a cause's
@@ -243,7 +295,9 @@ and the words share one.
 
 `health.test.ts`, `hysteresis.test.ts`, `rung.test.ts`,
 `treatments.test.ts` and `importance.test.ts` (properties over random
-lanes, rungs and rankings), `measurements.test.ts` (a property:
+lanes, rungs and rankings), `repair.test.ts` (properties over random
+states and events: every move the table allows and no other, what leaves
+`failed`, the shared state's text both ways), `repair-steps.test.ts`, `measurements.test.ts` (a property:
 `commandProgram` never returns an argument), `types.test.ts`,
 `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`,
 `retention.test.ts` (a property, over random listings of every owner's

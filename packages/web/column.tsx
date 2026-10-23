@@ -271,8 +271,8 @@ export interface ColumnProps {
   attention: AttentionStore
   /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
   runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
-  /** Each lane the machine holds for memory, and how (`heldForMemory`). */
-  memoryHeld: ReadonlyMap<ThreadId, LaneTreatment>
+  /** Each lane the machine holds, and how (`heldLaneTreatments`). */
+  lanesHeld: ReadonlyMap<ThreadId, LaneTreatment>
   /** Each thread's status (`threadStatus`): what its dot draws. */
   statuses: ReadonlyMap<ThreadId, Status>
   /** When each thread's mark last arrived, and its ✓ last showed. */
@@ -697,7 +697,7 @@ export function Column(p: ColumnProps) {
     work: p.work,
     origins,
     runEnds: p.runEnds,
-    memoryHeld: p.memoryHeld,
+    lanesHeld: p.lanesHeld,
   })
   // What a card's command catches up with: the thread's base,
   // or the thread it branched from. One object while what it

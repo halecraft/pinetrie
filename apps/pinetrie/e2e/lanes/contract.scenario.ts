@@ -135,6 +135,7 @@ async function dockerContract(
     hostSocket: path.join(projA, ".no-ssh.sock"),
     log,
     building: build => log(`building ${JSON.stringify(build)}`),
+    manage: "manage",
   })
   if (a?.kind !== "found")
     throw new Error(`no Docker runtime: ${a === null ? "no project" : a.words}`)
@@ -533,6 +534,7 @@ async function dockerContract(
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,
       building: build => log(`building ${JSON.stringify(build)}`),
+      manage: "manage",
     })
     if (b?.kind === "found") {
       await b.ready({
@@ -580,6 +582,7 @@ async function dockerContract(
       hostSocket: path.join(projA, ".no-ssh.sock"),
       log,
       building: build => log(`building ${JSON.stringify(build)}`),
+      manage: "manage",
     })
     const refusal =
       second?.kind === "found"

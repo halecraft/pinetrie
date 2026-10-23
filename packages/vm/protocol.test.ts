@@ -13,6 +13,7 @@ test("each message is one line, and decodes to itself", () => {
     { kind: "lease", agent: null },
     { kind: "retire" },
     { kind: "status" },
+    { kind: "stop-for-repair" },
     {
       kind: "fill",
       entries: [{ name: "a1", source: "/p", readOnly: true }],

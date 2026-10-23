@@ -150,6 +150,22 @@ describe("the builder's pins", () => {
       expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/)
     }
   })
+  test("the repair's packages are Alpine's, on the manifest's branch, its btrfs-progs the image's", () => {
+    const btrfs = pins.repair.packages.find(p => p.name === "btrfs-progs")
+    expect(btrfs?.version).toBe(manifest.packages["btrfs-progs"])
+    for (const pin of pins.repair.packages) {
+      expect(pin.url).toContain(`/v${manifest.alpine}/main/${manifest.arch}/`)
+      expect(path.basename(pin.url)).toBe(`${pin.name}-${pin.version}.apk`)
+      expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+  test("the repair's init parses, and prints sizes whole past 2³¹", () => {
+    const init = path.join(import.meta.dirname, "builder", "repair-init")
+    execFileSync("sh", ["-n", init])
+    const text = readFileSync(init, "utf8")
+    expect(text).toContain("%.0f")
+    expect(text).not.toMatch(/printf[^\n]*%d/)
+  })
   test("the builder's init parses, and writes to its one disk", () => {
     const init = path.join(import.meta.dirname, "builder", "init")
     execFileSync("sh", ["-n", init])

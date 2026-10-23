@@ -75,7 +75,31 @@ describe("machineWords", () => {
           kind: "room-unrecoverable",
           unallocated: 6 * GiB,
           minimum: 20 * GiB,
+          isRepaired: true,
         }),
+        amber({
+          kind: "room-unrecoverable",
+          unallocated: 6 * GiB,
+          minimum: 20 * GiB,
+          isRepaired: false,
+        }),
+        amber({
+          kind: "disk-being-repaired",
+          step: "detected",
+          progress: null,
+        }),
+        amber({
+          kind: "disk-being-repaired",
+          step: "stopping-vm",
+          progress: null,
+        }),
+        amber({
+          kind: "disk-being-repaired",
+          step: "booting-repair",
+          progress:
+            "[repair] grown: Resize device id 1 (/dev/vda) from 2.00GiB to max",
+        }),
+        amber({ kind: "disk-repair-failed", why: "mount: bad superblock" }),
         amber({ kind: "snapshot-skipped", count: 1 }),
         amber({ kind: "snapshot-skipped", count: 3 }),
         amber({ kind: "unsampled", reason: "waiting", error: null }),
@@ -97,6 +121,11 @@ describe("machineWords", () => {
       "work is slowed: the host stalled for 1.5 seconds",
       "work is slowed: the lanes' disk is low: old turns' snapshots are being deleted to free room",
       "work is slowed: the lanes' disk is low, and nothing is left that may be deleted: 6 GB left, 20 GB at least",
+      "work is slowed: the lanes' disk is low, and nothing is left that may be deleted: 6 GB left, 20 GB at least; `btrfs balance start -dusage=10` on the lanes' directory may free room",
+      "work is slowed: the lane VM's disk is full: repairing it",
+      "work is slowed: the lane VM's disk is full: repairing it, the lane VM stopping",
+      "work is slowed: the lane VM's disk is full: repairing it (grown: Resize device id 1 (/dev/vda) from 2.00GiB to max)",
+      "work is slowed: the lane VM's disk could not be repaired: mount: bad superblock; it is tried again once the disk could grow: raise `lanes.store.max`, or free the Mac's disk",
       "a turn's snapshot could not be recorded: branching at it starts from the turn before",
       "3 turns' snapshots could not be recorded: branching at them starts from the turn before",
       "waiting for its first reading",
@@ -127,15 +156,38 @@ describe("memory held", () => {
     )
   })
 
+  test("lanes waiting for a repair are not counted as waiting for room", () => {
+    expect(
+      machineWords(
+        {
+          state: "amber",
+          causes: [short],
+          treatments: [
+            { lane, treatment: waiting },
+            {
+              lane: threadIdFor("t-2"),
+              treatment: { kind: "waiting-for-repair" },
+            },
+          ],
+        },
+        nameOf,
+      ),
+    ).toBe(
+      "The machine lanes run on: work is slowed: memory is short: 1 thread waits for room",
+    )
+  })
+
   test("a column says why its lane waits, and nothing for one not held", () => {
     expect([
       treatmentWords({ kind: "normal" }),
       treatmentWords(waiting),
       treatmentWords({ kind: "paused" }),
+      treatmentWords({ kind: "waiting-for-repair" }),
     ]).toEqual([
       null,
       "waits for room on the machine to start",
       "paused for memory: its next tool call waits for room",
+      "waits while the lane VM's disk is repaired",
     ])
   })
 })

@@ -8,6 +8,7 @@
 
 import {
   errorText,
+  type HeldLane,
   type MachineHealth,
   type MemoryCounters,
   snapshotId,
@@ -38,15 +39,31 @@ import type {
   MachineManager,
   MachineMeasurements,
   MachineSensor,
+  RepairControls,
 } from "./ports.ts"
+import {
+  isRepairCalledFor,
+  isRepairRunning,
+  NO_REPAIR,
+  nextRepairState,
+  type RepairFacts,
+  type RepairRead,
+  type RepairState,
+  repairCause,
+  repairFacts,
+  repairStateNow,
+} from "./repair.ts"
+import { runRepairSteps } from "./repair-steps.ts"
 import { FIRST_RUNG_STATE, planRung, type RungPlanState } from "./rung.ts"
 import type { MachineSample, UpkeepHeard } from "./sample.ts"
 import type { SnapshotIndex } from "./snapshot-index.ts"
 import type { StoreControls, StoreRecords } from "./store.ts"
 import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
+import { plannedStoreSize } from "./store-size.ts"
 import {
   ALL_NORMAL,
   FIRST_TREATMENT_STATE,
+  heldForRepair,
   isActivityAllowed,
   isRankingNeeded,
   type LaneActivity,
@@ -85,8 +102,16 @@ export type ManagerNews =
   | { readonly kind: "upkeep-failed"; readonly error: string }
   /** The measurements could not be written; the next sample writes its own. */
   | { readonly kind: "unmeasured"; readonly error: string }
+  /** The lane VM's repair moved, this host's own. */
+  | {
+      readonly kind: "repair"
+      readonly from: RepairState
+      readonly to: RepairState
+    }
+  /** A repair asked for did not run: another holds the lock, or it could not be taken. */
+  | { readonly kind: "repair-not-run"; readonly why: string }
 
-export function createMachineManager(deps: {
+export function createMachineManager<Held, LauncherHeld>(deps: {
   readonly sensor: MachineSensor
   readonly sink: HealthSink
   readonly settings: StoreSettings
@@ -98,6 +123,10 @@ export function createMachineManager(deps: {
   readonly records: StoreRecords
   readonly laneFacts: HostLaneFacts
   readonly measurements: MachineMeasurements
+  /** The lane VM's shared repair state, read each sample; null where nothing is repaired. */
+  readonly readRepair: (() => Promise<RepairRead>) | null
+  /** Made only where the disk can be repaired and this host manages: null, no path stops a VM. */
+  readonly repair: RepairControls<Held, LauncherHeld> | null
   readonly tell: (news: ManagerNews) => void
 }): MachineManager {
   const { sensor, sink, settings, tell, index, store, records } = deps
@@ -111,6 +140,25 @@ export function createMachineManager(deps: {
   let treatments: Treatments = ALL_NORMAL
   /** Memory's rung and holds as last planned, kept through a failed sample. */
   let memoryShort: MemoryShort = MEMORY_CALM
+  /** Memory's own treatments, as last planned: what applies when no repair runs. */
+  let memoryTreatments: Treatments = ALL_NORMAL
+  /** The lanes the last sample read running, held while a repair runs though a sample fails. */
+  let lanesSeen: readonly ThreadId[] = []
+  /** The lanes held as last applied, memory's or a repair's: what the measurements' changes are from. */
+  let heldBefore: readonly HeldLane[] = []
+  /**
+   * This host's own repair, from the sample that asked to its end: a
+   * sample before it has written `detected` must not ask again.
+   */
+  let repairInFlight: Promise<void> | null = null
+  /** Memory as the last sample read it: what a decision's row is measured at. */
+  let lastMemory: {
+    readonly fullAvg10: number | null
+    readonly memoryAvailable: number
+  } = {
+    fullAvg10: null,
+    memoryAvailable: 0,
+  }
   const waiters = new Set<Waiter>()
   let closed = false
   /** The last counters a sample read, and each lane as last kept: what the measurements store differences from. */
@@ -152,6 +200,15 @@ export function createMachineManager(deps: {
     for (const w of waiters)
       if (isActivityAllowed(treatments.laneTreatment(w.lane), w.activity))
         w.allow()
+  }
+
+  /** A measurements write; one that fails is told, and the sample goes on. */
+  const record = (write: () => void) => {
+    try {
+      write()
+    } catch (error) {
+      tell({ kind: "unmeasured", error: errorText(error) })
+    }
   }
 
   /**
@@ -205,31 +262,122 @@ export function createMachineManager(deps: {
       },
       lanes: lanesChanged(lanesKept, lanesNow),
       decisions: [
-        ...treatmentChanges(memoryShort.held, held).map(
-          (c): DecisionMeasured => ({ kind: "treatment", ...c, ...at }),
-        ),
         ...next.shadowDecisions.map(
-          (decision): DecisionMeasured => ({ kind: "shadow", decision, ...at }),
+          (decision): DecisionMeasured => ({
+            kind: "shadow",
+            decision,
+            ...at,
+          }),
         ),
       ],
       trim: untrimmed + 1 >= TRIM_MEASUREMENTS_EVERY_SAMPLES,
     }
     // execute
     treatmentState = next.state
-    treatments = isHolding ? next.treatments : ALL_NORMAL
+    memoryTreatments = isHolding ? next.treatments : ALL_NORMAL
     memoryShort = { rung, isHolding, held }
-    settleAllowed()
+    lanesSeen = sample.lanesRunning
+    lastMemory = at
     counters = sample.machine.counters
     lanesKept = new Map(lanesNow.map(l => [l.lane, l]))
     untrimmed = measured.trim ? 0 : untrimmed + 1
-    try {
+    record(() => {
       deps.measurements.recordSample(measured.sample)
       deps.measurements.recordLaneSamples(measured.lanes)
       deps.measurements.recordDecisions(measured.decisions)
       if (measured.trim) deps.measurements.trim()
-    } catch (error) {
-      tell({ kind: "unmeasured", error: errorText(error) })
+    })
+  }
+
+  /** The shared repair state, as every host reads it, and its text; on a failed read, none. */
+  const readRepairFacts = async (): Promise<{
+    readonly facts: RepairFacts
+    readonly text: string | null
+  }> => {
+    if (deps.readRepair === null) return { facts: NO_REPAIR, text: null }
+    try {
+      const read = await deps.readRepair()
+      return { facts: repairFacts(read), text: read.text }
+    } catch {
+      return { facts: NO_REPAIR, text: null }
     }
+  }
+
+  /**
+   * The treatments every waiter reads: while any host repairs, every lane
+   * waits, though this sample failed (its VM stopped); else memory's. The
+   * lanes held changing are measured.
+   */
+  const applyTreatments = (facts: RepairFacts) => {
+    const repairing = deps.mode === "manage" && isRepairRunning(facts)
+    const waitingToStart = [...waiters].map(w => w.lane)
+    treatments = repairing
+      ? heldForRepair([...new Set([...lanesSeen, ...waitingToStart])])
+      : memoryTreatments
+    settleAllowed()
+    const changes = treatmentChanges(heldBefore, treatments.held)
+    heldBefore = treatments.held
+    if (changes.length === 0) return
+    record(() =>
+      deps.measurements.recordDecisions(
+        changes.map(c => ({ kind: "treatment", ...c, ...lastMemory })),
+      ),
+    )
+  }
+
+  /**
+   * A repair started, beside the loop, when this fresh sample calls for
+   * one and the shared state allows it: never awaited in a sample, so the
+   * samples go on and hold this host's lanes while it runs.
+   */
+  const askRepair = (
+    sampled: MachineSample,
+    facts: RepairFacts,
+    seen: string | null,
+  ): Promise<void> | undefined => {
+    const controls = deps.repair
+    if (controls === null || deps.mode !== "manage") return
+    if (repairInFlight !== null || isRepairRunning(facts)) return
+    if (!isRepairCalledFor(sampled)) return
+    const plannedSize =
+      plannedStoreSize(sampled, settings, deps.capabilities) ??
+      sampled.store?.size ??
+      0
+    const state = repairStateNow(facts)
+    const trigger = "room-spent-and-nothing-to-delete"
+    const asked = nextRepairState(state, {
+      kind: "trigger",
+      trigger,
+      plannedSize,
+    })
+    if (asked.kind !== "detected") return
+    repairInFlight = runRepairSteps(
+      controls,
+      { trigger, plannedSize, seen },
+      (from, to) => {
+        tell({ kind: "repair", from, to })
+        record(() =>
+          deps.measurements.recordDecisions([
+            { kind: "repair", from: from.kind, to: to.kind, ...lastMemory },
+          ]),
+        )
+      },
+    )
+      .then(run => {
+        if (run.kind === "held-by-another")
+          tell({ kind: "repair-not-run", why: "another holds the repair lock" })
+        if (run.kind === "lock-failed")
+          tell({ kind: "repair-not-run", why: run.detail })
+      })
+      .catch(error => tell({ kind: "repair-not-run", why: errorText(error) }))
+      .finally(() => {
+        repairInFlight = null
+        // What the repair left is read afresh: the upkeep's last word
+        // was of the disk before it.
+        upkeep = { freeing: false, exhausted: false }
+        void sample()
+      })
+    return repairInFlight
   }
 
   const sampleOnce = async (): Promise<void> => {
@@ -250,14 +398,15 @@ export function createMachineManager(deps: {
       result = { kind: "failed", error: errorText(error) }
     }
     if (result.kind === "sampled") await planMemory(result.sample)
+    const { facts, text } = await readRepairFacts()
+    applyTreatments(facts)
+    // Never awaited: the samples go on while it runs.
+    if (result.kind === "sampled") void askRepair(result.sample, facts, text)
     const before = memory.health
-    const planned = planHealth(
-      memory,
-      result,
-      settings,
-      deps.capabilities,
-      memoryShort,
-    )
+    const planned = planHealth(memory, result, settings, deps.capabilities, {
+      memory: { ...memoryShort, held: treatments.held },
+      repair: repairCause(facts),
+    })
     if (!planned.changed) {
       memory = planned.state
       return
@@ -334,8 +483,9 @@ export function createMachineManager(deps: {
     })
   }
 
-  const sample = (): Promise<void> =>
-    keeper.later("sample", sampleOnce).catch(() => {})
+  function sample(): Promise<void> {
+    return keeper.later("sample", sampleOnce).catch(() => {})
+  }
 
   return {
     async start() {
@@ -387,6 +537,9 @@ export function createMachineManager(deps: {
       for (const w of waiters) w.refuse(new KeeperClosed())
       keeper.close("drop")
       await keeper.idle()
+      // A repair is never left half done by its host's close: its boot
+      // holds the disk while its locks are this host's.
+      await repairInFlight
       await writeHealth(STOPPED, { ...memory, health: STOPPED })
     },
   }

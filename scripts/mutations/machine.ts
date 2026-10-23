@@ -5,6 +5,88 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "any trigger leaves a failure",
+    file: "packages/machine/repair.ts",
+    from: "event.plannedSize <= state.sizeAtFailure",
+    to: "event.plannedSize < 0",
+    command: unit,
+    expect:
+      "a trigger leaves a failure only when the disk could grow past its size then",
+  },
+  {
+    name: "a repair that gained a byte is done",
+    file: "packages/machine/repair.ts",
+    from: "  outcome.leftUnallocated >= ROOM_SPENT_CLEAR\n",
+    to: "  outcome.leftUnallocated > 0\n",
+    command: unit,
+    expect: "a repair is done only if what it left is no longer spent",
+  },
+  {
+    name: "a repair is called for with nothing to delete alone",
+    file: "packages/machine/repair.ts",
+    from: "store !== null && sample.upkeep.exhausted && store.unallocated < ROOM_SPENT",
+    to: "store !== null && sample.upkeep.exhausted",
+    command: unit,
+    expect: "only with nothing left to delete and the room spent",
+  },
+  {
+    name: "any held repair lock is a repair",
+    file: "packages/machine/repair.ts",
+    from: `  facts.lockHeld &&
+  facts.state !== "interrupted" &&
+  RUNNING.has(facts.state.kind)`,
+    to: "  facts.lockHeld",
+    command: unit,
+    expect:
+      "a held lock is a repair only with a running state: else a VM's start",
+  },
+  {
+    name: "a repair is asked from this host's memory, not the shared state",
+    file: "packages/machine/manager.ts",
+    from: "    const state = repairStateNow(facts)\n",
+    to: '    const state: RepairState = { kind: "idle" }\n',
+    command: unit,
+    expect:
+      "another host's recorded failure stops this host's repair, until the disk could grow",
+  },
+  {
+    name: "a repair is awaited inside a sample",
+    file: "packages/machine/manager.ts",
+    from: "void askRepair(result.sample, facts, text)",
+    to: "await askRepair(result.sample, facts, text)",
+    command: unit,
+    expect:
+      "a sample with the room spent and nothing to delete repairs, beside the loop, once",
+  },
+  {
+    name: "a repair in flight is asked again",
+    file: "packages/machine/manager.ts",
+    from: "    if (repairInFlight !== null || isRepairRunning(facts)) return\n",
+    to: "    if (isRepairRunning(facts)) return\n",
+    command: unit,
+    expect:
+      "a sample taken before the repair has written its state asks for no second",
+  },
+  {
+    name: "a repair runs the lanes as they were",
+    file: "packages/machine/manager.ts",
+    from: '    const repairing = deps.mode === "manage" && isRepairRunning(facts)\n',
+    to: "    const repairing = false\n",
+    command: unit,
+    expect:
+      "another host's repair holds this host's lanes, and its VM start does not",
+  },
+  {
+    name: "a repair boot not ready still stops the VM",
+    file: "packages/machine/repair-steps.ts",
+    from: `      if (missing !== null)
+        throw new Error(\`the repair boot could not be made ready: \${missing}\`)
+`,
+    to: "",
+    command: unit,
+    expect: "a repair boot not ready fails it without stopping the VM",
+  },
+  {
     name: "a measurement not written is not told",
     file: "packages/machine/manager.ts",
     from: '      tell({ kind: "unmeasured", error: errorText(error) })\n',

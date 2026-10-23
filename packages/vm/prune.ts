@@ -6,9 +6,11 @@
 import { execFile } from "node:child_process"
 import { readdir, rm } from "node:fs/promises"
 import path from "node:path"
+import { kernelImageName } from "./apk.ts"
 import { readBuilderPins, readImageSources } from "./build.ts"
 import { gvproxyPath, readGvproxyPin } from "./gvproxy.ts"
 import { imageKey, type PruneEntry, planPrune } from "./plan.ts"
+import { gatherRepairBoot, repairBootNames } from "./repair.ts"
 import { BUILDER, gatherBinary, LAUNCHER } from "./swift.ts"
 
 const OWNED = /\.(?:tmp|old)-(\d+)$/
@@ -58,13 +60,16 @@ export const runningLaunchers = (): Promise<readonly string[] | null> =>
 
 /** The names of what the current sources use. */
 async function currentNames(stateDir: string): Promise<ReadonlySet<string>> {
-  const [sources, pins, gvproxy, launcher, builder] = await Promise.all([
-    readImageSources(),
-    readBuilderPins(),
-    readGvproxyPin(),
-    gatherBinary(stateDir, LAUNCHER),
-    gatherBinary(stateDir, BUILDER),
-  ])
+  const [sources, pins, gvproxy, launcher, builder, repair] = await Promise.all(
+    [
+      readImageSources(),
+      readBuilderPins(),
+      readGvproxyPin(),
+      gatherBinary(stateDir, LAUNCHER),
+      gatherBinary(stateDir, BUILDER),
+      gatherRepairBoot(stateDir),
+    ],
+  )
   return new Set([
     imageKey(sources),
     path.basename(launcher.binary),
@@ -72,7 +77,10 @@ async function currentNames(stateDir: string): Promise<ReadonlySet<string>> {
     path.basename(gvproxyPath(stateDir, gvproxy)),
     path.basename(pins.kernel.url),
     path.basename(pins.root.url),
-    `Image-${pins.kernel.sha256.slice(0, 16)}`,
+    kernelImageName(pins.kernel),
+    // Kept, so a repair boot needs no network, and one remade for a
+    // changed `repair-init` none either.
+    ...repairBootNames(repair),
   ])
 }
 

@@ -66,6 +66,38 @@ function memoryShortWords(
     : "memory is short: new runs wait for room"
 }
 
+/**
+ * The lane VM's repair as it runs, for the footer and a start's
+ * checklist alike: the step it is at, and the repair boot's last line.
+ */
+export function repairProgressWords(
+  step: Extract<MachineCause, { kind: "disk-being-repaired" }>["step"],
+  progress: string | null,
+): string {
+  switch (step) {
+    case "detected":
+      return "the lane VM's disk is full: repairing it"
+    case "stopping-vm":
+      return "the lane VM's disk is full: repairing it, the lane VM stopping"
+    case "booting-repair":
+      return progress === null
+        ? "the lane VM's disk is full: repairing it"
+        : `the lane VM's disk is full: repairing it (${progress.replace(/^\[repair\] /, "")})`
+    default:
+      return assertNever(step)
+  }
+}
+
+/** A repair of the lane VM's disk that failed, with what would let it be tried again. */
+export const repairFailedWords = (why: string): string =>
+  `the lane VM's disk could not be repaired: ${why}; it is tried again once the disk could grow: raise \`lanes.store.max\`, or free the Mac's disk`
+
+/** Why a host's start of the lane VM waits: another host's repair of its disk, or its start. */
+export const vmStartWaitWords = (isRepairing: boolean): string =>
+  isRepairing
+    ? "waiting for the lane VM: another host is repairing its disk"
+    : "waiting for the lane VM: another host is starting it"
+
 /** One cause, as a clause; `held` counts the lanes held for memory. */
 function causeWords(
   cause: MachineCause,
@@ -92,7 +124,11 @@ function causeWords(
     case "freeing-room":
       return "the lanes' disk is low: old turns' snapshots are being deleted to free room"
     case "room-unrecoverable":
-      return `the lanes' disk is low, and nothing is left that may be deleted: ${sizeWords(cause.unallocated)} left, ${sizeWords(cause.minimum)} at least`
+      return `the lanes' disk is low, and nothing is left that may be deleted: ${sizeWords(cause.unallocated)} left, ${sizeWords(cause.minimum)} at least${cause.isRepaired ? "" : "; `btrfs balance start -dusage=10` on the lanes' directory may free room"}`
+    case "disk-being-repaired":
+      return repairProgressWords(cause.step, cause.progress)
+    case "disk-repair-failed":
+      return repairFailedWords(cause.why)
     case "snapshot-skipped":
       return cause.count === 1
         ? "a turn's snapshot could not be recorded: branching at it starts from the turn before"
@@ -133,10 +169,13 @@ export function machineWords(
       : health.state === "red"
         ? "work is stopped: "
         : "work is slowed: "
-  return `The machine lanes run on: ${how}${causeWords(worst, nameOf, health.treatments.length)}${more}`
+  const heldForMemory = health.treatments.filter(
+    t => t.treatment.kind !== "waiting-for-repair",
+  ).length
+  return `The machine lanes run on: ${how}${causeWords(worst, nameOf, heldForMemory)}${more}`
 }
 
-/** Why a lane held for memory waits, as its column says it; null for one not held. */
+/** Why a held lane waits, as its column says it; null for one not held. */
 export function treatmentWords(treatment: LaneTreatment): string | null {
   switch (treatment.kind) {
     case "normal":
@@ -145,13 +184,15 @@ export function treatmentWords(treatment: LaneTreatment): string | null {
       return "waits for room on the machine to start"
     case "paused":
       return "paused for memory: its next tool call waits for room"
+    case "waiting-for-repair":
+      return "waits while the lane VM's disk is repaired"
     default:
       return assertNever(treatment.kind)
   }
 }
 
-/** Each lane the machine holds for memory, and how, from its health as the host last wrote it. */
-export function heldForMemory(
+/** Each lane the machine holds, and how, from its health as the host last wrote it. */
+export function heldLaneTreatments(
   health: MachineHealth | null,
 ): ReadonlyMap<ThreadId, LaneTreatment> {
   return new Map((health?.treatments ?? []).map(t => [t.lane, t.treatment]))

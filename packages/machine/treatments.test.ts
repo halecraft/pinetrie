@@ -4,6 +4,8 @@ import { describe, expect, test } from "vitest"
 import type { Rung } from "./rung.ts"
 import {
   FIRST_TREATMENT_STATE,
+  heldForRepair,
+  isActivityAllowed,
   type LaneToTreat,
   planTreatments,
   type TreatmentPlanState,
@@ -185,4 +187,14 @@ describe("planTreatments", () => {
       }),
     )
   })
+})
+
+test("while a repair runs, every lane waits, those listed and any unseen, for anything", () => {
+  const held = heldForRepair([lanes[0] ?? threadIdFor("x")])
+  expect(held.held).toEqual([
+    { lane: lanes[0], treatment: { kind: "waiting-for-repair" } },
+  ])
+  for (const lane of [lanes[0], lanes[5]].map(l => l ?? threadIdFor("x")))
+    for (const activity of ["tool-call", "container-start"] as const)
+      expect(isActivityAllowed(held.laneTreatment(lane), activity)).toBe(false)
 })

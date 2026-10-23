@@ -17,5 +17,59 @@
     "drivers/char/hw_random/rng-core.ko.gz",
     "drivers/char/hw_random/virtio-rng.ko.gz",
     "net/packet/af_packet.ko.gz"
-  ]
+  ],
+  "repair": {
+    "packages": [
+      {
+        "name": "btrfs-progs",
+        "version": "6.17.1-r0",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/btrfs-progs-6.17.1-r0.apk",
+        "sha256": "ed5f4f26b5d0abab61212a6de07e7094ebe20fede16a36f312ee5493d4571868"
+      },
+      {
+        "name": "libblkid",
+        "version": "2.41.6-r1",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libblkid-2.41.6-r1.apk",
+        "sha256": "0372923ddcaa28ec8f97992d2a03338ab6dde89686727c6ee54c210725e84724"
+      },
+      {
+        "name": "libuuid",
+        "version": "2.41.6-r1",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libuuid-2.41.6-r1.apk",
+        "sha256": "4dd5ed2791104a0043c4f27e433200117a36421a9bcd65906ce4b5c79284e478"
+      },
+      {
+        "name": "libeconf",
+        "version": "0.8.3-r0",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libeconf-0.8.3-r0.apk",
+        "sha256": "d450d85a7ee3b9940639c0f6ea2f8b7feea821bbc3828256ec784437082aefde"
+      },
+      {
+        "name": "lzo",
+        "version": "2.10-r5",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/lzo-2.10-r5.apk",
+        "sha256": "dd0381946b19ea5216e0372393a1c2132189fde0464f8e584af3815bdf07ecce"
+      },
+      {
+        "name": "zstd-libs",
+        "version": "1.5.7-r2",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-libs-1.5.7-r2.apk",
+        "sha256": "50a998e56e4bf31504996e49c1b4a23eed5e0cd4e24b8a1356a54daf1a6eabbe"
+      },
+      {
+        "name": "eudev-libs",
+        "version": "3.2.14-r6",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/eudev-libs-3.2.14-r6.apk",
+        "sha256": "163dee026e19892dc87528f4a8dfc75f8d736c039064c501dc1334c572ee9082"
+      }
+    ],
+    "modules": [
+      "crypto/crc32c-cryptoapi.ko.gz",
+      "arch/arm64/lib/xor-neon.ko.gz",
+      "crypto/xor.ko.gz",
+      "lib/raid6/raid6_pq.ko.gz",
+      "fs/btrfs/btrfs.ko.gz",
+      "drivers/block/loop.ko.gz"
+    ]
+  }
 }

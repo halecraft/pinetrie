@@ -3,6 +3,7 @@
 // `StoreSize`: a disk is only ever grown to one.
 
 import type { Capabilities } from "./capabilities.ts"
+import type { MachineSample } from "./sample.ts"
 import {
   leaveFreeBytes,
   minimumUnallocated,
@@ -52,4 +53,32 @@ export function planStoreSize(
     volumeAllows,
   )
   return target > facts.size ? (Math.floor(target) as StoreSize) : null
+}
+
+/**
+ * What the disk would grow to now: `planStoreSize` over the sample's
+ * room, the size it is when it would not grow. The one reading of "can it
+ * grow", for leaving a failure and for `room-low`'s words alike.
+ */
+export function plannedStoreSize(
+  sample: MachineSample,
+  settings: Pick<StoreSettings, "leaveFree" | "max">,
+  capabilities: Capabilities,
+): number | null {
+  const { store } = sample
+  if (store === null) return null
+  const planned =
+    sample.filesystem === null
+      ? null
+      : planStoreSize(
+          {
+            size: store.size,
+            allocated: store.size - store.unallocated,
+            volumeFree: sample.filesystem.free,
+            volumeSize: sample.filesystem.size,
+          },
+          settings,
+          capabilities,
+        )
+  return planned ?? store.size
 }

@@ -14,6 +14,7 @@ export {
 export {
   type DataDiskFacts,
   type DataDiskPlan,
+  gatherDataDisk,
   growDataDisk,
 } from "./grow.ts"
 export {
@@ -24,18 +25,21 @@ export {
 } from "./gvproxy.ts"
 export { type Endable, type Kept, keepLease } from "./keep.ts"
 export {
+  DiskFullAtBoot,
   type ExtraLease,
   gatherRunningVm,
   type Lease,
   launcherWords,
   leaseExtra,
   leaseVm,
+  stopVmForRepair,
   type VmBuild,
   VmRefused,
   vmProblem,
 } from "./lease.ts"
 export { ensurePinned, type Pin } from "./pinned.ts"
 export {
+  DATA_DISK_FULL_LINE,
   type Fill,
   GVPROXY_HOST_ADDRESS,
   type Held,
@@ -78,6 +82,20 @@ export {
 } from "./plan.ts"
 export * from "./protocol.ts"
 export { pruneVmState } from "./prune.ts"
+export {
+  ensureRepairBoot,
+  type RepairReport,
+  repairBootMissing,
+  repairDataDisk,
+} from "./repair.ts"
+export {
+  awaitLauncherGone,
+  type LauncherLockHeld,
+  type RepairLockHeld,
+  readRepairFacts,
+  takeRepairLock,
+  writeRepairState,
+} from "./repair-lock.ts"
 export {
   BUILDER,
   binaryName,

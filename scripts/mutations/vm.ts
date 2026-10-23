@@ -7,6 +7,70 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the repair boot loads no btrfs",
+    file: "packages/vm/builder/pins.json",
+    from: '      "fs/btrfs/btrfs.ko.gz",\n',
+    to: "",
+    suite: "lanes",
+    scenario: "vm-repair",
+    expect: "a full lane VM disk is repaired offline, its VM stopped for it",
+  },
+  {
+    name: "a VM's start does not take the repair lock",
+    file: "packages/vm/lease.ts",
+    from: `  const done = await withRepairLock(
+    input.stateDir,
+    input.onStartWaiting,
+    held => startVm(held, { input, ...launcher }),
+  )`,
+    to: `  const done = {
+    kind: "done" as const,
+    value: await startVm({} as RepairLockHeld, { input, ...launcher }),
+  }`,
+    command: unit,
+    expect:
+      "a VM's start waits while another holds the repair lock, growing nothing meanwhile; its holder killed frees it",
+  },
+  {
+    name: "the console is read only when Docker is silent",
+    file: "packages/vm/lease.ts",
+    from: `  if (await isDataDiskFull(input.stateDir)) {
+    await lease.close()
+    throw new DiskFullAtBoot()
+  }
+`,
+    to: "",
+    command: unit,
+    expect:
+      "a start whose console says the data disk is full fails as such, though Docker answered",
+  },
+  {
+    name: "the repair waits on no launcher's lock",
+    file: "packages/vm/repair-lock.ts",
+    from: "path.join(repairLockStateDir(held), LAUNCHER_LOCK),",
+    to: 'path.join(repairLockStateDir(held), "other.lock"),',
+    command: unit,
+    expect:
+      "the launcher's lock is waited for while a launcher holds it, then held: no launcher can take it",
+  },
+  {
+    name: "a prune drops the repair's packages",
+    file: "packages/vm/repair.ts",
+    from: "  ...plan.packages.map(p => path.basename(p.url)),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a prune keeps its initrd and every package, and an older initrd goes",
+  },
+  {
+    name: "a repair's line past 2³¹ is read short",
+    file: "packages/vm/repair.ts",
+    from: "    unallocated: Number(m[2]),",
+    to: "    unallocated: Math.min(Number(m[2]), 2 ** 31 - 1),",
+    command: unit,
+    expect: "reads a room's bytes past 2³¹ exactly",
+  },
+  {
     name: "the image leaves out Docker's daemon.json",
     file: "packages/vm/plan.ts",
     from: '  "daemon.json",\n] as const',
@@ -269,7 +333,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pax header's path is ignored",
     file: "packages/vm/apk.ts",
-    from: "      paxPath ??\n",
+    from: "      pax.path ??\n",
     to: "      null ??\n",
     command: unit,
     expect: "a pax header's path names the entry after it",
@@ -416,8 +480,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "growDataDisk shrinks a disk",
     file: "packages/vm/grow.ts",
-    from: "  if (to === null || to <= file.size) return null\n",
-    to: "  if (to === null || to === file.size) return null\n",
+    from: "  if (to === null || to <= facts.size) return null\n",
+    to: "  if (to === null || to === facts.size) return null\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/vm"],
     expect: "a plan for no larger leaves the disk as it is",
   },

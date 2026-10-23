@@ -109,6 +109,9 @@ export function sqliteMachineMeasurements(
     const at = [d.fullAvg10, d.memoryAvailable]
     if (d.kind === "treatment")
       return [d.kind, d.lane, d.from, d.to, null, null, ...at]
+    // The repair is the lane VM's, no lane's: its states in the treatments' columns.
+    if (d.kind === "repair")
+      return [d.kind, "", d.from, d.to, null, null, ...at]
     const s = d.decision
     return s.kind === "kill"
       ? [s.kind, s.lane, null, null, null, s.program, ...at]

@@ -6,6 +6,7 @@ export {
   planCapabilities,
   type StoreTarget,
 } from "./capabilities.ts"
+export { ROOM_SPENT } from "./health.ts"
 export { type LaneImportance, rankLanes } from "./importance.ts"
 export {
   createMachineManager,
@@ -25,7 +26,18 @@ export type {
   MachineManager,
   MachineMeasurements,
   MachineSensor,
+  RepairControls,
 } from "./ports.ts"
+export {
+  encodeRepairState,
+  isRepairRunning,
+  type RepairOutcome,
+  type RepairRead,
+  type RepairState,
+  repairFacts,
+  repairStateNow,
+} from "./repair.ts"
+export { runRepairSteps } from "./repair-steps.ts"
 export type {
   LaneSample,
   MachineSample,

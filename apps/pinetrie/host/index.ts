@@ -422,6 +422,7 @@ async function openHost(
     log,
     building: build => progress.building(build),
     // Like the slots, from the machine's and your own file alone.
+    manage: hostOnly["lanes.manage"].value,
     growData: facts =>
       planStoreSize(
         facts,

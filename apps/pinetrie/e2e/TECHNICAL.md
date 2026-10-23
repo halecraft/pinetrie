@@ -41,7 +41,12 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   lease. The `contract` scenario shares all three and a data disk kept
   between runs; `vm-image` shares the binaries and the pinned downloads,
   and builds its image from nothing (ADR-0147), so it stops its launcher
-  itself: a lease that failed leaves it holding a connection.
+  itself: a lease that failed leaves it holding a connection. `vm-repair`
+  shares all three and makes a 2 GiB data disk of its own, which a
+  container fills and the host's repair controls repair: a fresh disk
+  cannot hold the default image lanehost runs from, so the repair is run by
+  `runRepairSteps` directly, its triggers and holds being the machine
+  package's, unit-tested; and a kept disk would grow at every run.
 - **A failure a check is about is caught into the check.** A mutation is
   killed only when its expected check fails (`scripts/mutate.ts`); a
   thrown error is not one. `vm-image` catches a failed build and a failed

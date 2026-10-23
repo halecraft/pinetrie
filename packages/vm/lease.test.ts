@@ -1,20 +1,36 @@
 // The lease's client against a stand-in launcher speaking the protocol: the
 // real launcher is checked on the Mac by the lanes suite's `contract` scenario.
 
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import http from "node:http"
 import net from "node:net"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
+import { tryLock } from "@pinetrie/lock"
+import { childHoldingLock } from "@pinetrie/lock/testing"
 import { afterEach, expect, test } from "vitest"
-import { connect, gatherRunningVm, leaseExtra, leaseOn } from "./lease.ts"
+import {
+  connect,
+  DiskFullAtBoot,
+  gatherRunningVm,
+  leaseExtra,
+  leaseOn,
+  leaseStartedVm,
+  startLaneVm,
+} from "./lease.ts"
 import {
   decodeToLauncher,
   encode,
   type FromLauncher,
   type ToLauncher,
 } from "./protocol.ts"
+import {
+  awaitLauncherGone,
+  LAUNCHER_LOCK,
+  REPAIR_LOCK,
+  takeRepairLock,
+} from "./repair-lock.ts"
 
 const closers: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -38,6 +54,7 @@ const slotReply = (slot: number, leases = 1): FromLauncher => ({
  */
 async function standIn(
   answer: (m: ToLauncher, seen: ToLauncher[]) => FromLauncher | "end" | null,
+  options: { readonly isDockerSilent?: boolean } = {},
 ) {
   const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-lease-"))
   const docker = path.join(dir, "docker.sock")
@@ -56,7 +73,18 @@ async function standIn(
       const reply = answer(m, seen)
       if (reply === "end") s.end()
       else if (reply !== null)
-        s.write(encode(reply.kind === "slot" ? { ...reply, docker } : reply))
+        s.write(
+          encode(
+            reply.kind === "slot"
+              ? {
+                  ...reply,
+                  docker: options.isDockerSilent
+                    ? path.join(dir, "nothing.sock")
+                    : docker,
+                }
+              : reply,
+          ),
+        )
     })
     s.on("close", () => {
       ended = true
@@ -69,6 +97,7 @@ async function standIn(
     await rm(dir, { recursive: true, force: true })
   })
   return {
+    dir,
     control,
     seen,
     ended: () => ended,
@@ -235,3 +264,96 @@ test("a launcher that refuses status is running, its holders not known", async (
     leases: null,
   })
 })
+
+/** Settles once `onWaiting` is told, the lock found held. */
+const waitingTold = () => {
+  let told: () => void = () => {}
+  const heard = new Promise<void>(r => {
+    told = r
+  })
+  return { onWaiting: () => told(), heard }
+}
+
+test("a VM's start waits while another holds the repair lock, growing nothing meanwhile; its holder killed frees it", async () => {
+  const l = await standIn(() => null)
+  const holder = childHoldingLock(path.join(l.dir, REPAIR_LOCK))
+  closers.push(async () => {
+    holder.child.kill("SIGKILL")
+    await holder.exited
+  })
+  expect(await holder.said).toBe("held")
+  const grown: number[] = []
+  const { onWaiting, heard } = waitingTold()
+  const starting = startLaneVm(
+    {
+      stateDir: l.dir,
+      slots: 1,
+      agent: null,
+      log,
+      onStartWaiting: onWaiting,
+      growData: () => {
+        grown.push(1)
+        return null
+      },
+    },
+    { binary: "/usr/bin/false", argv: [] },
+  )
+  await heard
+  expect(grown).toEqual([])
+  holder.child.kill("SIGKILL")
+  // The stand-in answers by now: started by another host while this one
+  // waited, it is joined, and nothing grows.
+  const started = await starting
+  started.socket.destroy()
+  expect(started.started).toBeNull()
+  expect(grown).toEqual([])
+})
+
+test("the launcher's lock is waited for while a launcher holds it, then held: no launcher can take it", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-repair-"))
+  closers.push(() => rm(dir, { recursive: true, force: true }))
+  const launcher = childHoldingLock(path.join(dir, LAUNCHER_LOCK))
+  closers.push(async () => {
+    launcher.child.kill("SIGKILL")
+    await launcher.exited
+  })
+  expect(await launcher.said).toBe("held")
+  const repair = await takeRepairLock(dir)
+  if (repair === "held-by-another" || !("lock" in repair))
+    throw new Error("the repair lock was not taken")
+  const { onWaiting, heard } = waitingTold()
+  const gone = awaitLauncherGone(repair, onWaiting)
+  await heard
+  launcher.child.kill("SIGKILL")
+  const held = await gone
+  if (!("lock" in held)) throw new Error(held.detail)
+  const another = await tryLock(path.join(dir, LAUNCHER_LOCK), {
+    platform: process.platform,
+    heldWhile: "until-released",
+  })
+  expect(another.kind).toBe("held-by-another")
+  await held.lock.release()
+  await repair.lock.release()
+})
+
+const FULL_CONSOLE = `T+0.21 stage 1: system image mounted
+T+1.02 data disk room: unallocated=1048576 metadata=101711872/107347968
+T+1.02 data disk full
+`
+
+for (const isDockerSilent of [false, true])
+  test(`a start whose console says the data disk is full fails as such, ${isDockerSilent ? "Docker silent" : "though Docker answered"}`, async () => {
+    const l = await standIn(m => (m.kind === "lease" ? slotReply(0) : null), {
+      isDockerSilent,
+    })
+    await writeFile(path.join(l.dir, "console.log"), FULL_CONSOLE)
+    const socket = await connect(l.control)
+    if (socket === null) throw new Error("no stand-in")
+    await expect(
+      leaseStartedVm(
+        socket,
+        { stateDir: l.dir, agent: null, log, dockerMs: 300 },
+        0,
+      ),
+    ).rejects.toBeInstanceOf(DiskFullAtBoot)
+  })

@@ -7,6 +7,7 @@ import type {
   LaneMeasured,
   SampleMeasured,
 } from "./measurements.ts"
+import type { RepairOutcome, RepairRead, RepairState } from "./repair.ts"
 import type { SensedSample } from "./sample.ts"
 import type { LaneActivity } from "./treatments.ts"
 
@@ -34,6 +35,48 @@ export interface MachineMeasurements {
   recordDecisions(rows: readonly DecisionMeasured[]): void
   /** Rows older than `MEASUREMENTS_KEPT_DAYS`, by the store's clock, deleted. */
   trim(): void
+}
+
+/**
+ * The lane VM's repair, as the host does it, for a host that may repair:
+ * made only where the disk can be repaired and the host manages the
+ * machine, so with none no path reaches a VM's stop. `Held` and
+ * `LauncherHeld` are the host's proofs that it holds the repair lock and
+ * the launcher's: each step that needs one takes it.
+ */
+export interface RepairControls<Held, LauncherHeld> {
+  /** The repair lock now, or `held-by-another` (a repair, or a VM's start). */
+  takeRepairLock(): Promise<
+    | Held
+    | "held-by-another"
+    | { readonly kind: "failed"; readonly detail: string }
+  >
+  /** Settles if the lock is lost: the repair stops, and is failed. */
+  lockLost(held: Held): Promise<void>
+  /** The shared state, as any host reads it. */
+  readRepair(): Promise<RepairRead>
+  /** Why the repair boot cannot run now, without fetching or building; null when it can. */
+  repairBootMissing(): Promise<string | null>
+  /** The data disk's size now, in bytes. */
+  diskSize(): Promise<number>
+  /** Stops the VM, whatever leases it holds: every host's lease ends. */
+  stopVmForRepair(held: Held): Promise<void>
+  /** Waits for the launcher to exit, then holds its lock: no launcher runs while it is held. */
+  awaitLauncherGone(held: Held): Promise<LauncherHeld>
+  /** Grows the data disk as a start would; returns its size after. */
+  growForRepair(held: Held): Promise<number>
+  /** Boots the repair on the data disk, each `[repair] ` line told as it comes. */
+  bootRepair(
+    held: Held,
+    launcherHeld: LauncherHeld,
+    onLine: (line: string) => void,
+  ): Promise<RepairOutcome>
+  writeRepairState(held: Held, state: RepairState): Promise<void>
+  /** Lets both locks go: the kept leases then start the VM again. */
+  releaseRepairLocks(
+    held: Held,
+    launcherHeld: LauncherHeld | null,
+  ): Promise<void>
 }
 
 /** Where the health value goes: the session's `pinetrie.machine`. */

@@ -20,6 +20,7 @@ export const ACTIVITIES_ALLOWED = {
   normal: ["tool-call", "container-start"],
   "waiting-to-start": [],
   paused: ["container-start"],
+  "waiting-for-repair": [],
 } as const satisfies Record<LaneTreatment["kind"], readonly LaneActivity[]>
 
 /** Whether `treatment` lets a lane do `activity`. */
@@ -83,6 +84,17 @@ export const FIRST_TREATMENT_STATE: TreatmentPlanState = {
 const NORMAL: LaneTreatment = { kind: "normal" }
 const WAITING_TO_START: LaneTreatment = { kind: "waiting-to-start" }
 const PAUSED: LaneTreatment = { kind: "paused" }
+const WAITING_FOR_REPAIR: LaneTreatment = { kind: "waiting-for-repair" }
+
+/**
+ * Every lane held while the lane VM's disk is repaired, any lane unseen
+ * too: nothing it would do can reach a stopped VM. `lanes` are those
+ * listed as held.
+ */
+export const heldForRepair = (lanes: readonly ThreadId[]): Treatments => ({
+  laneTreatment: () => WAITING_FOR_REPAIR,
+  held: lanes.map(lane => ({ lane, treatment: WAITING_FOR_REPAIR })),
+})
 
 /** Every lane `normal`: observing, or before the first plan. */
 export const ALL_NORMAL: Treatments = {

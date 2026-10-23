@@ -4,19 +4,28 @@ import path from "node:path"
 import { gzipSync } from "node:zlib"
 import { describe, expect, test, vi } from "vitest"
 import {
+  apkEntries,
   apkFiles,
   KERNEL_ENTRY,
   pinnedKernel,
+  tarEntries,
   tarFiles,
   zbootImage,
 } from "./apk.ts"
 import { sha256Hex } from "./pinned.ts"
 
 /** One ustar entry: a 512-byte header, then the body padded to 512. */
-function entry(name: string, body: string | Uint8Array, type = "0"): Buffer {
+function entry(
+  name: string,
+  body: string | Uint8Array,
+  type = "0",
+  extra: { readonly mode?: number; readonly target?: string } = {},
+): Buffer {
   const data = Buffer.from(body)
   const h = Buffer.alloc(512)
   h.write(name, 0, 100)
+  h.write(`${(extra.mode ?? 0o644).toString(8).padStart(7, "0")}\0`, 100)
+  if (extra.target !== undefined) h.write(extra.target, 157, 100)
   h.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124)
   h.write(type, 156)
   h.write("ustar\0", 257)
@@ -71,6 +80,39 @@ describe("tarFiles", () => {
     expect(got.get(long)?.toString()).toBe("module")
     expect(got.get("next")?.toString()).toBe("n")
   })
+})
+
+describe("tarEntries", () => {
+  test("files with their modes and symlinks with their targets, in order; a directory is none", () => {
+    const tar = Buffer.concat([
+      entry("usr/lib/", "", "5"),
+      entry("usr/lib/libudev.so.1", "", "2", { target: "libudev.so.1.6.3" }),
+      entry("usr/lib/libudev.so.1.6.3", "lib", "0", { mode: 0o755 }),
+      Buffer.alloc(1024),
+    ])
+    expect(tarEntries(tar)).toEqual([
+      {
+        kind: "symlink",
+        name: "usr/lib/libudev.so.1",
+        target: "libudev.so.1.6.3",
+      },
+      {
+        kind: "file",
+        name: "usr/lib/libudev.so.1.6.3",
+        mode: 0o755,
+        body: Buffer.from("lib"),
+      },
+    ])
+  })
+})
+
+test("an apk's entries leave out apk-tools' own", () => {
+  const apk = Buffer.concat([
+    gzipSync(entry(".SIGN.RSA.key", "sig")),
+    gzipSync(entry(".PKGINFO", "info")),
+    gzipSync(Buffer.concat([entry("sbin/btrfs", "b"), Buffer.alloc(1024)])),
+  ])
+  expect(apkEntries(apk).map(e => e.name)).toEqual(["sbin/btrfs"])
 })
 
 test("an apk's gzip streams are read as one tar", () => {

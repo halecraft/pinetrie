@@ -44,6 +44,10 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
       return `[host] the machine: the lanes' disk upkeep failed: ${news.error}`
     case "unmeasured":
       return `[host] the machine: its measurements were not written: ${news.error}`
+    case "repair":
+      return `[host] the lane VM's disk repair: ${news.from.kind} to ${news.to.kind}${news.to.kind === "failed" ? `: ${news.to.why}` : ""}`
+    case "repair-not-run":
+      return `[host] the lane VM's disk was not repaired: ${news.why}`
   }
 }
 
@@ -91,17 +95,25 @@ export async function startMachineWatch(deps: {
 }): Promise<MachineWatch> {
   const kills = deps.reach.watchServiceKills()
   const sensor = createSensor(deps.reach, kills)
+  const capabilities = planCapabilities(deps.reach.target)
   const manager = createMachineManager({
     sensor: deps.options.wrapSensor?.(sensor) ?? sensor,
     sink: createHealthSink(deps),
     settings: deps.settings,
     mode: deps.mode,
-    capabilities: planCapabilities(deps.reach.target),
+    capabilities,
     index: deps.index,
     store: deps.reach.store,
     records: deps.storeRecords,
     laneFacts: deps.laneFacts,
     measurements: deps.measurements,
+    readRepair: deps.reach.repair?.read ?? null,
+    // Made only where the disk can be repaired and this host manages:
+    // observing, or on Linux, no path reaches a VM's stop.
+    repair:
+      deps.mode === "manage" && capabilities.repairDisk
+        ? (deps.reach.repair?.controls ?? null)
+        : null,
     tell: news => deps.log(newsLine(news, deps.session)),
   })
   await manager.start()

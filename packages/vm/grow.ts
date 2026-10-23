@@ -17,6 +17,22 @@ export interface DataDiskFacts {
 /** The size the data disk should grow to, or null to leave it: the host's plan. */
 export type DataDiskPlan = (facts: DataDiskFacts) => number | null
 
+/** The data disk at `dataPath` and the volume holding it, read; null for a disk not made yet. */
+export async function gatherDataDisk(
+  dataPath: string,
+  volume: string,
+): Promise<DataDiskFacts | null> {
+  const file = await stat(dataPath).catch(() => null)
+  if (file === null) return null
+  const fs = await statfs(volume)
+  return {
+    size: file.size,
+    allocated: file.blocks * 512,
+    volumeFree: fs.bavail * fs.bsize,
+    volumeSize: fs.blocks * fs.bsize,
+  }
+}
+
 /**
  * `dataPath` grown to what `plan` says, if larger than it is; nothing for a
  * disk not made yet, which the launcher makes. The sizes it went from and
@@ -27,16 +43,10 @@ export async function growDataDisk(
   volume: string,
   plan: DataDiskPlan,
 ): Promise<{ readonly from: number; readonly to: number } | null> {
-  const file = await stat(dataPath).catch(() => null)
-  if (file === null) return null
-  const fs = await statfs(volume)
-  const to = plan({
-    size: file.size,
-    allocated: file.blocks * 512,
-    volumeFree: fs.bavail * fs.bsize,
-    volumeSize: fs.blocks * fs.bsize,
-  })
-  if (to === null || to <= file.size) return null
+  const facts = await gatherDataDisk(dataPath, volume)
+  if (facts === null) return null
+  const to = plan(facts)
+  if (to === null || to <= facts.size) return null
   await truncate(dataPath, to)
-  return { from: file.size, to }
+  return { from: facts.size, to }
 }

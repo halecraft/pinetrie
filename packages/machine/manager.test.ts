@@ -21,7 +21,12 @@ import {
   type ManagerNews,
   TRIM_MEASUREMENTS_EVERY_SAMPLES,
 } from "./manager.ts"
-import type { MachineManager, MachineSensor } from "./ports.ts"
+import type { MachineManager, MachineSensor, RepairControls } from "./ports.ts"
+import {
+  decodeRepairState,
+  encodeRepairState,
+  type RepairOutcome,
+} from "./repair.ts"
 import type { SensedSample } from "./sample.ts"
 import type { SnapshotIndex, SnapshotRow } from "./snapshot-index.ts"
 import type { StoreListed, StoreRecords } from "./store.ts"
@@ -64,12 +69,14 @@ function managed(sensor: MachineSensor, mode: ManageMode = "manage") {
     },
     settings: SETTINGS,
     mode,
-    capabilities: { grow: false },
+    capabilities: { grow: false, repairDisk: false },
     index: memoryIndex(),
     store: fakeStore(EMPTY_LISTING).store,
     records: fakeRecords(),
     laneFacts: fakeLaneFacts(),
     measurements: keptMeasurements(),
+    readRepair: null,
+    repair: null,
     tell: news => told.push(news),
   })
   return { manager, written, told }
@@ -153,12 +160,14 @@ test("a refused write is written again at the next sample", async () => {
     },
     settings: SETTINGS,
     mode: "manage",
-    capabilities: { grow: false },
+    capabilities: { grow: false, repairDisk: false },
     index: memoryIndex(),
     store: fakeStore(EMPTY_LISTING).store,
     records: fakeRecords(),
     laneFacts: fakeLaneFacts(),
     measurements: keptMeasurements(),
+    readRepair: null,
+    repair: null,
     tell: news => told.push(news),
   })
   await manager.start()
@@ -212,12 +221,14 @@ describe("the disk upkeep", () => {
       sink: { write: async () => {} },
       settings: SETTINGS,
       mode: input.mode ?? "manage",
-      capabilities: { grow: false },
+      capabilities: { grow: false, repairDisk: false },
       index: input.index,
       store,
       records: input.records ?? fakeRecords(),
       laneFacts: fakeLaneFacts(),
       measurements: keptMeasurements(),
+      readRepair: null,
+      repair: null,
       tell: () => {},
     })
     return { manager, did }
@@ -292,7 +303,7 @@ describe("the disk upkeep", () => {
       sink: { write: async () => {} },
       settings: SETTINGS,
       mode: "manage",
-      capabilities: { grow: false },
+      capabilities: { grow: false, repairDisk: false },
       index,
       store: {
         ...store,
@@ -304,6 +315,8 @@ describe("the disk upkeep", () => {
       records: fakeRecords(),
       laneFacts: fakeLaneFacts(),
       measurements: keptMeasurements(),
+      readRepair: null,
+      repair: null,
       tell: () => {},
     })
     manager.requestUpkeep()
@@ -341,12 +354,14 @@ describe("the disk upkeep", () => {
       sink: { write: async () => {} },
       settings: SETTINGS,
       mode: "manage",
-      capabilities: { grow: false },
+      capabilities: { grow: false, repairDisk: false },
       index,
       store,
       records: fakeRecords(),
       laneFacts: fakeLaneFacts(),
       measurements: keptMeasurements(),
+      readRepair: null,
+      repair: null,
       tell: () => {},
     })
     await manager.start()
@@ -464,7 +479,7 @@ describe("memory", () => {
       sink: { write: async () => {} },
       settings: SETTINGS,
       mode: "manage",
-      capabilities: { grow: false },
+      capabilities: { grow: false, repairDisk: false },
       index: memoryIndex(),
       store: fakeStore(EMPTY_LISTING).store,
       records: fakeRecords(),
@@ -476,6 +491,8 @@ describe("memory", () => {
         programInFlight: () => null,
       },
       measurements: keptMeasurements(),
+      readRepair: null,
+      repair: null,
       tell: () => {},
     })
     await manager.start()
@@ -522,12 +539,14 @@ describe("measurements", () => {
         sink: { write: async () => {} },
         settings: SETTINGS,
         mode,
-        capabilities: { grow: false },
+        capabilities: { grow: false, repairDisk: false },
         index: memoryIndex(),
         store: fakeStore(EMPTY_LISTING).store,
         records: fakeRecords(),
         laneFacts: fakeLaneFacts(),
         measurements,
+        readRepair: null,
+        repair: null,
         tell: () => {},
       })
       await manager.start()
@@ -549,7 +568,7 @@ describe("measurements", () => {
       sink: { write: async health => void written.push(health) },
       settings: SETTINGS,
       mode: "manage",
-      capabilities: { grow: false },
+      capabilities: { grow: false, repairDisk: false },
       index: memoryIndex(),
       store: fakeStore(EMPTY_LISTING).store,
       records: fakeRecords(),
@@ -560,11 +579,191 @@ describe("measurements", () => {
           throw new Error("disk full")
         },
       },
+      readRepair: null,
+      repair: null,
       tell: news => told.push(news),
     })
     await manager.start()
     await manager.sample()
     expect(told).toContainEqual({ kind: "unmeasured", error: "disk full" })
     expect(reasons(written)).toEqual(["waiting", "neutral"])
+  })
+})
+
+describe("the lane VM's repair", () => {
+  const spent: SensedSample = {
+    ...calm,
+    store: {
+      size: 64 * GiB,
+      unallocated: GiB / 2,
+      data: { used: 32 * GiB, total: 63 * GiB },
+      metadata: { used: GiB / 2, total: GiB },
+    },
+  }
+  const lane = threadIdFor("t-repair")
+
+  /** Controls that record each step, the boot held until `boot` resolves. */
+  function fakeControls(shared: { text: string | null; lockHeld: boolean }) {
+    const steps: string[] = []
+    const boot = Promise.withResolvers<RepairOutcome>()
+    const controls: RepairControls<"held", "launcher"> = {
+      takeRepairLock: async () => {
+        steps.push("take")
+        shared.lockHeld = true
+        return "held"
+      },
+      lockLost: () => new Promise(() => {}),
+      readRepair: async () => ({ ...shared }),
+      repairBootMissing: async () => null,
+      diskSize: async () => 64 * GiB,
+      stopVmForRepair: async () => {
+        steps.push("stop")
+      },
+      awaitLauncherGone: async () => {
+        steps.push("launcher")
+        return "launcher"
+      },
+      growForRepair: async () => {
+        steps.push("grow")
+        return 128 * GiB
+      },
+      bootRepair: async () => {
+        steps.push("boot")
+        return boot.promise
+      },
+      writeRepairState: async (_held, state) => {
+        shared.text = encodeRepairState(state)
+      },
+      releaseRepairLocks: async () => {
+        steps.push("release")
+        shared.lockHeld = false
+      },
+    }
+    return { controls, steps, boot }
+  }
+
+  function repairing(
+    shared: { text: string | null; lockHeld: boolean },
+    controls: RepairControls<"held", "launcher"> | null,
+    sensed: SensedSample = spent,
+    mode: ManageMode = "manage",
+  ) {
+    const written: MachineHealth[] = []
+    const manager = createMachineManager({
+      sensor: { sample: async () => sensed },
+      sink: { write: async health => void written.push(health) },
+      settings: SETTINGS,
+      mode,
+      capabilities: { grow: true, repairDisk: true },
+      index: memoryIndex(),
+      store: fakeStore(EMPTY_LISTING).store,
+      records: fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements: keptMeasurements(),
+      readRepair: async () => ({ ...shared }),
+      repair: controls,
+      tell: () => {},
+    })
+    return { manager, written }
+  }
+
+  /** A sample, then the upkeep, which finds nothing to delete, the room spent. */
+  async function untilExhausted(manager: MachineManager) {
+    await manager.start()
+    await manager.sample()
+    manager.requestUpkeep()
+    await manager.idle()
+  }
+
+  test("a sample with the room spent and nothing to delete repairs, beside the loop, once", async () => {
+    const shared = { text: null, lockHeld: false }
+    const { controls, steps, boot } = fakeControls(shared)
+    const { manager, written } = repairing(shared, controls)
+    await untilExhausted(manager)
+    await manager.sample()
+    // The boot runs; samples go on, and are not held behind it.
+    await manager.sample()
+    await manager.sample()
+    expect(steps).toEqual(["take", "stop", "launcher", "grow", "boot"])
+    expect(written.at(-1)?.causes[0]).toMatchObject({
+      kind: "disk-being-repaired",
+    })
+    boot.resolve({
+      leftUnallocated: 60 * GiB,
+      leftMetadata: { size: GiB, used: GiB / 2 },
+      failed: null,
+    })
+    await manager.idle()
+    await new Promise(r => setTimeout(r, 0))
+    expect(steps.at(-1)).toBe("release")
+    expect(decodeRepairState(shared.text)).toMatchObject({ kind: "done" })
+    expect(steps.filter(s => s === "take")).toHaveLength(1)
+  })
+
+  test("a sample taken before the repair has written its state asks for no second", async () => {
+    const shared = { text: null, lockHeld: false }
+    const { controls } = fakeControls(shared)
+    const taking = Promise.withResolvers<"held">()
+    let takes = 0
+    const { manager } = repairing(shared, {
+      ...controls,
+      takeRepairLock: () => {
+        takes++
+        return taking.promise
+      },
+    })
+    await untilExhausted(manager)
+    await manager.sample()
+    await manager.sample()
+    expect(takes).toBe(1)
+  })
+
+  test("observing, or where nothing is repaired, the room spent is said and nothing is repaired", async () => {
+    const shared = { text: null, lockHeld: false }
+    const { manager, written } = repairing(shared, null)
+    await untilExhausted(manager)
+    await manager.sample()
+    expect(shared.text).toBeNull()
+    expect(written.at(-1)?.causes.map(c => c.kind)).toContain("room-spent")
+  })
+
+  test("another host's recorded failure stops this host's repair, until the disk could grow", async () => {
+    const shared = {
+      text: encodeRepairState({
+        kind: "failed",
+        why: "no room",
+        sizeAtFailure: 64 * GiB,
+      }),
+      lockHeld: false,
+    }
+    const { controls, steps } = fakeControls(shared)
+    const { manager, written } = repairing(shared, controls)
+    await untilExhausted(manager)
+    await manager.sample()
+    expect(steps).toEqual([])
+    expect(written.at(-1)?.causes[0]).toEqual({
+      kind: "disk-repair-failed",
+      why: "no room",
+    })
+  })
+
+  test("another host's repair holds this host's lanes, and its VM start does not", async () => {
+    const shared = {
+      text: encodeRepairState({ kind: "booting-repair", progress: [] }),
+      lockHeld: true,
+    }
+    const { manager } = repairing(shared, null, calm)
+    await manager.start()
+    await manager.sample()
+    let called = false
+    const call = manager.waitUntilAllowed(lane, "tool-call").then(() => {
+      called = true
+    })
+    await new Promise(r => setTimeout(r, 0))
+    expect(called).toBe(false)
+    shared.text = encodeRepairState({ kind: "idle" })
+    await manager.sample()
+    await call
+    expect(called).toBe(true)
   })
 })

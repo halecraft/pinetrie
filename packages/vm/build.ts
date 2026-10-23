@@ -10,6 +10,7 @@ import {
   copyFile,
   mkdir,
   open,
+  readdir,
   readFile,
   rename,
   rm,
@@ -42,15 +43,16 @@ import {
   imageRefusal,
   imageSourceSums,
   isBuildLogLine,
+  type KernelModule,
+  moduleOrder,
   parseSums,
   planVmBuildRun,
-  type VmBuildRun,
   vmBuildWaitWords,
 } from "./plan.ts"
 import { BUILDER, buildBinary, gatherBinary } from "./swift.ts"
 
 const SOURCE_DIR = path.join(import.meta.dirname, "image")
-const BUILDER_DIR = path.join(import.meta.dirname, "builder")
+export const BUILDER_DIR = path.join(import.meta.dirname, "builder")
 
 /** The image's sources, read from `image/`. */
 export async function readImageSources(): Promise<ImageSources> {
@@ -143,44 +145,52 @@ export async function installImage(
   return true
 }
 
-/** The initrd's own part: the modules, `m/order`, the builder's `init`, the image's sources. */
-async function writeInitrdDir(
-  run: VmBuildRun,
-  apk: Uint8Array,
-  sources: ImageSources,
-): Promise<void> {
-  const m = path.join(run.initrdDir, "m")
-  const src = path.join(run.initrdDir, "src")
+/**
+ * An initrd's own part, beside the root: modules out of the kernel's
+ * package, gunzipped, with their load order, and its `/init`. The image
+ * build and the repair boot each add their own files to `dir` after.
+ */
+export interface InitrdParts {
+  readonly dir: string
+  readonly kernelApk: Uint8Array
+  readonly modules: readonly KernelModule[]
+  /** The `/init` script's path. */
+  readonly init: string
+}
+
+/** Writes `m/` (the modules and `m/order`) and `init` into `parts.dir`. */
+export async function writeInitrdDir(parts: InitrdParts): Promise<void> {
+  const m = path.join(parts.dir, "m")
   await mkdir(m, { recursive: true })
-  await mkdir(src, { recursive: true })
   const files = apkFiles(
-    apk,
-    run.modules.map(x => x.entry),
+    parts.kernelApk,
+    parts.modules.map(x => x.entry),
   )
-  for (const { entry, as } of run.modules) {
+  for (const { entry, as } of parts.modules) {
     const gz = files.get(entry)
     if (gz === undefined)
       throw new Error(`the builder's kernel package holds no ${entry}`)
     await writeFile(path.join(m, as), gunzipSync(gz))
   }
-  await writeFile(path.join(m, "order"), run.order)
-  await copyFile(
-    path.join(BUILDER_DIR, "init"),
-    path.join(run.initrdDir, "init"),
-  )
-  await chmod(path.join(run.initrdDir, "init"), 0o755)
-  for (const name of IMAGE_FILES)
-    await writeFile(path.join(src, name), sources[name])
+  await writeFile(path.join(m, "order"), moduleOrder(parts.modules))
+  await copyFile(parts.init, path.join(parts.dir, "init"))
+  await chmod(path.join(parts.dir, "init"), 0o755)
 }
 
-/** The initrd: the minirootfs as newc cpio, then our part, concatenated; both owned by root. */
-async function writeInitrd(
-  run: VmBuildRun,
-  rootTarball: string,
-): Promise<void> {
-  const root = path.join(run.scratch, "root.cpio")
-  const own = path.join(run.scratch, "own.cpio")
-  await exec("bsdtar", ["--format", "newc", "-cf", root, `@${rootTarball}`])
+/**
+ * The initrd at `initrd`: the minirootfs as newc cpio, then every entry of
+ * `dir`, concatenated; both owned by root, later entries winning. Its
+ * parts are written in `scratch`.
+ */
+export async function writeInitrd(f: {
+  readonly rootTarball: string
+  readonly dir: string
+  readonly scratch: string
+  readonly initrd: string
+}): Promise<void> {
+  const root = path.join(f.scratch, "root.cpio")
+  const own = path.join(f.scratch, "own.cpio")
+  await exec("bsdtar", ["--format", "newc", "-cf", root, `@${f.rootTarball}`])
   await exec("bsdtar", [
     "--format",
     "newc",
@@ -191,12 +201,10 @@ async function writeInitrd(
     "-cf",
     own,
     "-C",
-    run.initrdDir,
-    "m",
-    "init",
-    "src",
+    f.dir,
+    ...(await readdir(f.dir)).sort(),
   ])
-  const initrd = await open(run.initrd, "w")
+  const initrd = await open(f.initrd, "w")
   try {
     for (const part of [root, own]) await initrd.write(await readFile(part))
   } finally {
@@ -204,33 +212,36 @@ async function writeInitrd(
   }
 }
 
-/** Run the builder, logging its console's build lines; its last lines name a failure. */
-function runBuilder(
+/**
+ * Runs the builder's machine, each line of its console and its own errors
+ * handed to `onLine` as it comes; fails on an exit but 0, with its last
+ * lines. Resolves with its last lines, which name what a guest that
+ * stopped itself did not do.
+ */
+export function runBuilder(
   binary: string,
   args: readonly string[],
-  log: (line: string) => void,
-): Promise<{ readonly built: boolean; readonly tail: readonly string[] }> {
+  onLine: (line: string) => void,
+): Promise<{ readonly tail: readonly string[] }> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, [...args], {
       stdio: ["ignore", "pipe", "pipe"],
     })
     const tail: string[] = []
-    let built = false
     const keep = (line: string) => {
       tail.push(line)
       if (tail.length > 30) tail.shift()
-      if (line === "[builder] built") built = true
-      if (isBuildLogLine(line)) log(line)
+      onLine(line)
     }
     createInterface({ input: child.stdout }).on("line", keep)
     createInterface({ input: child.stderr }).on("line", keep)
     child.on("error", reject)
     child.on("close", code =>
       code === 0
-        ? resolve({ built, tail })
+        ? resolve({ tail })
         : reject(
             new Error(
-              `the image's builder exited ${code}:\n${tail.join("\n")}`,
+              `the lane VM's builder machine exited ${code}:\n${tail.join("\n")}`,
             ),
           ),
     )
@@ -324,13 +335,31 @@ export async function buildVmImageInVm(input: {
         const apk = await readFile(
           path.join(run.pinsDir, path.basename(pins.kernel.url)),
         )
-        await writeInitrdDir(run, apk, sources)
-        await writeInitrd(run, rootTarball)
+        await writeInitrdDir({
+          dir: run.initrdDir,
+          kernelApk: apk,
+          modules: run.modules,
+          init: path.join(BUILDER_DIR, "init"),
+        })
+        const src = path.join(run.initrdDir, "src")
+        await mkdir(src)
+        for (const name of IMAGE_FILES)
+          await writeFile(path.join(src, name), sources[name])
+        await writeInitrd({
+          rootTarball,
+          dir: run.initrdDir,
+          scratch: run.scratch,
+          initrd: run.initrd,
+        })
         const disk = await open(run.disk.path, "w")
         await disk.truncate(run.disk.bytes)
         await disk.close()
-        const ran = await runBuilder(builder.binary, run.builderArgs, input.log)
-        if (!ran.built)
+        let isBuilt = false
+        const ran = await runBuilder(builder.binary, run.builderArgs, line => {
+          if (line === "[builder] built") isBuilt = true
+          if (isBuildLogLine(line)) input.log(line)
+        })
+        if (!isBuilt)
           throw new Error(
             `the lane VM's image did not build:\n${ran.tail.join("\n")}`,
           )

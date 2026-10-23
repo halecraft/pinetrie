@@ -5,7 +5,7 @@
 //   launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy>
 //
 // In <state dir>: launcher.lock (an exclusive flock: a second launcher exits
-// at once), data.img (the data disk, 256 GiB sparse, formatted by the guest
+// at once; a host repairing the data disk holds it while the VM is stopped), data.img (the data disk, 256 GiB sparse, formatted by the guest
 // on first boot), console.log, gvproxy.log, empty/ (an empty slot's share),
 // and the sockets docker.sock (the guest's vsock 2375), control.sock
 // (leases), gv.sock and net.sock (the network card's frames) and gv-api.sock
@@ -27,6 +27,9 @@
 //   ← the connection's end | {"kind":"refused","reason":"busy",…}
 //   → {"kind":"status"}, on any connection, taking no slot
 //   ← {"kind":"status"}
+//   → {"kind":"stop-for-repair"}, on any connection: stop the VM and exit,
+//     whatever leases it holds, so its data disk can be repaired
+//   ← the connection's end
 // The slot and status replies also name the image and launcher the VM was
 // started from, and the leases it holds (`identity`).
 // A refusal is {"kind":"refused","reason":<code>, …}. When the connection
@@ -520,6 +523,10 @@ func handle(_ lease: Lease, _ message: [String: Any]?) {
     stopVM("retired by a host with a newer image or launcher")
   case "status":
     lease.send(identity().merging(["kind": "status"]) { $1 })
+  case "stop-for-repair":
+    // Sent only by a host holding the repair lock: every lease ends, and
+    // each host's lease, kept, starts the VM again once the repair is done.
+    stopVM("stopped for a repair of its data disk")
   default:
     lease.refuse("unreadable")
   }

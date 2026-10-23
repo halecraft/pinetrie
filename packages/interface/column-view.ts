@@ -239,13 +239,13 @@ interface ThreadFacts {
 
 /**
  * What shows under a column's line, always: the reason of a run-end status
- * raised for you, else why its lane waits for memory, else what the thread
+ * raised for you, else why its lane waits, else what the thread
  * is about; nothing for none. A quiet status is the dot's title alone, so
  * what it is about is not hidden by a report already read.
  */
 export type HeadLine =
   | { readonly kind: "status"; readonly status: ColumnStatus }
-  /** Its lane is held for memory: why, as `treatmentWords` says it. */
+  /** Its lane is held, for memory or a repair: why, as `treatmentWords` says it. */
   | { readonly kind: "held"; readonly words: string }
   | { readonly kind: "about"; readonly about: ThreadAbout }
   | { readonly kind: "none" }
@@ -393,8 +393,8 @@ export interface ColumnFacts {
   readonly origins: OriginFacts
   /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
   readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
-  /** Each lane the machine holds for memory, and how (`heldForMemory`). */
-  readonly memoryHeld: ReadonlyMap<ThreadId, LaneTreatment>
+  /** Each lane the machine holds, and how (`heldLaneTreatments`). */
+  readonly lanesHeld: ReadonlyMap<ThreadId, LaneTreatment>
 }
 
 /** What a column's header tells: who, how it stands, why, where it came from. */
@@ -491,7 +491,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
             index,
             thread: head,
           }),
-          f.memoryHeld.get(head) ?? null,
+          f.lanesHeld.get(head) ?? null,
         )
       : chatLine(f.thread === null ? null : threadTitle(work.titles, f.thread))
   const strip = workStrip(f, parent)

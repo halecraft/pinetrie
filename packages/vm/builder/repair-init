@@ -1,0 +1,44 @@
+#!/bin/sh
+# PID 1 of the lane VM's repair boot, on the builder's machine: its one disk
+# is the lane VM's data.img (/dev/vda), the VM stopped. Offline:
+# btrfs-progs and its libraries are in this initrd. Grows the filesystem to
+# the disk, frees data chunks, and says what it found and did in
+# `[repair] ` lines, which the host reads (`parseRepairLine`, repair.ts):
+# change one, and change its parser with it.
+#
+# Sizes are printed with awk's %.0f: busybox awk's %d stops at 2^31-1.
+# The modules are loaded with insmod, in /m/order's order, dependencies
+# first: they are uncompressed, and busybox's modprobe cannot read .ko.gz.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /tmp /mnt
+say() { echo "[repair] $*"; }
+room() {
+  btrfs filesystem usage -b /mnt 2>/dev/null | awk '
+    /Device size:/ { s = $3 }
+    /Device unallocated:/ { u = $3 }
+    /^Metadata,/ { split($0, a, "Used:"); split($0, b, "Size:"); mt = b[2] + 0; mu = a[2] + 0 }
+    END { printf "size=%.0f unallocated=%.0f metadata-size=%.0f metadata-used=%.0f", s, u, mt, mu }'
+}
+for m in $(cat /m/order); do insmod "/m/$m" 2>/dev/null || say "module $m not loaded"; done
+if ! mount -t btrfs -o user_subvol_rm_allowed /dev/vda /mnt 2>/tmp/err; then
+  say "failed: mount: $(cat /tmp/err)"
+  dmesg | tail -5 | sed 's/^/[repair] dmesg: /'
+  poweroff -f
+fi
+say "found $(room)"
+if out=$(btrfs filesystem resize max /mnt 2>&1); then
+  say "grown: $(echo "$out" | tail -1)"
+else
+  say "not grown: $(echo "$out" | tail -1)"
+fi
+for u in 0 5 10 20 40; do
+  say "repacked at $u%: $(btrfs balance start -dusage=$u /mnt 2>&1 | tail -1)"
+done
+say "left $(room)"
+umount /mnt
+sync
+say "done"
+poweroff -f

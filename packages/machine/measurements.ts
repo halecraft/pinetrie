@@ -12,6 +12,7 @@ import type {
   ThreadId,
 } from "@pinetrie/core"
 import type { ManageMode } from "./manager.ts"
+import type { RepairState } from "./repair.ts"
 import type { Rung } from "./rung.ts"
 import type { LaneSample } from "./sample.ts"
 import type { ShadowDecision } from "./treatments.ts"
@@ -104,6 +105,12 @@ export type DecisionMeasured = {
       readonly to: LaneTreatment["kind"]
     }
   | { readonly kind: "shadow"; readonly decision: ShadowDecision }
+  /** The lane VM's repair moved, this host's own. */
+  | {
+      readonly kind: "repair"
+      readonly from: RepairState["kind"]
+      readonly to: RepairState["kind"]
+    }
 )
 
 /** The rise of each counter from `before` to `now`; null when either is missing or one fell, as at a reboot. */
