@@ -108,9 +108,12 @@ function setUp(
   readCanvasContext: ReadCanvasContext = async () => [],
 ) {
   const b = basics()
-  const work = record<Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">>({
+  const work = record<
+    Pick<LaneWork, "beforeRun" | "runEnded" | "abandonStart" | "splitEnded">
+  >({
     beforeRun: () => {},
     runEnded: () => {},
+    abandonStart: () => {},
     splitEnded,
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
@@ -149,6 +152,7 @@ function setUp(
   return {
     b,
     lane,
+    work,
     runs: { ...runs, start: runs.start.bind(null, b.roots) },
     runDocs,
     pending,
@@ -481,6 +485,22 @@ describe("a run's pinned cards", () => {
     expect(methods(lane.calls)).toEqual(["isLeftOpen", "run"])
   })
 
+  test("a stop abandons the lane's start held for room, before pi's abort", async () => {
+    const { lane, runs, ended, work } = setUp()
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    await untilRun(lane)
+    runs.cancel(LANE)
+    expect(
+      work.calls.filter(c => c.method === "abandonStart").map(c => c.args),
+    ).toEqual([[LANE]])
+    lane.finish(RAN)
+    await ended
+  })
+
   test("once a chat's run has reached pi, cancel returns false, so pi's abort is used", async () => {
     const { lane, runs, ended } = setUp()
     runs.start(runnableFor(LANE), {
@@ -591,6 +611,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
     work: {
       beforeRun: () => {},
       runEnded: l => order.push(`work ${l}`),
+      abandonStart: () => {},
       splitEnded: async () => null,
     },
     readPinned: async () => null,
@@ -631,6 +652,7 @@ test("a run holds its lane's root from its start until its end's last step, thro
     work: {
       beforeRun: () => {},
       runEnded: () => {},
+      abandonStart: () => {},
       splitEnded: async () => null,
     },
     readPinned: async () => null,

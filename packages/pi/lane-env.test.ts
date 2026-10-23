@@ -17,6 +17,8 @@ import {
   type LaneChannel,
   laneEnv,
   laneRunner,
+  laneShell,
+  type OpenedLane,
   openChannel,
 } from "./lane-env.ts"
 
@@ -221,4 +223,70 @@ test("a helper that exits fails its waiting calls, naming why", async () => {
   const broken = openChannel([process.execPath, "-e", "process.exit(3)"])
   await expect(broken.ready).rejects.toThrow("exited (code 3)")
   await expect(laneRunner(broken).run(["true"])).rejects.toThrow("exited")
+})
+
+/** A gate that lets nothing through until `allow`, and rejects on its signal's abort. */
+function heldGate() {
+  const allows: (() => void)[] = []
+  return {
+    allow: () => {
+      for (const a of allows.splice(0)) a()
+    },
+    gate: (signal: AbortSignal | undefined) =>
+      new Promise<OpenedLane>((resolve, reject) => {
+        if (signal?.aborted) return reject(signal.reason)
+        allows.push(() => resolve({ channel, observation: null }))
+        signal?.addEventListener("abort", () => reject(signal.reason))
+      }),
+  }
+}
+
+const ASK = {
+  timeout: null,
+  spill: { maxBytes: 1 << 20, maxLines: 10_000 },
+  cap: 1 << 20,
+}
+
+describe("the gate", () => {
+  test("a call held at its gate settles when its signal aborts", async () => {
+    const { gate } = heldGate()
+    const env = laneEnv(dir, async signal => (await gate(signal)).channel)
+    const control = new AbortController()
+    const read = env.readTextFile(
+      "a.txt",
+      withAbortSignal(control.signal, BACKGROUND_CONTEXT),
+    )
+    control.abort(new Error("stopped"))
+    await expect(read).rejects.toThrow("stopped")
+  })
+
+  test("a held bash call ends as aborted when its signal fires, and was never started", async () => {
+    const { gate } = heldGate()
+    const said: string[] = []
+    const shell = laneShell("bash", dir, gate, command => {
+      said.push(`started ${command}`)
+      return outcome => said.push(`ended ${outcome}`)
+    })
+    const control = new AbortController()
+    const run = shell("echo held", ASK, control.signal)
+    control.abort()
+    expect(await run.end).toEqual({ kind: "aborted", spill: null })
+    expect(said).toEqual([])
+  })
+
+  test("a held bash call runs once allowed, told started after its gate and ended at its end", async () => {
+    const { allow, gate } = heldGate()
+    const said: string[] = []
+    const shell = laneShell("bash", dir, gate, command => {
+      said.push(`started ${command}`)
+      return outcome => said.push(`ended ${outcome}`)
+    })
+    const run = shell("echo allowed", ASK, undefined)
+    await new Promise(r => setTimeout(r, 20))
+    expect(said).toEqual([])
+    allow()
+    const end = await run.end
+    expect(end.kind).toBe("exited")
+    expect(said).toEqual(["started echo allowed", "ended exited"])
+  })
 })

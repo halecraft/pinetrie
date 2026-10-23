@@ -220,7 +220,10 @@ export function createRuns(deps: {
   readonly basics: Basics
   readonly runDocs: ReturnType<typeof createRunDocs>
   readonly agent: Pick<Agent, "lane">
-  readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
+  readonly work: Pick<
+    LaneWork,
+    "beforeRun" | "runEnded" | "abandonStart" | "splitEnded"
+  >
   readonly readPinned: ReadPinned
   readonly readCanvasContext: ReadCanvasContext
   /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
@@ -414,6 +417,8 @@ export function createRuns(deps: {
       return id
     },
     cancel(lane) {
+      // First, as the abort waits on the run's turn, queued behind its start.
+      work.abandonStart(lane)
       const stopping = stoppable.get(lane)
       if (stopping === undefined) return false
       stopping.stop.abort()

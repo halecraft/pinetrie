@@ -2,6 +2,7 @@ import { commitId, pointFromCommit, pointId, type Sha256 } from "@pinetrie/core"
 import { diffUrl, reviewUrl } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { KEY_COOKIE, type RequestFacts } from "./admission.ts"
+import { MEASUREMENTS_KEPT_DAYS } from "./machine/measurements.ts"
 import { planPageRequest, planRequest, planUpgrade, route } from "./routes.ts"
 
 const SHA = "a".repeat(64) as Sha256
@@ -16,6 +17,22 @@ test("a blob's GET, with its hash or null; the upload's POST; else the page", ()
   expect(at("POST", `/blob/${SHA}`)).toEqual({ kind: "other" })
   expect(at("GET", "/src/app.tsx")).toEqual({ kind: "other" })
   expect(at("GET", "/")).toEqual({ kind: "other" })
+})
+
+test("the machine's measurements are a GET of the days kept, or fewer; any other ask of them is bad", () => {
+  expect(at("GET", "/machine/measurements")).toEqual({
+    kind: "measurements",
+    days: MEASUREMENTS_KEPT_DAYS,
+  })
+  expect(at("GET", "/machine/measurements?days=2")).toEqual({
+    kind: "measurements",
+    days: 2,
+  })
+  for (const days of ["0", "1.5", "x", String(MEASUREMENTS_KEPT_DAYS + 1)])
+    expect(at("GET", `/machine/measurements?days=${days}`)).toEqual({
+      kind: "bad",
+    })
+  expect(at("POST", "/machine/measurements")).toEqual({ kind: "bad" })
 })
 
 test("a review's read is a GET the wire accepts; anything else under /review/ is bad", () => {
@@ -54,13 +71,14 @@ describe("planRequest and planUpgrade: admission first", () => {
   const withCookie = (url: string) =>
     facts(url, { cookie: `${KEY_COOKIE}=${KEY}` })
 
-  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, proposed changes' read", () => {
+  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, proposed changes' read, the measurements", () => {
     const c = commitId("0123abcd")
     for (const [method, url] of [
       ["GET", "/"],
       ["GET", `/blob/${SHA}`],
       ["POST", "/blob"],
       ["GET", reviewUrl({ kind: "revision", commit: c })],
+      ["GET", "/machine/measurements"],
     ] as const)
       expect(planRequest(facts(url), KEY, method)).toEqual({ kind: "refuse" })
     expect(planRequest(withCookie(`/blob/${SHA}`), KEY, "GET")).toEqual({

@@ -60,7 +60,7 @@ knows of.
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs, its ledger and what each document stores beside its whole record (`storedSizes`) as one `OpenedStore`, which is what `startHost` takes |
-| `machine/` | the machine lanes run on, watched (ADR-0210): `sensor.ts`, the one `MachineSensor`, composed from the runtime's raw reads (`runningLanes`, `machineSample`), the services' kills taken from the runtime's watch of Docker's events after those reads (so a sample whose read fails leaves them for the next), the `statfs` of the filesystem holding the store (`Found.machine`'s `storeVolume`: the lane VM's state directory on the Mac, the lanes directory on Linux) and the longest stall since the last sample, mapped by `planSample`; `sink.ts`, the `pinetrie.machine` record written in a step of the documents' keeper, only when it differs; `index.ts`, the watch of Docker's events opened and closed with the manager, the manager started in the start's `agent` step, its first sample queued and not awaited, and the timer (`MACHINE_SAMPLE_MS`, unref'd) that asks it for each sample; `records.ts`, what the disk upkeep reads of the documents (every root's revision records' entry snapshots, for the index's fill, each costed by the paths its turn changed, `recordedChange`; and the lanes that will run again, each with a record in no archived canvas). The manager is given the whole snapshot index and the runtime's `StoreControls` (`Found.machine`'s `store`: the store's listing, a snapshot's, a lane's and an inner project's deletion), and `lanes.manage` (`manage`, or `observe` for a machine something else keeps, which runs no upkeep). The disk upkeep is asked for at its start (not awaited: runs resume beside it), at each run's end once its container stopped (`containers.ts`), by an archive and a restore, when the health gains `room-low`, and by a backstop timer (`DISK_UPKEEP_EVERY_MS`, 15 minutes, unref'd); every ask is alike, and the step decides from what it finds. Lane work asks through forwards bound once the watch exists, held until then. `quiet` waits for the upkeep too. A host with no tools runs none. It closes in shutdown's `intake` step, before the documents' keeper closes, since its last write (`unsampled`) is a step there; on a start that throws, its closer runs before the keeper's |
+| `machine/` | the machine lanes run on, watched (ADR-0210): `sensor.ts`, the one `MachineSensor`, composed from the runtime's raw reads (`runningLanes`, `machineSample`), the services' kills taken from the runtime's watch of Docker's events after those reads (so a sample whose read fails leaves them for the next), the `statfs` of the filesystem holding the store (`Found.machine`'s `storeVolume`: the lane VM's state directory on the Mac, the lanes directory on Linux) and the longest stall since the last sample, mapped by `planSample`; `sink.ts`, the `pinetrie.machine` record written in a step of the documents' keeper, only when it differs; `index.ts`, the watch of Docker's events opened and closed with the manager, the manager started in the start's `agent` step, its first sample queued and not awaited, and the timer (`MACHINE_SAMPLE_MS`, unref'd) that asks it for each sample; `records.ts`, what the disk upkeep reads of the documents (every root's revision records' entry snapshots, for the index's fill, each costed by the paths its turn changed, `recordedChange`; and the lanes that will run again, each with a record in no archived canvas); `importance.ts`, what bears on which lane matters most, gathered for `rankLanes` (`gatherLaneImportance`: a column's thread end in the lane's thread, read from its root's tree under a lease; the order runs started in, a count raised at each `beforeRun`, `createRunStarts`, never a clock; a held queue); `shell-calls.ts`, each lane's `bash` calls from the lane access's hook (`onShellStarted`): the program in flight, for the plan, and each call's duration, timed on the host after its gate, for the measurements; `measurements.ts`, the measurements' four tables and their export (ADR-0212). A host inside a lane, its observer relayed by the host outside (`Found.machine`'s `memorySource`), reads its own cgroup as the machine (`ownCgroupMachine`): its `memory.pressure`, its limit, and as available its limit less what its use is not inactive page cache (S329), from its own `/sys/fs/cgroup`, with lanehost's pure parsers, not through lanehost, whose role is a cgroup of its own; PSI is not namespaced, and the lane VM's whole is other threads' pressure too. `startHost`'s `machine` option gives a suite its own sensor over the host's (`wrapSensor`) and a shorter sample (`sampleEveryMs`), as it shortens `presenceDecay`; the manager has no test-only method. The manager is given the whole snapshot index and the runtime's `StoreControls` (`Found.machine`'s `store`: the store's listing, a snapshot's, a lane's and an inner project's deletion), and `lanes.manage` (`manage`, or `observe` for a machine something else keeps, which runs no upkeep). The disk upkeep is asked for at its start (not awaited: runs resume beside it), at each run's end once its container stopped (`containers.ts`), by an archive and a restore, when the health gains `room-low`, and by a backstop timer (`DISK_UPKEEP_EVERY_MS`, 15 minutes, unref'd); every ask is alike, and the step decides from what it finds. Lane work asks through forwards bound once the watch exists, held until then. `quiet` waits for the upkeep too. A host with no tools runs none. It closes in shutdown's `intake` step, before the documents' keeper closes, since its last write (`unsampled`) is a step there; on a start that throws, its closer runs before the keeper's |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
 | `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`@pinetrie/folder`'s `planKeep`, carried out in `index.ts`), its reviews (`review.ts`), its records written (`record-writes.ts`), the only code that touches the project's folder (ADR-0142); it takes the runtime's disks (`LaneDisks`, or a `Pick` of it), and a whole runtime only where it runs steps (`history.ts`) |
@@ -469,6 +469,19 @@ reading the store once, planning once, then acting:
   (`name`, `ran`), a table in the store's file on the store's connection,
   as `pinetrie_blobs` is; `backup` copies it. A host on an in-memory store
   keeps it in memory.
+- **The machine's measurements** (`machine/measurements.ts`,
+  `@pinetrie/machine`'s `MachineMeasurements`, ADR-0212) are four tables
+  on the store's connection: `pinetrie_machine_samples` (each sample's
+  rung, pressure, memory, its source, the kernel's refaults and stall time
+  since the last, lanes running, the mode), `pinetrie_machine_lane_samples`
+  (a running lane's memory in MiB and its program, only when changed),
+  `pinetrie_machine_shell_calls` (a `bash` call's lane, program, duration
+  and how it ended) and `pinetrie_machine_decisions` (a treatment changed,
+  or a shadow decision, with the pressure and memory then). Each row is
+  stamped with the host's clock, which no planner reads; rows older than
+  `MEASUREMENTS_KEPT_DAYS` go at the manager's trim, in both modes. No
+  command's arguments or output are kept. `backup` copies them; a host on
+  an in-memory store keeps them in memory (`memoryMachineMeasurements`).
 - **The snapshot index** (`snapshot-index.ts`, `@pinetrie/machine`'s
   `SnapshotIndex`, ADR-0210) is `pinetrie_snapshots` (`snapshot`, `lane`,
   `changed`, `used`, `branched`, `state`) and a one-row
@@ -1680,6 +1693,11 @@ queued cards, which `planArchive` refuses.
   (`hmr.server` before Vite 8) Vite listens on port 24678. Behind a tunnel that socket hangs, and Firefox,
   which opens one WebSocket to a host at a time, held `/ws` behind it (S112).
   Vite's own host check is off (`allowedHosts: true`): admission decides.
+- **The machine's measurements are a `GET /machine/measurements?days=N`**
+  (`routes.ts`, 1 to `MEASUREMENTS_KEPT_DAYS`, all of them by default),
+  admitted as every request is: JSON lines, the first naming the backend
+  and the memory's source, then every row of the four tables, each naming
+  its table.
 - **Every answer the host writes itself is a `responses.ts` value**, written
   by one `send`. A blob, a review and a diff are cached for a year
   (`IMMUTABLE`: each is named by what it holds); a refusal is never stored.
@@ -1733,6 +1751,20 @@ adapter's.
   (`owner.read`), which writes nothing (S87) and waits on no queue. A
   fetch's bundle needs the lane running, about 30 ms (S43), so a container
   stopped since is started for it, then stopped.
+- **A lane waits for memory at its gate and at its start** (ADR-0212,
+  `memory-holds.ts`). The gate is the lane's queue going idle, then the
+  machine letting it make a tool call (`waitUntilAllowed`), then its
+  channel; the whole wait, the queue's included, settles on the call's
+  abort (`settledOrAborted`), since a call can wait behind a held start. A
+  run's start waits for the machine in its queue step (`holdStart`), so its
+  first tool call waits behind it and the model thinks. A held start holds
+  the lane's queue, and the run's turn (`turnDone`) queues behind it, which
+  pi's abort waits on: so a Stop abandons the held start before it aborts
+  (`runs.ts`' `cancel`, `abandonStart`), as do the run's end and the host's
+  close; an abandoned start starts nothing and is no failure, so the queue
+  does not break. The containers reach `waitUntilAllowed` through a binding
+  made once the machine is watched, letting every lane through before then
+  and on a host that watches none.
 - **A turn's end is one queued step** (`turns.ts`, `disk.ts`). The commit
   is queued and awaited; the rest is one step, not awaited, so the next
   tool call waits for all of it and the next request for none:

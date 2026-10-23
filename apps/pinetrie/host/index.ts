@@ -113,8 +113,15 @@ import { HostRefused } from "./host-refused.ts"
 import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
-import { startMachineWatch } from "./machine/index.ts"
+import { createRunStarts, gatherLaneImportance } from "./machine/importance.ts"
+import {
+  type MachineWatch,
+  type MachineWatchOptions,
+  startMachineWatch,
+} from "./machine/index.ts"
+import { memoryMachineMeasurements } from "./machine/measurements.ts"
 import { createStoreRecords } from "./machine/records.ts"
+import { createShellCalls } from "./machine/shell-calls.ts"
 import {
   migrate,
   planStoredStart,
@@ -262,6 +269,8 @@ export interface StartHostOptions {
   readonly now?: () => number
   /** How long presence lasts without a refresh; a suite shortens it. */
   readonly presenceDecay?: PresenceDecay
+  /** The machine's sensor and how often it is sampled; a suite gives its own pressure. */
+  readonly machine?: MachineWatchOptions
   /**
    * Keep each root's last copy for `rootsRead`, so a suite reads a root the
    * host let go. Never in use: it keeps every root ever loaded in memory.
@@ -374,6 +383,7 @@ async function openHost(
     page = NO_PAGE,
     now = Date.now,
     presenceDecay = PRESENCE_DECAY,
+    machine: machineOptions = {},
     keepRootsRead = false,
     log = console.log,
   }: StartHostOptions,
@@ -433,6 +443,7 @@ async function openHost(
           blobs: memoryBlobs(now),
           ledger: memoryLedger(),
           snapshots: memorySnapshotIndex(),
+          measurements: memoryMachineMeasurements(now),
           backup: null,
           sizes: null,
         })
@@ -766,6 +777,14 @@ async function openHost(
   const requestUpkeep = forward<[]>("the machine", "hold")
   const markArchived = forward<[readonly SnapshotId[]]>("the machine", "hold")
   const keepRestored = forward<[readonly ThreadId[]]>("the machine", "hold")
+  // Before the machine is watched, and on a host that watches none, every
+  // lane is let through at once.
+  let waitUntilAllowed: MachineWatch["waitUntilAllowed"] = async () => {}
+  const runStarts = createRunStarts()
+  const shellCalls = createShellCalls({
+    now,
+    ended: call => opened.measurements.recordShellCall(call),
+  })
   const work = await startLaneWork({
     basics: leaseBasics,
     project: openedProject,
@@ -783,6 +802,12 @@ async function openHost(
       requestUpkeep: requestUpkeep.call,
       markArchivedForDeletion: markArchived.call,
       keepRestored: keepRestored.call,
+    },
+    machine: {
+      waitUntilAllowed: (lane, activity, signal) =>
+        waitUntilAllowed(lane, activity, signal),
+      noteRunStarted: runStarts.noteRunStarted,
+      shellStarted: shellCalls.shellStarted,
     },
   })
   progress.begin("agent")
@@ -804,12 +829,23 @@ async function openHost(
             basics: leaseBasics,
             reach: found.machine,
           }),
+          laneFacts: {
+            lanesByImportance: lanes =>
+              gatherLaneImportance(
+                { basics: leaseBasics, presence, runStarts },
+                lanes,
+              ),
+            programInFlight: shellCalls.programInFlight,
+          },
+          options: machineOptions,
+          measurements: opened.measurements,
           log,
         })
       : null
   // Its `unsampled` is a step on the documents' keeper: it closes first.
   if (machine !== null) {
     closers.defer(() => machine.close())
+    waitUntilAllowed = machine.waitUntilAllowed
     snapshotSkipped.bind(() => machine.noteSnapshotSkipped())
     const { upkeep } = machine
     requestUpkeep.bind(() => upkeep.requestUpkeep())
@@ -1159,6 +1195,13 @@ async function openHost(
     blobs,
     destination: work.destination,
     page,
+    measurements: {
+      store: opened.measurements,
+      heading: {
+        backend: found?.kind === "found" ? found.machine.target : null,
+        source: found?.kind === "found" ? found.machine.memorySource : null,
+      },
+    },
     log,
   })
 

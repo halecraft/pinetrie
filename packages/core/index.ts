@@ -198,6 +198,9 @@ export {
 } from "./lanes.ts"
 export {
   type CgroupMemory,
+  type HeldLane,
+  LANE_TREATMENTS,
+  type LaneTreatment,
   MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,
@@ -205,6 +208,8 @@ export {
   type MachineHealth,
   type MachineService,
   type MachineState,
+  type MemoryCounters,
+  type MemorySource,
   type Pressure,
   type StoreRoom,
   UNSAMPLED_REASONS,

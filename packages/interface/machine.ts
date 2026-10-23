@@ -4,6 +4,7 @@
 
 import {
   assertNever,
+  type LaneTreatment,
   type MachineCause,
   type MachineHealth,
   type MachineService,
@@ -49,10 +50,27 @@ function serviceWords(service: MachineService): string {
   }
 }
 
-/** One cause, as a clause. */
+/**
+ * Memory short, by what the host does of it: observing, nothing; holding,
+ * the threads it holds (`held`), or what it would hold at this rung.
+ */
+function memoryShortWords(
+  cause: Extract<MachineCause, { kind: "memory-short" }>,
+  held: number,
+): string {
+  if (!cause.isHolding) return "memory is short"
+  if (held === 1) return "memory is short: 1 thread waits for room"
+  if (held > 1) return `memory is short: ${held} threads wait for room`
+  return cause.rung >= 3
+    ? "memory is short: only the threads that matter most make tool calls"
+    : "memory is short: new runs wait for room"
+}
+
+/** One cause, as a clause; `held` counts the lanes held for memory. */
 function causeWords(
   cause: MachineCause,
   nameOf: (lane: ThreadId) => string,
+  held: number,
 ): string {
   switch (cause.kind) {
     case "room-low":
@@ -63,8 +81,8 @@ function causeWords(
       return `the lanes' disk has no room for more files: its metadata is ${percentWords((100 * cause.used) / Math.max(cause.total, 1))} full`
     case "filesystem-low":
       return `the disk holding the lanes is low: ${sizeWords(cause.free)} free, ${sizeWords(cause.leaveFree)} to leave`
-    case "memory-stalls":
-      return `lanes are short of memory: every task waited on it ${percentWords(cause.fullAvg10)} of the last 10 seconds`
+    case "memory-short":
+      return memoryShortWords(cause, held)
     case "lane-oom-killed":
       return `a command in ${nameOf(cause.lane)} was killed for using too much memory`
     case "service-oom-killed":
@@ -115,7 +133,28 @@ export function machineWords(
       : health.state === "red"
         ? "work is stopped: "
         : "work is slowed: "
-  return `The machine lanes run on: ${how}${causeWords(worst, nameOf)}${more}`
+  return `The machine lanes run on: ${how}${causeWords(worst, nameOf, health.treatments.length)}${more}`
+}
+
+/** Why a lane held for memory waits, as its column says it; null for one not held. */
+export function treatmentWords(treatment: LaneTreatment): string | null {
+  switch (treatment.kind) {
+    case "normal":
+      return null
+    case "waiting-to-start":
+      return "waits for room on the machine to start"
+    case "paused":
+      return "paused for memory: its next tool call waits for room"
+    default:
+      return assertNever(treatment.kind)
+  }
+}
+
+/** Each lane the machine holds for memory, and how, from its health as the host last wrote it. */
+export function heldForMemory(
+  health: MachineHealth | null,
+): ReadonlyMap<ThreadId, LaneTreatment> {
+  return new Map((health?.treatments ?? []).map(t => [t.lane, t.treatment]))
 }
 
 /** What the footer's status draws: its state's mark, and its words. */

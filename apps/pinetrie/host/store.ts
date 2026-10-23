@@ -26,6 +26,10 @@ import { createSqliteStore } from "@kyneta/sqlite-store"
 import { type BlobStore, PRODUCT_NAME } from "@pinetrie/core"
 import type { SnapshotIndex } from "@pinetrie/machine"
 import { sqliteBlobs } from "./blobs.ts"
+import {
+  type HostMeasurements,
+  sqliteMachineMeasurements,
+} from "./machine/measurements.ts"
 import { type MigrationLedger, sqliteLedger } from "./migrations/ledger.ts"
 import { sqliteSnapshotIndex } from "./snapshot-index.ts"
 
@@ -79,6 +83,8 @@ export interface OpenedStore {
   readonly ledger: MigrationLedger
   /** The project's entry snapshots, indexed (`snapshot-index.ts`). */
   readonly snapshots: SnapshotIndex
+  /** The machine's measurements, kept to tune memory's rungs by (`machine/measurements.ts`). */
+  readonly measurements: HostMeasurements
   readonly backup: ((suffix: string) => string) | null
   /** What each document stores beside its whole record (`storedSizes`); null for a store that cannot say. */
   readonly sizes:
@@ -187,6 +193,7 @@ export function openStore(
     blobs: sqliteBlobs(db, options.now),
     ledger: sqliteLedger(db),
     snapshots: sqliteSnapshotIndex(db),
+    measurements: sqliteMachineMeasurements(db, options.now ?? Date.now),
     backup,
     sizes: docIds => storedSizes(db, docIds),
   }

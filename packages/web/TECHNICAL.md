@@ -607,7 +607,9 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   the dot and, while raised, the word (`.head-status-word`, `statusWord`):
   a mark, no button. Under the line, `headLine`'s value: a raised run-end
   status's reason (`.head-status[data-role="reason"]`, a press bringing the
-  run's last entry into view), else what the thread is about
+  run's last entry into view), else why its lane waits for memory
+  (`.head-held[data-role="held"]`, one line, from `heldForMemory` of the
+  machine's health, ADR-0212), else what the thread is about
   (`.head-focus[data-role="focus"]`, its `data-kind` `title`, `model` or
   `opening`, the opening alone dimmed), each two lines at most; then the
   fork row (`Origin`, `data-role="origin"`) and an ssh ask

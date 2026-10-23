@@ -52,8 +52,8 @@ type Context = Parameters<typeof threadOfContext>[0]
 /**
  * How a lane's tools reach its files, as the host resolves it: in the lane's
  * container, through its helper. `gate` settles with the channel, and the
- * lane's observation, once the lane is started and its queue has drained:
- * tools wait for it, the model does not.
+ * lane's observation, once the lane is started, its queue has drained and
+ * the machine lets it call: tools wait for it, the model does not.
  */
 export interface LaneAccess {
   readonly facts: LaneFacts
@@ -66,7 +66,14 @@ export interface LaneAccess {
   readonly programs: string
   /** Where pine·trie's bash is in the lane (`RUNTIME_SHELL_PATH`). */
   readonly shell: string
-  readonly gate: () => Promise<OpenedLane>
+  /**
+   * Settles with the lane once its tools may run: its queue drained and
+   * the machine letting it call. Rejects with `signal`'s reason when the
+   * call is aborted while it waits.
+   */
+  readonly gate: (signal: AbortSignal | undefined) => Promise<OpenedLane>
+  /** A `bash` call past its gate, on the host; what it returns is called once with how the call ended. */
+  readonly onShellStarted: (command: string) => (outcome: string) => void
 }
 
 /**
@@ -293,9 +300,17 @@ export function laneToolContext(
     }
   const { facts, hostPaths, programs } = access
   return {
-    env: laneEnv(facts.dir, async () => (await access.gate()).channel),
+    env: laneEnv(
+      facts.dir,
+      async signal => (await access.gate(signal)).channel,
+    ),
     programs: async program => `${programs}/${program}`,
-    shell: laneShell(access.shell, facts.dir, access.gate),
+    shell: laneShell(
+      access.shell,
+      facts.dir,
+      access.gate,
+      access.onShellStarted,
+    ),
     dir: facts.dir,
     lane: { facts, hostPaths },
   }

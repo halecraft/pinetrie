@@ -7,13 +7,27 @@
 import { isSha256, type Sha256 } from "@pinetrie/core"
 import { parseReviewPath, type ReviewAsk } from "@pinetrie/rules"
 import { admits, type RequestFacts } from "./admission.ts"
+import { MEASUREMENTS_KEPT_DAYS } from "./machine/measurements.ts"
 
 export type Route =
   | { readonly kind: "blob-get"; readonly sha: Sha256 | null }
   | { readonly kind: "blob-post" }
   | { readonly kind: "review"; readonly ask: ReviewAsk }
+  /** The machine's measurements of the last `days` days, as JSON lines. */
+  | { readonly kind: "measurements"; readonly days: number }
   | { readonly kind: "bad" }
   | { readonly kind: "other" }
+
+/** How many days of measurements a request asks for: 1 to what is kept, `MEASUREMENTS_KEPT_DAYS` when it names none. */
+function measurementsRoute(url: URL): Route {
+  const asked = url.searchParams.get("days")
+  if (asked === null)
+    return { kind: "measurements", days: MEASUREMENTS_KEPT_DAYS }
+  const days = Number(asked)
+  return Number.isInteger(days) && days >= 1 && days <= MEASUREMENTS_KEPT_DAYS
+    ? { kind: "measurements", days }
+    : { kind: "bad" }
+}
 
 /**
  * What a request is for. `GET /blob/<anything>` is a blob's, with a null hash
@@ -28,6 +42,8 @@ export function route(method: string | undefined, url: URL): Route {
     return { kind: "blob-get", sha: isSha256(sha) ? sha : null }
   }
   if (pathname === "/blob" && method === "POST") return { kind: "blob-post" }
+  if (pathname === "/machine/measurements")
+    return method === "GET" ? measurementsRoute(url) : { kind: "bad" }
   const ask = parseReviewPath(url)
   if (ask === null) return { kind: "other" }
   if (ask === "bad" || method !== "GET") return { kind: "bad" }

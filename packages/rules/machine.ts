@@ -3,6 +3,8 @@
 // host's start and at its stop, so no tab reads a stopped host's.
 
 import {
+  type HeldLane,
+  LANE_TREATMENTS,
   MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,
@@ -41,7 +43,11 @@ const CauseSchema = Type.Union([
     free: Bytes,
     leaveFree: Bytes,
   }),
-  Type.Object({ kind: Type.Literal("memory-stalls"), fullAvg10: Bytes }),
+  Type.Object({
+    kind: Type.Literal("memory-short"),
+    rung: Type.Integer({ minimum: 2, maximum: 5 }),
+    isHolding: Type.Boolean(),
+  }),
   Type.Object({ kind: Type.Literal("lane-oom-killed"), lane: ThreadIdSchema }),
   Type.Object({
     kind: Type.Literal("service-oom-killed"),
@@ -68,6 +74,12 @@ const CauseSchema = Type.Union([
 const HealthSchema = Type.Object({
   state: choiceSchema(MACHINE_STATES),
   causes: Type.Array(CauseSchema),
+  treatments: Type.Array(
+    Type.Object({
+      lane: ThreadIdSchema,
+      treatment: Type.Object({ kind: choiceSchema(LANE_TREATMENTS) }),
+    }),
+  ),
 })
 
 export const MACHINE: RecordSpec<MachineHealth, typeof MACHINE_KEY, "session"> =
@@ -75,10 +87,18 @@ export const MACHINE: RecordSpec<MachineHealth, typeof MACHINE_KEY, "session"> =
     namespace: "pinetrie.machine",
     home: "session",
     keyOf: () => MACHINE_KEY,
-    encode: h => ({ state: h.state, causes: h.causes.map(c => ({ ...c })) }),
+    encode: h => ({
+      state: h.state,
+      causes: h.causes.map(c => ({ ...c })),
+      treatments: h.treatments.map(t => ({
+        lane: t.lane,
+        treatment: { ...t.treatment },
+      })),
+    }),
     decode: (contents, key) =>
       decodeRecord(HealthSchema, contents, fixedKey(MACHINE_KEY, key), h => ({
         state: h.state,
         causes: h.causes as readonly MachineCause[],
+        treatments: h.treatments as readonly HeldLane[],
       })),
   }

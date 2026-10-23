@@ -42,26 +42,31 @@ afterAll(async () => {
 
 /** A lane's shell, its helper's side run in this process. */
 const localShell = (observation: ShellObservation | null = null) =>
-  laneShell("bash", dir, async () => ({
-    observation,
-    channel: {
-      shell: (request, signal, onUpdate) =>
-        runShell(request, {
-          startRun: () => "1",
-          runEnv: run => ({ ...process.env, PINETRIE_RUN: run }),
-          spillFile: async () => {
-            const made = await env.createTempFile(
-              { prefix: "pi-output-", suffix: ".log" },
-              BACKGROUND_CONTEXT,
-            )
-            if (!made.ok) throw made.error
-            return made.value
-          },
-          signal: signal ?? new AbortController().signal,
-          update: onUpdate,
-        }),
-    } as Pick<LaneChannel, "shell"> as LaneChannel,
-  }))
+  laneShell(
+    "bash",
+    dir,
+    async () => ({
+      observation,
+      channel: {
+        shell: (request, signal, onUpdate) =>
+          runShell(request, {
+            startRun: () => "1",
+            runEnv: run => ({ ...process.env, PINETRIE_RUN: run }),
+            spillFile: async () => {
+              const made = await env.createTempFile(
+                { prefix: "pi-output-", suffix: ".log" },
+                BACKGROUND_CONTEXT,
+              )
+              if (!made.ok) throw made.error
+              return made.value
+            },
+            signal: signal ?? new AbortController().signal,
+            update: onUpdate,
+          }),
+      } as Pick<LaneChannel, "shell"> as LaneChannel,
+    }),
+    () => () => {},
+  )
 
 test("the model meets pi's bash tool: its name, description and parameters", () => {
   const ours = bashTool()

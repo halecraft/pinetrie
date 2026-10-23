@@ -437,10 +437,12 @@ export {
   type StatementStreams,
 } from "./live.ts"
 export {
+  heldForMemory,
   type MachineStatusView,
   machineStatus,
   machineWords,
   sizeWords,
+  treatmentWords,
 } from "./machine.ts"
 export {
   addCommentWords,

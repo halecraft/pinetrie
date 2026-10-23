@@ -20,7 +20,13 @@ export {
   type ProjectDisks,
   projectDisks,
 } from "./layout.ts"
-export type { MachineRead } from "./machine.ts"
+export {
+  type MachineRead,
+  memoryCounters,
+  parseInactiveFile,
+  parseMemoryMax,
+  parsePressure,
+} from "./machine.ts"
 export { holdingMount, type Mount } from "./mountinfo.ts"
 export {
   ATTRIBUTION_HOOKS,

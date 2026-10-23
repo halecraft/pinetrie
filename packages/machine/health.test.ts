@@ -1,13 +1,14 @@
 import { threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  ENTER_AFTER,
-  FIRST_MEMORY,
-  type HealthMemory,
-  LEAVE_AFTER,
+  FIRST_HEALTH_STATE,
+  type HealthPlanState,
+  MEMORY_CALM,
+  type MemoryShort,
   type Planned,
   planHealth,
 } from "./health.ts"
+import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import type { MachineSample } from "./sample.ts"
 import { LEAVE_FREE_DEFAULT } from "./store-settings.ts"
 
@@ -22,6 +23,8 @@ const calm: MachineSample = {
     memoryTotal: 12 * GiB,
     memoryAvailable: 8 * GiB,
     pressure: { someAvg10: 0, fullAvg10: 0 },
+    counters: null,
+    source: "whole-machine",
   },
   lanes: [
     {
@@ -34,6 +37,7 @@ const calm: MachineSample = {
       pressure: { someAvg10: 0, fullAvg10: 0 },
     },
   ],
+  lanesRunning: [lane],
   store: {
     size: 200 * GiB,
     unallocated: 100 * GiB,
@@ -51,10 +55,12 @@ const withUnallocated = (bytes: number): MachineSample => ({
   ...calm,
   store: calm.store === null ? null : { ...calm.store, unallocated: bytes },
 })
-const withFullAvg10 = (fullAvg10: number): MachineSample => ({
+/** The store's filesystem with `free` of its 1000 GiB, which leaves 100 GiB free: low under it, clear again over 110. */
+const withFree = (free: number): MachineSample => ({
   ...calm,
-  machine: { ...calm.machine, pressure: { someAvg10: fullAvg10, fullAvg10 } },
+  filesystem: { size: 1000 * GiB, free },
 })
+const FILESYSTEM_LOW = withFree(80 * GiB)
 const withOomKills = (oomKills: number): MachineSample => ({
   ...calm,
   lanes: calm.lanes.map(l => ({ ...l, oomKills })),
@@ -63,17 +69,18 @@ const withOomKills = (oomKills: number): MachineSample => ({
 /** Each sample planned in turn from the first memory; every plan, in order. */
 function run(
   samples: readonly MachineSample[],
-  from: HealthMemory = FIRST_MEMORY,
+  from: HealthPlanState = FIRST_HEALTH_STATE,
 ): readonly Planned[] {
-  let memory = from
+  let state = from
   return samples.map(sample => {
     const planned = planHealth(
-      memory,
+      state,
       { kind: "sampled", sample },
       settings,
       NO_GROW,
+      MEMORY_CALM,
     )
-    memory = planned.memory
+    state = planned.state
     return planned
   })
 }
@@ -83,39 +90,39 @@ const times = <T>(n: number, x: T): readonly T[] =>
 
 describe("levels", () => {
   test("a level enters only after ENTER_AFTER samples over its threshold", () => {
-    const plans = run(times(ENTER_AFTER, withFullAvg10(20)))
+    const plans = run(times(ENTER_AFTER, FILESYSTEM_LOW))
     expect(plans.slice(0, -1).map(kinds)).toEqual(times(ENTER_AFTER - 1, []))
-    expect(kinds(plans.at(-1))).toEqual(["memory-stalls"])
+    expect(kinds(plans.at(-1))).toEqual(["filesystem-low"])
     expect(plans.at(-1)?.health.state).toBe("amber")
   })
 
   test("a level leaves only after LEAVE_AFTER samples under its lower threshold", () => {
     const plans = run([
-      ...times(ENTER_AFTER, withFullAvg10(20)),
-      ...times(LEAVE_AFTER, withFullAvg10(1)),
+      ...times(ENTER_AFTER, FILESYSTEM_LOW),
+      ...times(LEAVE_AFTER, withFree(200 * GiB)),
     ])
-    expect(kinds(plans.at(-2))).toEqual(["memory-stalls"])
+    expect(kinds(plans.at(-2))).toEqual(["filesystem-low"])
     expect(kinds(plans.at(-1))).toEqual([])
     expect(plans.at(-1)?.health.state).toBe("neutral")
   })
 
   test("a value crossing one threshold back and forth does not flap", () => {
-    const entered = run(times(ENTER_AFTER, withFullAvg10(20)))
-    const memory = entered.at(-1)?.memory ?? FIRST_MEMORY
+    const entered = run(times(ENTER_AFTER, FILESYSTEM_LOW))
+    const memory = entered.at(-1)?.state ?? FIRST_HEALTH_STATE
     const flapping = run(
       times(4 * LEAVE_AFTER, 0).map((_, i) =>
-        withFullAvg10(i % 2 === 0 ? 9 : 11),
+        withFree((i % 2 === 0 ? 105 : 95) * GiB),
       ),
       memory,
     )
     expect(flapping.every(p => !p.changed)).toBe(true)
-    expect(kinds(flapping.at(-1))).toEqual(["memory-stalls"])
+    expect(kinds(flapping.at(-1))).toEqual(["filesystem-low"])
 
     const outside = run(
       times(4 * ENTER_AFTER, 0).map((_, i) =>
-        withFullAvg10(i % 2 === 0 ? 9 : 11),
+        withFree((i % 2 === 0 ? 105 : 95) * GiB),
       ),
-      run([calm])[0]?.memory,
+      run([calm])[0]?.state,
     )
     expect(outside.every(p => !p.changed)).toBe(true)
   })
@@ -146,6 +153,7 @@ describe("the store's room", () => {
           grows: false,
         },
       ],
+      treatments: [],
     })
   })
 
@@ -212,6 +220,7 @@ describe("events", () => {
     expect(plans[0]?.health).toEqual({
       state: "amber",
       causes: [{ kind: "service-oom-killed", service: "observer" }],
+      treatments: [],
     })
     expect(kinds(plans.at(-2))).toEqual(["service-oom-killed"])
     expect(kinds(plans.at(-1))).toEqual([])
@@ -265,6 +274,7 @@ describe("events", () => {
           grows: false,
         },
       ],
+      treatments: [],
     })
   })
 
@@ -276,6 +286,7 @@ describe("events", () => {
     expect(plans[0]?.health).toEqual({
       state: "amber",
       causes: [{ kind: "snapshot-skipped", count: 2 }],
+      treatments: [],
     })
     expect(kinds(plans.at(-2))).toEqual(["snapshot-skipped"])
     expect(kinds(plans.at(-1))).toEqual([])
@@ -286,13 +297,13 @@ describe("the value", () => {
   test("the state is the worst cause's, and the causes are worst first", () => {
     const both: MachineSample = {
       ...withUnallocated(GiB / 2),
-      machine: withFullAvg10(20).machine,
+      filesystem: FILESYSTEM_LOW.filesystem,
     }
     const health = run(times(ENTER_AFTER, both)).at(-1)?.health
     expect(health?.state).toBe("red")
     expect(health?.causes.map(c => c.kind)).toEqual([
       "room-spent",
-      "memory-stalls",
+      "filesystem-low",
     ])
   })
 
@@ -314,25 +325,74 @@ describe("the value", () => {
   })
 
   test("a failed sample adds unsampled to the causes it leaves standing", () => {
-    const entered = run(times(ENTER_AFTER, withFullAvg10(20))).at(-1)
+    const entered = run(times(ENTER_AFTER, FILESYSTEM_LOW)).at(-1)
     const failed = planHealth(
-      entered?.memory ?? FIRST_MEMORY,
+      entered?.state ?? FIRST_HEALTH_STATE,
       { kind: "failed", error: "lanehost did not answer" },
       settings,
       NO_GROW,
+      MEMORY_CALM,
     )
     expect(failed.changed).toBe(true)
     expect(failed.health.causes).toEqual([
       { kind: "unsampled", reason: "failed", error: "lanehost did not answer" },
-      { kind: "memory-stalls", fullAvg10: 20 },
+      { kind: "filesystem-low", free: 80 * GiB, leaveFree: 100 * GiB },
     ])
     const back = planHealth(
-      failed.memory,
-      { kind: "sampled", sample: withFullAvg10(20) },
+      failed.state,
+      { kind: "sampled", sample: FILESYSTEM_LOW },
       settings,
       NO_GROW,
+      MEMORY_CALM,
     )
     expect(back.changed).toBe(true)
-    expect(kinds(back)).toEqual(["memory-stalls"])
+    expect(kinds(back)).toEqual(["filesystem-low"])
+  })
+})
+
+describe("memory", () => {
+  const plan = (memory: MemoryShort, from = FIRST_HEALTH_STATE) =>
+    planHealth(
+      from,
+      { kind: "sampled", sample: calm },
+      settings,
+      NO_GROW,
+      memory,
+    )
+
+  test("memory short from rung 2 is amber, with the lanes held listed beside it", () => {
+    const held = [{ lane, treatment: { kind: "paused" } } as const]
+    expect(plan({ rung: 1, isHolding: true, held: [] }).health.causes).toEqual(
+      [],
+    )
+    expect(plan({ rung: 3, isHolding: true, held }).health).toEqual({
+      state: "amber",
+      causes: [{ kind: "memory-short", rung: 3, isHolding: true }],
+      treatments: held,
+    })
+  })
+
+  test("a rung changing, or a lane held, is a change; nothing else of memory is", () => {
+    const two = plan({ rung: 2, isHolding: true, held: [] })
+    const three = plan({ rung: 3, isHolding: true, held: [] }, two.state)
+    expect(three.changed).toBe(true)
+    const held = plan(
+      {
+        rung: 3,
+        isHolding: true,
+        held: [{ lane, treatment: { kind: "paused" } }],
+      },
+      three.state,
+    )
+    expect(held.changed).toBe(true)
+    const same = plan(
+      {
+        rung: 3,
+        isHolding: true,
+        held: [{ lane, treatment: { kind: "paused" } }],
+      },
+      held.state,
+    )
+    expect(same.changed).toBe(false)
   })
 })

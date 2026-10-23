@@ -9,6 +9,12 @@ import type {
   ThreadId,
 } from "@pinetrie/core"
 import type {
+  DecisionMeasured,
+  LaneMeasured,
+  SampleMeasured,
+} from "./measurements.ts"
+import type { HostLaneFacts, MachineMeasurements } from "./ports.ts"
+import type {
   Reservation,
   RowState,
   SnapshotIndex,
@@ -134,5 +140,48 @@ export function fakeRecords(
     snapshotsOf: async root => roots.get(root) ?? [],
     liveLanes: async () => new Set(input.live ?? []),
     runningLanes: async () => new Set(input.running ?? []),
+  }
+}
+
+/** What the host knows of its lanes: `ranked` most important first, and each lane's program in flight. */
+export function fakeLaneFacts(
+  input: {
+    readonly ranked?: readonly ThreadId[]
+    readonly inFlight?: ReadonlyMap<ThreadId, string>
+  } = {},
+): HostLaneFacts {
+  return {
+    lanesByImportance: async lanes => {
+      const ranked = input.ranked ?? []
+      const at = (l: ThreadId) =>
+        ranked.includes(l) ? ranked.indexOf(l) : ranked.length
+      return [...lanes].sort((a, b) => at(a) - at(b))
+    },
+    programInFlight: lane => input.inFlight?.get(lane) ?? null,
+  }
+}
+
+/** Measurements kept in arrays, each write in order, and how many trims were asked for. */
+export function keptMeasurements(): MachineMeasurements & {
+  readonly samples: SampleMeasured[]
+  readonly lanes: LaneMeasured[]
+  readonly decisions: DecisionMeasured[]
+  readonly trims: { count: number }
+} {
+  const samples: SampleMeasured[] = []
+  const lanes: LaneMeasured[] = []
+  const decisions: DecisionMeasured[] = []
+  const trims = { count: 0 }
+  return {
+    samples,
+    lanes,
+    decisions,
+    trims,
+    recordSample: row => void samples.push(row),
+    recordLaneSamples: rows => void lanes.push(...rows),
+    recordDecisions: rows => void decisions.push(...rows),
+    trim: () => {
+      trims.count++
+    },
   }
 }

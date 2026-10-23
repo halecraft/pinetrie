@@ -37,6 +37,11 @@ import type { NewLanes } from "./create.ts"
 import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { InnerDockerDataRootsHeld } from "./inner-docker-data-roots.ts"
+import {
+  createStartHolds,
+  type LaneMachineAsks,
+  settledOrAborted,
+} from "./memory-holds.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
@@ -83,6 +88,11 @@ export interface Containers {
   /** After a run: stop its container, and follow its proposed changes. */
   runEnded(lane: ThreadId): void
   /**
+   * A Stop: a start waiting for room starts nothing. The run's turn queues
+   * behind its start, and the run's abort waits on its turn.
+   */
+  abandonStart(lane: ThreadId): void
+  /**
    * Start a lane's container, as `planLaneStart` decides from its fork's
    * record and its container (`decideContainerStart`): a fork owed runs; a container
    * made from another spec (image, mounts, grants) is recreated on the same
@@ -108,10 +118,12 @@ export function createContainers(deps: {
   readonly snapshots: Pick<SnapshotTaking, "markUsed" | "rows">
   /** A run's end, its container stopped: what it left may go (a nested lane's inner projects). */
   readonly requestUpkeep: () => void
+  readonly machine: LaneMachineAsks
 }): Containers {
   const { basics, setup, registry, keeper, proposed, innerDockerDataRoots } =
     deps
   const { session, log } = basics
+  const startHolds = createStartHolds(deps.machine)
 
   // A lane whose use of its owner's identity is taken back: its sessions
   // through the host are closed already; any that went around the host end
@@ -254,22 +266,40 @@ export function createContainers(deps: {
         hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,
         shell: RUNTIME_SHELL_PATH,
-        gate: async () => {
-          await handle.queue.idle()
+        // The queue's wait too settles on the call's abort: a held start
+        // holds the queue.
+        gate: async signal => {
+          await settledOrAborted(
+            handle.queue
+              .idle()
+              .then(() =>
+                deps.machine.waitUntilAllowed(lane, "tool-call", signal),
+              ),
+            signal,
+          )
           const link = await handle.link()
           return { channel: link.channel, observation: link.runs }
         },
+        onShellStarted: command => deps.machine.shellStarted(lane, command),
       }
     },
 
     beforeRun(lane) {
       if (!registry.isOwn(lane)) return
+      deps.machine.noteRunStarted(lane)
       registry.handleOf(lane).queue.reset()
+      // The start waits for room in its step, so the run's first tool call
+      // waits behind it and the model thinks.
+      const startWhenAllowed = startHolds.holdStart(lane)
       void keeper.track(
         registry
-          .withHistory(lane, (h, _, record) => startContainer(record, h), {
-            fatal: true,
-          })
+          .withHistory(
+            lane,
+            (h, _, record) => startWhenAllowed(() => startContainer(record, h)),
+            {
+              fatal: true,
+            },
+          )
           .catch(error =>
             log(
               `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,
@@ -280,6 +310,7 @@ export function createContainers(deps: {
 
     runEnded(lane) {
       if (!registry.isOwn(lane)) return
+      startHolds.abandon(lane)
       proposed.runEnded(lane)
       const handle = registry.handleOf(lane)
       void keeper.track(
@@ -296,9 +327,12 @@ export function createContainers(deps: {
       )
     },
 
+    abandonStart: lane => startHolds.abandon(lane),
+
     startContainer,
 
     async close() {
+      startHolds.close()
       await setup.ssh.close()
       await registry.stopAll()
     },

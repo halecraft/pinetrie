@@ -6,22 +6,65 @@
 // snapshot's own life (`SnapshotTaking`), so a restore never comes between
 // a step's plan and its deletion.
 
-import { errorText, type MachineHealth, snapshotId } from "@pinetrie/core"
+import {
+  errorText,
+  type MachineHealth,
+  type MemoryCounters,
+  snapshotId,
+  type ThreadId,
+} from "@pinetrie/core"
 import { createKeeper, KeeperClosed } from "@pinetrie/keeper"
 import type { Capabilities } from "./capabilities.ts"
 import {
-  FIRST_MEMORY,
-  type HealthMemory,
+  FIRST_HEALTH_STATE,
+  type HealthPlanState,
+  MEMORY_CALM,
+  type MemoryShort,
   planHealth,
   type SampleResult,
   STOPPED,
 } from "./health.ts"
-import type { HealthSink, MachineManager, MachineSensor } from "./ports.ts"
-import type { UpkeepHeard } from "./sample.ts"
+import {
+  counterRise,
+  type DecisionMeasured,
+  type LaneMeasured,
+  lanesChanged,
+  lanesMeasured,
+  treatmentChanges,
+} from "./measurements.ts"
+import type {
+  HealthSink,
+  HostLaneFacts,
+  MachineManager,
+  MachineMeasurements,
+  MachineSensor,
+} from "./ports.ts"
+import { FIRST_RUNG_STATE, planRung, type RungPlanState } from "./rung.ts"
+import type { MachineSample, UpkeepHeard } from "./sample.ts"
 import type { SnapshotIndex } from "./snapshot-index.ts"
 import type { StoreControls, StoreRecords } from "./store.ts"
 import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
+import {
+  ALL_NORMAL,
+  FIRST_TREATMENT_STATE,
+  isActivityAllowed,
+  type LaneActivity,
+  planTreatments,
+  type TreatmentPlanState,
+  type Treatments,
+} from "./treatments.ts"
 import { planUpkeepStep } from "./upkeep.ts"
+
+/** Samples between the measurements' trims: an hour at the host's 5 s. */
+export const TRIM_MEASUREMENTS_EVERY_SAMPLES = 720
+
+/** A `waitUntilAllowed` not yet settled. */
+interface Waiter {
+  readonly lane: ThreadId
+  readonly activity: LaneActivity
+  readonly allow: () => void
+  readonly refuse: (reason: unknown) => void
+}
 
 /**
  * Whether this host keeps the machine itself, or only reads and reports it,
@@ -39,6 +82,8 @@ export type ManagerNews =
   | { readonly kind: "unwritten"; readonly error: string }
   /** An upkeep step failed; the next trigger tries again. */
   | { readonly kind: "upkeep-failed"; readonly error: string }
+  /** The measurements could not be written; the next sample writes its own. */
+  | { readonly kind: "unmeasured"; readonly error: string }
 
 export function createMachineManager(deps: {
   readonly sensor: MachineSensor
@@ -50,13 +95,28 @@ export function createMachineManager(deps: {
   readonly index: SnapshotIndex
   readonly store: StoreControls
   readonly records: StoreRecords
+  readonly laneFacts: HostLaneFacts
+  readonly measurements: MachineMeasurements
   readonly tell: (news: ManagerNews) => void
 }): MachineManager {
   const { sensor, sink, settings, tell, index, store, records } = deps
   const keeper = createKeeper<"sample" | "disk-upkeep">({
     onSlow: step => tell({ kind: "slow", ms: Math.round(step.ran) }),
   })
-  let memory: HealthMemory = FIRST_MEMORY
+  let memory: HealthPlanState = FIRST_HEALTH_STATE
+  let rungState: RungPlanState = FIRST_RUNG_STATE
+  let treatmentState: TreatmentPlanState = FIRST_TREATMENT_STATE
+  /** The last plan's: what every `waitUntilAllowed` reads. */
+  let treatments: Treatments = ALL_NORMAL
+  /** Memory's rung and holds as last planned, kept through a failed sample. */
+  let memoryShort: MemoryShort = MEMORY_CALM
+  const waiters = new Set<Waiter>()
+  let closed = false
+  /** The last counters a sample read, and each lane as last kept: what the measurements store differences from. */
+  let counters: MemoryCounters | null = null
+  let lanesKept = new Map<ThreadId, LaneMeasured>()
+  /** Samples since the measurements were last trimmed. */
+  let untrimmed = 0
   /** Skipped snapshots heard since the last sample's read. */
   let skipped = 0
   /** The store's room and its floor, as the last sample read them. */
@@ -70,7 +130,10 @@ export function createMachineManager(deps: {
   const read = new Set<string>()
 
   /** One write; on a refusal the memory forgets it, so the next sample writes again. */
-  const writeHealth = async (health: MachineHealth, written: HealthMemory) => {
+  const writeHealth = async (
+    health: MachineHealth,
+    written: HealthPlanState,
+  ) => {
     try {
       await sink.write(health)
       memory = written
@@ -82,6 +145,89 @@ export function createMachineManager(deps: {
 
   const hasRoomLow = (h: MachineHealth) =>
     h.causes.some(c => c.kind === "room-low")
+
+  /** Every waiter its lane's treatment now allows, settled. */
+  const settleAllowed = () => {
+    for (const w of waiters)
+      if (isActivityAllowed(treatments.laneTreatment(w.lane), w.activity))
+        w.allow()
+  }
+
+  /**
+   * Memory's rung and each lane's treatment from one sample, and what the
+   * measurements keep of it. Observing, the treatments are planned only for
+   * their shadow decisions: every lane is `normal`.
+   */
+  const planMemory = async (sample: MachineSample): Promise<void> => {
+    const planned = planRung(rungState, sample.machine)
+    rungState = planned.state
+    const { rung } = planned
+    const isHolding = deps.mode === "manage"
+    // gather
+    const lanesWaitingToStart = [...waiters]
+      .filter(w => w.activity === "container-start")
+      .map(w => w.lane)
+    const lanesByImportance = await deps.laneFacts.lanesByImportance([
+      ...new Set([...sample.lanesRunning, ...lanesWaitingToStart]),
+    ])
+    const memoryByLane = new Map(sample.lanes.map(l => [l.lane, l]))
+    // plan
+    const next = planTreatments(treatmentState, {
+      rung,
+      lanesRunning: sample.lanesRunning.map(lane => ({
+        lane,
+        memory: memoryByLane.get(lane) ?? null,
+        programInFlight: deps.laneFacts.programInFlight(lane),
+      })),
+      lanesWaitingToStart,
+      lanesByImportance,
+    })
+    const held = isHolding ? next.treatments.held : []
+    const at = {
+      fullAvg10: sample.machine.pressure?.fullAvg10 ?? null,
+      memoryAvailable: sample.machine.memoryAvailable,
+    }
+    const lanesNow = lanesMeasured(sample.lanes, deps.laneFacts.programInFlight)
+    const measured = {
+      sample: {
+        rung,
+        someAvg10: sample.machine.pressure?.someAvg10 ?? null,
+        fullAvg10: at.fullAvg10,
+        memoryTotal: sample.machine.memoryTotal,
+        memoryAvailable: sample.machine.memoryAvailable,
+        source: sample.machine.source,
+        since: counterRise(counters, sample.machine.counters),
+        lanesRunning: sample.lanesRunning.length,
+        mode: deps.mode,
+      },
+      lanes: lanesChanged(lanesKept, lanesNow),
+      decisions: [
+        ...treatmentChanges(memoryShort.held, held).map(
+          (c): DecisionMeasured => ({ kind: "treatment", ...c, ...at }),
+        ),
+        ...next.shadowDecisions.map(
+          (decision): DecisionMeasured => ({ kind: "shadow", decision, ...at }),
+        ),
+      ],
+      trim: untrimmed + 1 >= TRIM_MEASUREMENTS_EVERY_SAMPLES,
+    }
+    // execute
+    treatmentState = next.state
+    treatments = isHolding ? next.treatments : ALL_NORMAL
+    memoryShort = { rung, isHolding, held }
+    settleAllowed()
+    counters = sample.machine.counters
+    lanesKept = new Map(lanesNow.map(l => [l.lane, l]))
+    untrimmed = measured.trim ? 0 : untrimmed + 1
+    try {
+      deps.measurements.recordSample(measured.sample)
+      deps.measurements.recordLaneSamples(measured.lanes)
+      deps.measurements.recordDecisions(measured.decisions)
+      if (measured.trim) deps.measurements.trim()
+    } catch (error) {
+      tell({ kind: "unmeasured", error: errorText(error) })
+    }
+  }
 
   const sampleOnce = async (): Promise<void> => {
     let result: SampleResult
@@ -100,13 +246,20 @@ export function createMachineManager(deps: {
     } catch (error) {
       result = { kind: "failed", error: errorText(error) }
     }
+    if (result.kind === "sampled") await planMemory(result.sample)
     const before = memory.health
-    const planned = planHealth(memory, result, settings, deps.capabilities)
+    const planned = planHealth(
+      memory,
+      result,
+      settings,
+      deps.capabilities,
+      memoryShort,
+    )
     if (!planned.changed) {
-      memory = planned.memory
+      memory = planned.state
       return
     }
-    await writeHealth(planned.health, planned.memory)
+    await writeHealth(planned.health, planned.state)
     tell({ kind: "changed", health: planned.health })
     if (hasRoomLow(planned.health) && !hasRoomLow(before)) queueUpkeep()
   }
@@ -199,8 +352,36 @@ export function createMachineManager(deps: {
       await keeper.run(async () => index.keepAgain(lanes))
       queueUpkeep()
     },
+    waitUntilAllowed(lane, activity, signal) {
+      if (deps.mode !== "manage") return Promise.resolve()
+      if (closed) return Promise.reject(new KeeperClosed())
+      if (signal?.aborted) return Promise.reject(signal.reason)
+      if (isActivityAllowed(treatments.laneTreatment(lane), activity))
+        return Promise.resolve()
+      return new Promise<void>((resolve, reject) => {
+        const onAbort = () => waiter.refuse(signal?.reason)
+        const waiter: Waiter = {
+          lane,
+          activity,
+          allow: () => {
+            waiters.delete(waiter)
+            signal?.removeEventListener("abort", onAbort)
+            resolve()
+          },
+          refuse: reason => {
+            waiters.delete(waiter)
+            signal?.removeEventListener("abort", onAbort)
+            reject(reason)
+          },
+        }
+        waiters.add(waiter)
+        signal?.addEventListener("abort", onAbort, { once: true })
+      })
+    },
     idle: () => keeper.idle(),
     async close() {
+      closed = true
+      for (const w of waiters) w.refuse(new KeeperClosed())
       keeper.close("drop")
       await keeper.idle()
       await writeHealth(STOPPED, { ...memory, health: STOPPED })

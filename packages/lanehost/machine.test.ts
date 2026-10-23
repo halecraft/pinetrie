@@ -3,11 +3,14 @@ import {
   cgroupCandidates,
   deviceName,
   isContainerId,
+  memoryCounters,
+  parseInactiveFile,
   parseMeminfo,
   parseMemoryEvents,
   parseMemoryMax,
   parseMemoryStat,
   parsePressure,
+  parsePressureTotals,
   planBtrfsRoom,
 } from "./machine.ts"
 
@@ -119,4 +122,32 @@ test("a device's name is its path under /dev, and nothing deeper", () => {
   expect(deviceName("/dev/vdb")).toBe("vdb")
   expect(deviceName("/dev/mapper/vg-lanes")).toBeNull()
   expect(deviceName("overlay")).toBeNull()
+})
+
+describe("the kernel's memory counters", () => {
+  const VMSTAT =
+    "nr_free_pages 123\nworkingset_refault_anon 4021\nworkingset_refault_file 99812\nworkingset_activate_anon 1\n"
+  const PRESSURE =
+    "some avg10=0.00 avg60=0.00 avg300=0.00 total=6120\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=5100\n"
+
+  test("refaults from /proc/vmstat and stall time from /proc/pressure/memory", () => {
+    expect(memoryCounters(VMSTAT, PRESSURE)).toEqual({
+      refaultAnon: 4021,
+      refaultFile: 99812,
+      stallSomeUs: 6120,
+      stallFullUs: 5100,
+    })
+  })
+
+  test("a file not read, or one without refaults, gives none", () => {
+    expect(memoryCounters(null, PRESSURE)).toBeNull()
+    expect(memoryCounters("nr_free_pages 1\n", PRESSURE)).toBeNull()
+    expect(parsePressureTotals("")).toBeNull()
+  })
+
+  test("a cgroup's inactive page cache from its memory.stat", () => {
+    expect(parseInactiveFile("anon 4096\ninactive_file 528379904\n")).toBe(
+      528379904,
+    )
+  })
 })

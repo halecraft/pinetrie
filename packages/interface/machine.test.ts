@@ -1,12 +1,12 @@
 import { type MachineCause, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { machineWords, sizeWords } from "./machine.ts"
+import { machineWords, sizeWords, treatmentWords } from "./machine.ts"
 
 const GiB = 1024 ** 3
 const lane = threadIdFor("0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e6f")
 const nameOf = () => "Quiet Otter"
 const amber = (...causes: MachineCause[]) =>
-  machineWords({ state: "amber", causes }, nameOf)
+  machineWords({ state: "amber", causes, treatments: [] }, nameOf)
 
 describe("sizeWords", () => {
   test("binary sizes, one decimal under 10", () => {
@@ -22,9 +22,9 @@ describe("sizeWords", () => {
 
 describe("machineWords", () => {
   test("a neutral machine is keeping up", () => {
-    expect(machineWords({ state: "neutral", causes: [] }, nameOf)).toBe(
-      "The machine lanes run on: keeping up",
-    )
+    expect(
+      machineWords({ state: "neutral", causes: [], treatments: [] }, nameOf),
+    ).toBe("The machine lanes run on: keeping up")
   })
 
   test("the worst cause is worded, and the rest counted", () => {
@@ -36,6 +36,7 @@ describe("machineWords", () => {
             { kind: "room-spent", unallocated: GiB / 2 },
             { kind: "host-stalls", stalledMs: 1500 },
           ],
+          treatments: [],
         },
         nameOf,
       ),
@@ -61,7 +62,9 @@ describe("machineWords", () => {
         }),
         amber({ kind: "metadata-full", used: 3.9 * GiB, total: 4 * GiB }),
         amber({ kind: "filesystem-low", free: 80 * GiB, leaveFree: 100 * GiB }),
-        amber({ kind: "memory-stalls", fullAvg10: 12.4 }),
+        amber({ kind: "memory-short", rung: 2, isHolding: true }),
+        amber({ kind: "memory-short", rung: 3, isHolding: true }),
+        amber({ kind: "memory-short", rung: 3, isHolding: false }),
         amber({ kind: "lane-oom-killed", lane }),
         amber({ kind: "service-oom-killed", service: "disks" }),
         amber({ kind: "service-oom-killed", service: "privileged" }),
@@ -84,7 +87,9 @@ describe("machineWords", () => {
       "work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least; it grows when the lane VM next starts",
       "work is slowed: the lanes' disk has no room for more files: its metadata is 98% full",
       "work is slowed: the disk holding the lanes is low: 80 GB free, 100 GB to leave",
-      "work is slowed: lanes are short of memory: every task waited on it 12% of the last 10 seconds",
+      "work is slowed: memory is short: new runs wait for room",
+      "work is slowed: memory is short: only the threads that matter most make tool calls",
+      "work is slowed: memory is short",
       "work is slowed: a command in Quiet Otter was killed for using too much memory",
       "work is slowed: lanehost's disk service was killed for using too much memory",
       "work is slowed: lanehost's privileged service was killed for using too much memory",
@@ -97,6 +102,40 @@ describe("machineWords", () => {
       "waiting for its first reading",
       "the host has stopped",
       "it could not be read: no answer",
+    ])
+  })
+})
+
+describe("memory held", () => {
+  const short = { kind: "memory-short", rung: 2, isHolding: true } as const
+  const waiting = { kind: "waiting-to-start" } as const
+  test("the footer counts the threads that wait for room", () => {
+    expect(
+      machineWords(
+        {
+          state: "amber",
+          causes: [short],
+          treatments: [
+            { lane, treatment: waiting },
+            { lane: threadIdFor("t-2"), treatment: { kind: "paused" } },
+          ],
+        },
+        nameOf,
+      ),
+    ).toBe(
+      "The machine lanes run on: work is slowed: memory is short: 2 threads wait for room",
+    )
+  })
+
+  test("a column says why its lane waits, and nothing for one not held", () => {
+    expect([
+      treatmentWords({ kind: "normal" }),
+      treatmentWords(waiting),
+      treatmentWords({ kind: "paused" }),
+    ]).toEqual([
+      null,
+      "waits for room on the machine to start",
+      "paused for memory: its next tool call waits for room",
     ])
   })
 })

@@ -4,18 +4,22 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { entrySnapshotId } from "@pinetrie/core/fixtures"
+import { KeeperClosed } from "@pinetrie/keeper"
 import { describe, expect, test } from "vitest"
 import {
   EMPTY_LISTING,
+  fakeLaneFacts,
   fakeRecords,
   fakeStore,
+  keptMeasurements,
   memoryIndex,
 } from "./fixtures.ts"
-import { ENTER_AFTER, LEAVE_AFTER } from "./health.ts"
+import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import {
   createMachineManager,
   type ManageMode,
   type ManagerNews,
+  TRIM_MEASUREMENTS_EVERY_SAMPLES,
 } from "./manager.ts"
 import type { MachineManager, MachineSensor } from "./ports.ts"
 import type { SensedSample } from "./sample.ts"
@@ -36,8 +40,11 @@ const calm: SensedSample = {
     memoryTotal: 12 * GiB,
     memoryAvailable: 8 * GiB,
     pressure: { someAvg10: 0, fullAvg10: 0 },
+    counters: null,
+    source: "whole-machine",
   },
   lanes: [],
+  lanesRunning: [],
   store: null,
   filesystem: null,
   serviceKills: [],
@@ -45,7 +52,7 @@ const calm: SensedSample = {
 }
 
 /** A manager over `sensor`, with what its sink was written and what it told. */
-function managed(sensor: MachineSensor) {
+function managed(sensor: MachineSensor, mode: ManageMode = "manage") {
   const written: MachineHealth[] = []
   const told: ManagerNews[] = []
   const manager = createMachineManager({
@@ -56,11 +63,13 @@ function managed(sensor: MachineSensor) {
       },
     },
     settings: SETTINGS,
-    mode: "manage",
+    mode,
     capabilities: { grow: false },
     index: memoryIndex(),
     store: fakeStore(EMPTY_LISTING).store,
     records: fakeRecords(),
+    laneFacts: fakeLaneFacts(),
+    measurements: keptMeasurements(),
     tell: news => told.push(news),
   })
   return { manager, written, told }
@@ -87,7 +96,10 @@ test("the sink is written once per change, and not for an unchanged sample", asy
   await manager.sample()
   expect(reasons(written)).toEqual(["waiting", "neutral"])
   expect(told).toEqual([
-    { kind: "changed", health: { state: "neutral", causes: [] } },
+    {
+      kind: "changed",
+      health: { state: "neutral", causes: [], treatments: [] },
+    },
   ])
 })
 
@@ -104,6 +116,7 @@ test("a sensor that throws gives unsampled, with its error", async () => {
     causes: [
       { kind: "unsampled", reason: "failed", error: "lanehost did not answer" },
     ],
+    treatments: [],
   })
 })
 
@@ -144,6 +157,8 @@ test("a refused write is written again at the next sample", async () => {
     index: memoryIndex(),
     store: fakeStore(EMPTY_LISTING).store,
     records: fakeRecords(),
+    laneFacts: fakeLaneFacts(),
+    measurements: keptMeasurements(),
     tell: news => told.push(news),
   })
   await manager.start()
@@ -201,6 +216,8 @@ describe("the disk upkeep", () => {
       index: input.index,
       store,
       records: input.records ?? fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements: keptMeasurements(),
       tell: () => {},
     })
     return { manager, did }
@@ -285,6 +302,8 @@ describe("the disk upkeep", () => {
         },
       },
       records: fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements: keptMeasurements(),
       tell: () => {},
     })
     manager.requestUpkeep()
@@ -326,6 +345,8 @@ describe("the disk upkeep", () => {
       index,
       store,
       records: fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements: keptMeasurements(),
       tell: () => {},
     })
     await manager.start()
@@ -352,4 +373,140 @@ describe("the disk upkeep", () => {
     ])
     expect(did).toEqual([`snapshot ${B}`])
   })
+})
+
+describe("memory", () => {
+  const LANE = threadIdFor("t-1")
+  /** A sensor whose `full avg10` is what `pressure.full` says at each sample, `LANE` running when `running` says so. */
+  const pressured = () => {
+    const now = { full: 0, running: false }
+    const sensor: MachineSensor = {
+      sample: async () => ({
+        ...calm,
+        machine: {
+          ...calm.machine,
+          pressure: { someAvg10: now.full, fullAvg10: now.full },
+        },
+        lanesRunning: now.running ? [LANE] : [],
+      }),
+    }
+    return { now, sensor }
+  }
+  /** Samples until the rung has climbed to 2 and held starts. */
+  const toRung2 = async (manager: MachineManager) => {
+    for (let i = 0; i < ENTER_AFTER + 2; i++) await manager.sample()
+  }
+
+  test("waitUntilAllowed settles at once when allowed, and once a later plan allows", async () => {
+    const { now, sensor } = pressured()
+    const { manager } = managed(sensor)
+    await manager.start()
+    await manager.waitUntilAllowed(LANE, "container-start")
+    now.full = 6
+    await toRung2(manager)
+    let started = false
+    const start = manager.waitUntilAllowed(LANE, "container-start").then(() => {
+      started = true
+    })
+    await manager.sample()
+    expect(started).toBe(false)
+    now.full = 0
+    for (let i = 0; i < LEAVE_AFTER + 2 && !started; i++) await manager.sample()
+    await start
+    expect(started).toBe(true)
+  })
+
+  test("a start waiting is among the lanes waiting to start, and leaves them on its abort", async () => {
+    const { now, sensor } = pressured()
+    const { manager, written } = managed(sensor)
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    const abort = new AbortController()
+    const start = manager.waitUntilAllowed(
+      LANE,
+      "container-start",
+      abort.signal,
+    )
+    await manager.sample()
+    expect(written.at(-1)?.treatments).toEqual([
+      { lane: LANE, treatment: { kind: "waiting-to-start" } },
+    ])
+    abort.abort(new Error("stopped"))
+    await expect(start).rejects.toThrow("stopped")
+    await manager.sample()
+    expect(written.at(-1)?.treatments).toEqual([])
+  })
+
+  test("a running lane whose cgroup was not read may still call from rung 2", async () => {
+    const { now, sensor } = pressured()
+    const { manager } = managed(sensor)
+    await manager.start()
+    now.full = 6
+    now.running = true
+    await toRung2(manager)
+    await manager.waitUntilAllowed(LANE, "tool-call")
+    await expect(
+      Promise.race([
+        manager
+          .waitUntilAllowed(threadIdFor("t-2"), "tool-call")
+          .then(() => "allowed"),
+        Promise.resolve("held"),
+      ]),
+    ).resolves.toBe("held")
+  })
+
+  test("observing holds nothing, and says memory is short", async () => {
+    const { now, sensor } = pressured()
+    const { manager, written } = managed(sensor, "observe")
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    await manager.waitUntilAllowed(LANE, "container-start")
+    expect(written.at(-1)?.causes).toEqual([
+      { kind: "memory-short", rung: 2, isHolding: false },
+    ])
+    expect(written.at(-1)?.treatments).toEqual([])
+  })
+
+  test("close refuses every waiter", async () => {
+    const { now, sensor } = pressured()
+    const { manager } = managed(sensor)
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    const start = manager.waitUntilAllowed(LANE, "container-start")
+    await manager.close()
+    await expect(start).rejects.toBeInstanceOf(KeeperClosed)
+  })
+})
+
+describe("measurements", () => {
+  test.each(["manage", "observe"] as const)(
+    "every sample is measured, and they are trimmed every TRIM_MEASUREMENTS_EVERY_SAMPLES samples, %s",
+    async mode => {
+      const measurements = keptMeasurements()
+      const manager = createMachineManager({
+        sensor: steady,
+        sink: { write: async () => {} },
+        settings: SETTINGS,
+        mode,
+        capabilities: { grow: false },
+        index: memoryIndex(),
+        store: fakeStore(EMPTY_LISTING).store,
+        records: fakeRecords(),
+        laneFacts: fakeLaneFacts(),
+        measurements,
+        tell: () => {},
+      })
+      await manager.start()
+      for (let i = 0; i < TRIM_MEASUREMENTS_EVERY_SAMPLES; i++)
+        await manager.sample()
+      expect(measurements.samples).toHaveLength(
+        TRIM_MEASUREMENTS_EVERY_SAMPLES + 1,
+      )
+      expect(measurements.samples.every(s => s.mode === mode)).toBe(true)
+      expect(measurements.trims.count).toBe(1)
+    },
+  )
 })

@@ -6,6 +6,50 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a stop leaves the lane's held start waiting",
+    file: "apps/pinetrie/host/runs.ts",
+    from: "      work.abandonStart(lane)\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
+    expect: "a stop abandons the lane's start held for room, before pi's abort",
+  },
+  {
+    name: "a host in a lane reads the whole machine's pressure as its own",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: "      input.own === null\n",
+    to: "      input.own === null || input.own !== null\n",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/machine"],
+    expect:
+      "its sample says it read its own cgroup, never the machine's pressure",
+  },
+  {
+    name: "a host in a lane counts its inactive cache as used",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: "          available: Math.max(0, Math.min(limit, limit - current + inactive)),\n",
+    to: "          available: Math.max(0, Math.min(limit, limit - current)),\n",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/machine"],
+    expect:
+      "its available is its limit less its use but its inactive cache, so a cgroup full of cache has room",
+  },
+  {
+    name: "the measurements are never trimmed",
+    file: "apps/pinetrie/host/machine/measurements.ts",
+    from: "      for (const t of trims) t.run(before)\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/machine"],
+    expect:
+      "a trim deletes the rows older than what is kept, and an export reads only its days",
+  },
+  {
+    name: "a held start abandoned keeps waiting",
+    file: "apps/pinetrie/host/work/memory-holds.ts",
+    from: "    abandon(lane) {\n      waiting.get(lane)?.abort()\n",
+    to: "    abandon(lane) {\n",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/work"],
+    expect:
+      "a held start its run's end aborts starts nothing, and the queue's next step runs",
+  },
   // ── the theme ──
   {
     name: "a chosen theme never reaches the page's root",
@@ -77,6 +121,33 @@ export const mutations: readonly Mutation[] = [
       "a spent budget: the answer wakes nobody, and the asking thread is told it was spent",
   },
   // ── the lanes suite, proven in a lane ──
+  {
+    name: "the gate does not wait for the machine to let the lane call",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: '              .then(() =>\n                deps.machine.waitUntilAllowed(lane, "tool-call", signal),\n              ),\n',
+    to: "              ,\n",
+    suite: "lanes",
+    scenario: "memory-gate",
+    expect: "a paused lane's call waits at its gate",
+  },
+  {
+    name: "the host writes no lane held for memory",
+    file: "packages/machine/health.ts",
+    from: "    treatments: memory.held,\n",
+    to: "    treatments: [],\n",
+    suite: "lanes",
+    scenario: "memory-gate",
+    expect: "a paused lane's column says why it waits",
+  },
+  {
+    name: "a stop waits for its run's start held for room",
+    file: "apps/pinetrie/host/runs.ts",
+    from: "      work.abandonStart(lane)\n",
+    to: "",
+    suite: "lanes",
+    scenario: "memory-gate",
+    expect: "Stop is never held",
+  },
   {
     name: "a new lane forks from the root, not where it branched",
     file: "apps/pinetrie/host/work/create.ts",
@@ -3556,7 +3627,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a session another host serves is opened as a new hold's",
     file: "apps/pinetrie/host/sessions.ts",
-    from: '        if (attempt.kind === "held") holds.set(name, attempt)\n        else served.set(name, await saidPidIn(dir))\n',
+    from: '        if (attempt.kind === "held") holds.set(name, attempt)\n        else served.set(name, await sessionHolderPid(dir))\n',
     to: '        if (attempt.kind === "held") holds.set(name, attempt)\n',
     command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect:

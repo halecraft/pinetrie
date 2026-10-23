@@ -77,6 +77,7 @@ test("laneToolContext: no access is no lane, named by the project's root, whose 
       programs: "/pinetrie-runtime/bin",
       shell: "/pinetrie-runtime/shell/bash",
       gate: () => new Promise(() => {}),
+      onShellStarted: () => () => {},
     },
     "/repo",
   )
@@ -94,6 +95,7 @@ test("laneToolContext: a lane of its own runs the runtime's programs by path", a
       programs: "/pinetrie-runtime/bin",
       shell: "/pinetrie-runtime/shell/bash",
       gate: () => new Promise(() => {}),
+      onShellStarted: () => () => {},
     },
     "/repo",
   )
@@ -533,6 +535,7 @@ describe("lanes in a harness", () => {
         await ready
         return { channel, observation: null }
       },
+      onShellStarted: () => () => {},
     }
   }
 
@@ -606,6 +609,7 @@ describe("lanes in a harness", () => {
       programs: path.join(dir, "bin"),
       shell: "bash",
       gate: async () => ({ channel, observation: null }),
+      onShellStarted: () => () => {},
     })
     script.use([
       { tool: "write", args: { path: "made.txt", content: "in the lane\n" } },
@@ -656,6 +660,7 @@ describe("lanes in a harness", () => {
       programs: path.join(dir, "bin"),
       shell: "bash",
       gate: async () => ({ channel, observation: null }),
+      onShellStarted: () => () => {},
     })
     script.use([
       { tool: "grep", args: { pattern: "it's", glob: "*.txt" } },

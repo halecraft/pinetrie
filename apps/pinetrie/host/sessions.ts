@@ -265,7 +265,7 @@ export async function openSession(input: {
         if (attempt.kind === "failed")
           return { refused: lockFailed(dir, attempt.detail) }
         if (attempt.kind === "held") holds.set(name, attempt)
-        else served.set(name, await saidPidIn(dir))
+        else served.set(name, await sessionHolderPid(dir))
       }
       const plan = planSession(registry, {
         path: real,
@@ -309,7 +309,7 @@ export async function openSession(input: {
           refused: {
             kind: "served",
             name,
-            pid: await saidPidIn(dir),
+            pid: await sessionHolderPid(dir),
           },
         }
       holds.set(name, attempt)
@@ -331,7 +331,7 @@ export async function openSession(input: {
 }
 
 /** The pid the session's lock holder wrote, as a refusal's words take it. */
-const saidPidIn = async (dir: string): Promise<number | null> =>
+const sessionHolderPid = async (dir: string): Promise<number | null> =>
   (await holderPid(sessionLockFile(dir)))?.saidPid ?? null
 
 const lockFailed = (dir: string, detail: string): RegistryProblem => ({
@@ -379,7 +379,7 @@ export async function renameSession(
         old,
         next,
         dir !== null && attempt?.kind === "held-by-another"
-          ? { pid: await saidPidIn(dir) }
+          ? { pid: await sessionHolderPid(dir) }
           : null,
       )
       if (plan.kind === "refused") return plan

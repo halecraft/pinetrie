@@ -201,7 +201,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // The footer's machine status: once the host has sampled the lane
         // VM, a status named for a machine keeping up. A suite's load can
         // stall the host for a moment, which leaves after a few samples.
-        const keepingUp = machineWords({ state: "neutral", causes: [] }, l => l)
+        const keepingUp = machineWords(
+          { state: "neutral", causes: [], treatments: [] },
+          l => l,
+        )
         const status = await ap
           .waitForSelector(
             `footer .machine-status[role="img"][aria-label="${keepingUp}"]`,

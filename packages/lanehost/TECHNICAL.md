@@ -287,7 +287,9 @@ host, whatever their projects.
 
 - **What it reads, it reads where any container can** (S322, S323):
   `/proc/meminfo`, `/proc/pressure/memory` (absent where the kernel's PSI
-  is off: no pressure), and btrfs's counters under
+  is off: no pressure), its `total=`s and `/proc/vmstat`'s
+  `workingset_refault_*` as the kernel's counters (`memoryCounters`, which
+  the host's measurements difference, ADR-0212), and btrfs's counters under
   `/sys/fs/btrfs/<fsid>/`. The filesystem is the one whose `devices/`
   lists the device the lanes directory is mounted from (`holdingMount`); a
   device not named by its path under `/dev` (a mapper's) is not found,

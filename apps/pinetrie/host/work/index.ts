@@ -44,6 +44,7 @@ import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, prepareLane } from "./create.ts"
 import type { ActRefusal, Destination } from "./destination.ts"
 import { holdInnerDockerDataRoots } from "./inner-docker-data-roots.ts"
+import type { LaneMachineAsks } from "./memory-holds.ts"
 import { createRegistry } from "./registry.ts"
 import { type OpenedProject, startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
@@ -58,7 +59,7 @@ import { createUpdates, type Updates } from "./update.ts"
  */
 export type LaneWork = Pick<
   Containers,
-  "access" | "beforeRun" | "runEnded" | "close"
+  "access" | "beforeRun" | "runEnded" | "abandonStart" | "close"
 > &
   Pick<NewLanes, "checkBegin" | "prepareLane"> &
   Pick<Updates, "prepareUpdate"> &
@@ -140,6 +141,8 @@ export async function startLaneWork(input: {
   readonly upkeep: UpkeepAsks & {
     requestUpkeep(): void
   }
+  /** What lanes ask of the machine while memory is short. */
+  readonly machine: LaneMachineAsks
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -253,6 +256,7 @@ export async function startLaneWork(input: {
     innerDockerDataRoots,
     snapshots: input.snapshots,
     requestUpkeep: () => input.upkeep.requestUpkeep(),
+    machine: input.machine,
   })
   const updates = createUpdates({
     basics,
@@ -331,6 +335,7 @@ export async function startLaneWork(input: {
     prepareLane: newLanes.prepareLane,
     beforeRun: containers.beforeRun,
     runEnded: containers.runEnded,
+    abandonStart: containers.abandonStart,
     prepareUpdate: updates.prepareUpdate,
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
@@ -375,6 +380,7 @@ const NO_LANES: LaneWork = {
   resolve: async () => ({ kind: "refused", code: ERR.NOT_OWN_COPY }),
   beforeRun: () => {},
   runEnded: () => {},
+  abandonStart: () => {},
   prepareUpdate: async () => ({
     kind: "refused",
     reason: "the lane has no copy of its own",

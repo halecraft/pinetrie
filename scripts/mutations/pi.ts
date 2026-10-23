@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 const config = ["pnpm", "exec", "vitest", "run", "packages/pi/config.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "the gate ignores the call's abort",
+    file: "packages/pi/lane-env.ts",
+    from: "        const channel = await gate(context?.abortSignal)\n",
+    to: "        const channel = await gate(undefined)\n",
+    command: unit,
+    expect: "a call held at its gate settles when its signal aborts",
+  },
   // ── a bash call's output by statement ──
   {
     name: "a split that stops verifying leaves its statements open",

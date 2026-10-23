@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { errorText, OBSERVER_SOCKET } from "@pinetrie/core"
+import { errorText, type MemorySource, OBSERVER_SOCKET } from "@pinetrie/core"
 import {
   type DockerRuntime,
   type DockerTarget,
@@ -95,6 +95,8 @@ export interface MachineReach
   readonly store: StoreControls
   /** Where the store is, which says what can be done to it (`planCapabilities`). */
   readonly target: StoreTarget
+  /** Whose memory is the machine's: a host in a lane reads its own cgroup's. */
+  readonly memorySource: MemorySource
 }
 
 /** The runtime's reads, with the store's place on this host. */
@@ -102,8 +104,10 @@ const machineReach = (
   runtime: DockerRuntime,
   storeVolume: string,
   target: StoreTarget,
+  memorySource: MemorySource,
 ): MachineReach => ({
   target,
+  memorySource,
   runningLanes: () => runtime.runningLanes(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
@@ -276,7 +280,14 @@ async function hostDockerFound(
     },
     shareAndGrant,
     close: async () => {},
-    machine: machineReach(runtime, lanesDir, "docker-host"),
+    // A host whose observer an outer host relays runs in a lane: the
+    // machine its inner lanes share is its own cgroup.
+    machine: machineReach(
+      runtime,
+      lanesDir,
+      "docker-host",
+      observed.kind === "forwarded" ? "own-cgroup" : "whole-machine",
+    ),
   }
 }
 
@@ -388,7 +399,7 @@ async function vmFound(
       await held.close()
       await kept.close()
     },
-    machine: machineReach(runtime, stateDir, "lane-vm"),
+    machine: machineReach(runtime, stateDir, "lane-vm", "whole-machine"),
   }
 }
 

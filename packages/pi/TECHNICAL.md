@@ -538,8 +538,11 @@ item 18, and in `lanes.test.ts` against the harness.
 - **`LaneAccess`** is pine·trie's type, so no pi type crosses the boundary. It
   is either `direct` (a directory on the host, and a promise its tools wait
   for) or `lane` (a lane of its own: its `LaneFacts`, the host paths of the
-  skills it can read, where the runtime's programs are, and a `gate()` that
-  settles with its channel).
+  skills it can read, where the runtime's programs are, a `gate(signal)`
+  that settles with its channel, and `onShellStarted`, told of each `bash`
+  call past its gate, whose answer is told how it ended: the host times
+  its calls and knows each lane's program in flight from the pair, with no
+  change to the helper's protocol).
   `LaneFacts` is everything the lane's prompt says about it: its directory,
   `/workspace`, its shared directories relative to it (ADR-0035), its proposed changes'
   bookmark, its grants, whether it runs the default image (`defaultImage`:
@@ -573,9 +576,13 @@ item 18, and in `lanes.test.ts` against the harness.
   - `exec`'s `onUpdate` receives each update.
   - Methods whose results are not data are refused with `not_supported`, not
     forwarded: `openTextLineReader` returns an object with methods.
-  - The gate is the lane's queue in the host, so the model can think while a
-    turn's disk is cloned, and no tool touches the disk until the clone is
-    done.
+  - The gate is the lane's queue in the host, then the machine letting the
+    lane call (ADR-0212), so the model can think while a turn's disk is
+    cloned or the lane waits for memory, and no tool touches the disk until
+    the clone is done. It takes the call's abort signal, a required
+    parameter so no call site forgets it: a gate that may wait for minutes
+    must settle when the call is stopped (S319). A `bash` call whose gate is
+    aborted ends `aborted`, as the helper's own abort does.
 - **The channel** (`openChannel`) is one long-lived process: the helper,
   started by the lane runtime's `execArgv` (`helperCommand`: `docker exec
   -i`), serving `lane-protocol.ts`'s calls over `@pinetrie/channel`

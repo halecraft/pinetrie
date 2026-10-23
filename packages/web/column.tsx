@@ -7,6 +7,7 @@ import {
   type ConflictChoice,
   type EntryId,
   isThreadId,
+  type LaneTreatment,
   type Position,
   ROOT,
   type Sha256,
@@ -270,6 +271,8 @@ export interface ColumnProps {
   attention: AttentionStore
   /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
   runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
+  /** Each lane the machine holds for memory, and how (`heldForMemory`). */
+  memoryHeld: ReadonlyMap<ThreadId, LaneTreatment>
   /** Each thread's status (`threadStatus`): what its dot draws. */
   statuses: ReadonlyMap<ThreadId, Status>
   /** When each thread's mark last arrived, and its ✓ last showed. */
@@ -694,6 +697,7 @@ export function Column(p: ColumnProps) {
     work: p.work,
     origins,
     runEnds: p.runEnds,
+    memoryHeld: p.memoryHeld,
   })
   // What a card's command catches up with: the thread's base,
   // or the thread it branched from. One object while what it
@@ -1498,6 +1502,12 @@ function HeadLineView({
         </Button>
       )
     }
+    case "held":
+      return (
+        <div className="head-held" data-role="held" title={line.words}>
+          {line.words}
+        </div>
+      )
     case "about": {
       const { about } = line
       return (

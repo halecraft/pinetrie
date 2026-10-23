@@ -11,11 +11,16 @@ and the words share one.
 
 | module | holds |
 |---|---|
-| `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager` |
+| `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager`, `HostLaneFacts`, `MachineMeasurements` |
 | `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it |
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`) and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
-| `health.ts` | `planHealth` and its memory: the causes, their thresholds, the state |
+| `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it |
+| `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
+| `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
+| `importance.ts` | which lanes matter most (`rankLanes`) |
+| `treatments.ts` | each lane's treatment (`planTreatments`, `Treatments`), what each allows (`ACTIVITIES_ALLOWED`), the shadow decisions of the rungs not built |
+| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`) and a command's program (`commandProgram`) |
 | `manager.ts` | `createMachineManager`: gather, plan, write, and the disk upkeep's steps, on a keeper of its own; `MANAGE_MODES` |
 | `store.ts` | what the upkeep reads and does: `StoreListed`, `StoreControls`, `StoreRecords` |
 | `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
@@ -26,10 +31,60 @@ and the words share one.
 
 ## Rules
 
-- **ADR-0212 (accepted, not yet built) builds the memory ladder's hold and
-  pause first**, on every backend, and records squeezing, freezing and
-  killing as decisions not taken, with a kept record of samples, until a
-  measurement of real use (S328) says whether they are needed.
+- **Of memory's ladder, rungs 2 and 3 act; 1, 4 and 5 are measured**
+  (ADR-0212). The rung (`planRung`) is the highest of five levels, each
+  with the causes' hysteresis (`hysteresis.ts`), moved one step a sample,
+  so a release lets go one rung's holds at a time. Each rung's bounds are
+  one table (`RUNG_BOUNDS`): PSI's `avg10`s, and the share of memory
+  available. A rung entered by either kind of bound is cleared only when
+  every bound it reads is clear; without PSI the available bounds alone
+  read, so rungs 2 and 3 hold on such a kernel, and rung 1, whose bounds
+  are all PSI, is unmeasured. The PSI numbers are S309's and the available
+  shares are set to enter before 4 and 5's; S328 tunes them.
+- **A hold is a treatment, planned afresh each sample** (`planTreatments`):
+  nothing is released by hand, so no release can be forgotten. Every lane
+  has one, a started one or not (`laneTreatment`): one not running is
+  `waiting-to-start` from rung 2, or while held starts are being let go,
+  else `normal`. Running is every running lane container, its cgroup read
+  or not (`lanesRunning`), so a backend that reads no lane's cgroup does
+  not hold its running lanes for being unseen. `ACTIVITIES_ALLOWED` says,
+  in one place, what each treatment lets a lane do; a treatment added to
+  core's `LaneTreatment` fails `tsc` until it says (`types.test.ts`).
+- **Held starts are let go one a sample**, most important first
+  (`rankLanes`: a thread someone reads, the latest run started, a queue not
+  held, then by id), so a release never starts every held command at
+  once. A lane let go is `normal` until a sample lists it running.
+- **At rung 3 only the most important running lanes make tool calls**:
+  their count (`lanesAllowedToCall`) starts at every running lane, falls by
+  one each sample the rung holds, never below 1, and rises by one each
+  sample below it. A pause stops the next heavy command and frees nothing
+  in flight (S316), so no estimate of what it frees enters the choice;
+  whether pauses relieve pressure is S328's to read.
+- **Rungs 1, 4 and 5 are shadow decisions**: a squeeze of each idle
+  lane's page cache from rung 1, a freeze of each paused lane's `anon`
+  from rung 4, a kill of the least important lane with a call in flight at
+  5, each naming only a lane whose memory was read. `LaneTreatment` has no
+  kind for them, so nothing can be asked to do one.
+- **`waitUntilAllowed` is what waits** (the host's gate and its start): it
+  settles when the last plan's treatment allows the activity, rejects on
+  its signal's abort, settles at once observing and before the first
+  plan, and is refused (`KeeperClosed`) at `close`, so a stopping host
+  waits on none. A start waiting is what the next plan counts among the
+  lanes waiting to start.
+- **Observing, the rung is planned and measured, and nothing is held**: the
+  treatments are planned for their shadow decisions only, every lane is
+  `normal`, and memory short is said without a hold (`isHolding`).
+- **The measurements are kept in both modes** (`MachineMeasurements`): each
+  sample's rung, pressure, memory, its source and the kernel's counters'
+  rise since the last (`counterRise`, none across a reset); each running
+  lane's memory in MiB and its program, kept only when it changed
+  (`lanesChanged`); every treatment changed and every shadow decision, with
+  the pressure and memory at that moment. An action's effect is never
+  stored: S328 joins the samples that follow. They are trimmed on the
+  sample's own step every `TRIM_MEASUREMENTS_EVERY_SAMPLES`, not by the
+  upkeep, which runs only in `manage` mode. The manager reads no clock: the
+  host's store stamps each row. A write that fails is told (`unmeasured`)
+  and the sample goes on.
 
 - **No I/O lives here.** It declares only `@pinetrie/core` and
   `@pinetrie/keeper` (`workspace.test.ts`), and `boundary.test.ts` refuses
@@ -56,8 +111,7 @@ and the words share one.
   first action brings it, as nothing reads one before.
 - **Thresholds count samples, never time.** The lane VM runs after the
   Mac's own work, so a sample can come late; a count still means what it
-  says. A **level** cause (the store's room, the filesystem, memory
-  stalls) enters after `ENTER_AFTER` samples in a row over its threshold
+  says. A **level** cause (the store's room, the filesystem) enters after `ENTER_AFTER` samples in a row over its threshold
   and leaves after `LEAVE_AFTER` in a row clear of a lower one, so a value
   crossing one threshold back and forth never flaps. An **event** cause (a
   lane's OOM kill, a service's, a host stall) is never seen twice running:
@@ -152,8 +206,9 @@ and the words share one.
   `room-low` says so (`grows`), planned from the sample's room and
   filesystem.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
-  when the state, or the set of causes by kind and lane, differs from the
-  value last written; a cause's measures changing alone is not. So the
+  when the state, the set of causes by kind and lane, memory's rung, or the
+  lanes held and how, differs from the value last written; a cause's
+  measures changing alone is not. So the
   record is written a few times an hour, not every sample, and its
   measures are those of the sample that changed it.
 - **A failed sample changes no count.** Its causes stay as they were, with
@@ -182,7 +237,11 @@ and the words share one.
 
 ## Tests
 
-`health.test.ts`, `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`,
+`health.test.ts`, `hysteresis.test.ts`, `rung.test.ts`,
+`treatments.test.ts` and `importance.test.ts` (properties over random
+lanes, rungs and rankings), `measurements.test.ts` (a property:
+`commandProgram` never returns an argument), `types.test.ts`,
+`manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`,
 `retention.test.ts` (a property, over random listings of every owner's
 names and random rows: no plan deletes another owner's name, a protected
 row, an unindexed name before the index is complete, or more than its

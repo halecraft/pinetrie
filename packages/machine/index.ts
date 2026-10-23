@@ -6,13 +6,26 @@ export {
   planCapabilities,
   type StoreTarget,
 } from "./capabilities.ts"
+export { type LaneImportance, rankLanes } from "./importance.ts"
 export {
   createMachineManager,
   MANAGE_MODES,
   type ManageMode,
   type ManagerNews,
 } from "./manager.ts"
-export type { HealthSink, MachineManager, MachineSensor } from "./ports.ts"
+export {
+  commandProgram,
+  type DecisionMeasured,
+  type LaneMeasured,
+  type SampleMeasured,
+} from "./measurements.ts"
+export type {
+  HealthSink,
+  HostLaneFacts,
+  MachineManager,
+  MachineMeasurements,
+  MachineSensor,
+} from "./ports.ts"
 export type {
   LaneSample,
   MachineSample,
@@ -43,3 +56,4 @@ export {
   type StoreSize,
   type StoreSizeFacts,
 } from "./store-size.ts"
+export type { LaneActivity } from "./treatments.ts"

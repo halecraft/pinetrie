@@ -284,6 +284,7 @@ const facts = (
       reader: { me: ADA, nameOf: new Map() },
     },
     runEnds: new Map(),
+    memoryHeld: new Map(),
     ...over,
   }
 }
@@ -752,6 +753,19 @@ describe("headLine: what shows under a column's line", () => {
       about: focus,
     })
     expect(headLine(null, null)).toEqual({ kind: "none" })
+  })
+
+  test("a lane held for memory says why, under a raised status and over the focus", () => {
+    const paused = { kind: "paused" } as const
+    expect(headLine(null, focus, paused)).toEqual({
+      kind: "held",
+      words: "paused for memory: its next tool call waits for room",
+    })
+    expect(headLine(status(false), focus, paused).kind).toBe("status")
+    expect(headLine(null, focus, { kind: "normal" })).toEqual({
+      kind: "about",
+      about: focus,
+    })
   })
 })
 

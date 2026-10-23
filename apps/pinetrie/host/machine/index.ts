@@ -6,7 +6,10 @@
 import { machineWords } from "@pinetrie/interface"
 import {
   createMachineManager,
+  type HostLaneFacts,
   type MachineManager,
+  type MachineMeasurements,
+  type MachineSensor,
   type ManageMode,
   type ManagerNews,
   planCapabilities,
@@ -39,10 +42,22 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
       return `[host] the machine: its health was not written: ${news.error}`
     case "upkeep-failed":
       return `[host] the machine: the lanes' disk upkeep failed: ${news.error}`
+    case "unmeasured":
+      return `[host] the machine: its measurements were not written: ${news.error}`
   }
 }
 
+/** What a suite may change of the machine's watch, as it shortens presence's decay. */
+export interface MachineWatchOptions {
+  /** The sensor the manager reads, made from the host's own: a suite's gives its own pressure. */
+  readonly wrapSensor?: (own: MachineSensor) => MachineSensor
+  /** How often a sample is taken, in ms; `MACHINE_SAMPLE_MS` by default. */
+  readonly sampleEveryMs?: number
+}
+
 export interface MachineWatch {
+  /** What a lane's gate and its start wait on: its treatment allowing it. */
+  readonly waitUntilAllowed: MachineManager["waitUntilAllowed"]
   /** Takes each of the host's stalls, for the next sample. */
   hearStall(stall: Stall): void
   /** A turn's snapshot skipped, its index row unwritten: counted in the next sample. */
@@ -69,12 +84,15 @@ export async function startMachineWatch(deps: {
   /** The store's snapshot index, whole: only the manager is given it so. */
   readonly index: SnapshotIndex
   readonly storeRecords: StoreRecords
+  readonly laneFacts: HostLaneFacts
+  readonly measurements: MachineMeasurements
+  readonly options: MachineWatchOptions
   readonly log: (line: string) => void
 }): Promise<MachineWatch> {
   const kills = deps.reach.watchServiceKills()
   const sensor = createSensor(deps.reach, kills)
   const manager = createMachineManager({
-    sensor,
+    sensor: deps.options.wrapSensor?.(sensor) ?? sensor,
     sink: createHealthSink(deps),
     settings: deps.settings,
     mode: deps.mode,
@@ -82,10 +100,15 @@ export async function startMachineWatch(deps: {
     index: deps.index,
     store: deps.reach.store,
     records: deps.storeRecords,
+    laneFacts: deps.laneFacts,
+    measurements: deps.measurements,
     tell: news => deps.log(newsLine(news, deps.session)),
   })
   await manager.start()
-  const timer = setInterval(() => void manager.sample(), MACHINE_SAMPLE_MS)
+  const timer = setInterval(
+    () => void manager.sample(),
+    deps.options.sampleEveryMs ?? MACHINE_SAMPLE_MS,
+  )
   timer.unref()
   // After the lanes are ready, and not awaited: runs resume beside it.
   manager.requestUpkeep()
@@ -95,6 +118,8 @@ export async function startMachineWatch(deps: {
   )
   backstop.unref()
   return {
+    waitUntilAllowed: (lane, activity, signal) =>
+      manager.waitUntilAllowed(lane, activity, signal),
     hearStall: stall => sensor.hearStall(stall),
     noteSnapshotSkipped: () => manager.noteSnapshotSkipped(),
     upkeep: manager,

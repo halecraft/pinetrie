@@ -5,6 +5,94 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the measurements are never trimmed in observe mode",
+    file: "packages/machine/manager.ts",
+    from: "      if (measured.trim) deps.measurements.trim()\n",
+    to: '      if (measured.trim && deps.mode === "manage")\n        deps.measurements.trim()\n',
+    command: unit,
+    expect:
+      "every sample is measured, and they are trimmed every TRIM_MEASUREMENTS_EVERY_SAMPLES samples",
+  },
+  {
+    name: "an unseen lane at rung 2 may start",
+    file: "packages/machine/treatments.ts",
+    from: "        : rung >= 2 || startsHeld.length > 0\n",
+    to: "        : startsHeld.length > 0\n",
+    command: unit,
+    expect:
+      "every lane has a treatment, and one not running is waiting-to-start from rung 2",
+  },
+  {
+    name: "every held start is let go at once",
+    file: "packages/machine/treatments.ts",
+    from: "  const release = rung < 2 ? held.slice(0, 1) : []\n",
+    to: "  const release = rung < 2 ? held : []\n",
+    command: unit,
+    expect:
+      "as the rung falls, held starts are let go one a sample, most important first",
+  },
+  {
+    name: "the lanes allowed to call do not fall while rung 3 holds",
+    file: "packages/machine/treatments.ts",
+    from: "        : Math.max(1, state.lanesAllowedToCall - 1)\n",
+    to: "        : state.lanesAllowedToCall\n",
+    command: unit,
+    expect:
+      "at rung 3 the most important lanes are never paused, their count falling while it holds, never below 1, and rising below it",
+  },
+  {
+    name: "a shadow squeeze is planned at rung 0",
+    file: "packages/machine/treatments.ts",
+    from: "    if (rung >= 1 && programInFlight === null)\n",
+    to: "    if (rung >= 0 && programInFlight === null)\n",
+    command: unit,
+    expect:
+      "shadow decisions: a squeeze from rung 1, a freeze from rung 4, a kill at rung 5, none at rung 0",
+  },
+  {
+    name: "a wait for the machine ignores its signal",
+    file: "packages/machine/manager.ts",
+    from: '        signal?.addEventListener("abort", onAbort, { once: true })\n',
+    to: "",
+    command: unit,
+    expect:
+      "a start waiting is among the lanes waiting to start, and leaves them on its abort",
+  },
+  {
+    name: "treatments are planned over the lanes whose cgroups were read",
+    file: "packages/machine/manager.ts",
+    from: "      lanesRunning: sample.lanesRunning.map(lane => ({\n",
+    to: "      lanesRunning: sample.lanes.map(({ lane }) => ({\n",
+    command: unit,
+    expect:
+      "a running lane whose cgroup was not read may still call from rung 2",
+  },
+  {
+    name: "close leaves a waiter waiting",
+    file: "packages/machine/manager.ts",
+    from: "      for (const w of waiters) w.refuse(new KeeperClosed())\n",
+    to: "",
+    command: unit,
+    expect: "close refuses every waiter",
+  },
+  {
+    name: "a rung is cleared while one of its bounds is still entered",
+    file: "packages/machine/rung.ts",
+    from: '  if (readings.every(r => r === "clear")) return { kind: "clear" }\n',
+    to: '  if (readings.includes("clear")) return { kind: "clear" }\n',
+    command: unit,
+    expect:
+      "a rung with both kinds of bound is cleared only when both are clear",
+  },
+  {
+    name: "the rung jumps to its target",
+    file: "packages/machine/rung.ts",
+    from: "  const rung = RUNGS[state.rung + step] ?? state.rung\n",
+    to: "  const rung = RUNGS[highest ?? 0] ?? state.rung\n",
+    command: unit,
+    expect: "the rung moves one step a sample",
+  },
+  {
     name: "a service's kill heard is no cause",
     file: "packages/machine/health.ts",
     from: "    ...sample.serviceKills.map(\n",
@@ -23,11 +111,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a level enters on its first sample over its threshold",
-    file: "packages/machine/health.ts",
+    file: "packages/machine/hysteresis.ts",
     from: "    const count = (was?.count ?? 0) + 1\n",
     to: "    const count = (was?.count ?? 0) + ENTER_AFTER\n",
     command: unit,
-    expect: "a level enters only after ENTER_AFTER samples over its threshold",
+    expect: "is active only after ENTER_AFTER readings over in a row",
   },
   {
     name: "every plan is changed, so the record is written each sample",

@@ -18,6 +18,7 @@ import type { ReviewAsk } from "@pinetrie/rules"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { classifyUpload, MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
+import type { HostMeasurements } from "./machine/measurements.ts"
 import type { PageSource } from "./page.ts"
 import {
   blobResponse,
@@ -68,6 +69,11 @@ export async function startHttp(input: {
   readonly destination: LaneWork["destination"]
   /** Where the page comes from: Vite, or the built page in `dist/`. */
   readonly page: PageSource
+  /** The machine's measurements, and the line that heads their export: what it was measured on. */
+  readonly measurements: {
+    readonly store: Pick<HostMeasurements, "exportRows">
+    readonly heading: Readonly<Record<string, string | number | null>>
+  }
   readonly log: (message: string) => void
 }): Promise<RunningHttp> {
   const { port, bind, key, serverTransport, blobs, destination, page } = input
@@ -130,6 +136,20 @@ export async function startHttp(input: {
         return void receiveBlob(req, res)
       case "review":
         return void serveReviewRead(to.ask, res)
+      case "measurements": {
+        const { store, heading } = input.measurements
+        const lines = [
+          JSON.stringify({ ...heading, days: to.days }),
+          ...store.exportRows(to.days),
+        ]
+        res
+          .writeHead(200, {
+            "content-type": "application/x-ndjson; charset=utf-8",
+            "cache-control": "no-store",
+          })
+          .end(`${lines.join("\n")}\n`)
+        return
+      }
       case "bad":
         res.writeHead(400).end()
         return

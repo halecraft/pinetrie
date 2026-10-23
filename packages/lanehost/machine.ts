@@ -5,7 +5,12 @@
 
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
-import type { CgroupMemory, Pressure, StoreRoom } from "@pinetrie/core"
+import type {
+  CgroupMemory,
+  MemoryCounters,
+  Pressure,
+  StoreRoom,
+} from "@pinetrie/core"
 import { holdingMount } from "./mountinfo.ts"
 
 /** What one `machine-sample` read. */
@@ -13,6 +18,8 @@ export interface MachineRead {
   readonly memory: { readonly total: number; readonly available: number }
   /** null where the kernel has no PSI. */
   readonly pressure: Pressure | null
+  /** The kernel's refaults and memory stall time; null where either file could not be read. */
+  readonly counters: MemoryCounters | null
   /** null where the lanes directory is not on btrfs, or its counters cannot be found. */
   readonly store: StoreRoom | null
   /** Each container asked for, in order; `memory` null when its cgroup was not found. */
@@ -55,7 +62,46 @@ export function parsePressure(text: string): Pressure | null {
   return { someAvg10: some, fullAvg10: avg10("full") ?? 0 }
 }
 
-/** A flat-keyed cgroup file (`memory.stat`, `memory.events`): each name's number. */
+/** A pressure file's `total=`s: the µs some task, and every task, stalled; null without a `some` line. */
+export function parsePressureTotals(
+  text: string,
+): { readonly some: number; readonly full: number } | null {
+  const total = (line: "some" | "full") => {
+    const found = new RegExp(`^${line} .*total=(\\d+)`, "m").exec(text)
+    return found === null ? null : Number(found[1])
+  }
+  const some = total("some")
+  return some === null ? null : { some, full: total("full") ?? 0 }
+}
+
+/**
+ * The counters from a `workingset_refault_*` file (`/proc/vmstat`, a
+ * cgroup's `memory.stat`) and a pressure file; null when either says none.
+ */
+export function memoryCounters(
+  refaults: string | null,
+  pressure: string | null,
+): MemoryCounters | null {
+  if (refaults === null || pressure === null) return null
+  const counts = keyedCounts(refaults)
+  const anon = counts.get("workingset_refault_anon")
+  const file = counts.get("workingset_refault_file")
+  const stalls = parsePressureTotals(pressure)
+  return anon === undefined || file === undefined || stalls === null
+    ? null
+    : {
+        refaultAnon: anon,
+        refaultFile: file,
+        stallSomeUs: stalls.some,
+        stallFullUs: stalls.full,
+      }
+}
+
+/** `memory.stat`'s inactive page cache: what reclaim gives back first, so a cgroup full of it still has room. */
+export const parseInactiveFile = (text: string): number =>
+  keyedCounts(text).get("inactive_file") ?? 0
+
+/** A flat-keyed cgroup file (`memory.stat`, `memory.events`, `/proc/vmstat`): each name's number. */
 const keyedCounts = (text: string): ReadonlyMap<string, number> =>
   new Map(
     text.split("\n").flatMap(line => {
@@ -233,9 +279,10 @@ export async function readMachine(input: {
   for (const id of input.containers)
     if (!isContainerId(id))
       throw new Error(`not a container's id: ${JSON.stringify(id)}`)
-  const [meminfo, pressure, store, tree] = await Promise.all([
+  const [meminfo, pressure, vmstat, store, tree] = await Promise.all([
     readOrNull(`${PROC}/meminfo`),
     readOrNull(`${PROC}/pressure/memory`),
+    readOrNull(`${PROC}/vmstat`),
     readStore(input.lanesDir),
     input.cgroup === null
       ? Promise.resolve(false)
@@ -261,6 +308,7 @@ export async function readMachine(input: {
   return {
     memory,
     pressure: pressure === null ? null : parsePressure(pressure),
+    counters: memoryCounters(vmstat, pressure),
     store,
     containers,
   }

@@ -204,7 +204,9 @@ While the page syncs, "syncing…" leads its right end.
   everyone's side and drawn always, for the machine lanes run on (the lane
   VM on the Mac, Linux's own). It is the footer's grey while lanes and the
   host keep up; amber, with a triangle at its corner, when work slows (the
-  lanes' disk low, the disk holding it low, lanes short of memory, a
+  lanes' disk low, the disk holding it low, memory short (from the memory
+  rung that holds runs' starts: "memory is short: 2 threads wait for room",
+  or, observing a machine something else manages, "memory is short"), a
   command killed for memory, lanehost's disk or privileged service or the
   file observer killed for memory, the host stalling, a turn's snapshot
   not recorded, old turns' snapshots being deleted to free room, or no
@@ -493,7 +495,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   does nothing else. The status is a mark, not a button: its dot, and a
   word while something is raised for you (needs you, conflicts, ready,
   worth a read). Under the line, always, nothing behind a press: the run-end
-  reason while raised for you, else the thread's title, else its focus; the
+  reason while raised for you, else why its lane waits for memory, else the
+  thread's title, else its focus; the
   fork row; and an ssh request for its owner. The column's ⋯ starts with
   how it reads (**brief**, **story**, **everything**, the current one
   checked) for a column with messages, then, where the agent joined below
@@ -538,6 +541,12 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   word. A press brings the run's last entry into view. Read past or
   dismissed, it turns quiet and the focus shows again; the next run's start
   clears it. A run that was done, or a stop you made, shows nothing.
+- **Why a lane waits for memory** (ADR-0212), in the slowed colour of the
+  footer's status, one line: "waits for room on the machine to start"
+  while its run's start is held, "paused for memory: its next tool call
+  waits for room" while it is paused at its gate (`treatmentWords`), from
+  the lanes `pinetrie.machine` lists as held. A raised run-end reason
+  comes before it.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
   its rail track's colour: its column's header carries a stripe of it and a dot
   beside its fork, and the fork point in the parent column shows a dot of it.

@@ -5,8 +5,9 @@
 // it, the host gets:
 // - `laneEnv`: an `ExecutionEnv` whose every call runs in the lane, so pi's
 //   tools work there unchanged. Each call first waits on the lane's gate, the
-//   tail of its queue: the model can think while a turn's disk is cloned, but
-//   no tool touches the disk until the clone is done.
+//   tail of its queue and then the machine's leave: the model can think while
+//   a turn's disk is cloned, or while the lane waits for memory, but no tool
+//   touches the disk until the clone is done.
 // - `laneRunner`: the host's own jj and git in the lane, with exit status,
 //   separate stdout and stderr, and bytes. pi's `exec` reports only an exit
 //   code, and its output is capped text with stderr mixed in.
@@ -145,15 +146,16 @@ export function openChannel(argv: readonly string[]): LaneChannel {
 
 /**
  * pi's `ExecutionEnv`, answered in the lane whose directory is `cwd`. Every
- * method first awaits `gate()`, which settles with the lane's channel once the
- * lane is started and its queue has drained; a gate that fails fails the
- * call. The context's abort sends `{ abort }`; `exec`'s `onUpdate` gets each
+ * method first awaits `gate` with the call's abort signal, which settles with
+ * the lane's channel once the lane is started, its queue has drained and the
+ * machine lets it call; a gate that fails or is aborted fails the call. The
+ * context's abort then sends `{ abort }`; `exec`'s `onUpdate` gets each
  * update. Methods that cannot cross return a `not_supported` error, as pi's
  * environments must never throw.
  */
 export function laneEnv(
   cwd: string,
-  gate: () => Promise<LaneChannel>,
+  gate: (signal: AbortSignal | undefined) => Promise<LaneChannel>,
 ): ExecutionEnv {
   const target = { cwd }
   return new Proxy(target, {
@@ -183,7 +185,7 @@ export function laneEnv(
             rest[1] = { ...options, onUpdate: undefined }
           }
         }
-        const channel = await gate()
+        const channel = await gate(context?.abortSignal)
         return channel[toolCall](prop, rest, context?.abortSignal, onUpdate)
       }
     },
@@ -304,15 +306,18 @@ export type LaneShell = (
 ) => ShellRun
 
 /**
- * A lane's shell: pine·trie's bash at `shell`, in `cwd`, once `gate()` has
- * let the lane's queue through, as every environment call waits. The run's
+ * A lane's shell: pine·trie's bash at `shell`, in `cwd`, once `gate` has let
+ * the call through, as every environment call waits. A gate aborted ends the
+ * call as `aborted`, as the helper's own abort would. `onShellStarted` is
+ * told of a call past its gate, and its answer of the call's end. The run's
  * output is claimed from the observer as soon as the lane names the run,
  * and let go once the flush after the call has answered.
  */
 export function laneShell(
   shell: string,
   cwd: string,
-  gate: () => Promise<OpenedLane>,
+  gate: (signal: AbortSignal | undefined) => Promise<OpenedLane>,
+  onShellStarted: (command: string) => (outcome: string) => void,
 ): LaneShell {
   return (command, ask, signal) => {
     const events = queue<ShellEvent>()
@@ -320,25 +325,45 @@ export function laneShell(
     const run = new Promise<string>(r => {
       started = r
     })
-    const opened = gate()
+    const opened = gate(signal)
     const attribution = opened.then(
       o => o.observation?.attribution ?? null,
       () => null,
     )
     // Set in the update's callback, which the compiler cannot follow.
     const claim: { release: (() => void) | null } = { release: null }
-    const end = (async () => {
-      const { channel, observation } = await opened
-      return channel.shell({ shell, command, cwd, ...ask }, signal, update => {
-        if ("started" in update) {
-          started(update.started)
-          claim.release =
-            observation?.output(update.started, notice =>
-              events.push({ notice }),
-            ) ?? null
-        } else if ("overCap" in update) events.push("over-cap")
-        else events.push(update)
-      })
+    const end = (async (): Promise<ShellEnd> => {
+      let lane: OpenedLane
+      try {
+        lane = await opened
+      } catch (error) {
+        if (signal?.aborted) return { kind: "aborted", spill: null }
+        throw error
+      }
+      const { channel, observation } = lane
+      const ended = onShellStarted(command)
+      const result = channel.shell(
+        { shell, command, cwd, ...ask },
+        signal,
+        update => {
+          if ("started" in update) {
+            started(update.started)
+            claim.release =
+              observation?.output(update.started, notice =>
+                events.push({ notice }),
+              ) ?? null
+          } else if ("overCap" in update) events.push("over-cap")
+          else events.push(update)
+        },
+      )
+      try {
+        const done = await result
+        ended(done.kind)
+        return done
+      } catch (error) {
+        ended("failed")
+        throw error
+      }
     })().then(
       e => e,
       (error: unknown): ShellEnd => ({

@@ -456,6 +456,10 @@
       .column-head .head-status[data-level="needs-you"] { color: var(--attention); }
       .column-head .head-status[data-level="worth-a-read"] { color: color-mix(in srgb, var(--attention) 73%, var(--text-faint)); }
       .column-head .head-status:hover, .column-head .head-status:focus-visible { color: var(--text-dim); }
+      /* Or, while the machine holds its lane for memory, why it waits: in
+         the colour the footer's status says the machine is slowed in. */
+      .column-head .head-held { min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; color: var(--caution); }
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: var(--font-sm); color: var(--text-faint); }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: var(--text-dim); }
