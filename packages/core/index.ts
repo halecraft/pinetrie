@@ -312,6 +312,7 @@ export { parseSize } from "./size.ts"
 export {
   type Deletable,
   deletableSnapshot,
+  type IndexedSnapshot,
   snapshotOwner,
 } from "./snapshots.ts"
 export { firstLine } from "./text.ts"

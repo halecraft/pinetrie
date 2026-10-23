@@ -7,11 +7,7 @@ import { statfs } from "node:fs/promises"
 import type { MachineService } from "@pinetrie/core"
 import type { RunningLane, ServiceKillWatch } from "@pinetrie/docker"
 import type { MachineRead } from "@pinetrie/lanehost"
-import type {
-  LaneSample,
-  MachineSample,
-  MachineSensor,
-} from "@pinetrie/machine"
+import type { LaneSample, MachineSensor, SensedSample } from "@pinetrie/machine"
 import type { Stall } from "../stalls.ts"
 import type { MachineReach } from "../work/runtime.ts"
 
@@ -22,10 +18,10 @@ import type { MachineReach } from "../work/runtime.ts"
 export function planSample(input: {
   readonly running: readonly RunningLane[]
   readonly read: MachineRead
-  readonly filesystem: MachineSample["filesystem"]
+  readonly filesystem: SensedSample["filesystem"]
   readonly serviceKills: readonly MachineService[]
   readonly hostStalledMs: number
-}): MachineSample {
+}): SensedSample {
   const { running, read } = input
   const memoryById = new Map(read.containers.map(c => [c.id, c.memory]))
   const lanes = running.flatMap((r): LaneSample[] => {
@@ -49,7 +45,7 @@ export function planSample(input: {
 /** The filesystem holding `dir`: its size and what an unprivileged writer may still use. */
 async function readFilesystem(
   dir: string,
-): Promise<MachineSample["filesystem"]> {
+): Promise<SensedSample["filesystem"]> {
   const fs = await statfs(dir).catch(() => null)
   return fs === null
     ? null

@@ -206,7 +206,11 @@ export function planTurn(facts: {
   readonly own: boolean
 }):
   | { readonly kind: "none" }
-  | { readonly kind: "record"; readonly revision: RevisionRecord }
+  /** A lane with no copy of its own records no snapshot. */
+  | {
+      readonly kind: "record"
+      readonly revision: RevisionRecord & { readonly snapshot: null }
+    }
   | TurnToCommit {
   const { index, lane } = facts
   const entry = turnEntry(index, facts.tip)
@@ -226,7 +230,9 @@ export function planTurn(facts: {
       conflicts: [],
       merged: false,
     })
-    return revision === null ? { kind: "none" } : { kind: "record", revision }
+    return revision === null
+      ? { kind: "none" }
+      : { kind: "record", revision: { ...revision, snapshot: null } }
   }
   return {
     kind: "commit",

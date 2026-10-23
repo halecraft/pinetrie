@@ -1,6 +1,6 @@
-// core/snapshots — whose rule decides a snapshot's name, and the proof a
-// deletion carries. A project's `snapshots/` holds the names of four owners;
-// a rule written for one must never delete another's.
+// core/snapshots — whose rule decides a snapshot's name, and the proofs a
+// deletion and a revision record carry. A project's `snapshots/` holds the
+// names of four owners; a rule written for one must never delete another's.
 
 import type { SnapshotId } from "./disks.ts"
 import { isFolderStateId } from "./folder.ts"
@@ -42,3 +42,11 @@ export function deletableSnapshot<O extends DeletableOwner>(
     )
   return id as Deletable<O>
 }
+
+declare const indexedBrand: unique symbol
+/**
+ * A snapshot the host's index holds a row for, taken: the only snapshot a
+ * revision record is written with. Only the index makes one, once the
+ * snapshot is there.
+ */
+export type IndexedSnapshot = SnapshotId & { readonly [indexedBrand]: true }

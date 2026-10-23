@@ -12,7 +12,8 @@ and the words share one.
 | module | holds |
 |---|---|
 | `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager` |
-| `sample.ts` | `MachineSample`: what one sample measured, and only that |
+| `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it |
+| `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`) and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
 | `health.ts` | `planHealth` and its memory: the causes, their thresholds, the state |
 | `manager.ts` | `createMachineManager`: gather, plan, write, on a keeper of its own |
@@ -57,6 +58,28 @@ and the words share one.
   `serviceKills`, each kill heard from Docker's events since the last
   sample, since the observer's container is removed with its kill and its
   count with it (S324, ADR-0210). Each service is its own cause.
+- **A skipped snapshot is heard by the manager, not the sensor.** The
+  host's lane work tells `noteSnapshotSkipped` when a turn's snapshot was
+  skipped for its index row (`apps/pinetrie/host/work/snapshot-taking.ts`);
+  the manager counts them into the next sample's `snapshotsSkipped` and
+  starts again from none, and the sensor's `SensedSample` has no such
+  field. The cause, `snapshot-skipped`, is an event.
+- **The snapshot index is written before its snapshot** (ADR-0210). A row
+  is `reserved` before its snapshot is taken, `kept` once taken, `deleted`
+  when never taken, and `to-delete` once a rule said it can go; no upkeep
+  touches a `reserved` row, and at a start every one left is a dead
+  host's. So nothing the host makes is ever unindexed, and a name with no
+  row is an older store's. `used` is a place in the order of uses (the
+  highest so far plus one), never a clock; `branched` once a branch took
+  the snapshot, never unset. Only `markTaken` makes core's
+  `IndexedSnapshot`, which is all a revision record is written with, so a
+  `Reservation` is not one and no record names a snapshot whose taking
+  failed.
+- **Each writer of the index is given the narrowest port it needs.** The
+  host's lane work (turns, merges, forks, containers) takes
+  `SnapshotTaking`; the manager alone is given the whole `SnapshotIndex`,
+  so only its keeper moves a row to delete, keeps one again, or settles
+  what a dead host reserved. The host composes them once.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
   when the state, or the set of causes by kind and lane, differs from the
   value last written; a cause's measures changing alone is not. So the
@@ -88,5 +111,6 @@ and the words share one.
 
 ## Tests
 
-`health.test.ts`, `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`; mutations in
+`health.test.ts`, `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`; the index's
+own, in the host (`apps/pinetrie/host/snapshot-index.test.ts`); mutations in
 `scripts/mutations/machine.ts`.

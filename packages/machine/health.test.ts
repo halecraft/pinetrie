@@ -42,6 +42,7 @@ const calm: MachineSample = {
   filesystem: { size: 1000 * GiB, free: 500 * GiB },
   serviceKills: [],
   hostStalledMs: 0,
+  snapshotsSkipped: 0,
 }
 
 const withUnallocated = (bytes: number): MachineSample => ({
@@ -218,6 +219,19 @@ describe("events", () => {
       { kind: "host-stalls", stalledMs: 1500 },
     ])
     expect(kinds(run([{ ...calm, hostStalledMs: 900 }])[0])).toEqual([])
+  })
+
+  test("a skipped snapshot is a cause counting them, until LEAVE_AFTER samples without one", () => {
+    const plans = run([
+      { ...calm, snapshotsSkipped: 2 },
+      ...times(LEAVE_AFTER, calm),
+    ])
+    expect(plans[0]?.health).toEqual({
+      state: "amber",
+      causes: [{ kind: "snapshot-skipped", count: 2 }],
+    })
+    expect(kinds(plans.at(-2))).toEqual(["snapshot-skipped"])
+    expect(kinds(plans.at(-1))).toEqual([])
   })
 })
 

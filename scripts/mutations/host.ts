@@ -3480,4 +3480,29 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an archive deletes only entries' snapshots, and skips any other name",
   },
+  {
+    name: "takeIndexedSnapshot takes the snapshot before its row",
+    file: "apps/pinetrie/host/work/snapshot-taking.ts",
+    from: '  let reservation: ReturnType<SnapshotTaking["reserve"]>\n  try {\n',
+    to: '  let reservation: ReturnType<SnapshotTaking["reserve"]>\n  await input.take().catch(() => {})\n  try {\n',
+    command: unit,
+    expect: "the row is reserved before the snapshot is taken, and kept after",
+  },
+  {
+    name: "takeIndexedSnapshot marks a row taken before its snapshot is",
+    file: "apps/pinetrie/host/work/snapshot-taking.ts",
+    from: "  try {\n    await input.take()\n",
+    to: '  return { kind: "taken", snapshot: taking.markTaken(reservation) }\n  try {\n    await input.take()\n',
+    command: unit,
+    expect: "a snapshot that fails leaves its row not taken",
+  },
+  {
+    name: "a failed index write does not skip the snapshot",
+    file: "apps/pinetrie/host/work/snapshot-taking.ts",
+    from: '    input.skipped()\n    return { kind: "unindexed", error }\n  }\n  try {\n    await input.take()\n',
+    to: "    input.skipped()\n  }\n  try {\n    await input.take()\n",
+    command: unit,
+    expect:
+      "an index write that fails skips the snapshot, or names none, and is told",
+  },
 ]

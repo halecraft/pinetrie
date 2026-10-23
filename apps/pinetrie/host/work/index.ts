@@ -23,6 +23,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import {
@@ -131,6 +132,10 @@ export async function startLaneWork(input: {
   readonly personalSsh: PersonalSshPlaces
   /** The start's steps: setup's, and each step of making lanes ready. */
   readonly progress: StartProgress
+  /** The store's snapshot index, as lane work may write it. */
+  readonly snapshots: SnapshotTaking
+  /** A snapshot skipped, its index row unwritten: the machine's health says so. */
+  readonly snapshotSkipped: () => void
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -219,6 +224,8 @@ export async function startLaneWork(input: {
     keeper,
     records: input.records,
     shared: sharedLineages,
+    snapshots: input.snapshots,
+    snapshotSkipped: input.snapshotSkipped,
   })
   const innerDockerDataRoots = holdInnerDockerDataRoots()
   const newLanes = createNewLanes({
@@ -229,6 +236,7 @@ export async function startLaneWork(input: {
     pendingRecords: turns.pendingRecords,
     destination,
     innerDockerDataRoots,
+    snapshots: input.snapshots,
   })
   // After `turns` and `newLanes`: a fork waits on the records `turnDone` adds.
   const containers = createContainers({
@@ -239,6 +247,7 @@ export async function startLaneWork(input: {
     proposed: destination.proposed,
     fork: newLanes.fork,
     innerDockerDataRoots,
+    snapshots: input.snapshots,
   })
   const updates = createUpdates({
     basics,
@@ -249,6 +258,8 @@ export async function startLaneWork(input: {
     containers,
     records: input.records,
     writeRevision: turns.writeRevision,
+    snapshots: input.snapshots,
+    snapshotSkipped: input.snapshotSkipped,
   })
   const archive = createArchive({
     basics,

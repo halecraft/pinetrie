@@ -36,6 +36,8 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
 export interface MachineWatch {
   /** Takes each of the host's stalls, for the next sample. */
   hearStall(stall: Stall): void
+  /** A turn's snapshot skipped, its index row unwritten: counted in the next sample. */
+  noteSnapshotSkipped(): void
   /** Stops the timer, then the manager, which writes `unsampled`, then the events stream. */
   close(): Promise<void>
 }
@@ -62,6 +64,7 @@ export async function startMachineWatch(deps: {
   timer.unref()
   return {
     hearStall: stall => sensor.hearStall(stall),
+    noteSnapshotSkipped: () => manager.noteSnapshotSkipped(),
     async close() {
       clearInterval(timer)
       await manager.close()

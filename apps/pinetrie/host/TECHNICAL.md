@@ -468,7 +468,15 @@ reading the store once, planning once, then acting:
 - **The ledger** (`migrations/ledger.ts`, ADR-0174) is `pinetrie_migrations`
   (`name`, `ran`), a table in the store's file on the store's connection,
   as `pinetrie_blobs` is; `backup` copies it. A host on an in-memory store
-  keeps it in memory. A name is recorded only once its work is in the
+  keeps it in memory.
+- **The snapshot index** (`snapshot-index.ts`, `@pinetrie/machine`'s
+  `SnapshotIndex`, ADR-0210) is `pinetrie_snapshots` (`snapshot`, `lane`,
+  `changed`, `used`, `branched`, `state`) and a one-row
+  `pinetrie_snapshots_meta` (`complete`), on the store's connection. A
+  store serves one folder, and the project's lock one host, so its rows
+  carry no project. A host on an in-memory store keeps the same index over
+  a database of its own in memory (`memorySnapshotIndex`), which the tests
+  use too. A name is recorded only once its work is in the
   file: after `exchange.flush()` for a record migration, since before the
   flush Kyneta has not appended the write (S240), and after the deletes for
   a store migration, since `Store.delete` commits before it resolves. A
@@ -1726,7 +1734,19 @@ adapter's.
      128 KB. The
      host cannot reach the write tools' calls, which the helper records as
      tool writes (`packages/pi/TECHNICAL.md`);
-  2. the snapshot, which so holds the registry its outputs are kept by;
+  2. the snapshot, which so holds the registry its outputs are kept by,
+     taken under its index row (`takeIndexedSnapshot`,
+     `work/snapshot-taking.ts`, the only caller of the index's `reserve`,
+     `markTaken` and `markNotTaken`; an update's merge takes its snapshot
+     through it too): the row reserved first, then the snapshot, then the
+     row marked taken, which gives the `IndexedSnapshot` the record is
+     written with (`writeRevision` takes a `RevisionToWrite`). A snapshot
+     that fails marks its row not taken. An index write that fails skips
+     the snapshot, or leaves it unnamed, and is told to the machine
+     (`snapshot-skipped`), so branching at that turn starts from the one
+     before, and the health says so. A use of a snapshot is recorded where
+     it is read: the turn's diff from the one before, a fork's source
+     (branched, before its clone), a container's restore;
   3. its whole-disk diff against the snapshot before (the newest this host
      planned for the lane, else the nearest above the turn), whose paths no run or
      tool wrote are checked against `.gitignore` too. This is in the same

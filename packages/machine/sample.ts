@@ -34,4 +34,9 @@ export interface MachineSample {
   readonly serviceKills: readonly MachineService[]
   /** The longest stall of the host's event loop since the last sample, in ms. */
   readonly hostStalledMs: number
+  /** Turns whose snapshot was skipped since the last sample. The manager counts these, not the sensor. */
+  readonly snapshotsSkipped: number
 }
+
+/** What the sensor reads: a sample less what the manager hears itself. */
+export type SensedSample = Omit<MachineSample, "snapshotsSkipped">

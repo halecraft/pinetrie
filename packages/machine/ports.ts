@@ -2,10 +2,10 @@
 // as a file's name. The host composes each from the adapters' raw calls.
 
 import type { MachineHealth } from "@pinetrie/core"
-import type { MachineSample } from "./sample.ts"
+import type { SensedSample } from "./sample.ts"
 
 export interface MachineSensor {
-  sample(): Promise<MachineSample>
+  sample(): Promise<SensedSample>
 }
 
 /** Where the health value goes: the session's `pinetrie.machine`. */
@@ -18,6 +18,8 @@ export interface MachineManager {
   start(): Promise<void>
   /** Queues a sample, merged with one already queued; never two at once. */
   sample(): Promise<void>
+  /** A turn's snapshot was skipped, its index row unwritten: counted in the next sample. */
+  noteSnapshotSkipped(): void
   /** Waits for a sample that runs, then writes `unsampled`: a stopped host's value never outlives it. */
   close(): Promise<void>
 }

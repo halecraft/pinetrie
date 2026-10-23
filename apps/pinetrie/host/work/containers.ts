@@ -24,6 +24,7 @@ import {
   RUNTIME_SHELL_PATH,
   type Step,
 } from "@pinetrie/lanes"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import {
   readLaneForks,
@@ -104,6 +105,7 @@ export function createContainers(deps: {
   /** A lane's fork (`work/create.ts`), run by its start. */
   readonly fork: NewLanes["fork"]
   readonly innerDockerDataRoots: InnerDockerDataRootsHeld
+  readonly snapshots: Pick<SnapshotTaking, "markUsed">
 }): Containers {
   const { basics, setup, registry, keeper, proposed, innerDockerDataRoots } =
     deps
@@ -204,7 +206,13 @@ export function createContainers(deps: {
           await runtime.remove(container)
         }
         await runSteps(decided)
-        if (decided.kind === "snapshot") await h.afterRestore()
+        if (decided.kind === "snapshot") {
+          // Unrecorded, a use only ages the snapshot sooner.
+          try {
+            deps.snapshots.markUsed(decided.from, false)
+          } catch {}
+          await h.afterRestore()
+        }
         // Made just now: running.
         await handle.start("running")
         break

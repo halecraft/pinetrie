@@ -71,6 +71,10 @@ function causeWords(
       return `${serviceWords(cause.service)} was killed for using too much memory`
     case "host-stalls":
       return `the host stalled for ${(cause.stalledMs / 1000).toFixed(1)} seconds`
+    case "snapshot-skipped":
+      return cause.count === 1
+        ? "a turn's snapshot could not be recorded: branching at it starts from the turn before"
+        : `${cause.count} turns' snapshots could not be recorded: branching at them starts from the turn before`
     case "unsampled":
       switch (cause.reason) {
         case "waiting":
@@ -100,8 +104,9 @@ export function machineWords(
   if (health.state === "neutral" || worst === undefined)
     return "The machine lanes run on: keeping up"
   const more = rest.length === 0 ? "" : `; and ${rest.length} more`
+  // A reading not taken, or a snapshot not recorded, slows no work.
   const how =
-    worst.kind === "unsampled"
+    worst.kind === "unsampled" || worst.kind === "snapshot-skipped"
       ? ""
       : health.state === "red"
         ? "work is stopped: "

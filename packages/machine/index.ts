@@ -3,7 +3,16 @@
 
 export { createMachineManager, type ManagerNews } from "./manager.ts"
 export type { HealthSink, MachineManager, MachineSensor } from "./ports.ts"
-export type { LaneSample, MachineSample } from "./sample.ts"
+export type { LaneSample, MachineSample, SensedSample } from "./sample.ts"
+export {
+  type Reservation,
+  ROW_STATES,
+  type RowState,
+  type SnapshotIndex,
+  type SnapshotReads,
+  type SnapshotRow,
+  type SnapshotTaking,
+} from "./snapshot-index.ts"
 export {
   LEAVE_FREE_DEFAULT,
   type LeaveFree,

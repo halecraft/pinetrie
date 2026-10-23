@@ -206,12 +206,15 @@ While the page syncs, "syncing…" leads its right end.
   host keep up; amber, with a triangle at its corner, when work slows (the
   lanes' disk low, the disk holding it low, lanes short of memory, a
   command killed for memory, lanehost's disk or privileged service or the
-  file observer killed for memory, the host stalling, or no reading from
-  the host); red, with a barred disc, when work stops (the lanes' disk full,
+  file observer killed for memory, the host stalling, a turn's snapshot
+  not recorded, or no reading from the host); red, with a barred disc, when work stops (the lanes' disk full,
   or its metadata). Shape and colour both, never colour alone; never a
   badge, never moving. Its title, which is also its accessible name, names
   the worst cause in words, with how many more ("The machine lanes run on:
-  work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least"). It is
+  work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least"); a
+  cause that slows no work says so without "work is slowed" ("a turn's
+  snapshot could not be recorded: branching at it starts from the turn
+  before"). It is
   a status, not a control, until the Machine page it will open (Deferred,
   below). The host plans it from samples every few seconds, each cause
   entering and leaving by counts of samples so it does not flap, and writes

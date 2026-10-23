@@ -217,6 +217,10 @@ the disk events' ring, batches or held notices.
   cannot delete another's, and no one deletes the base or a name nothing
   decided about. A caller that may meet another owner's name filters with
   `snapshotOwner` first (the archive, `planKeep`), rather than throw.
+- **A revision record names only an indexed snapshot** (`IndexedSnapshot`):
+  the host's index makes one once the snapshot under its row is taken, and
+  the host's write of a record takes nothing else. A stored record still
+  decodes as a bare `SnapshotId`: only the write needs the proof.
 - **The pattern, for any destructive operation that gains a second
   decider:** the operation takes a branded value, and the one maker of the
   brand checks whose decision it is.

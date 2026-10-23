@@ -24,8 +24,10 @@ import { DatabaseSync } from "node:sqlite"
 import type { Store } from "@kyneta/exchange"
 import { createSqliteStore } from "@kyneta/sqlite-store"
 import { type BlobStore, PRODUCT_NAME } from "@pinetrie/core"
+import type { SnapshotIndex } from "@pinetrie/machine"
 import { sqliteBlobs } from "./blobs.ts"
 import { type MigrationLedger, sqliteLedger } from "./migrations/ledger.ts"
+import { sqliteSnapshotIndex } from "./snapshot-index.ts"
 
 /** How long taking the file waits for another owner to close it. */
 const BUSY_TIMEOUT_MS = 5_000
@@ -75,6 +77,8 @@ export interface OpenedStore {
   readonly store: Store
   readonly blobs: BlobStore
   readonly ledger: MigrationLedger
+  /** The project's entry snapshots, indexed (`snapshot-index.ts`). */
+  readonly snapshots: SnapshotIndex
   readonly backup: ((suffix: string) => string) | null
   /** What each document stores beside its whole record (`storedSizes`); null for a store that cannot say. */
   readonly sizes:
@@ -141,8 +145,8 @@ function storedSizes(
 }
 
 /**
- * The session's store, the host's blobs and the migrations' ledger, over one
- * connection to `file`. Closing the store closes the connection, and with it
+ * The session's store, the host's blobs, the migrations' ledger and the
+ * snapshot index, over one connection to `file`. Closing the store closes the connection, and with it
  * the blobs and the ledger. `backup` writes a consistent copy beside the
  * file, through the same connection, since the store holds the file's lock.
  */
@@ -182,6 +186,7 @@ export function openStore(
     store,
     blobs: sqliteBlobs(db, options.now),
     ledger: sqliteLedger(db),
+    snapshots: sqliteSnapshotIndex(db),
     backup,
     sizes: docIds => storedSizes(db, docIds),
   }

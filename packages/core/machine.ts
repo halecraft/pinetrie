@@ -41,6 +41,8 @@ export type MachineCause =
   | { readonly kind: "service-oom-killed"; readonly service: MachineService }
   /** The host's event loop stalled, the longest in ms. */
   | { readonly kind: "host-stalls"; readonly stalledMs: number }
+  /** Turns whose snapshot was skipped since the last sample: its index row could not be written. */
+  | { readonly kind: "snapshot-skipped"; readonly count: number }
   /**
    * No sample says how the machine is: none yet since the host started,
    * the host stopped, or the last sample failed, with its error.

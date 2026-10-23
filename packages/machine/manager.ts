@@ -34,6 +34,8 @@ export function createMachineManager(deps: {
     onSlow: step => tell({ kind: "slow", ms: Math.round(step.ran) }),
   })
   let memory: HealthMemory = FIRST_MEMORY
+  /** Skipped snapshots heard since the last sample's read. */
+  let skipped = 0
 
   /** One write; on a refusal the memory forgets it, so the next sample writes again. */
   const writeHealth = async (health: MachineHealth, written: HealthMemory) => {
@@ -49,7 +51,12 @@ export function createMachineManager(deps: {
   const sampleOnce = async (): Promise<void> => {
     let result: SampleResult
     try {
-      result = { kind: "sampled", sample: await sensor.sample() }
+      const sensed = await sensor.sample()
+      result = {
+        kind: "sampled",
+        sample: { ...sensed, snapshotsSkipped: skipped },
+      }
+      skipped = 0
     } catch (error) {
       result = { kind: "failed", error: errorText(error) }
     }
@@ -71,6 +78,9 @@ export function createMachineManager(deps: {
       void sample()
     },
     sample,
+    noteSnapshotSkipped() {
+      skipped++
+    },
     async close() {
       keeper.close("drop")
       await keeper.idle()

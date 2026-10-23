@@ -156,8 +156,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn's snapshot is never recorded",
     file: "apps/pinetrie/host/work/turns.ts",
-    from: "                snapshot: snapped ? planned.snapshot : null,",
-    to: "                snapshot: null,",
+    from: "                ...planned,\n                snapshot,\n",
+    to: "                ...planned,\n                snapshot: null,\n",
     suite: "lanes",
     scenario: "images",
     expect: "and its turn is committed and snapshotted",

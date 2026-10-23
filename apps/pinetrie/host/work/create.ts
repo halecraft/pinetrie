@@ -24,6 +24,7 @@ import {
   planFork,
   type StartRecords,
 } from "@pinetrie/lanes"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneChannel } from "@pinetrie/pi"
 import {
   type RootView,
@@ -195,6 +196,7 @@ export function createNewLanes(deps: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly destination: Pick<Destination, "begin">
   readonly innerDockerDataRoots: InnerDockerDataRootsHeld
+  readonly snapshots: Pick<SnapshotTaking, "markUsed">
 }): NewLanes {
   const { basics, setup, destination } = deps
   const { session } = basics
@@ -243,6 +245,12 @@ export function createNewLanes(deps: {
         kind,
       })
       if (source.kind === "foreign") throw new Error(foreignLaneWords(source))
+      // Before the clone: a branched snapshot is never deleted while its lane
+      // lives, so none is taken from under the fork. Unrecorded, the fork
+      // still runs.
+      try {
+        deps.snapshots.markUsed(source.snapshot, true)
+      } catch {}
       const forkSetup = h.forkSteps(source.start)
       const dataRoot = deps.innerDockerDataRoots.sourceAtFork(
         lane,

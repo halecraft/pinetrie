@@ -1,13 +1,14 @@
 import type { MachineHealth } from "@pinetrie/core"
 import { expect, test } from "vitest"
+import { LEAVE_AFTER } from "./health.ts"
 import { createMachineManager, type ManagerNews } from "./manager.ts"
 import type { MachineSensor } from "./ports.ts"
-import type { MachineSample } from "./sample.ts"
+import type { SensedSample } from "./sample.ts"
 import { LEAVE_FREE_DEFAULT } from "./store-settings.ts"
 
 const GiB = 1024 ** 3
 
-const calm: MachineSample = {
+const calm: SensedSample = {
   machine: {
     memoryTotal: 12 * GiB,
     memoryAvailable: 8 * GiB,
@@ -118,4 +119,18 @@ test("a refused write is written again at the next sample", async () => {
   await manager.sample()
   expect(reasons(written)).toEqual(["waiting", "neutral"])
   expect(told.map(n => n.kind)).toContain("unwritten")
+})
+
+test("a skipped snapshot is counted in the next sample, and only in it", async () => {
+  const { manager, written } = managed(steady)
+  await manager.start()
+  manager.noteSnapshotSkipped()
+  manager.noteSnapshotSkipped()
+  await manager.sample()
+  expect(written.at(-1)?.causes).toEqual([
+    { kind: "snapshot-skipped", count: 2 },
+  ])
+  // Counted again, it would be seen each sample, and never leave.
+  for (let i = 0; i < LEAVE_AFTER; i++) await manager.sample()
+  expect(written.at(-1)?.causes).toEqual([])
 })

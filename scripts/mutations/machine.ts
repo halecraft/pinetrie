@@ -55,4 +55,29 @@ export const mutations: readonly Mutation[] = [
     expect:
       "no module of @pinetrie/machine imports a lane package, pi, or Node's I/O",
   },
+  {
+    name: "a skipped snapshot is not counted",
+    file: "packages/machine/manager.ts",
+    from: "      skipped++\n",
+    to: "",
+    command: unit,
+    expect: "a skipped snapshot is counted in the next sample, and only in it",
+  },
+  {
+    name: "skipped snapshots are counted again each sample",
+    file: "packages/machine/manager.ts",
+    from: "      skipped = 0\n",
+    to: "",
+    command: unit,
+    expect: "a skipped snapshot is counted in the next sample, and only in it",
+  },
+  {
+    name: "a skipped snapshot's cause leaves at the next sample",
+    file: "packages/machine/health.ts",
+    from: '  "host-stalls",\n  "snapshot-skipped",\n])',
+    to: '  "host-stalls",\n])',
+    command: unit,
+    expect:
+      "a skipped snapshot is a cause counting them, until LEAVE_AFTER samples without one",
+  },
 ]

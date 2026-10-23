@@ -49,6 +49,7 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "lane-oom-killed": "amber",
   "service-oom-killed": "amber",
   "host-stalls": "amber",
+  "snapshot-skipped": "amber",
   unsampled: "amber",
 }
 
@@ -63,6 +64,7 @@ const ORDER: readonly MachineCauseKind[] = [
   "lane-oom-killed",
   "service-oom-killed",
   "host-stalls",
+  "snapshot-skipped",
 ]
 
 /** The causes that are events: seen on a sample, not measured against a threshold. */
@@ -70,6 +72,7 @@ const EVENT_KINDS: ReadonlySet<MachineCauseKind> = new Set([
   "lane-oom-killed",
   "service-oom-killed",
   "host-stalls",
+  "snapshot-skipped",
 ])
 
 /**
@@ -323,6 +326,8 @@ export function planHealth(
   ]
   if (sample.hostStalledMs > HOST_STALL_MS)
     events.push({ kind: "host-stalls", stalledMs: sample.hostStalledMs })
+  if (sample.snapshotsSkipped > 0)
+    events.push({ kind: "snapshot-skipped", count: sample.snapshotsSkipped })
   const seen = new Map(events.map(c => [causeKey(c), c]))
   const eventKeys = new Set([
     ...seen.keys(),

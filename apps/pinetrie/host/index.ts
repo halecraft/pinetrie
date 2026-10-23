@@ -157,6 +157,7 @@ import {
 import { createSettle } from "./settle.ts"
 import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
+import { memorySnapshotIndex } from "./snapshot-index.ts"
 import { createSplitCall } from "./split-call.ts"
 import { createSshNews } from "./ssh-news.ts"
 import { stallWords, watchStalls } from "./stalls.ts"
@@ -420,6 +421,7 @@ async function openHost(
           store: createInMemoryStore(),
           blobs: memoryBlobs(now),
           ledger: memoryLedger(),
+          snapshots: memorySnapshotIndex(),
           backup: null,
           sizes: null,
         })
@@ -747,6 +749,8 @@ async function openHost(
   const askSplit = createSplitCall({ basics, keeper, placesWriter })
 
   // --- where lanes work -----------------------------------------------------
+  // A snapshot skipped before the machine is watched is held for it.
+  const snapshotSkipped = forward<[]>("the machine", "hold")
   const work = await startLaneWork({
     basics: leaseBasics,
     project: openedProject,
@@ -758,6 +762,8 @@ async function openHost(
     piSetup,
     ensureNames: names.ensure,
     progress,
+    snapshots: opened.snapshots,
+    snapshotSkipped: snapshotSkipped.call,
   })
   progress.begin("agent")
 
@@ -776,7 +782,10 @@ async function openHost(
         })
       : null
   // Its `unsampled` is a step on the documents' keeper: it closes first.
-  if (machine !== null) closers.defer(() => machine.close())
+  if (machine !== null) {
+    closers.defer(() => machine.close())
+    snapshotSkipped.bind(() => machine.noteSnapshotSkipped())
+  }
 
   // `put_image` acts through the commands, and the agent's tools ask the
   // relays, which start runs over the agent: each bound once what carries it

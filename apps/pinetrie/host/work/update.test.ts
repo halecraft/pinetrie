@@ -30,6 +30,7 @@ import {
   row,
   storedMessage,
 } from "../fakes.ts"
+import { memorySnapshotIndex } from "../snapshot-index.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Ready } from "./setup.ts"
 import {
@@ -219,6 +220,8 @@ describe("askedAboutConflict", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       records: { writeValues: async writes => applyWrites(b, writes) },
       writeRevision: async () => {},
+      snapshots: memorySnapshotIndex(),
+      snapshotSkipped: () => {},
     })
     return { updates, asked, b }
   }
@@ -344,6 +347,8 @@ describe("getLatestInRun", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       records: record<Parameters<typeof createUpdates>[0]["records"]>().port,
       writeRevision: async () => {},
+      snapshots: memorySnapshotIndex(),
+      snapshotSkipped: () => {},
     })
     return { updates, asked }
   }

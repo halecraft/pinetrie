@@ -23,7 +23,11 @@
     (an entry's, a folder state's, the base, no one's), and only
     `deletableSnapshot`, checking the name's owner, makes one. So the upkeep's
     rule deletes only entries, the folder code's only folder states, and
-    nothing the base or a name no owner holds.
+    nothing the base or a name no owner holds. A revision record names a
+    snapshot only as core's `IndexedSnapshot`, which the index makes once the
+    snapshot under its row, reserved first, is taken: nothing the host makes
+    is unindexed, so the upkeep needs no clock to tell an old snapshot from
+    one in flight.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

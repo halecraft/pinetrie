@@ -6,6 +6,7 @@
 import {
   type EntryId,
   firstLine,
+  type IndexedSnapshot,
   NO_SHARED,
   type PointId,
   type RevisionRecord,
@@ -15,6 +16,7 @@ import {
 import { callPurpose } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow, type Follow, planSnapshot } from "@pinetrie/lanes"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
 import {
@@ -37,6 +39,7 @@ import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { SharedLineages } from "./shared.ts"
+import { takeIndexedSnapshot } from "./snapshot-taking.ts"
 
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
@@ -75,7 +78,13 @@ export interface Turns {
    * turn's disk, not the one before.
    */
   pendingRecords(): Promise<void>
-  writeRevision(record: RevisionRecord): Promise<void>
+  /** A revision, in the root its lane works in; its snapshot only one the index holds, taken. */
+  writeRevision(record: RevisionToWrite): Promise<void>
+}
+
+/** A revision record as written: a stored one decodes as `RevisionRecord`, but only a write needs the proof. */
+export type RevisionToWrite = Omit<RevisionRecord, "snapshot"> & {
+  readonly snapshot: IndexedSnapshot | null
 }
 
 /** A lane's disk at a revision: its snapshot, and the state with it. */
@@ -92,6 +101,9 @@ export function createTurns(deps: {
   readonly keeper: Keeper
   readonly records: Pick<Records, "writeValues">
   readonly shared: SharedLineages
+  readonly snapshots: SnapshotTaking
+  /** A turn's snapshot skipped, its index row unwritten: the machine's health says so. */
+  readonly snapshotSkipped: () => void
 }): Turns {
   const { basics, registry, keeper } = deps
   const { docs } = basics
@@ -114,8 +126,7 @@ export function createTurns(deps: {
       : { snapshot: above.snapshot, point: above.point }
   }
 
-  /** A revision, in the root its lane works in. */
-  const writeRevision = async (record: RevisionRecord) => {
+  const writeRevision = async (record: RevisionToWrite) => {
     const root = docs.rootOfLane(record.lane)
     if (root === null) throw new Error(`${record.lane} is in no root`)
     await using held = basics.leases.root(root)
@@ -185,10 +196,45 @@ export function createTurns(deps: {
                   failed(basics, "classing the turn's writes", lane)(error)
                   return null
                 })
-                await executeOrThrow(
-                  planSnapshot({ lane, snapshot: turn.snapshot }),
-                  handle.runners,
-                )
+                const taken = await takeIndexedSnapshot({
+                  taking: deps.snapshots,
+                  row: {
+                    snapshot: turn.snapshot,
+                    lane,
+                    changed: changed.length,
+                  },
+                  take: () =>
+                    executeOrThrow(
+                      planSnapshot({ lane, snapshot: turn.snapshot }),
+                      handle.runners,
+                    ),
+                  skipped: deps.snapshotSkipped,
+                })
+                if (taken.kind === "failed") throw taken.error
+                if (taken.kind === "unindexed") {
+                  failed(
+                    basics,
+                    "indexing the turn's snapshot",
+                    lane,
+                  )(taken.error)
+                  last.delete(lane)
+                  return {
+                    snapshot: null,
+                    disk: null,
+                    touched: classed?.touched ?? null,
+                  }
+                }
+                const diff = async (from: SnapshotId) => {
+                  const d = await handle.runners.runtime.diff(
+                    from,
+                    turn.snapshot,
+                  )
+                  // Unrecorded, a use only ages the snapshot sooner.
+                  try {
+                    deps.snapshots.markUsed(from, false)
+                  } catch {}
+                  return d
+                }
                 const disk =
                   classed === null
                     ? null
@@ -198,17 +244,14 @@ export function createTurns(deps: {
                         diff:
                           previous === null
                             ? null
-                            : await handle.runners.runtime.diff(
-                                previous.snapshot,
-                                turn.snapshot,
-                              ),
+                            : await diff(previous.snapshot),
                         shared,
                       }).catch(error => {
                         failed(basics, "the turn's diff", lane)(error)
                         return null
                       })
                 return {
-                  snapped: true,
+                  snapshot: taken.snapshot,
                   disk,
                   touched: classed?.touched ?? null,
                 }
@@ -216,13 +259,13 @@ export function createTurns(deps: {
               .catch(error => {
                 failed(basics, "the snapshot", lane)(error)
                 last.delete(lane)
-                return { snapped: false, disk: null, touched: null }
+                return { snapshot: null, disk: null, touched: null }
               }),
           follow,
         )
         const recorded = keeper.track(
           ended
-            .then(async ({ snapped, disk, touched }) => {
+            .then(async ({ snapshot, disk, touched }) => {
               // Off the lane's queue: the lineages are every lane's.
               const shared =
                 touched === null
@@ -239,7 +282,7 @@ export function createTurns(deps: {
                       })
               await writeRevision({
                 ...planned,
-                snapshot: snapped ? planned.snapshot : null,
+                snapshot,
                 disk: disk === null ? null : { ...disk, shared },
               })
             })

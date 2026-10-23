@@ -21,6 +21,7 @@ import {
   type LaneHistory,
   planSnapshot,
 } from "@pinetrie/lanes"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -59,6 +60,7 @@ import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
+import { type TakenSnapshot, takeIndexedSnapshot } from "./snapshot-taking.ts"
 import type { Turns } from "./turns.ts"
 
 /**
@@ -173,6 +175,9 @@ export function createUpdates(deps: {
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
   readonly records: Pick<Records, "writeValues">
   readonly writeRevision: Turns["writeRevision"]
+  readonly snapshots: SnapshotTaking
+  /** The merge's snapshot skipped, its index row unwritten. */
+  readonly snapshotSkipped: () => void
 }): Updates {
   const { basics, setup, registry, containers, destination } = deps
   const { docs } = basics
@@ -187,23 +192,28 @@ export function createUpdates(deps: {
     merge: PointId,
   ): Promise<void> {
     const handle = registry.handleOf(lane)
-    const snapped = await handle.queue
-      .enqueue(async () => {
-        await executeOrThrow(
-          planSnapshot({ lane, snapshot: snapshotId(entry) }),
-          handle.runners,
-        )
-        return true
-      })
-      .catch(error => {
-        failed(basics, "the snapshot", lane)(error)
-        return false
-      })
+    const snapshot = snapshotId(entry)
+    const taken: TakenSnapshot = await handle.queue
+      .enqueue(() =>
+        takeIndexedSnapshot({
+          taking: deps.snapshots,
+          // The update belongs to no ask: it changed no path of its own.
+          row: { snapshot, lane, changed: 0 },
+          take: () =>
+            executeOrThrow(planSnapshot({ lane, snapshot }), handle.runners),
+          skipped: deps.snapshotSkipped,
+        }),
+      )
+      .catch(error => ({ kind: "failed", error }))
+    if (taken.kind === "failed")
+      failed(basics, "the snapshot", lane)(taken.error)
+    if (taken.kind === "unindexed")
+      failed(basics, "indexing the merge's snapshot", lane)(taken.error)
     await deps.writeRevision({
       entry,
       lane,
       point: merge,
-      snapshot: snapped ? snapshotId(entry) : null,
+      snapshot: taken.kind === "taken" ? taken.snapshot : null,
       // The update belongs to no ask, so its files count toward none.
       paths: [],
       // A clean merge.
