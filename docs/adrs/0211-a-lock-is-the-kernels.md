@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (Duane, 2026-10-22)
 - **Area:** `packages/lock/TECHNICAL.md`, `apps/pinetrie/host/TECHNICAL.md`,
-  `packages/vm/TECHNICAL.md`
+  `packages/config/TECHNICAL.md`, `packages/vm/TECHNICAL.md`
 - **Evidence:** S326, S327
 - **Amends:**
   - ADR-0210: `@pinetrie/lock` gains a macOS backend and a wait, and takes the

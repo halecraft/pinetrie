@@ -121,8 +121,8 @@ and the words share one.
   (`WORKSPACE_ROOT`), as `planProjectSweep` drops a project whose root is
   gone.
 - **A dead host's reservations are settled before the first plan**
-  (`settleReserved`, from the first step's listing): the lock and
-  `host.pid` keep any other host out, so each is a dead host's.
+  (`settleReserved`, from the first step's listing): the project's lock
+  and the store's keep any other host out, so each is a dead host's.
 - **Only the manager's keeper changes the index's states** but for a
   snapshot's own life: an archive's marks (`markArchivedForDeletion`) and a
   restore's (`keepRestored`) are `run` steps there, and a step plans,

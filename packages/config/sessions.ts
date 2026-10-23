@@ -47,8 +47,19 @@ export function nameFrom(folder: string): string {
 const isSessionName = (text: string): text is SessionName =>
   nameFrom(text) === text
 
+/**
+ * A session another host serves: its lock is held. `pid` is the one its
+ * holder wrote, for words only; null when it wrote none.
+ */
+export interface SessionServed {
+  readonly kind: "served"
+  readonly name: SessionName
+  readonly pid: number | null
+}
+
 export type SessionRefusal =
   | { readonly kind: "bad-name"; readonly asked: string }
+  | SessionServed
   /** `PINETRIE_SESSION` names one session; this folder already has another. */
   | {
       readonly kind: "has-own"
@@ -101,10 +112,12 @@ export interface SessionFacts {
   readonly gone: ReadonlySet<string>
   /**
    * A file the folder's own session holds, in its data or local config
-   * directory (a `host.pid` naming no process aside); null when it holds
-   * none, or the folder has no session.
+   * directory (its lock's file aside); null when it holds none, or the
+   * folder has no session.
    */
   readonly ownHolds: string | null
+  /** The sessions another host serves, each with the pid its holder wrote. */
+  readonly served: ReadonlyMap<SessionName, number | null>
 }
 
 const replaced = (
@@ -116,11 +129,29 @@ const replaced = (
   entries: registry.entries.map(e => (e === old ? next : e)),
 })
 
-/** Which session the folder at `facts.path` is, and the registry to write. */
+/**
+ * Which session the folder at `facts.path` is, and the registry to write:
+ * refused when another host serves it, or serves the folder's own session
+ * an attach would drop.
+ */
 export function planSession(
   registry: Registry,
   facts: SessionFacts,
 ): SessionPlan {
+  const plan = chosenSession(registry, facts)
+  if (plan.kind === "refused") return plan
+  const dropped = plan.kind === "attached" ? plan.dropped : null
+  for (const name of [plan.entry.name, dropped])
+    if (name !== null && facts.served.has(name))
+      return {
+        kind: "refused",
+        why: { kind: "served", name, pid: facts.served.get(name) ?? null },
+      }
+  return plan
+}
+
+/** Which session the folder is, whoever serves it. */
+function chosenSession(registry: Registry, facts: SessionFacts): SessionPlan {
   const { path, asked, now } = facts
   if (asked !== null && !isSessionName(asked))
     return { kind: "refused", why: { kind: "bad-name", asked } }
@@ -222,12 +253,7 @@ export type RenameRefusal =
   | { readonly kind: "unknown"; readonly name: string }
   | { readonly kind: "bad-name"; readonly asked: string }
   | { readonly kind: "taken"; readonly name: SessionName }
-  /** A live host holds the session's `host.pid`. */
-  | {
-      readonly kind: "served"
-      readonly name: SessionName
-      readonly pid: number
-    }
+  | SessionServed
 
 export type RenamePlan =
   | {
@@ -239,14 +265,14 @@ export type RenamePlan =
   | { readonly kind: "refused"; readonly why: RenameRefusal }
 
 /**
- * Renaming the session `old` to `next`. `servedBy` is the live pid in its
- * `host.pid`, or null: the caller reads it only for a name the registry has.
+ * Renaming the session `old` to `next`. `served` is another host's hold on
+ * its lock, or null: the caller tries it only for a name the registry has.
  */
 export function planRename(
   registry: Registry,
   old: string,
   next: string,
-  servedBy: number | null,
+  served: { readonly pid: number | null } | null,
 ): RenamePlan {
   const entry = registry.entries.find(e => e.name === old)
   if (entry === undefined)
@@ -255,10 +281,10 @@ export function planRename(
     return { kind: "refused", why: { kind: "bad-name", asked: next } }
   if (registry.entries.some(e => e.name === next))
     return { kind: "refused", why: { kind: "taken", name: next } }
-  if (servedBy !== null)
+  if (served !== null)
     return {
       kind: "refused",
-      why: { kind: "served", name: entry.name, pid: servedBy },
+      why: { kind: "served", name: entry.name, pid: served.pid },
     }
   return {
     kind: "renamed",
@@ -313,8 +339,12 @@ export type RegistryProblem =
       readonly file: string
       readonly why: BrokenRegistry
     }
-  /** Another process held the lock for longer than the wait. */
-  | { readonly kind: "locked"; readonly file: string; readonly pid: number }
+  /** A lock could not be taken at all: no backend, or its file not writable. */
+  | {
+      readonly kind: "lock-failed"
+      readonly file: string
+      readonly detail: string
+    }
 
 type SessionSaid = SessionRefusal | RenameRefusal | RegistryProblem
 
@@ -342,10 +372,18 @@ export function sessionWords(said: SessionSaid): string {
     case "taken":
       return `a session is already named ${said.name}`
     case "served":
-      return `session ${said.name} is being served, by process ${said.pid}: stop its host first`
+      return `session ${said.name} is being served${said.pid === null ? "" : `, by process ${said.pid}`}: stop its host first`
     case "broken":
       return `${said.file} is not ${PRODUCT_NAME}'s session registry, since ${BROKEN[said.why]}: it is left as it is; move it aside, and the next host starts a new one`
-    case "locked":
-      return `${said.file} was held by process ${said.pid} for too long: if no host is starting, remove it`
+    case "lock-failed":
+      return `${said.file} could not be locked: ${said.detail}`
   }
 }
+
+/** What a host or a rename says once, while another process holds the registry's lock. */
+export const registryWaitWords = (pid: number | null): string =>
+  `waiting for ${pid === null ? "another process" : `process ${pid}`}, which holds ${PRODUCT_NAME}'s session registry`
+
+/** What a host says as it stops for its session's lock gone from under it. */
+export const sessionLockLostWords = (name: SessionName): string =>
+  `session ${name}'s lock was let go under this host, so a rename could move it: shutting down`

@@ -25,9 +25,9 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 async function served(name: string) {
   const root = path.join(dir, name)
   mkdirSync(root, { recursive: true })
-  const opened = await openSession({ root, env: {}, dirs })
+  const opened = await openSession({ root, env: {}, dirs, onWaiting: () => {} })
   if ("refused" in opened) throw new Error("not opened")
-  await opened.release()
+  await opened.releaseLock()
   return { root, store: sessionFiles(opened.dir).store }
 }
 

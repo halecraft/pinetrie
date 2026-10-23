@@ -2590,14 +2590,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a host serving the built page sends its index and a hashed asset",
   },
   {
-    name: "a held lock is not waited for",
-    file: "apps/pinetrie/host/sessions.ts",
-    from: "      if (taken) break\n",
-    to: "      break\n",
-    command: unit,
-    expect: "two sessions opened at once both land in the registry",
-  },
-  {
     name: "a session is found by the path as given, not its real path",
     file: "apps/pinetrie/host/sessions.ts",
     from: "  const real = await realPath(input.root)\n",
@@ -2609,7 +2601,7 @@ export const mutations: readonly Mutation[] = [
     name: "a session's directories are removed whatever they hold",
     file: "apps/pinetrie/host/sessions.ts",
     from: "    const kept = await rmdir(dir).then(",
-    to: "    const kept = await rm(dir, { recursive: true, force: true }).then(",
+    to: '    const kept = await import("node:fs/promises").then(f => f.rm(dir, { recursive: true, force: true })).then(',
     command: unit,
     expect: "a session's directories that gained a file are kept, naming it",
   },

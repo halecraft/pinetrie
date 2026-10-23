@@ -3553,4 +3553,29 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a branch from an evicted folder turn starts from its base, and says so",
   },
+  {
+    name: "a session another host serves is opened as a new hold's",
+    file: "apps/pinetrie/host/sessions.ts",
+    from: '        if (attempt.kind === "held") holds.set(name, attempt)\n        else served.set(name, await holderPid(sessionLockFile(dir)))\n',
+    to: '        if (attempt.kind === "held") holds.set(name, attempt)\n',
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
+    expect:
+      "an attach is refused while another host serves the session it would drop",
+  },
+  {
+    name: "a refused open keeps the locks it tried",
+    file: "apps/pinetrie/host/sessions.ts",
+    from: "      for (const [name, held] of holds) if (name !== kept) await held.release()\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
+    expect: "a refused open leaves the session's lock free",
+  },
+  {
+    name: "a rename takes no session lock",
+    file: "apps/pinetrie/host/sessions.ts",
+    from: "    const attempt = dir === null ? null : await trySessionLock(locked, dir)\n",
+    to: "    const attempt: LockAttempt | null = null\n",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
+    expect: "a session a live host serves is not renamed",
+  },
 ]

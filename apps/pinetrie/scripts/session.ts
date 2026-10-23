@@ -3,7 +3,7 @@
 // directories, while no host serves it. A refusal prints why and exits 2.
 
 import { homedir } from "node:os"
-import { configPlaces, sessionWords } from "@pinetrie/config"
+import { configPlaces, registryWaitWords, sessionWords } from "@pinetrie/config"
 import { renameSession } from "../host/sessions.ts"
 
 const USAGE = "usage: pinetrie session rename <old> <new>"
@@ -21,7 +21,9 @@ export async function main(args: readonly string[]): Promise<number> {
     return 2
   }
   const { dirs } = configPlaces(process.env, homedir(), null)
-  const done = await renameSession(dirs, old, next)
+  const done = await renameSession(dirs, old, next, pid =>
+    console.error(registryWaitWords(pid)),
+  )
   if ("refused" in done) {
     console.error(sessionWords(done.refused))
     return 2

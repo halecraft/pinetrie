@@ -89,6 +89,9 @@ importers:
       '@pinetrie/lanes':
         specifier: workspace:*
         version: link:../../packages/lanes
+      '@pinetrie/lock':
+        specifier: workspace:*
+        version: link:../../packages/lock
       '@pinetrie/machine':
         specifier: workspace:*
         version: link:../../packages/machine

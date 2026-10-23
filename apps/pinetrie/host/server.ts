@@ -37,7 +37,12 @@
 
 import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
-import { configPlaces, sessionWords } from "@pinetrie/config"
+import {
+  configPlaces,
+  registryWaitWords,
+  sessionLockLostWords,
+  sessionWords,
+} from "@pinetrie/config"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { sessionFiles } from "@pinetrie/lanes"
 import { bindAgentDir } from "@pinetrie/pi"
@@ -95,6 +100,7 @@ export async function runHost(
     root,
     env,
     dirs: configPlaces(env, home, null).dirs,
+    onWaiting: pid => console.log(`[host] ${registryWaitWords(pid)}`),
   })
   if ("refused" in opened) {
     console.error(`[host] ${sessionWords(opened.refused)}`)
@@ -136,7 +142,7 @@ export async function runHost(
     log,
     progress,
   }).catch(async error => {
-    await opened.release()
+    await opened.releaseLock()
     // Lanes cannot run here: the words say how to fix it.
     if (error instanceof HostRefused) {
       console.error(`[host] lanes cannot start: ${error.message}`)
@@ -150,17 +156,26 @@ export async function runHost(
   for (const invite of host.invites) console.log(openLine(invite))
 
   const signals = ["SIGINT", "SIGTERM"] as const
-  // Once the listeners are off, Node's default action ends the process.
+  // Once the listeners are off, Node's default action ends the process. A
+  // lost lock may follow a signal: one shutdown either way.
+  let stopping = false
   const stop = () => {
+    if (stopping) return
+    stopping = true
     for (const signal of signals) process.off(signal, stop)
     console.log("\n[host] shutting down")
     host
       .shutdown()
-      .then(() => opened.release())
+      .then(() => opened.releaseLock())
       .then(
         () => process.exit(0),
         () => process.exit(1),
       )
   }
   for (const signal of signals) process.on(signal, stop)
+  // A lock gone from under the host would let a rename move its session.
+  void opened.lockLost.then(() => {
+    console.error(`[host] ${sessionLockLostWords(opened.name)}`)
+    stop()
+  })
 }

@@ -67,6 +67,10 @@ XDG spec says.
   folders are gone (their path no longer its own real path) and what the
   own session holds, then writes the plan's registry
   (`apps/pinetrie/host/sessions.ts`).
+- **A session another host serves is refused by the plan** (`served`,
+  ADR-0211): the host tries each session's lock it may pick or drop, and
+  passes those another holds, with the pid each holder wrote, for words
+  only. `planRename` refuses the same way.
 
 ## The rules
 

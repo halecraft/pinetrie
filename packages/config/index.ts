@@ -41,9 +41,12 @@ export {
   type Registry,
   type RegistryProblem,
   type RenamePlan,
+  registryWaitWords,
   type SessionName,
   type SessionPlan,
   type SessionRefusal,
+  type SessionServed,
+  sessionLockLostWords,
   sessionWords,
 } from "./sessions.ts"
 export { defineTable, join, limited, pick } from "./setting.ts"

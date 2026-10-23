@@ -19,7 +19,7 @@ knows of.
 | `dev.ts`, `serve.ts`, `serve-built.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]`, `pnpm serve [folder]` and `pinetrie serve [folder]` (ADR-0086, ADR-0148, ADR-0190), each a few lines over `runHost` (`server.ts`), which takes the command's arguments: `planInvocation` (the folder: the one named, or the one the command started in), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; else the session's own, in its data directory for every kind of project, ADR-0150), `refusalText` (a refusal's words, with its command's usage). The folder is read from `INIT_CWD`, where pnpm was started, else the working directory (S108). `pinetrie serve` is `serve-built.ts`, the only `runHost("serve")`; `pnpm serve` rebuilds a stale page and then runs it. `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts`, `page-build.ts` | the page a host serves (ADR-0148): `page.ts` the built page in the page's `dist/`, whose files it reads once at start (`readBuiltPage`), loading no Vite, so the installed command never does; `page-build.ts` Vite's: the build (`buildPage`), the rebuild when the stamp no longer matches its inputs (`ensurePage`), and the live page `pnpm dev` and the suites serve (`livePage`), which the host opens on its own server. With no page given a host serves none (`NO_PAGE`) |
 | `../command.ts`, `../bin.ts` | `pinetrie <command>`, the command the npm package puts on the PATH: `planCommand` decides which of `serve`, `sign-in`, `sign-out`, `tidy` and `session` an invocation asks for, and `bin.ts` loads only that command's module, each exporting `main(args)` and running nothing when loaded |
-| `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
+| `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its lock held (`sessionLockFile`); and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
 | `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`readRepoSizes`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`invokedFolder`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model; and the start's checklist, drawn (`checklistLines`) or a line per step (`endedLine`, `buildingLine`) |
 | `start-checklist.ts` | a start's steps as values (§ Startup): `planStartSteps`, the cursor (`checklistAfter`), estimates (`stepEstimate`, `START_DEFAULTS`), what is remembered (`timesAfter`, `decodeStartTimes`), and the port a start reports through (`StartProgress`) |
@@ -747,13 +747,23 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   `sessionWords` and exits 2, with nothing opened. Its name keys the
   local layer (`configPlaces`); `startHost` names it on the setup page
   (`served`), and with none given has no local layer, as every suite.
-- **The registry is written whole, under its lock** (`sessions.ts`):
-  `sessions.json.lock` holds the writer's pid, linked into place so it is
-  never seen empty; the write is `sessions.json.tmp` renamed over the
-  registry. A served session holds `host.pid` in its data directory,
-  which only a rename reads. A host that dies leaves both; each is taken
-  over once its pid names no process (`ESRCH`; `EPERM` is alive). Two
-  processes taking over one dead lock at once can both hold it.
+- **The registry is written whole, under its lock** (`sessions.ts`,
+  ADR-0211): `sessions.json.lock` is an `@pinetrie/lock` lock, waited for
+  and said once (`registryWaitWords`), with no timeout; the kernel frees
+  it with its holder, so no dead holder's lock is taken over and no two
+  takers race. What must run under it takes its proof (`RegistryLocked`):
+  writing the registry, trying a session's lock, dropping a session's
+  directories. The write is `sessions.json.tmp` renamed over the registry.
+- **A served session holds its lock for the host's life**
+  (`sessionLockFile`, the file `host.pid`, a name kept from when it held
+  only a pid). Each session the plan may pick or drop has its lock tried
+  once, before the plan: one another host holds is `served`, which the
+  plan refuses, naming the pid its holder wrote, so a second host on a
+  session stops before it opens anything. Every hold but the opened
+  session's is released after, a refusal's too. A rename holds the
+  session's lock while it moves the directories, the file moving with
+  them, and removes nothing: a removed lock file is a free lock (S327). A
+  host whose session lock is lost shuts down (`sessionLockLostWords`).
 - **A session's directories are removed with `rmdir`,** never a
   recursive delete: when an attach replaces a folder's own empty session,
   a file written since it was found empty refuses the attach, and stays.
@@ -931,9 +941,9 @@ rejects `shutdown()`.
   page retries Vite's socket once a second, and once Vite's `upgrade`
   listener is gone, the `"vite"` route leaves that socket open. A host
   serving the built page has no Vite to close.
-- **`host.pid` goes after `shutdown()`** (`server.ts`): the session's
-  `release`, also when lanes refuse to start, after the start closed what
-  it opened.
+- **The session's lock goes after `shutdown()`** (`server.ts`): its
+  `releaseLock`, also when lanes refuse to start, after the start closed
+  what it opened.
 - **Only the first signal shuts down** (`server.ts`). It takes the SIGINT
   and SIGTERM listeners off, so a second Ctrl-C gets Node's default action
   and ends the process, even while `shutdown()` hangs.

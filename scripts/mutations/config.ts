@@ -158,4 +158,21 @@ export const mutations: readonly Mutation[] = [
     // tsc names no failing check: with typecheck clean, any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
+  {
+    name: "planSession ignores a session another host serves",
+    file: sessions,
+    from: "    if (name !== null && facts.served.has(name))\n",
+    to: "    if (false)\n",
+    command: unit,
+    expect:
+      "a folder whose session another host serves is refused, naming its pid",
+  },
+  {
+    name: "a served session's words never name its pid",
+    file: sessions,
+    from: '${said.pid === null ? "" : `, by process ${said.pid}`}',
+    to: "",
+    command: unit,
+    expect: "names the holder's pid when it wrote one",
+  },
 ]

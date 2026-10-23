@@ -1,22 +1,12 @@
 // host/sessions — the session a host serves: its folder's real path looked
 // up in the registry (`sessions.json` in pine·trie's data directory), under
-// a lock, so hosts starting together each see the others' entries; and a
+// the registry's lock, so hosts starting together each see the others'
+// entries, and the session's own lock held for the host's life; and a
 // session renamed (`pnpm session rename`). The rules are
 // `@pinetrie/config`'s; this gathers, plans and writes.
 
-import { randomUUID } from "node:crypto"
 import { realpath as realpathCallback } from "node:fs"
-import {
-  link,
-  mkdir,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  rmdir,
-  unlink,
-  writeFile,
-} from "node:fs/promises"
+import { mkdir, readdir, readFile, rename, rmdir } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
 import {
@@ -32,6 +22,14 @@ import {
   type SessionPlan,
   type SessionRefusal,
 } from "@pinetrie/config"
+import {
+  type HeldLock,
+  holderPid,
+  type LockAttempt,
+  removeLockFile,
+  tryLock,
+  withLock,
+} from "@pinetrie/lock"
 import { replaceFile } from "./replace-file.ts"
 
 /**
@@ -39,10 +37,6 @@ import { replaceFile } from "./replace-file.ts"
  * on disk, which Node's own walk of the path does not give.
  */
 const realPath = promisify(realpathCallback.native)
-
-/** How often a held lock is tried again, and for how long, in ms. */
-const LOCK_RETRY = 50
-const LOCK_WAIT = 5000
 
 /** The registry and its lock, in pine·trie's data directory. */
 export const registryFiles = (data: string) => ({
@@ -65,80 +59,57 @@ export const sessionDirs = (
   config: path.join(dirs.config, "sessions", name),
 })
 
-/** The pid file a served session holds, in its data directory. */
-export const hostPidFile = (sessionDir: string): string =>
+/**
+ * A served session's lock, in its data directory. Its file is `host.pid`,
+ * as it was when it held only a pid: a new name would leave the old file in
+ * every session's directory, which an attach would count as kept.
+ */
+export const sessionLockFile = (sessionDir: string): string =>
   path.join(sessionDir, "host.pid")
 
-/**
- * Whether `pid` names a process. `EPERM` is another user's process: alive.
- * A pid the system has since reused for another process reads as alive.
- */
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH"
-  }
-}
+declare const registryLockedBrand: unique symbol
+/** Proof the registry's lock is held: made only by `withRegistryLock`. */
+export type RegistryLocked = { readonly [registryLockedBrand]: true }
+const REGISTRY_LOCKED = {} as RegistryLocked
 
-const readPid = async (file: string): Promise<number | null> => {
-  const text = await readFile(file, "utf8").catch(() => null)
-  const pid = text === null ? Number.NaN : Number.parseInt(text, 10)
-  return Number.isInteger(pid) && pid > 0 ? pid : null
-}
-
-/** The live pid in `file`, or null when there is none or it names no process. */
-async function livePid(file: string): Promise<number | null> {
-  const pid = await readPid(file)
-  return pid !== null && isAlive(pid) ? pid : null
-}
+/** Said once while another process holds the registry's lock, with the pid it wrote. */
+export type OnWaiting = (holder: number | null) => void
 
 /**
- * Run `work` holding the registry's lock: a file holding this process's
- * pid, linked into place so it is never seen empty. A lock whose pid is
- * not alive is taken over; two processes taking one over at once can both
- * hold it, which needs a host to have died holding it first. Held for
- * longer than `LOCK_WAIT`, it is a problem, naming the lock's file.
+ * Run `work` holding the registry's lock, waited for: `onWaiting` is told
+ * once whom for. No timeout: a holder that hangs is named instead.
  */
 async function withRegistryLock<T>(
   data: string,
-  work: () => Promise<T>,
+  onWaiting: OnWaiting,
+  work: (locked: RegistryLocked) => Promise<T>,
 ): Promise<T | { readonly refused: RegistryProblem }> {
   const { lock } = registryFiles(data)
   await mkdir(data, { recursive: true })
-  // Unique even within one process, which may open two sessions at once.
-  const mine = `${lock}.${process.pid}.${randomUUID()}`
-  await writeFile(mine, `${process.pid}\n`)
-  try {
-    const until = Date.now() + LOCK_WAIT
-    for (;;) {
-      const taken = await link(mine, lock).then(
-        () => true,
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "EEXIST") return false
-          throw error
-        },
-      )
-      if (taken) break
-      const holder = await readPid(lock)
-      // A holder that died, or a file no pid is in, is stale.
-      if (holder === null || !isAlive(holder)) {
-        await rm(lock, { force: true })
-        continue
-      }
-      if (Date.now() >= until)
-        return { refused: { kind: "locked", file: lock, pid: holder } }
-      await new Promise(resolve => setTimeout(resolve, LOCK_RETRY))
-    }
-  } finally {
-    await rm(mine, { force: true })
-  }
-  try {
-    return await work()
-  } finally {
-    await rm(lock, { force: true })
-  }
+  const done = await withLock(
+    lock,
+    { platform: process.platform, writePid: true, onWaiting },
+    () => work(REGISTRY_LOCKED),
+  )
+  return done.kind === "done"
+    ? done.value
+    : { refused: { kind: "lock-failed", file: lock, detail: done.detail } }
+}
+
+/**
+ * The session's lock in `sessionDir` tried, which only a holder of the
+ * registry's takes: so a rename never moves a session while it is taken.
+ */
+async function trySessionLock(
+  _locked: RegistryLocked,
+  sessionDir: string,
+): Promise<LockAttempt> {
+  await mkdir(sessionDir, { recursive: true })
+  return tryLock(sessionLockFile(sessionDir), {
+    platform: process.platform,
+    heldWhile: "until-released",
+    writePid: true,
+  })
 }
 
 /** The registry in `data`: empty when there is none, a problem when it is not one. */
@@ -182,8 +153,9 @@ export async function sessionOfFolder(
     : { name: entry.name, dir: sessionDirs(dirs, entry.name).data }
 }
 
-/** Write the registry whole (`replaceFile`). Under the lock only. */
+/** Write the registry whole (`replaceFile`). */
 export async function writeRegistry(
+  _locked: RegistryLocked,
   data: string,
   registry: Registry,
 ): Promise<void> {
@@ -209,8 +181,10 @@ export interface OpenedSession {
   /** The session's data directory. */
   readonly dir: string
   readonly plan: OpenedPlan
-  /** Let go of `host.pid`, at the host's shutdown. */
-  release(): Promise<void>
+  /** Let go of the session's lock, at the host's shutdown. */
+  releaseLock(): Promise<void>
+  /** Settles if the session's lock went from under the host: it must stop. */
+  readonly lockLost: Promise<void>
 }
 
 /** The entries of `dir`, or none when it does not exist. */
@@ -220,28 +194,28 @@ const entriesIn = (dir: string): Promise<readonly string[]> =>
     throw error
   })
 
-/** A file the session's directories hold, a `host.pid` naming no process aside; null when they hold none. */
-async function heldFile(dirs: PinetrieDirs): Promise<string | null> {
+/** A file the session's directories keep, its lock's file aside; null when they keep none. */
+async function keptSessionFile(dirs: PinetrieDirs): Promise<string | null> {
   for (const dir of [dirs.data, dirs.config])
     for (const name of await entriesIn(dir)) {
       const file = path.join(dir, name)
-      if (dir === dirs.data && name === "host.pid" && !(await livePid(file)))
-        continue
-      return file
+      if (file !== sessionLockFile(dirs.data)) return file
     }
   return null
 }
 
 /**
- * Remove a session's directories, which must hold nothing but a stale
- * `host.pid`: `rmdir`, never a recursive delete, so a file written since
- * `heldFile` looked is kept, and named. Returns that file's directory, or
- * null once both are gone.
+ * Remove a session's directories, which must keep nothing but its lock's
+ * file, removed by `held`, its holder: `rmdir`, never a recursive delete, so
+ * a file written since `keptSessionFile` looked is kept, and named. Returns
+ * that file's directory, or null once both are gone.
  */
 export async function dropSessionDirs(
+  _locked: RegistryLocked,
+  held: HeldLock,
   dirs: PinetrieDirs,
 ): Promise<string | null> {
-  await rm(hostPidFile(dirs.data), { force: true })
+  await removeLockFile(held)
   for (const dir of [dirs.data, dirs.config]) {
     const kept = await rmdir(dir).then(
       () => false,
@@ -259,13 +233,17 @@ export async function dropSessionDirs(
 /**
  * The session for the folder at `root`, `env.PINETRIE_SESSION` attaching
  * it to one by name: the registry written, its data directory made, and its
- * `host.pid` taken, all under the registry's lock so a rename cannot move
- * it in between. A refusal changes nothing but an empty directory.
+ * lock held, all under the registry's lock so a rename cannot move it in
+ * between. Each session the plan may pick or drop has its lock tried once,
+ * before the plan: one another host holds is `served`. A refusal leaves
+ * at most a session's directory made and its lock's file, and holds
+ * nothing after it.
  */
 export async function openSession(input: {
   readonly root: string
   readonly env: Readonly<Record<string, string | undefined>>
   readonly dirs: PinetrieDirs
+  readonly onWaiting: OnWaiting
   readonly now?: () => number
 }): Promise<
   OpenedSession | { readonly refused: SessionRefusal | RegistryProblem }
@@ -273,52 +251,92 @@ export async function openSession(input: {
   const { dirs, env, now = Date.now } = input
   const real = await realPath(input.root)
   const asked = env.PINETRIE_SESSION
-  return withRegistryLock(dirs.data, async () => {
+  return withRegistryLock(dirs.data, input.onWaiting, async locked => {
     const registry = await readRegistry(dirs.data)
     if ("refused" in registry) return registry
     const own = registry.entries.find(e => e.path === real)
-    const plan = planSession(registry, {
-      path: real,
-      asked: asked === undefined || asked === "" ? null : asked,
-      now: now(),
-      gone: await gonePaths(registry),
-      ownHolds:
-        own === undefined ? null : await heldFile(sessionDirs(dirs, own.name)),
-    })
-    if (plan.kind === "refused") return { refused: plan.why }
-    if (plan.kind === "attached" && plan.dropped !== null) {
-      const kept = await dropSessionDirs(sessionDirs(dirs, plan.dropped))
-      if (kept !== null)
+    const named = registry.entries.find(e => e.name === asked)
+    const holds = new Map<SessionName, HeldLock>()
+    let kept: SessionName | null = null
+    try {
+      const served = new Map<SessionName, number | null>()
+      for (const name of new Set([own?.name, named?.name])) {
+        if (name === undefined) continue
+        const dir = sessionDirs(dirs, name).data
+        const attempt = await trySessionLock(locked, dir)
+        if (attempt.kind === "failed")
+          return { refused: lockFailed(dir, attempt.detail) }
+        if (attempt.kind === "held") holds.set(name, attempt)
+        else served.set(name, await holderPid(sessionLockFile(dir)))
+      }
+      const plan = planSession(registry, {
+        path: real,
+        asked: asked === undefined || asked === "" ? null : asked,
+        now: now(),
+        gone: await gonePaths(registry),
+        ownHolds:
+          own === undefined
+            ? null
+            : await keptSessionFile(sessionDirs(dirs, own.name)),
+        served,
+      })
+      if (plan.kind === "refused") return { refused: plan.why }
+      const dropped = plan.kind === "attached" ? plan.dropped : null
+      const droppedHold = dropped === null ? undefined : holds.get(dropped)
+      if (dropped !== null && droppedHold !== undefined) {
+        holds.delete(dropped)
+        const left = await dropSessionDirs(
+          locked,
+          droppedHold,
+          sessionDirs(dirs, dropped),
+        )
+        if (left !== null)
+          return {
+            refused: {
+              kind: "own-holds",
+              asked: plan.entry.name,
+              own: dropped,
+              file: left,
+            },
+          }
+      }
+      const { name } = plan.entry
+      const dir = sessionDirs(dirs, name).data
+      // A new session's lock is first tried here, its directory new.
+      const attempt = holds.get(name) ?? (await trySessionLock(locked, dir))
+      if (attempt.kind === "failed")
+        return { refused: lockFailed(dir, attempt.detail) }
+      if (attempt.kind === "held-by-another")
         return {
           refused: {
-            kind: "own-holds",
-            asked: plan.entry.name,
-            own: plan.dropped,
-            file: kept,
+            kind: "served",
+            name,
+            pid: await holderPid(sessionLockFile(dir)),
           },
         }
+      holds.set(name, attempt)
+      await writeRegistry(locked, dirs.data, plan.write)
+      kept = name
+      return {
+        name,
+        path: real,
+        dir,
+        plan,
+        releaseLock: () => attempt.release(),
+        lockLost: attempt.lockLost,
+      }
+    } finally {
+      // Every hold but the session's own, which the host keeps.
+      for (const [name, held] of holds) if (name !== kept) await held.release()
     }
-    await writeRegistry(dirs.data, plan.write)
-    const dir = sessionDirs(dirs, plan.entry.name).data
-    await mkdir(dir, { recursive: true })
-    const release = await takeHostPid(hostPidFile(dir))
-    return { name: plan.entry.name, path: real, dir, plan, release }
   })
 }
 
-/**
- * Write this process's pid to `file`, unless a live process holds it: a
- * second host on one folder is the store's to refuse, not this file's.
- * Returns what removes it again, which is nothing when another holds it.
- */
-async function takeHostPid(file: string): Promise<() => Promise<void>> {
-  if ((await livePid(file)) !== null) return async () => {}
-  await rm(file, { force: true })
-  await writeFile(file, `${process.pid}\n`, { flag: "wx" })
-  return async () => {
-    if ((await readPid(file)) === process.pid) await unlink(file)
-  }
-}
+const lockFailed = (dir: string, detail: string): RegistryProblem => ({
+  kind: "lock-failed",
+  file: sessionLockFile(dir),
+  detail,
+})
 
 /** Move `from` to `to`, unless `from` does not exist. Whether it moved. */
 const moveDir = (from: string, to: string): Promise<boolean> =>
@@ -334,36 +352,48 @@ const moveDir = (from: string, to: string): Promise<boolean> =>
 
 /**
  * Rename the session `old` to `next`, with its two directories, under the
- * registry's lock, unless a live host holds its `host.pid`. The registry is
- * written last: a move that fails moves the first back, and the registry
- * still names the old name.
+ * registry's lock, unless another host holds the session's lock. It holds
+ * that lock while it moves the directories, and its file moves with the
+ * data directory, held. The registry is written last: a move that fails
+ * moves the first back, and the registry still names the old name.
  */
 export async function renameSession(
   dirs: PinetrieDirs,
   old: string,
   next: string,
+  onWaiting: OnWaiting,
 ): Promise<RenamePlan | { readonly refused: RegistryProblem }> {
-  return withRegistryLock(dirs.data, async () => {
+  return withRegistryLock(dirs.data, onWaiting, async locked => {
     const registry = await readRegistry(dirs.data)
     if ("refused" in registry) return registry
     const known = registry.entries.find(e => e.name === old)
-    const servedBy =
-      known === undefined
-        ? null
-        : await livePid(hostPidFile(sessionDirs(dirs, known.name).data))
-    const plan = planRename(registry, old, next, servedBy)
-    if (plan.kind === "refused") return plan
-    const from = sessionDirs(dirs, plan.from)
-    const to = sessionDirs(dirs, plan.to)
-    await rm(hostPidFile(from.data), { force: true })
-    const movedData = await moveDir(from.data, to.data)
+    const dir = known === undefined ? null : sessionDirs(dirs, known.name).data
+    const attempt = dir === null ? null : await trySessionLock(locked, dir)
+    if (dir !== null && attempt?.kind === "failed")
+      return { refused: lockFailed(dir, attempt.detail) }
     try {
-      await moveDir(from.config, to.config)
-    } catch (error) {
-      if (movedData) await rename(to.data, from.data)
-      throw error
+      const plan = planRename(
+        registry,
+        old,
+        next,
+        dir !== null && attempt?.kind === "held-by-another"
+          ? { pid: await holderPid(sessionLockFile(dir)) }
+          : null,
+      )
+      if (plan.kind === "refused") return plan
+      const from = sessionDirs(dirs, plan.from)
+      const to = sessionDirs(dirs, plan.to)
+      const movedData = await moveDir(from.data, to.data)
+      try {
+        await moveDir(from.config, to.config)
+      } catch (error) {
+        if (movedData) await rename(to.data, from.data)
+        throw error
+      }
+      await writeRegistry(locked, dirs.data, plan.write)
+      return plan
+    } finally {
+      if (attempt?.kind === "held") await attempt.release()
     }
-    await writeRegistry(dirs.data, plan.write)
-    return plan
   })
 }

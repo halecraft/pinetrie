@@ -9,6 +9,7 @@ import {
   type Registry,
   type SessionEntry,
   type SessionFacts,
+  sessionWords,
 } from "./sessions.ts"
 import { sessionNameFor } from "./testing.ts"
 
@@ -29,6 +30,7 @@ const facts = (over: Partial<SessionFacts> = {}): SessionFacts => ({
   now: 100,
   gone: new Set(),
   ownHolds: null,
+  served: new Map(),
   ...over,
 })
 
@@ -198,6 +200,63 @@ describe("planSession", () => {
   })
 })
 
+describe("planSession, with a session another host serves", () => {
+  const own = entry("/w/website", "website")
+  const name = own.name
+
+  test("a folder whose session another host serves is refused, naming its pid", () => {
+    expect(
+      planSession(registry(own), facts({ served: new Map([[name, 42]]) })),
+    ).toEqual({ kind: "refused", why: { kind: "served", name, pid: 42 } })
+  })
+
+  test("a served session whose holder wrote no pid is refused without one", () => {
+    expect(
+      planSession(registry(own), facts({ served: new Map([[name, null]]) })),
+    ).toEqual({ kind: "refused", why: { kind: "served", name, pid: null } })
+  })
+
+  test("an attach that would drop a session another host serves is refused", () => {
+    const old = entry("/old/site", "site")
+    const plan = planSession(
+      registry(own, old),
+      facts({
+        asked: "site",
+        gone: new Set(["/old/site"]),
+        served: new Map([[name, 7]]),
+      }),
+    )
+    expect(plan).toEqual({
+      kind: "refused",
+      why: { kind: "served", name, pid: 7 },
+    })
+  })
+
+  test("another session served refuses nothing here", () => {
+    const other = entry("/w/blog", "blog")
+    const served = new Map([[other.name, 7]])
+    expect(planSession(registry(own, other), facts({ served })).kind).toBe(
+      "found",
+    )
+  })
+})
+
+describe("sessionWords for a served session", () => {
+  const name = entry("/w/website", "website").name
+
+  test("names the holder's pid when it wrote one", () => {
+    expect(sessionWords({ kind: "served", name, pid: 42 })).toContain(
+      "by process 42",
+    )
+  })
+
+  test("says no pid when it wrote none", () => {
+    expect(sessionWords({ kind: "served", name, pid: null })).toBe(
+      "session website is being served: stop its host first",
+    )
+  })
+})
+
 describe("planRename", () => {
   const reg = registry(entry("/w/website", "website"), entry("/w/blog", "blog"))
 
@@ -232,7 +291,7 @@ describe("planRename", () => {
   })
 
   test("a rename of a served session is refused", () => {
-    expect(planRename(reg, "website", "site", 42)).toEqual({
+    expect(planRename(reg, "website", "site", { pid: 42 })).toEqual({
       kind: "refused",
       why: { kind: "served", name: "website", pid: 42 },
     })
