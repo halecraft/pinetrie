@@ -619,6 +619,10 @@ reading the store once, planning once, then acting:
   words that are a blob (`cardTextSource`) count as referenced. It keeps
   each referenced original's fitted copy too: a draft names the original,
   and its message will show the copy.
+- **A known opportunity, not work:** the sweep could order blobs by a
+  use counter, the highest so far plus one, as the snapshot index orders
+  its rows (`snapshot-index.ts`), rather than by the clock, so a store on
+  a clock behind or ahead would sweep alike.
 - **The sweep reads the host's clock, and so do the blobs** (ADR-0139):
   `startHost`'s `now` is `Basics.now`, and the clock of the blobs it opens
   (`openStore`'s `now`) or keeps in memory. A caller that opens its own

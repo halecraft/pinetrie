@@ -474,9 +474,12 @@ paths are its diff." would compare a function with itself.
 - **A start reads one fact at a time, each only when its plan asks**
   (`planLaneStart`'s `gather`, read by `decideLaneStart` through a
   `LaneFactReader`): whether its disk is there; only with it gone, its
-  revision records' snapshots and its history's `keptSnapshot` (a load of
-  its root); then each snapshot, newest first, until one is there. So a
-  lane whose disk is there reads only that. A listing of every snapshot
+  revision records' snapshots, its history's `keptSnapshot` (a load of
+  its root) and its newest snapshot the host's index keeps (`indexed`,
+  which the disk upkeep never deletes, ADR-0210); then that one first, and
+  only where the index has no row or its snapshot is not there, each of
+  the rest, newest first, until one is there. So a lane whose disk is
+  there reads only that. A listing of every snapshot
   stats each one, which took 9 s cold on Duane's Mac (S247), so no start
   lists them.
 - **A nested lane's inner Docker data root is made before its container

@@ -150,6 +150,9 @@ hosts lanehost's roles; its disks are lanehost's client, spread
     Docker restarted), from the last event heard or, before any, the first
     stream's start; a kill while it is down is heard if fewer than 256
     events pass first.
+  - A known opportunity, not work: the same stream, filtered to `die`,
+    could tell the host when a lane's container dies, which the disk
+    upkeep now learns only from a listing of running lanes at each step.
 - **Every script it starts is the install's** (`dockerRuntime`'s
   `install`, `@pinetrie/install`'s `scriptCommand`): lanehost's server and
   its readers, the observer's server and its connection, each in the

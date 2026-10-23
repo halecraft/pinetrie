@@ -72,6 +72,11 @@ export interface LaneMade {
     readonly recorded: boolean
     /** The snapshot of its newest state, kept off its disk (`LaneHistory.keptSnapshot`). */
     readonly kept: SnapshotId | null
+    /**
+     * Its newest snapshot as the host's index keeps it, which the disk
+     * upkeep never deletes; null where the index has no row for the lane.
+     */
+    readonly indexed: SnapshotId | null
   } | null
   /** Each snapshot checked, and whether it is there. */
   readonly exists: ReadonlyMap<SnapshotId, boolean>
@@ -89,11 +94,13 @@ export const NOTHING_MADE: LaneMade = {
  * A fork owed runs whatever is there. A begun lane whose container must be
  * made starts from its disk; else its newest snapshot that exists, a
  * revision's before its kept state's, since a turn that changed only
- * ignored files leaves the state older; else, with no turn recorded, its
+ * ignored files leaves the state older, and the one the host's index keeps
+ * before either; else, with no turn recorded, its
  * files are its fork's, so it forks again; else what it recorded is gone,
  * and it is retired: a branch from it continues. It reads its facts one at
  * a time, as it needs them (`gather`): its history only once its disk is
- * gone, and its snapshots one each, newest first, until one is there.
+ * gone, and its snapshots one each, the index's first, then newest first,
+ * until one is there.
  */
 export function planLaneStart(input: {
   readonly fork: "owed" | "begun"
@@ -109,8 +116,11 @@ export function planLaneStart(input: {
   if (made.disk) return { kind: "disk", recreate }
   const { history } = made
   if (history === null) return { kind: "gather", need: { kind: "history" } }
+  // The index's first: what it names is there but for a lag, so the probe
+  // of the rest, newest first, runs only when it is not.
   const candidates = [
-    ...history.own,
+    ...(history.indexed === null ? [] : [history.indexed]),
+    ...history.own.filter(s => s !== history.indexed),
     ...(history.kept === null ? [] : [history.kept]),
   ]
   for (const snapshot of candidates) {

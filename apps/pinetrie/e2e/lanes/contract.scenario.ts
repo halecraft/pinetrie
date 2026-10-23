@@ -608,7 +608,33 @@ async function dockerContract(
 
     // A dead server's lock goes with its child: the host's next call takes
     // it again, once that child has exited.
-    await inDisks(projA, 'pkill -9 -f "server.ts disks" || true')
+    // Every disks container of the project's: on the Mac the refused host's
+    // is left in its slot, and only the first host's server holds the lock.
+    const disksContainers = (
+      await cli([
+        "ps",
+        "--filter",
+        `label=pinetrie.project=${projectKey(projA)}`,
+        "--filter",
+        `label=${LANEHOST_LABEL}=disks`,
+        "--format",
+        "{{.Names}}",
+      ])
+    )
+      .split("\n")
+      .filter(n => n.trim() !== "")
+    let killed = 0
+    for (const c of disksContainers) {
+      const out = await cli([
+        "exec",
+        c,
+        "sh",
+        "-c",
+        // Bracketed, so the pattern matches no shell that holds it.
+        'n=$(pgrep -f "[s]erver.ts disks" | wc -l); pkill -9 -f "[s]erver.ts disks"; echo $n',
+      ]).catch(() => "0")
+      killed += Number(out.trim()) || 0
+    }
     let refusedAfterKill = 0
     const tookBack = await waitFor(
       () =>
@@ -623,8 +649,8 @@ async function dockerContract(
     ).catch(() => -1)
     check(
       "a disks server killed with SIGKILL frees its project's lock: its host's next call takes it back",
-      tookBack >= 0,
-      `refused ${refusedAfterKill} times`,
+      killed > 0 && tookBack >= 0,
+      `killed ${killed} servers in ${disksContainers.length} containers, then refused ${refusedAfterKill} times`,
     )
 
     // ── the VM stops under a running host: it leases again ──

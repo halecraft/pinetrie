@@ -51,7 +51,7 @@ describe("a lane's start", () => {
       snapshotId("e1"),
       snapshotId("turn-1"),
     ]
-    const history = { own: [e2, e1], recorded: true, kept }
+    const history = { own: [e2, e1], recorded: true, kept, indexed: null }
     const gone: LaneMade = { disk: false, history, exists: new Map() }
     const start = (m: Partial<LaneMade>, container = "create" as const) =>
       planLaneStart({ fork: "begun", container, made: { ...gone, ...m } })
@@ -102,6 +102,20 @@ describe("a lane's start", () => {
       ).toEqual({ kind: "snapshot", from: kept, recreate: false })
     })
 
+    test("planLaneStart: with no disk, the index's newest is asked first, and the rest probed only when it is gone", () => {
+      const indexed = { ...history, indexed: e1 }
+      expect(start({ history: indexed })).toEqual({
+        kind: "gather",
+        need: { kind: "snapshot", snapshot: e1 },
+      })
+      expect(
+        start({ history: indexed, exists: new Map([[e1, true]]) }),
+      ).toEqual({ kind: "snapshot", from: e1, recreate: false })
+      expect(
+        start({ history: indexed, exists: new Map([[e1, false]]) }),
+      ).toEqual({ kind: "gather", need: { kind: "snapshot", snapshot: e2 } })
+    })
+
     test("planLaneStart: with nothing kept, a lane that recorded no turn forks again, and one that did is retired", () => {
       const none = new Map([
         [e2, false],
@@ -127,7 +141,12 @@ describe("a lane's start", () => {
         },
         async history() {
           reads.push("history")
-          return { own: [e3, e2, e1], recorded: true, kept: null }
+          return {
+            own: [e3, e2, e1],
+            recorded: true,
+            kept: null,
+            indexed: null,
+          }
         },
         async snapshotExists(s) {
           reads.push(s)

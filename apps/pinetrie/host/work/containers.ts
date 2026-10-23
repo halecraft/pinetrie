@@ -105,7 +105,7 @@ export function createContainers(deps: {
   /** A lane's fork (`work/create.ts`), run by its start. */
   readonly fork: NewLanes["fork"]
   readonly innerDockerDataRoots: InnerDockerDataRootsHeld
-  readonly snapshots: Pick<SnapshotTaking, "markUsed">
+  readonly snapshots: Pick<SnapshotTaking, "markUsed" | "rows">
   /** A run's end, its container stopped: what it left may go (a nested lane's inner projects). */
   readonly requestUpkeep: (reason: UpkeepReason) => void
 }): Containers {
@@ -130,8 +130,8 @@ export function createContainers(deps: {
   /**
    * What a begun lane's start reads once its container must be made, each
    * fact only when its plan asks: its disk; its revision records'
-   * snapshots, whether it has any, and its history's kept snapshot; and
-   * whether a snapshot is there, one at a time.
+   * snapshots, whether it has any, its history's kept snapshot, and its
+   * newest the index keeps; and whether a snapshot is there, one at a time.
    */
   const factsOf = (lane: ThreadId, h: LaneHistory): LaneFactReader => ({
     disk: () => setup.runtime.diskExists(lane),
@@ -143,10 +143,19 @@ export function createContainers(deps: {
           : held.ready.then(doc => readLaneRevisions(doc, lane)),
         h.keptSnapshot(),
       ])
+      // The lane's newest kept row, by id: a UUIDv7 orders by its making.
+      const indexed =
+        deps.snapshots
+          .rows()
+          .filter(r => r.lane === lane && r.state === "kept")
+          .map(r => r.snapshot)
+          .sort()
+          .at(-1) ?? null
       return {
         own: revisions.flatMap(r => (r.snapshot === null ? [] : [r.snapshot])),
         recorded: revisions.length > 0,
         kept,
+        indexed,
       }
     },
     snapshotExists: snapshot => setup.runtime.snapshotExists(snapshot),

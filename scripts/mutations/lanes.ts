@@ -199,8 +199,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a start checks its oldest snapshot first",
     file: "packages/lanes/start.ts",
-    from: "    ...history.own,\n",
-    to: "    ...[...history.own].reverse(),\n",
+    from: "    ...history.own.filter(s => s !== history.indexed),\n",
+    to: "    ...[...history.own].reverse().filter(s => s !== history.indexed),\n",
     command: unit,
     expect:
       "decideLaneStart: a lane whose disk is gone checks its snapshots only until one is there",
@@ -1068,5 +1068,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the default image downloads each tool for the machine it is built on, naming no architecture",
+  },
+  {
+    name: "a lane's start probes its snapshots before asking the index",
+    file: "packages/lanes/start.ts",
+    from: "    ...(history.indexed === null ? [] : [history.indexed]),\n    ...history.own.filter(s => s !== history.indexed),\n",
+    to: "    ...history.own,\n    ...(history.indexed === null ? [] : [history.indexed]),\n",
+    command: unit,
+    expect:
+      "with no disk, the index's newest is asked first, and the rest probed only when it is gone",
   },
 ]
