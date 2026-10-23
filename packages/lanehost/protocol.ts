@@ -47,8 +47,17 @@ export type LanehostCall =
   | { readonly kind: "record"; readonly project: string; readonly root: string }
   /** Every project in the lanes directory, with the root it recorded. */
   | { readonly kind: "projects" }
-  /** A project's disks, all of them, and its directory. */
-  | { readonly kind: "remove-project"; readonly project: string }
+  /**
+   * A project's disks, all of them, and its directory; `within`, an inner
+   * project in a nested lane's store: `project` is the inner one's key.
+   */
+  | {
+      readonly kind: "remove-project"
+      readonly project: string
+      readonly within?: NestedStore
+    }
+  /** What a project's store holds, by directory listings alone (`StoreListing`). */
+  | { readonly kind: "store-listing"; readonly project: string }
   /** A project's grant of the host's ports, replacing its last (`grants.ts`). */
   | ({ readonly kind: "grant" } & Grant)
   /** What differs between two of a project's snapshots, both read-only (`btrfs.ts`, `walk.ts`). */
@@ -145,6 +154,30 @@ export interface ProjectListed {
   readonly root: string | null
 }
 
+/** A nested lane's store: the lanes directory its inner hosts keep their projects in. */
+export interface NestedStore {
+  /** The outer project's key. */
+  readonly project: string
+  readonly lane: string
+}
+
+/**
+ * A project's store, listed. The names are read by a listing alone, never
+ * stat'ed (a stat of each held a listing for 9 s cold): a deletion
+ * by name needs no proof a name is a subvolume. A name in the making
+ * (`.tmp`), or no disk's, is left out, so none reaches an owner.
+ */
+export interface StoreListing {
+  readonly snapshots: readonly string[]
+  /** Its lanes' disks: `folder-line`, a read's working disk, is none. */
+  readonly lanes: readonly string[]
+  /** Each nested lane's inner projects, with the root each recorded. */
+  readonly nested: readonly {
+    readonly lane: string
+    readonly projects: readonly ProjectListed[]
+  }[]
+}
+
 /** What each call answers. */
 export interface LanehostResults {
   readonly disk: null
@@ -155,6 +188,7 @@ export interface LanehostResults {
   readonly record: null
   readonly projects: readonly ProjectListed[]
   readonly "remove-project": null
+  readonly "store-listing": StoreListing
   readonly grant: null
   readonly diff: DiskDiff
   readonly "path-facts": readonly PathFact[]
@@ -173,4 +207,9 @@ export type LanehostResult<C extends LanehostCall> = LanehostResults[C["kind"]]
 /** The server's hello: the role it serves. */
 export interface LanehostHello {
   readonly role: string
+  /**
+   * Why this server serves nothing: its project's lock is another host's,
+   * or could not be taken. Null when it serves.
+   */
+  readonly refused: string | null
 }

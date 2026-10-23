@@ -51,6 +51,7 @@ export function callModule(call: LanehostCall): Module {
     case "record":
     case "projects":
     case "remove-project":
+    case "store-listing":
       return "projects"
     case "grant":
       return "grants"

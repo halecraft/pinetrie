@@ -2,13 +2,19 @@
 // (`serverArgs`) and back.
 
 import type { Serving } from "./answer.ts"
-import { FOLDER_MOUNT, isNestedDisk, type NestedDisk } from "./layout.ts"
+import {
+  FOLDER_MOUNT,
+  isNestedDisk,
+  isProjectKey,
+  type NestedDisk,
+} from "./layout.ts"
 import { isRole, type Role, type RoleFacts } from "./roles.ts"
 
 /**
  * The arguments a role's server is started with. `cgroup` is where the
  * runtime bound the cgroup tree into the role's container; null where it
- * bound none.
+ * bound none. `holds` is the project whose lock the server takes: only a
+ * runtime's own disks role is given one, never a one-shot.
  */
 export const serverArgs = (
   role: Role,
@@ -16,10 +22,16 @@ export const serverArgs = (
   facts: RoleFacts,
   nested: NestedDisk,
   cgroup: string | null = null,
+  holds: string | null = null,
 ): readonly string[] => [
   role,
   lanesDir,
-  JSON.stringify({ ...facts, nested, ...(cgroup === null ? {} : { cgroup }) }),
+  JSON.stringify({
+    ...facts,
+    nested,
+    ...(cgroup === null ? {} : { cgroup }),
+    ...(holds === null ? {} : { holds }),
+  }),
 ]
 
 /**
@@ -38,6 +50,7 @@ export function servingFrom(args: readonly string[]): Serving {
     folder?: unknown
     nested?: unknown
     cgroup?: unknown
+    holds?: unknown
   }
   if (!isNestedDisk(parsed.nested))
     throw new Error(
@@ -55,6 +68,10 @@ export function servingFrom(args: readonly string[]): Serving {
     cgroup:
       typeof parsed.cgroup === "string" && parsed.cgroup.startsWith("/")
         ? parsed.cgroup
+        : null,
+    holds:
+      typeof parsed.holds === "string" && isProjectKey(parsed.holds)
+        ? parsed.holds
         : null,
   }
 }

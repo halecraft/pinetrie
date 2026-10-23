@@ -3,15 +3,15 @@ import { type LanehostChannel, lanehostClient } from "./client.ts"
 import type { LanehostCall } from "./protocol.ts"
 import type { Role } from "./roles.ts"
 
-/** A channel that answers each call with its kind, until `end`. */
-function fakeChannel(role: Role) {
+/** A channel that answers each call with its kind, until `end`; one whose server `refused` serves nothing. */
+function fakeChannel(role: Role, refused: string | null = null) {
   let end: () => void = () => {}
   const closed = new Promise<void>(r => {
     end = r
   })
   const calls: LanehostCall[] = []
   const channel: LanehostChannel = {
-    ready: Promise.resolve({ role }),
+    ready: Promise.resolve({ role, refused }),
     closed,
     async call(c) {
       calls.push(c)
@@ -23,6 +23,21 @@ function fakeChannel(role: Role) {
 }
 
 describe("lanehostClient", () => {
+  test("a server that refused is let go with its words, and the next call opens another", async () => {
+    const made: ReturnType<typeof fakeChannel>[] = []
+    const client = lanehostClient({
+      open: async role => {
+        const c = fakeChannel(role, made.length === 0 ? "held" : null)
+        made.push(c)
+        return c.channel
+      },
+      facts: async () => ({ rootless: false }),
+    })
+    await expect(client.call({ kind: "projects" })).rejects.toThrow("held")
+    await made[0]?.channel.closed
+    expect(await client.call({ kind: "projects" })).toBe("projects")
+    expect(made).toHaveLength(2)
+  })
   test("one channel per role, opened at its first call, every call logged", async () => {
     const opened: Role[] = []
     const lines: string[] = []

@@ -79,4 +79,31 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a plain directory is made a subvolume, and a missing one made, the rootless user's",
   },
+  {
+    name: "a disks server serves without its project's lock",
+    file: "packages/lanehost/start-serving.ts",
+    from: "  if (serving.holds === null) return ports.serve(null, answerCall)\n",
+    to: "  return ports.serve(null, answerCall)\n",
+    command: unit,
+    expect:
+      "the lock is held before the drop, and the drop runs before any call is answered",
+  },
+  {
+    name: "the client keeps a server that refused",
+    file: "packages/lanehost/client.ts",
+    from: "      if (hello.refused !== null) {\n",
+    to: "      if (false) {\n",
+    command: unit,
+    expect:
+      "a server that refused is let go with its words, and the next call opens another",
+  },
+  {
+    name: "the runtime's disks server locks no project",
+    file: "packages/docker/runtime.ts",
+    from: '          role === "disks" ? key : null,\n',
+    to: "          null,\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect: "a second host on a served project is refused",
+  },
 ]

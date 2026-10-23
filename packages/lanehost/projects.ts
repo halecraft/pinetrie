@@ -3,9 +3,15 @@
 
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { isDiskName } from "@pinetrie/core"
 import { type DiskStep, executeDiskSteps } from "./disks.ts"
-import { isProjectKey, type ProjectDisks, projectDisks } from "./layout.ts"
-import type { ProjectListed } from "./protocol.ts"
+import {
+  FOLDER_LINE,
+  isProjectKey,
+  type ProjectDisks,
+  projectDisks,
+} from "./layout.ts"
+import type { ProjectListed, StoreListing } from "./protocol.ts"
 
 /** The project's root, written beside its disks, for the sweep. */
 export async function recordProject(
@@ -66,6 +72,23 @@ export function planProjectRemoval(
       path: `${disks.statesDir}/${n}`,
     })),
   ]
+}
+
+/** What `disks`' store holds (`StoreListing`), each list sorted. */
+export async function storeListing(disks: ProjectDisks): Promise<StoreListing> {
+  const list = async (dir: string) =>
+    (await readdir(dir).catch(() => [] as string[])).filter(isDiskName).sort()
+  const nested = await list(disks.nestedDir)
+  return {
+    snapshots: await list(disks.snapshots),
+    lanes: (await list(disks.lanes)).filter(n => n !== FOLDER_LINE),
+    nested: await Promise.all(
+      nested.map(async lane => ({
+        lane,
+        projects: await listProjects(disks.nested(lane)),
+      })),
+    ),
+  }
 }
 
 /** A project's disks, all of them, then its directory. */

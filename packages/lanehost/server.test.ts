@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
@@ -21,6 +28,12 @@ import { isProjectKey, nestedDataRoot, projectDisks } from "./layout.ts"
 import { planProjectRemoval } from "./projects.ts"
 import { planDiff, planRoles } from "./roles.ts"
 import { servingFrom } from "./serving.ts"
+
+const exists = (p: string) =>
+  access(p).then(
+    () => true,
+    () => false,
+  )
 
 const A = entrySnapshotId(1)
 const B = entrySnapshotId(2)
@@ -333,6 +346,79 @@ describe("readSnapshotFile: a file inside a snapshot", () => {
       )
       await expect(read("../x")).rejects.toThrow("not a path inside")
       await expect(read("notes.md", 3)).rejects.toThrow("more than 3")
+    } finally {
+      await rm(lanesDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("a project's store, listed and cleared", () => {
+  const INNER = "fedcba9876543210"
+  const LANE = "t-01a125ee-afcf-7d13-99dc-58aa74a6e0fe"
+  const setUp = async () => {
+    const lanesDir = await mkdtemp(path.join(tmpdir(), "pinetrie-store-"))
+    const d = projectDisks(lanesDir, KEY)
+    for (const dir of [
+      d.snapshot(A),
+      `${d.snapshot(B)}.tmp`,
+      d.lane(LANE),
+      d.lane("folder-line"),
+    ])
+      await mkdir(dir, { recursive: true })
+    const inner = projectDisks(d.nested(LANE), INNER)
+    await mkdir(inner.snapshots, { recursive: true })
+    await writeFile(inner.root, "/tmp/pinetrie-folder-x")
+    return {
+      lanesDir,
+      d,
+      inner,
+      serving: servingFrom(testServerArgs("disks", lanesDir)),
+    }
+  }
+
+  test("the listing names snapshots, lanes and nested lanes' inner projects, never a snapshot in the making", async () => {
+    const { lanesDir, serving } = await setUp()
+    try {
+      expect(
+        await answer({ kind: "store-listing", project: KEY }, serving),
+      ).toEqual({
+        snapshots: [A],
+        lanes: [LANE],
+        nested: [
+          {
+            lane: LANE,
+            projects: [{ key: INNER, root: "/tmp/pinetrie-folder-x" }],
+          },
+        ],
+      })
+    } finally {
+      await rm(lanesDir, { recursive: true, force: true })
+    }
+  })
+
+  test("an inner project is removed within its nested lane's store, and only it", async () => {
+    const { lanesDir, d, inner, serving } = await setUp()
+    try {
+      await answer(
+        {
+          kind: "remove-project",
+          project: INNER,
+          within: { project: KEY, lane: LANE },
+        },
+        serving,
+      )
+      expect(await exists(inner.dir)).toBe(false)
+      expect(await exists(d.snapshot(A))).toBe(true)
+      await expect(
+        answer(
+          {
+            kind: "remove-project",
+            project: INNER,
+            within: { project: KEY, lane: "../x" },
+          },
+          serving,
+        ),
+      ).rejects.toThrow("not a disk's name")
     } finally {
       await rm(lanesDir, { recursive: true, force: true })
     }

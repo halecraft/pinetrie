@@ -32,7 +32,12 @@ import {
   projectDisks,
 } from "./layout.ts"
 import { readMachine } from "./machine.ts"
-import { listProjects, recordProject, removeProject } from "./projects.ts"
+import {
+  listProjects,
+  recordProject,
+  removeProject,
+  storeListing,
+} from "./projects.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
 import {
   callModule,
@@ -54,6 +59,11 @@ export interface Serving {
   readonly nested: NestedDisk
   /** Where the cgroup tree is bound read-only; null when the role was not given it. */
   readonly cgroup: string | null
+  /**
+   * The project whose lock this server holds for its whole life: its
+   * runtime's own disks role's. Null for a one-shot and the other roles.
+   */
+  readonly holds: string | null
 }
 
 const disksOf = (serving: Serving, key: string) => {
@@ -170,9 +180,20 @@ async function answerAny(
       return null
     case "projects":
       return listProjects(serving.lanesDir)
-    case "remove-project":
-      await removeProject(disksOf(serving, call.project))
+    case "remove-project": {
+      const { within } = call
+      if (within === undefined) {
+        await removeProject(disksOf(serving, call.project))
+        return null
+      }
+      const store = disksOf(serving, within.project).nested(named(within.lane))
+      if (!isProjectKey(call.project))
+        throw new Error(`not a project's key: ${JSON.stringify(call.project)}`)
+      await removeProject(projectDisks(store, call.project))
       return null
+    }
+    case "store-listing":
+      return storeListing(disksOf(serving, call.project))
     case "grant": {
       const { kind: _, ...grant } = call
       await applyGrant(grant)

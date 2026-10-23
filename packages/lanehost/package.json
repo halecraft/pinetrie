@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@pinetrie/channel": "workspace:*",
-    "@pinetrie/core": "workspace:*"
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/lock": "workspace:*"
   }
 }

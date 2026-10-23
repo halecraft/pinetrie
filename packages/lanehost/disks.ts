@@ -14,6 +14,7 @@ import {
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import { type DiskOp, isDiskName, isPathInside } from "@pinetrie/core"
+import type { Held } from "@pinetrie/lock"
 import {
   createSubvolume,
   drop,
@@ -226,6 +227,27 @@ export async function snapshotsIn(disks: ProjectDisks): Promise<string[]> {
     )
       found.push(e.name)
   return found.sort()
+}
+
+/**
+ * Every snapshot in the making (`<id>.tmp`) under a project's snapshots,
+ * dropped: what a snapshot cut short left. It takes the project's lock, so
+ * only a server holding it drops one: no other host's server is making a
+ * snapshot then. Read by a listing alone; `drop` removes whatever is there.
+ */
+export async function dropUnfinishedSnapshots(
+  _held: Held,
+  disks: ProjectDisks,
+): Promise<readonly string[]> {
+  const names = await readdir(disks.snapshots).catch(() => [] as string[])
+  const unfinished = names.filter(n => n.endsWith(".tmp")).sort()
+  await executeDiskSteps(
+    unfinished.map(n => ({
+      kind: "drop",
+      path: path.join(disks.snapshots, n),
+    })),
+  )
+  return unfinished
 }
 
 /** Carry out `steps` in order; throws at the first that fails. */

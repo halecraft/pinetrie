@@ -242,6 +242,9 @@ importers:
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
+      '@pinetrie/lock':
+        specifier: workspace:*
+        version: link:../lock
 
   packages/lanes:
     dependencies:
@@ -251,6 +254,8 @@ importers:
       '@pinetrie/install':
         specifier: workspace:*
         version: link:../install
+
+  packages/lock: {}
 
   packages/machine:
     dependencies:

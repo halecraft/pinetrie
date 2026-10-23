@@ -2,8 +2,8 @@
 
 Everything the host asks of the machine its lanes' disks are on, outside a
 lane (ADR-0129): one protocol, one server, one client, and a module per
-responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
-(`workspace.test.ts`), and knows no runtime (ADR-0205): the runtime
+responsibility. It declares `@pinetrie/core`, `@pinetrie/channel` and
+`@pinetrie/lock` only (`workspace.test.ts`), and knows no runtime (ADR-0205): the runtime
 (`@pinetrie/docker`) makes each role's container, opens its channel, and
 tells its server what a nested lane's disk holds (`NestedDisk`: its owner
 and its inner runtime's data root, `serverArgs`), so lanehost holds none of
@@ -28,7 +28,8 @@ server loads (`scripts/shipped.test.ts`).
 | `layout.ts` | where a project's disks are (`projectDisks`, `nestedDataRoot`), which names may stand for a project or a disk, and a nested disk's values (`NestedDisk`) |
 | `roles.ts` | `ROLES`, each role's grant; `callModule`, a call's module; `planRoles`, which role serves each module; `planDiff`, how a diff is made and by which role, one value |
 | `answer.ts` | one call answered by its module, refused when another role serves it |
-| `server.ts` | a role's process: `answer` served over `@pinetrie/channel` |
+| `server.ts` | a role's process: `startServing`'s ports, the real ones, over `@pinetrie/channel` |
+| `start-serving.ts` | a server's start, in its order: its project's lock (`HOST_LOCK`), the `.tmp` snapshots dropped, then `answer`; a refusal's words (`lockRefusal`) |
 | `once.ts` | one call answered and printed, for the suites |
 | `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`), which refuses arguments without a nested disk's values |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
@@ -36,7 +37,7 @@ server loads (`scripts/shipped.test.ts`).
 | `disks.ts` | each disk operation (core's `DiskOp`) planned as `DiskStep`s, then executed; a file read from a snapshot |
 | `btrfs.ts` | the one store: subvolumes made, snapshotted, found and dropped; the diff by `btrfs send`; a tree cloned by reflink |
 | `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`read-in`) |
-| `projects.ts` | a project's root recorded, the listing, a project's removal |
+| `projects.ts` | a project's root recorded, the listing, a project's removal; a store's listing (`storeListing`) |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
 | `machine.ts` | `machine-sample`: the machine's memory and pressure, the lanes directory's btrfs room, and each container's cgroup, read; the parsers of their files and `planBtrfsRoom`, pure |
 | `mountinfo.ts` | the mount holding a directory (`holdingMount`), from `/proc/self/mountinfo`; Docker's check of the lanes directory reads it too |
@@ -299,6 +300,35 @@ host, whatever their projects.
   puts it, then systemd (`cgroupCandidates`), and the one found is kept
   in the role's memory while the container is still asked for.
 
+## One host per project (`start-serving.ts`, S326, ADR-0210)
+
+- **A runtime's own disks server holds its project's lock for its whole
+  life** (`projects/<key>/host.lock`, through `@pinetrie/lock`), taken
+  before it answers anything: its arguments name the project it `holds`
+  (`serverArgs`), and only the runtime's disks role is given one. Another
+  role, and a one-shot (`once.ts`, the suites'), takes no lock and drops
+  nothing at its start.
+- **A lock another host holds refuses the server.** Its hello says why
+  (`LanehostHello.refused`, worded by `lockRefusal`), and every call is
+  refused with those words. The client lets such a channel go and throws
+  the words, so a host's start stops there (a `HostRefused`), and the next
+  call opens a fresh server: the lock may be free by then, since a dead
+  server's lock is freed only as its child exits. On Linux two hosts share
+  the role's container, and each runs its own server, so the lock still
+  tells them apart.
+- **A server outlives its host only for its call in flight** (S326): on
+  the Mac it dies at once with its slot's share; on Linux it finishes that
+  call, at most a diff's 120 s, then exits as its stdin has ended. Until
+  then, a host restarted on the project is refused, and says why.
+- **Only a holder of the lock drops what a snapshot cut short left**
+  (`dropUnfinishedSnapshots`, which takes the lock's `Held`): every
+  `<id>.tmp` under the project's snapshots, at the server's start, when no
+  other host's server is making one. A drop that fails is left for the
+  next start; the server serves anyway.
+- **A lock lost stops the server** (`Held.lost`): its child gone, another
+  host may take the project, so the server exits, and the host's next call
+  opens a fresh one.
+
 ## Calls name names, never paths
 
 - **A project is named by its key, a disk by its name** (`isProjectKey`,
@@ -447,6 +477,16 @@ out, every call checked and planned into paths first (`planApply`,
 - **A review's file is a stream too** (`file-out.ts`): one regular file of
   a snapshot, its path on stdin, its bytes on stdout, its path checked by
   the same `checkOutPaths` as `tar-out.ts`'s, never a copy of it.
+- **A store's listing reads names alone** (`store-listing`,
+  `storeListing`): its snapshots', its lanes' and each nested lane's inner
+  projects, each with the root it recorded, never a stat of each: a
+  deletion by name needs no proof a name is a subvolume, and `drop`
+  removes whatever is there. A name in the making (`.tmp`), or no disk's,
+  is left out, so none reaches an owner; `folder-line` is no lane.
+- **An inner project is removed in its nested lane's store**
+  (`remove-project` with `within`): the same removal, over the nested
+  store as its lanes directory, which is where an inner host keeps its
+  projects (its `/var/lib/pinetrie-lanes`).
 - **One listing names every snapshot** (`snapshots`, `snapshotsIn`): each
   subvolume under the project's snapshots directory with a disk's name,
   so one in the making (`.tmp`) is none yet. What the host keeps is
@@ -554,7 +594,11 @@ out, every call checked and planned into paths first (`planApply`,
   a delete of disks holding read-only subvolumes among it. It runs in a
   pine·trie lane, whose `/workspace` is the VM's btrfs, and skips, saying
   why, where its directory is not on btrfs.
-- `client.test.ts`: one channel per role, reopened after it ends.
+- `client.test.ts`: one channel per role, reopened after it ends; a
+  refusing server let go.
+- `start-serving.test.ts`: the start's order, the refusal, a lost lock;
+  with `flock` (Linux), two servers on one project, the second refusing.
+- `server.test.ts` also lists a store and removes an inner project.
 - `grants.test.ts`: `planGrant`'s input, and its refusals.
 - `send-stream.test.ts`: S148's recorded streams (`fixtures/`), each kind
   of change, names with a newline and a space; the recorded stream fed in

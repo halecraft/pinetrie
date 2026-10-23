@@ -366,6 +366,8 @@ export function dockerRuntime(input: {
           { rootless },
           NESTED_DISK,
           cgroupMount(role, rootless),
+          // Only this runtime's own disks server locks the project to its host.
+          role === "disks" ? key : null,
         ),
       ]),
       `lanehost's ${role} role`,

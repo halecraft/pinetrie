@@ -572,6 +572,61 @@ async function dockerContract(
       after.stdout.trim().replace(/\n/g, " ") + after.stderr.trim(),
     )
 
+    // ── one host per project: its disks server holds the project's lock ──
+    const second = await findProject({
+      root: projA,
+      install: thisInstall,
+      slots,
+      hostSocket: path.join(projA, ".no-ssh.sock"),
+      log,
+      building: build => log(`building ${JSON.stringify(build)}`),
+    })
+    const refusal =
+      second?.kind === "found"
+        ? await second
+            .ready({
+              defaultImage: "",
+              hostPorts: [],
+              mounts: [...mountsOfA, ...serverMounts],
+            })
+            .then(
+              () => "served",
+              (error: unknown) => errorText(error),
+            )
+        : `no runtime: ${second === null ? "no project" : second.words}`
+    if (second?.kind === "found") await second.close()
+    const firstServes = await runtime.snapshots().then(
+      () => "serves",
+      (error: unknown) => errorText(error),
+    )
+    check(
+      "a second host on a served project is refused",
+      refusal.includes("another pine·trie host serves this project's lanes") &&
+        firstServes === "serves",
+      `the second: ${refusal} | the first: ${firstServes}`,
+    )
+
+    // A dead server's lock goes with its child: the host's next call takes
+    // it again, once that child has exited.
+    await inDisks(projA, 'pkill -9 -f "server.ts disks" || true')
+    let refusedAfterKill = 0
+    const tookBack = await waitFor(
+      () =>
+        runtime.snapshots().then(
+          () => true,
+          () => {
+            refusedAfterKill++
+            return false
+          },
+        ),
+      30_000,
+    ).catch(() => -1)
+    check(
+      "a disks server killed with SIGKILL frees its project's lock: its host's next call takes it back",
+      tookBack >= 0,
+      `refused ${refusedAfterKill} times`,
+    )
+
     // ── the VM stops under a running host: it leases again ──
     if (own !== null) {
       const before = logs.length

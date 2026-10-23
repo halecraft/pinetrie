@@ -121,7 +121,8 @@ export interface ConflictRecord {
 /**
  * A lane's or a snapshot's name on lanehost's disks: one path segment, never
  * `.` or `..`, and never ending in `.tmp`, which a snapshot in the making
- * holds.
+ * holds, and which only the disks server holding its project's lock drops
+ * (lanehost's `dropUnfinishedSnapshots`).
  */
 export const isDiskName = (name: string): boolean =>
   /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name) && !name.endsWith(".tmp")

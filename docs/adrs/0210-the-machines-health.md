@@ -4,7 +4,7 @@
 - **Area:** `docs/06-interface.md`, `packages/vm/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
   `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
-  `packages/core/TECHNICAL.md`
+  `packages/core/TECHNICAL.md`, `packages/lock/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
   S317, S318, S319, S320, S321, S322, S323, S324, S326
 - **Revised:**

@@ -43,7 +43,13 @@ export function lanehostClient(input: {
       void channel.closed.then(() => {
         if (open.get(role) === opening) open.delete(role)
       })
-      await channel.ready
+      const hello = await channel.ready
+      // A server that serves nothing is let go, so the next call opens a
+      // fresh one: the lock it was refused may be free by then.
+      if (hello.refused !== null) {
+        channel.close()
+        throw new Error(hello.refused)
+      }
       return channel
     })
     open.set(role, opening)

@@ -319,11 +319,16 @@ test("only the app declares ssh: lanes and Docker know a host socket, never ssh"
   assert.deepEqual(declaring, ["apps/pinetrie"])
 })
 
-test("lanehost declares only core and channel: it knows nothing of lanes or Docker", () => {
+test("lanehost declares only core, channel and lock: it knows nothing of lanes or Docker", () => {
   assert.deepEqual(deps(read("packages/lanehost")).sort(), [
     "@pinetrie/channel",
     "@pinetrie/core",
+    "@pinetrie/lock",
   ])
+})
+
+test("lock declares nothing: lanehost runs it from pine·trie's install", () => {
+  assert.deepEqual(allDeps(read("packages/lock")), [])
 })
 
 test("the page declares no server package and no app", () => {
