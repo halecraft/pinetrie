@@ -19,6 +19,7 @@ import {
   gatherChangedFiles,
   readImageSources,
 } from "./build.ts"
+import { type DataDiskPlan, growDataDisk } from "./grow.ts"
 import { ensureGvproxy, gvproxyPath, readGvproxyPin } from "./gvproxy.ts"
 import {
   type Fill,
@@ -242,6 +243,8 @@ interface LeaseInput {
   readonly log: (line: string) => void
   /** Told before each build; without it, each is logged in `vmBuildWords`. */
   readonly building?: (build: VmBuild) => void
+  /** How large the data disk should be at a start this host makes; absent, it is left as it is. */
+  readonly growData?: DataDiskPlan
 }
 
 /**
@@ -283,6 +286,18 @@ async function leaseOnce(input: LeaseInput): Promise<{
     }
     // The VM's network stack: fetched and checked once, then kept.
     await ensureGvproxy(stateDir, pin)
+    // Before the launcher: the guest resizes into it at this boot.
+    if (input.growData !== undefined) {
+      const grown = await growDataDisk(
+        path.join(stateDir, "data.img"),
+        stateDir,
+        input.growData,
+      )
+      if (grown !== null)
+        input.log(
+          `[vm] the lanes' disk grows from ${gib(grown.from)} to ${gib(grown.to)} GiB at this start`,
+        )
+    }
     const out = openSync(path.join(stateDir, "launcher.log"), "a")
     started = Date.now()
     spawn(launcher.binary, argv, {
@@ -311,6 +326,9 @@ async function leaseOnce(input: LeaseInput): Promise<{
 }
 
 const refusedBy = (r: VmRefusal) => new VmRefused(vmWords(r))
+
+/** Bytes as whole GiB, for the log. */
+const gib = (bytes: number) => Math.round(bytes / 1024 ** 3)
 
 /** Build the current image, saying first what that takes, then prune what it replaced. */
 async function buildImage(input: LeaseInput): Promise<void> {

@@ -414,4 +414,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a status names the booted image and its one lease, and takes no slot",
   },
+  {
+    name: "growDataDisk shrinks a disk",
+    file: "packages/vm/grow.ts",
+    from: "  if (to === null || to <= file.size) return null\n",
+    to: "  if (to === null || to === file.size) return null\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/vm"],
+    expect: "a plan for no larger leaves the disk as it is",
+  },
 ]

@@ -12,7 +12,8 @@ import type { MachineSample } from "./sample.ts"
 import { LEAVE_FREE_DEFAULT } from "./store-settings.ts"
 
 const GiB = 1024 ** 3
-const settings = { leaveFree: LEAVE_FREE_DEFAULT }
+const settings = { leaveFree: LEAVE_FREE_DEFAULT, max: null }
+const NO_GROW = { grow: false }
 const lane = threadIdFor("t-1")
 
 /** A calm machine: room to spare, no pressure, one lane. */
@@ -66,7 +67,12 @@ function run(
 ): readonly Planned[] {
   let memory = from
   return samples.map(sample => {
-    const planned = planHealth(memory, { kind: "sampled", sample }, settings)
+    const planned = planHealth(
+      memory,
+      { kind: "sampled", sample },
+      settings,
+      NO_GROW,
+    )
     memory = planned.memory
     return planned
   })
@@ -132,7 +138,14 @@ describe("the store's room", () => {
     const low = run(times(ENTER_AFTER, withUnallocated(10 * GiB))).at(-1)
     expect(low?.health).toEqual({
       state: "amber",
-      causes: [{ kind: "room-low", unallocated: 10 * GiB, minimum: 20 * GiB }],
+      causes: [
+        {
+          kind: "room-low",
+          unallocated: 10 * GiB,
+          minimum: 20 * GiB,
+          grows: false,
+        },
+      ],
     })
   })
 
@@ -245,7 +258,12 @@ describe("events", () => {
           unallocated: 10 * GiB,
           minimum: 20 * GiB,
         },
-        { kind: "room-low", unallocated: 10 * GiB, minimum: 20 * GiB },
+        {
+          kind: "room-low",
+          unallocated: 10 * GiB,
+          minimum: 20 * GiB,
+          grows: false,
+        },
       ],
     })
   })
@@ -301,6 +319,7 @@ describe("the value", () => {
       entered?.memory ?? FIRST_MEMORY,
       { kind: "failed", error: "lanehost did not answer" },
       settings,
+      NO_GROW,
     )
     expect(failed.changed).toBe(true)
     expect(failed.health.causes).toEqual([
@@ -311,6 +330,7 @@ describe("the value", () => {
       failed.memory,
       { kind: "sampled", sample: withFullAvg10(20) },
       settings,
+      NO_GROW,
     )
     expect(back.changed).toBe(true)
     expect(kinds(back)).toEqual(["memory-stalls"])

@@ -29,9 +29,10 @@ import {
   removeLane,
   type Served,
 } from "@pinetrie/lanes"
-import type { StoreControls } from "@pinetrie/machine"
+import type { StoreControls, StoreTarget } from "@pinetrie/machine"
 import type { ProjectRecord } from "@pinetrie/rules"
 import {
+  type DataDiskPlan,
   GVPROXY_HOST_ADDRESS,
   keepLease,
   leaseExtra,
@@ -92,13 +93,17 @@ export interface MachineReach
   readonly storeVolume: string
   /** What the disk upkeep does to the store. */
   readonly store: StoreControls
+  /** Where the store is, which says what can be done to it (`planCapabilities`). */
+  readonly target: StoreTarget
 }
 
 /** The runtime's reads, with the store's place on this host. */
 const machineReach = (
   runtime: DockerRuntime,
   storeVolume: string,
+  target: StoreTarget,
 ): MachineReach => ({
+  target,
   runningLanes: () => runtime.runningLanes(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
@@ -171,6 +176,8 @@ export async function findProject(input: {
   readonly log: (line: string) => void
   /** Told before each build the runtime or the lane VM's lease runs, now or later. */
   readonly building: (build: Build) => void
+  /** How large the lane VM's data disk should be at a start this host makes; absent, as it is. */
+  readonly growData?: DataDiskPlan
 }): Promise<Found | Refused | null> {
   if (input.root === null) return null
   return runtimeFound(input.root, input, input.ownPort ?? null)
@@ -185,6 +192,7 @@ interface RuntimeInput {
   readonly hostSocket: string
   readonly log: (line: string) => void
   readonly building: (build: Build) => void
+  readonly growData?: DataDiskPlan
 }
 
 async function runtimeFound(
@@ -268,7 +276,7 @@ async function hostDockerFound(
     },
     shareAndGrant,
     close: async () => {},
-    machine: machineReach(runtime, lanesDir),
+    machine: machineReach(runtime, lanesDir, "docker-host"),
   }
 }
 
@@ -295,6 +303,7 @@ async function vmFound(
       agent: hostSocket,
       log,
       building: input.building,
+      ...(input.growData === undefined ? {} : { growData: input.growData }),
     })
   const leased = await leaseNow().catch((error: unknown) =>
     refusedWith(errorText(error)),
@@ -379,7 +388,7 @@ async function vmFound(
       await held.close()
       await kept.close()
     },
-    machine: machineReach(runtime, stateDir),
+    machine: machineReach(runtime, stateDir, "lane-vm"),
   }
 }
 

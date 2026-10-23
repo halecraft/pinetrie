@@ -56,7 +56,7 @@ function causeWords(
 ): string {
   switch (cause.kind) {
     case "room-low":
-      return `the lanes' disk is low: ${sizeWords(cause.unallocated)} left, ${sizeWords(cause.minimum)} at least`
+      return `the lanes' disk is low: ${sizeWords(cause.unallocated)} left, ${sizeWords(cause.minimum)} at least${cause.grows ? "; it grows when the lane VM next starts" : ""}`
     case "room-spent":
       return `the lanes' disk is full: ${sizeWords(cause.unallocated)} left, and writes in lanes may fail`
     case "metadata-full":

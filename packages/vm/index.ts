@@ -12,6 +12,11 @@ export {
   readImageSources,
 } from "./build.ts"
 export {
+  type DataDiskFacts,
+  type DataDiskPlan,
+  growDataDisk,
+} from "./grow.ts"
+export {
   ensureGvproxy,
   type GvproxyPin,
   gvproxyPath,

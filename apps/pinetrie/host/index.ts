@@ -21,7 +21,11 @@ import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
-import type { UpkeepReason } from "@pinetrie/machine"
+import {
+  planCapabilities,
+  planStoreSize,
+  type UpkeepReason,
+} from "@pinetrie/machine"
 import {
   type AgentDirBinding,
   createAgent,
@@ -409,6 +413,13 @@ async function openHost(
     slots: settleHost(start, {}).settled["lanes.vm.slots"].value,
     log,
     building: build => progress.building(build),
+    // Like the slots, from the machine's and your own file alone.
+    growData: facts =>
+      planStoreSize(
+        facts,
+        storeSettings(settleHost(start, {}).settled),
+        planCapabilities("lane-vm"),
+      ),
   })
   if (found?.kind === "refused") throw new HostRefused(found.words)
   if (found !== null) closers.defer(() => found.close())

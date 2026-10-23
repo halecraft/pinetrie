@@ -28,6 +28,7 @@ const CauseSchema = Type.Union([
     kind: Type.Literal("room-low"),
     unallocated: Bytes,
     minimum: Bytes,
+    grows: Type.Boolean(),
   }),
   Type.Object({ kind: Type.Literal("room-spent"), unallocated: Bytes }),
   Type.Object({

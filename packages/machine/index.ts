@@ -2,6 +2,11 @@
 // I/O: the host hands it ports (`TECHNICAL.md`).
 
 export {
+  type Capabilities,
+  planCapabilities,
+  type StoreTarget,
+} from "./capabilities.ts"
+export {
   createMachineManager,
   MANAGE_MODES,
   type ManageMode,
@@ -35,4 +40,9 @@ export {
   type LeaveFree,
   type StoreSettings,
 } from "./store-settings.ts"
+export {
+  planStoreSize,
+  type StoreSize,
+  type StoreSizeFacts,
+} from "./store-size.ts"
 export type { UpkeepReason } from "./upkeep.ts"

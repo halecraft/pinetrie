@@ -297,13 +297,22 @@ sweep of what binds into it.
   it. Full is btrfs's, not `df`'s: once every chunk is allocated, a full
   metadata fails every write while `df` still shows the free space inside
   data chunks (S314), and a balance cannot run to free one. No shell
-  reaches the guest, so the way back is a bigger file: with the launcher
-  stopped, `truncate -s <size> data.img` on the Mac (the launcher makes
-  the file only when it is missing), and `init` grows the filesystem at
-  the next boot. That resize failed once, on a disk of 36,000 subvolumes,
+  reaches the guest, so the way back is a bigger file, which the lease
+  makes itself (below); by hand, with the launcher stopped, `truncate -s
+  <size> data.img` on the Mac (the launcher makes the file only when it is
+  missing), and `init` grows the filesystem at the next boot. That resize failed once, on a disk of 36,000 subvolumes,
   and `init` logs why to the console; a boot of the builder's machine on
   `data.img` with `btrfs` and `btrfs-progs` grew it and balanced it
   (S314, its `recovery-init`).
+- **The lease grows `data.img` at each start it makes** (`growDataDisk`,
+  `grow.ts`, ADR-0210), before the launcher starts, so `init`'s resize
+  takes it at that boot: to the size its host plans (`LeaseInput.growData`,
+  the machine package's `planStoreSize` over the file's size and allocated
+  bytes and its volume's free space), within `lanes.store.max` and never
+  into `lanes.store.leaveFree`, and only ever larger. A sparse file grown
+  costs the volume nothing until the guest writes into it. A lease on a VM
+  already running grows nothing: growth waits for the next start (an idle
+  stop, an update, a repair), which `room-low`'s words say.
 - **Space freed in the guest goes back to the Mac** within seconds: the
   data disk takes discards and btrfs sends them (`discard=async`), so
   `data.img`'s size on the Mac follows what the guest holds (S312).

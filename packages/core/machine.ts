@@ -19,6 +19,8 @@ export type MachineCause =
       readonly kind: "room-low"
       readonly unallocated: number
       readonly minimum: number
+      /** The disk grows when the lane VM next starts: its settings and the volume allow it. */
+      readonly grows: boolean
     }
   /** The store has almost no unallocated space: a write may fail. */
   | { readonly kind: "room-spent"; readonly unallocated: number }

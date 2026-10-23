@@ -47,7 +47,18 @@ describe("machineWords", () => {
   test("each cause has its words", () => {
     expect(
       [
-        amber({ kind: "room-low", unallocated: 6 * GiB, minimum: 20 * GiB }),
+        amber({
+          kind: "room-low",
+          unallocated: 6 * GiB,
+          minimum: 20 * GiB,
+          grows: false,
+        }),
+        amber({
+          kind: "room-low",
+          unallocated: 6 * GiB,
+          minimum: 20 * GiB,
+          grows: true,
+        }),
         amber({ kind: "metadata-full", used: 3.9 * GiB, total: 4 * GiB }),
         amber({ kind: "filesystem-low", free: 80 * GiB, leaveFree: 100 * GiB }),
         amber({ kind: "memory-stalls", fullAvg10: 12.4 }),
@@ -70,6 +81,7 @@ describe("machineWords", () => {
       ].map(t => t.replace("The machine lanes run on: ", "")),
     ).toEqual([
       "work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least",
+      "work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least; it grows when the lane VM next starts",
       "work is slowed: the lanes' disk has no room for more files: its metadata is 98% full",
       "work is slowed: the disk holding the lanes is low: 80 GB free, 100 GB to leave",
       "work is slowed: lanes are short of memory: every task waited on it 12% of the last 10 seconds",

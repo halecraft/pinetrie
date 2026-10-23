@@ -130,4 +130,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "only entries have a rule that deletes",
   },
+  {
+    name: "the store grows into the volume's leaveFree",
+    file: "packages/machine/store-size.ts",
+    from: "    settings.max ?? Number.POSITIVE_INFINITY,\n    volumeAllows,\n",
+    to: "    settings.max ?? Number.POSITIVE_INFINITY,\n",
+    command: unit,
+    expect:
+      "it grows to at most what the volume gives while keeping lanes.store.leaveFree",
+  },
+  {
+    name: "a backend that cannot grow plans a growth",
+    file: "packages/machine/store-size.ts",
+    from: "  if (!capabilities.grow) return null\n",
+    to: "",
+    command: unit,
+    expect: "a backend that cannot grow plans nothing",
+  },
 ]

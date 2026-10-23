@@ -213,7 +213,9 @@ While the page syncs, "syncing…" leads its right end.
   deleted). Shape and colour both, never colour alone; never a
   badge, never moving. Its title, which is also its accessible name, names
   the worst cause in words, with how many more ("The machine lanes run on:
-  work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least"); a
+  work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least", and,
+  where the lane VM's disk will grow, "; it grows when the lane VM next
+  starts"); a
   cause that slows no work says so without "work is slowed" ("a turn's
   snapshot could not be recorded: branching at it starts from the turn
   before"). It is

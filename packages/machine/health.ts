@@ -7,15 +7,16 @@ import type {
   MachineCauseKind,
   MachineHealth,
   MachineState,
-  StoreRoom,
   ThreadId,
 } from "@pinetrie/core"
+import type { Capabilities } from "./capabilities.ts"
 import type { MachineSample } from "./sample.ts"
 import {
   leaveFreeBytes,
   minimumUnallocated,
   type StoreSettings,
 } from "./store-settings.ts"
+import { planStoreSize } from "./store-size.ts"
 
 const GiB = 1024 ** 3
 
@@ -140,8 +141,11 @@ const causeKey = (cause: MachineCause): string => {
 const UNMEASURED: LevelReading = { kind: "unmeasured" }
 
 function roomReadings(
-  store: StoreRoom | null,
+  sample: MachineSample,
+  settings: Pick<StoreSettings, "leaveFree" | "max">,
+  capabilities: Capabilities,
 ): readonly [string, LevelReading][] {
+  const { store } = sample
   if (store === null)
     return [
       ["room-spent", UNMEASURED],
@@ -150,6 +154,20 @@ function roomReadings(
     ]
   const { unallocated } = store
   const minimum = minimumUnallocated(store.size)
+  // Planned from what the sample read: btrfs's chunks stand for what the
+  // disk holds, and the store's filesystem for the volume holding it.
+  const grows =
+    sample.filesystem !== null &&
+    planStoreSize(
+      {
+        size: store.size,
+        allocated: store.size - unallocated,
+        volumeFree: sample.filesystem.free,
+        volumeSize: sample.filesystem.size,
+      },
+      settings,
+      capabilities,
+    ) !== null
   const spent: LevelReading =
     unallocated < ROOM_SPENT
       ? { kind: "over", cause: { kind: "room-spent", unallocated } }
@@ -158,9 +176,15 @@ function roomReadings(
         : { kind: "clear" }
   const low: LevelReading =
     unallocated < minimum
-      ? { kind: "over", cause: { kind: "room-low", unallocated, minimum } }
+      ? {
+          kind: "over",
+          cause: { kind: "room-low", unallocated, minimum, grows },
+        }
       : unallocated < minimum * CLEAR_MARGIN
-        ? { kind: "between", cause: { kind: "room-low", unallocated, minimum } }
+        ? {
+            kind: "between",
+            cause: { kind: "room-low", unallocated, minimum, grows },
+          }
         : { kind: "clear" }
   const { used, total } = store.metadata
   const metadata = { kind: "metadata-full", used, total } as const
@@ -326,7 +350,8 @@ export interface Planned {
 export function planHealth(
   memory: HealthMemory,
   result: SampleResult,
-  settings: Pick<StoreSettings, "leaveFree">,
+  settings: Pick<StoreSettings, "leaveFree" | "max">,
+  capabilities: Capabilities,
 ): Planned {
   if (result.kind === "failed") {
     const health = rankedHealth([
@@ -338,7 +363,7 @@ export function planHealth(
   const { sample } = result
   const next = new Map<string, Tracked>()
   const levels: readonly [string, LevelReading][] = [
-    ...roomReadings(sample.store),
+    ...roomReadings(sample, settings, capabilities),
     ["filesystem-low", filesystemReading(sample, settings)],
     ["memory-stalls", memoryReading(sample)],
     ...upkeepReadings(sample),

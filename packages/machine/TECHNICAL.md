@@ -21,6 +21,8 @@ and the words share one.
 | `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
 | `upkeep.ts` | the next bounded step (`planUpkeepStep`): the index's fill, or deletions of entries, lanes no thread will run (`deletableLanes`) and stopped nested lanes' abandoned inner projects (`abandonedInnerProjects`) |
 | `fixtures.ts` | test support: the index in memory, a store and records to plan over |
+| `capabilities.ts` | what a backend can do to the store (`Capabilities`, `planCapabilities`): the lane VM grows; Linux does not |
+| `store-size.ts` | how large the store's disk should be (`planStoreSize`, the one maker of `StoreSize`) |
 
 ## Rules
 
@@ -131,6 +133,14 @@ and the words share one.
   `room-unrecoverable` (red) while its last found nothing left to delete
   and the room still under it, each a level read from the sample's
   `upkeep`, which the manager fills, not the sensor.
+- **The store's disk grows only where the backend can** (`Capabilities`,
+  the first action to need one): `planStoreSize` grows a disk whose
+  unallocated room is under its floor by the larger of a quarter and
+  64 GiB, to at most `lanes.store.max` and at most what the volume gives
+  while keeping `lanes.store.leaveFree`, and never shrinks one. The lane
+  VM's lease grows it at its next start (`packages/vm/TECHNICAL.md`), and
+  `room-low` says so (`grows`), planned from the sample's room and
+  filesystem.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
   when the state, or the set of causes by kind and lane, differs from the
   value last written; a cause's measures changing alone is not. So the

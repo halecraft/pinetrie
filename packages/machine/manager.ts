@@ -8,6 +8,7 @@
 
 import { errorText, type MachineHealth, snapshotId } from "@pinetrie/core"
 import { createKeeper, KeeperClosed } from "@pinetrie/keeper"
+import type { Capabilities } from "./capabilities.ts"
 import {
   FIRST_MEMORY,
   type HealthMemory,
@@ -44,6 +45,8 @@ export function createMachineManager(deps: {
   readonly sink: HealthSink
   readonly settings: StoreSettings
   readonly mode: ManageMode
+  /** What this backend can do to the store: on Linux nothing grows. */
+  readonly capabilities: Capabilities
   readonly index: SnapshotIndex
   readonly store: StoreControls
   readonly records: StoreRecords
@@ -98,7 +101,7 @@ export function createMachineManager(deps: {
       result = { kind: "failed", error: errorText(error) }
     }
     const before = memory.health
-    const planned = planHealth(memory, result, settings)
+    const planned = planHealth(memory, result, settings, deps.capabilities)
     if (!planned.changed) {
       memory = planned.memory
       return
