@@ -24,10 +24,8 @@ export {
   ROW_STATES,
   type RowState,
   type SnapshotIndex,
-  type SnapshotReads,
   type SnapshotRow,
   type SnapshotTaking,
-  snapshotCost,
 } from "./snapshot-index.ts"
 export type {
   RecordedSnapshot,
@@ -45,4 +43,3 @@ export {
   type StoreSize,
   type StoreSizeFacts,
 } from "./store-size.ts"
-export type { UpkeepReason } from "./upkeep.ts"

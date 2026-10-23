@@ -24,7 +24,7 @@ import {
   RUNTIME_SHELL_PATH,
   type Step,
 } from "@pinetrie/lanes"
-import type { SnapshotTaking, UpkeepReason } from "@pinetrie/machine"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import {
   readLaneForks,
@@ -107,7 +107,7 @@ export function createContainers(deps: {
   readonly innerDockerDataRoots: InnerDockerDataRootsHeld
   readonly snapshots: Pick<SnapshotTaking, "markUsed" | "rows">
   /** A run's end, its container stopped: what it left may go (a nested lane's inner projects). */
-  readonly requestUpkeep: (reason: UpkeepReason) => void
+  readonly requestUpkeep: () => void
 }): Containers {
   const { basics, setup, registry, keeper, proposed, innerDockerDataRoots } =
     deps
@@ -290,7 +290,7 @@ export function createContainers(deps: {
             // clone, and no Docker runs on it unless it starts again.
             if (setup.specOf(lane).grants.nested)
               innerDockerDataRoots.stoppedAfterRun(lane)
-            deps.requestUpkeep("run-ended")
+            deps.requestUpkeep()
           })
           .catch(failed(basics, "stopping", lane)),
       )

@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite"
 import { deletableSnapshot, type SnapshotId, threadIdFor } from "@pinetrie/core"
 import { entrySnapshotId } from "@pinetrie/core/fixtures"
 import type { SnapshotIndex } from "@pinetrie/machine"
+import { memoryIndex } from "@pinetrie/machine/fixtures"
 import { afterAll, describe, expect, test } from "vitest"
 import { memorySnapshotIndex, sqliteSnapshotIndex } from "./snapshot-index.ts"
 
@@ -19,9 +20,16 @@ const stateOf = (index: SnapshotIndex, snapshot: SnapshotId) =>
 const take = (index: SnapshotIndex, snapshot: SnapshotId, lane = LANE) =>
   index.markTaken(index.reserve({ snapshot, lane, changed: 1 }))
 
-describe("the snapshot index", () => {
+/**
+ * The same rules for both: the machine's tests plan over its fixture, the
+ * host runs over SQLite, so neither drifts from the other.
+ */
+describe.each([
+  ["in SQLite", memorySnapshotIndex],
+  ["as the machine's tests keep it", () => memoryIndex()],
+] as const)("the snapshot index %s", (_, fresh) => {
   test("a row is reserved, then kept once taken, or deleted when never taken", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     const r = index.reserve({ snapshot: a, lane: LANE, changed: 5 })
     expect(stateOf(index, a)).toBe("reserved")
     expect(index.markTaken(r)).toBe(a)
@@ -31,7 +39,7 @@ describe("the snapshot index", () => {
   })
 
   test("a retake under the same name reserves its row again, whatever its state", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     index.markNotTaken(index.reserve({ snapshot: a, lane: LANE, changed: 1 }))
     index.reserve({ snapshot: a, lane: LANE, changed: 3 })
     expect(index.rows()).toMatchObject([
@@ -40,7 +48,7 @@ describe("the snapshot index", () => {
   })
 
   test("uses order rows by the order they came in, and a branch stays branched", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     for (const s of [a, b, c]) take(index, s)
     index.markUsed(a, true)
     index.markUsed(b, false)
@@ -54,13 +62,13 @@ describe("the snapshot index", () => {
   })
 
   test("a use of a name with no row writes none", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     index.markUsed(a, true)
     expect(index.rows()).toEqual([])
   })
 
   test("settling at a start keeps a reserved row whose snapshot is listed, and deletes one whose is not", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     index.reserve({ snapshot: a, lane: LANE, changed: 1 })
     index.reserve({ snapshot: b, lane: LANE, changed: 1 })
     index.settleReserved(new Set([a]))
@@ -68,7 +76,7 @@ describe("the snapshot index", () => {
   })
 
   test("rows marked to delete are kept again for a restored lane, and only for it", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     take(index, a)
     take(index, b, OTHER)
     index.markToDelete([a, b])
@@ -80,7 +88,7 @@ describe("the snapshot index", () => {
   })
 
   test("only a kept row is marked to delete, and no reserved row is marked deleted", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     index.reserve({ snapshot: a, lane: LANE, changed: 1 })
     take(index, b)
     index.markToDelete([a, b])
@@ -94,7 +102,7 @@ describe("the snapshot index", () => {
   })
 
   test("the fill writes a recorded snapshot kept, and leaves a name that has a row as it is", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     index.markNotTaken(index.reserve({ snapshot: a, lane: LANE, changed: 1 }))
     index.indexRecorded([
       { snapshot: a, lane: LANE, changed: 9 },
@@ -107,7 +115,7 @@ describe("the snapshot index", () => {
   })
 
   test("the index is incomplete until marked complete", () => {
-    const index = memorySnapshotIndex()
+    const index = fresh()
     expect(index.isComplete()).toBe(false)
     index.markComplete()
     expect(index.isComplete()).toBe(true)

@@ -23,7 +23,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { SnapshotTaking, UpkeepReason } from "@pinetrie/machine"
+import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import {
@@ -138,7 +138,7 @@ export async function startLaneWork(input: {
   readonly snapshotSkipped: () => void
   /** What lane work asks of the disk upkeep: a run's end, an archive, a restore. */
   readonly upkeep: UpkeepAsks & {
-    requestUpkeep(reason: UpkeepReason): void
+    requestUpkeep(): void
   }
 }): Promise<LaneWork> {
   const { basics } = input
@@ -252,7 +252,7 @@ export async function startLaneWork(input: {
     fork: newLanes.fork,
     innerDockerDataRoots,
     snapshots: input.snapshots,
-    requestUpkeep: reason => input.upkeep.requestUpkeep(reason),
+    requestUpkeep: () => input.upkeep.requestUpkeep(),
   })
   const updates = createUpdates({
     basics,

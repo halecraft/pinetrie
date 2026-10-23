@@ -137,8 +137,9 @@ describe("the retention table", () => {
   })
 
   test("only entries have a rule that deletes", () => {
+    const names = ["base", `turn-${entrySnapshotId(1)}`, "x"]
     for (const owner of ["folder-state", "base", "unknown"] as const)
-      expect(RETENTION[owner]()).toEqual([])
+      expect(RETENTION[owner](names, { ...FACTS, budget: 0 })).toEqual([])
   })
 })
 

@@ -2,7 +2,8 @@
 // snapshot fits: a lane's old turns' snapshots evicted, its newest and the
 // base kept; a branch from an evicted turn in a jj project keeping that
 // turn's files; and in a folder project, every state accepted work keeps
-// left to the folder code.
+// left to the folder code, and a branch from an evicted turn starting from
+// its base, saying so.
 
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -16,7 +17,12 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
-import { readAccepted, readPlaces, readRevisions } from "@pinetrie/reads"
+import {
+  readAccepted,
+  readLaneForks,
+  readPlaces,
+  readRevisions,
+} from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import { ancestry, messageText } from "@pinetrie/threads"
 import type { RunningHost } from "../../host/index.ts"
@@ -90,6 +96,19 @@ function toolResults(wh: RunningHost, lane: ThreadId | undefined): string[] {
     .map(m => messageText(m as never))
 }
 
+/** Each turn of `lane` that wrote `a.txt`, oldest first: the prompt's own record changed nothing. */
+function writesOfA(wh: RunningHost, lane: ThreadId | undefined) {
+  return [...heldRootRecords(wh, readRevisions).values()]
+    .filter(
+      (
+        r,
+      ): r is RevisionRecord & {
+        snapshot: NonNullable<RevisionRecord["snapshot"]>
+      } => r.lane === lane && r.snapshot !== null && r.paths.includes("a.txt"),
+    )
+    .sort((a, b) => (a.entry < b.entry ? -1 : 1))
+}
+
 /** Three turns, each writing `a.txt` anew. */
 const THREE_TURNS = [
   { tool: "bash", args: { command: "echo one > a.txt" } },
@@ -116,17 +135,7 @@ async function jjSection(
     await wu.send("@agent write", ROOT, START_AGENT)
     await idle()
     const lane = laneWith("@agent write")
-    // Each turn that wrote `a.txt`: the prompt's own record changed nothing.
-    const turns = [...heldRootRecords(wh, readRevisions).values()]
-      .filter(
-        (
-          r,
-        ): r is RevisionRecord & {
-          snapshot: NonNullable<RevisionRecord["snapshot"]>
-        } =>
-          r.lane === lane && r.snapshot !== null && r.paths.includes("a.txt"),
-      )
-      .sort((a, b) => (a.entry < b.entry ? -1 : 1))
+    const turns = writesOfA(wh, lane)
     const there = await projectSnapshots(project)
     const first = turns[0]
     const newest = turns.at(-1)
@@ -176,7 +185,7 @@ async function folderSection(
   lanes: LaneHosts,
 ): Promise<void> {
   const dir = plainFolder({ "a.txt": "base\n" })
-  const { script, wh, wu, idle } = await tightHost(
+  const { script, wh, wu, idle, laneWith } = await tightHost(
     lanes,
     dir,
     "store-upkeep-folder",
@@ -195,6 +204,32 @@ async function folderSection(
         kept.every(k => there.has(k as never)) &&
         states.length > 0,
       `kept ${kept.length}, listed ${states.length} folder states`,
+    )
+
+    // A folder turn's snapshot is its files: evicted, a branch there starts
+    // from its base, and its fork's record says so for its row.
+    const lane = laneWith("@agent write")
+    const first = writesOfA(wh, lane)[0]
+    script.use([
+      { tool: "bash", args: { command: "cat a.txt" } },
+      { text: "read" },
+    ])
+    await wu.send("@agent read", at(first?.entry ?? null), BRANCH)
+    await idle()
+    const branched = laneWith("@agent read")
+    const read = toolResults(wh, branched).at(-1)?.trim()
+    const fork =
+      branched === undefined
+        ? undefined
+        : readLaneForks(wh.session).get(branched)
+    check(
+      "a branch from an evicted folder turn starts from its base, and says so",
+      first !== undefined &&
+        !there.has(first.snapshot) &&
+        read === "base" &&
+        fork?.state === "begun" &&
+        fork.instead === "base",
+      `read ${JSON.stringify(read)} | fork ${JSON.stringify(fork)}`,
     )
   } finally {
     await wu.close().catch(() => {})

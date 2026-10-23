@@ -612,7 +612,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   leaves untracked (installed dependencies, build output) comes from an
   earlier turn's snapshot; its fork row says "started from an earlier
   turn's installed files; reinstall if needed", on its own canvas too.
-  Otherwise it starts from its base, as a copy does.
+  Otherwise it starts from its base, as a copy does, and its fork row says
+  "that turn's files are gone: started from its thread's base". A folder
+  project's turn has no commit, so a branch from one whose snapshot was
+  evicted always starts from its base: a folder project keeps less history
+  by choice.
 - **A thread from another root shows its path from that root**, the part
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with

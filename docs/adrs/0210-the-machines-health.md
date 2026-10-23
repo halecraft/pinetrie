@@ -38,6 +38,13 @@
     plans and deletes, so a restore never lands between the two. The listing
     is split by each name's owner before any rule sees it, and only the entry
     rule deletes.
+  - 2026-10-22 (Duane): a folder project's turn snapshots are evicted on the
+    same footing as a jj project's, least recently used, though a folder turn
+    has no commit to keep its tracked files: a person who chose a folder over
+    a repo chose less history. A branch from an evicted folder turn starts
+    from its thread's base, and its fork row says so. A store serves one
+    folder, so no weighing between a jj and a folder project's turns could
+    arise within one index.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

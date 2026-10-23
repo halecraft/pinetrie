@@ -32,6 +32,7 @@ import {
   type IconsRecord,
   type LaneForkRecord,
   type LatestNow,
+  type LostInstead,
   latestNow,
   latestSourceName,
   type ParentNow,
@@ -736,6 +737,24 @@ function proposedItem(
   return { speaker: `${agent}'s proposal`, text: title }
 }
 
+/** What a fork's row says of a snapshot it lost, by where its files came from instead. */
+function lostWords(instead: LostInstead | null, copied: boolean): string[] {
+  switch (instead) {
+    case null:
+      return []
+    case "point":
+      return [
+        "started from an earlier turn's installed files; reinstall if needed",
+      ]
+    case "base":
+      return [
+        copied
+          ? "its files could not be copied"
+          : "that turn's files are gone: started from its thread's base",
+      ]
+  }
+}
+
 /** A copy's source, or a parent thread elsewhere, as its fork row names it; null for neither. */
 function sourceOf(f: ColumnFacts): HeadOrigin | null {
   const { thread, index, origins } = f
@@ -751,12 +770,7 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   const copied = fork?.how === "copy"
   const laneFork = f.work.laneForks.get(thread)
   const begun = laneFork?.state === "begun" ? laneFork : null
-  const lost =
-    begun?.instead === "point"
-      ? ["started from an earlier turn's installed files; reinstall if needed"]
-      : copied && begun !== null && begun.lost !== null
-        ? ["its files could not be copied"]
-        : []
+  const lost = lostWords(begun?.instead ?? null, copied)
   // A branch whose parent is on this canvas names the message it forks from,
   // unless its files have something to say.
   if (

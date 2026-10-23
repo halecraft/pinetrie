@@ -220,7 +220,7 @@ describe("the disk upkeep", () => {
       index,
       listing: { snapshots: [A], lanes: [], nested: [] },
     })
-    manager.requestUpkeep("start")
+    manager.requestUpkeep()
     await settle(manager)
     expect(index.rows().map(r => r.state)).toEqual(["kept", "deleted"])
   })
@@ -240,7 +240,7 @@ describe("the disk upkeep", () => {
     index.markComplete()
     const { manager, did } = upkept({ index, mode: "observe" })
     await manager.markArchivedForDeletion([A])
-    manager.requestUpkeep("backstop")
+    manager.requestUpkeep()
     await settle(manager)
     expect(did).toEqual([])
   })
@@ -287,7 +287,7 @@ describe("the disk upkeep", () => {
       records: fakeRecords(),
       tell: () => {},
     })
-    manager.requestUpkeep("start")
+    manager.requestUpkeep()
     await new Promise(resolve => setTimeout(resolve, 0))
     const restored = manager.keepRestored([LANE])
     gate.resolve()
@@ -344,7 +344,7 @@ describe("the disk upkeep", () => {
         live: [LANE],
       }),
     })
-    manager.requestUpkeep("start")
+    manager.requestUpkeep()
     await settle(manager)
     expect(index.isComplete()).toBe(true)
     expect(index.rows()).toMatchObject([

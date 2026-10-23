@@ -102,6 +102,11 @@ and the words share one.
   (by id, a UUIDv7's order of making), until the kept rows' estimated
   metadata (`snapshotCost`, S320) is within `lanes.store.snapshotMetadata`
   and the room, with what each frees, is above its floor.
+- **A folder project's turns are evicted on the same footing as a jj
+  project's** (ADR-0210): least recently used, though an evicted folder
+  turn's files are gone, since it has no commit to keep them. A store
+  serves one folder, so one index never weighs the two kinds against each
+  other.
 - **The upkeep is bounded steps** (`planUpkeepStep`): at most
   `DELETIONS_PER_STEP` deletions and removals, or one batch of
   `INDEX_ROOTS_PER_STEP` roots of the index's fill, and whether more

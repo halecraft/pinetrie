@@ -21,11 +21,7 @@ import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
-import {
-  planCapabilities,
-  planStoreSize,
-  type UpkeepReason,
-} from "@pinetrie/machine"
+import { planCapabilities, planStoreSize } from "@pinetrie/machine"
 import {
   type AgentDirBinding,
   createAgent,
@@ -403,6 +399,8 @@ async function openHost(
   const chosen = projectDir === null ? null : projectAdapter(projectDir)
   if (chosen !== null && "refused" in chosen)
     throw new HostRefused(chosen.refused)
+  // The settings no project's copy may set, settled from the start's layers.
+  const hostOnly = settleHost(start, {}).settled
   const found = await findProject({
     install,
     hostSocket: hostSocketIn(sshDir),
@@ -410,14 +408,14 @@ async function openHost(
     // A port of 0 is chosen when the host listens, after this.
     ownPort: port === 0 ? null : port,
     // Only the machine's and your own file may set it: no project's copy.
-    slots: settleHost(start, {}).settled["lanes.vm.slots"].value,
+    slots: hostOnly["lanes.vm.slots"].value,
     log,
     building: build => progress.building(build),
     // Like the slots, from the machine's and your own file alone.
     growData: facts =>
       planStoreSize(
         facts,
-        storeSettings(settleHost(start, {}).settled),
+        storeSettings(hostOnly),
         planCapabilities("lane-vm"),
       ),
   })
@@ -765,7 +763,7 @@ async function openHost(
   // What lane work tells or asks of the machine, before it is watched, is
   // held for it.
   const snapshotSkipped = forward<[]>("the machine", "hold")
-  const requestUpkeep = forward<[UpkeepReason]>("the machine", "hold")
+  const requestUpkeep = forward<[]>("the machine", "hold")
   const markArchived = forward<[readonly SnapshotId[]]>("the machine", "hold")
   const keepRestored = forward<[readonly ThreadId[]]>("the machine", "hold")
   const work = await startLaneWork({
@@ -814,7 +812,7 @@ async function openHost(
     closers.defer(() => machine.close())
     snapshotSkipped.bind(() => machine.noteSnapshotSkipped())
     const { upkeep } = machine
-    requestUpkeep.bind(reason => upkeep.requestUpkeep(reason))
+    requestUpkeep.bind(() => upkeep.requestUpkeep())
     markArchived.bind(s => void upkeep.markArchivedForDeletion(s))
     keepRestored.bind(l => void upkeep.keepRestored(l))
   }

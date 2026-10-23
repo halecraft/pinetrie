@@ -629,6 +629,29 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
       "started from an earlier turn's installed files; reinstall if needed",
     )
   })
+  test("a branch whose fork lost a turn's files to its base says so", () => {
+    if (thread === null) throw new Error("no thread")
+    const forks = new Map([
+      [thread, { kind: "fork", at: entryId("4"), how: "branch" } as const],
+    ])
+    const laneForks = new Map([
+      [
+        thread,
+        {
+          lane: thread,
+          base: null,
+          state: "begun",
+          lost: snapshotId("e1"),
+          instead: "base",
+        } as const,
+      ],
+    ])
+    const o = columnView(facts(1, { thread, work: work({ forks, laneForks }) }))
+      .head.origin
+    expect(o.kind === "source" ? o.words : "").toContain(
+      "that turn's files are gone: started from its thread's base",
+    )
+  })
   test("a copy says it was copied; a branch, only where it is from", () => {
     expect(row("copy")).toMatchObject({ kind: "source", copied: true })
     expect(row("branch")).toMatchObject({ kind: "source", copied: false })

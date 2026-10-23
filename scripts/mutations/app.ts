@@ -3543,4 +3543,14 @@ export const mutations: readonly Mutation[] = [
     scenario: "store-upkeep",
     expect: "the upkeep never deletes a folder state",
   },
+  {
+    name: "a folder fork takes a swept state's snapshot for one still there",
+    file: "apps/pinetrie/host/work/create.ts",
+    from: "                : exists(snapshotId(above.point)),\n",
+    to: "                : Promise.resolve(true),\n",
+    suite: "lanes",
+    scenario: "store-upkeep",
+    expect:
+      "a branch from an evicted folder turn starts from its base, and says so",
+  },
 ]

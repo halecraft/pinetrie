@@ -159,8 +159,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's fork row ignores whether its files were kept",
     file: "packages/interface/column-view.ts",
-    from: "      : copied && begun !== null && begun.lost !== null\n",
-    to: "      : copied && begun !== null\n",
+    from: "    case null:\n      return []\n",
+    to: '    case null:\n      return copied ? ["its files could not be copied"] : []\n',
     command: unit,
     expect:
       "a copy whose fork began from its base says its files could not be copied",
@@ -5050,10 +5050,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch that kept a lost turn's files says nothing of it",
     file: "packages/interface/column-view.ts",
-    from: '    begun?.instead === "point"\n',
-    to: "    false\n",
+    from: '        "started from an earlier turn\'s installed files; reinstall if needed",\n',
+    to: '        "",\n',
     command: unit,
     expect:
       "a branch whose fork kept a lost turn's files from its point says it started from an earlier turn's installed files",
+  },
+  {
+    name: "a branch that lost a turn's files to its base says nothing of it",
+    file: "packages/interface/column-view.ts",
+    from: "          : \"that turn's files are gone: started from its thread's base\",\n",
+    to: '          : "",\n',
+    command: unit,
+    expect: "a branch whose fork lost a turn's files to its base says so",
   },
 ]

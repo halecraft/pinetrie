@@ -20,15 +20,6 @@ import {
 import type { SnapshotRow } from "./snapshot-index.ts"
 import type { StoreListed } from "./store.ts"
 
-/** Why an upkeep was asked for: each a trigger, none read to decide. */
-export type UpkeepReason =
-  | "start"
-  | "run-ended"
-  | "archived"
-  | "restored"
-  | "room-low"
-  | "backstop"
-
 /** The most deletions and removals one step makes. */
 export const DELETIONS_PER_STEP = 200
 /** The most roots one step of the index's fill reads. */
@@ -112,7 +103,14 @@ export function planUpkeepStep(facts: UpkeepFacts): UpkeepStep {
   }
   const owned = partitionByOwner(facts.listing.snapshots)
   const limit = DELETIONS_PER_STEP
-  const snapshots = RETENTION.entry(owned.entry, { ...facts, limit })
+  const ruled = { ...facts, limit }
+  // Every owner's rule, each over its own names: only the entry rule deletes.
+  const snapshots = [
+    ...RETENTION.entry(owned.entry, ruled),
+    ...RETENTION["folder-state"](owned["folder-state"], ruled),
+    ...RETENTION.base(owned.base, ruled),
+    ...RETENTION.unknown(owned.unknown, ruled),
+  ]
   const lanes = deletableLanes({
     lanes: facts.listing.lanes,
     live: facts.live,

@@ -3,7 +3,6 @@
 
 import type { MachineHealth, SnapshotId, ThreadId } from "@pinetrie/core"
 import type { SensedSample } from "./sample.ts"
-import type { UpkeepReason } from "./upkeep.ts"
 
 export interface MachineSensor {
   sample(): Promise<SensedSample>
@@ -21,8 +20,12 @@ export interface MachineManager {
   sample(): Promise<void>
   /** A turn's snapshot was skipped, its index row unwritten: counted in the next sample. */
   noteSnapshotSkipped(): void
-  /** A disk upkeep queued, merged with one already queued; none while observing. */
-  requestUpkeep(reason: UpkeepReason): void
+  /**
+   * A disk upkeep queued, merged with one already queued; none while
+   * observing. Every trigger asks alike (a start, a run's end, a timer): the
+   * step decides from what it finds.
+   */
+  requestUpkeep(): void
   /** An archive's snapshots marked to delete, a step on the manager's keeper; then an upkeep. */
   markArchivedForDeletion(snapshots: readonly SnapshotId[]): Promise<void>
   /** A restore's lanes' rows marked to delete kept again, a step on the manager's keeper; then an upkeep. */

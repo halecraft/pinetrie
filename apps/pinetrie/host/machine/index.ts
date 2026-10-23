@@ -88,9 +88,9 @@ export async function startMachineWatch(deps: {
   const timer = setInterval(() => void manager.sample(), MACHINE_SAMPLE_MS)
   timer.unref()
   // After the lanes are ready, and not awaited: runs resume beside it.
-  manager.requestUpkeep("start")
+  manager.requestUpkeep()
   const backstop = setInterval(
-    () => manager.requestUpkeep("backstop"),
+    () => manager.requestUpkeep(),
     DISK_UPKEEP_EVERY_MS,
   )
   backstop.unref()

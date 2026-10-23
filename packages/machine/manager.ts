@@ -190,8 +190,7 @@ export function createMachineManager(deps: {
     noteSnapshotSkipped() {
       skipped++
     },
-    // Every trigger asks alike: the step decides from what it finds.
-    requestUpkeep: () => queueUpkeep(),
+    requestUpkeep: queueUpkeep,
     async markArchivedForDeletion(snapshots) {
       await keeper.run(async () => index.markToDelete(snapshots))
       queueUpkeep()

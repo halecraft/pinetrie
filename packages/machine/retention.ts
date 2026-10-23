@@ -39,7 +39,10 @@ export type Retention<O extends SnapshotOwner> = (
 ) => readonly (O extends DeletableOwner ? Deletable<O> : never)[]
 
 /** A rule that keeps every name: the owner's own code decides, or nobody does. */
-export const keepAll = (): readonly never[] => []
+export const keepAll = (
+  _names: readonly string[],
+  _facts: RetentionFacts,
+): readonly never[] => []
 
 /** The listing split by `snapshotOwner`, before any rule sees it. */
 export function partitionByOwner(
