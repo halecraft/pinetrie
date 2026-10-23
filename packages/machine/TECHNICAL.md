@@ -26,6 +26,11 @@ and the words share one.
 
 ## Rules
 
+- **ADR-0212 (accepted, not yet built) builds the memory ladder's hold and
+  pause first**, on every backend, and records squeezing, freezing and
+  killing as decisions not taken, with a kept record of samples, until a
+  measurement of real use (S328) says whether they are needed.
+
 - **No I/O lives here.** It declares only `@pinetrie/core` and
   `@pinetrie/keeper` (`workspace.test.ts`), and `boundary.test.ts` refuses
   any import of a lane package, a runtime, pi, or Node's `fs`,

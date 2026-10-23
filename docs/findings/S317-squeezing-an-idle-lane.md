@@ -1,7 +1,7 @@
 # S317 — Reclaiming an idle lane's cache through its cgroup frees it in about two seconds, slows its next command by 2–4%, and leaves a busy lane beside it alone
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** The first step of the pressure ladder (ADR-0210) takes the
 cache idle lanes hold (S316) before anything has to wait. cgroup v2's

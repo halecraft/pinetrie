@@ -1,7 +1,7 @@
 # S316 — Between tool calls a lane holds almost no memory of its own, only cache: its peaks are its commands', up to 2.7 GiB for pine·trie's typecheck
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** A person runs 4 to 20 threads at once, each in a lane limited
 to 4 GiB (`LANE_MEMORY`). Admitting runs by their limits would allow two on

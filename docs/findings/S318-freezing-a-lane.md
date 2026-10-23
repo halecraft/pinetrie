@@ -1,7 +1,7 @@
 # S318 — A frozen lane's memory goes to zram only when reclaimed on purpose: then 1.6 GiB leaves in under a second, compressed 3.7 to 1, and comes back in about 2 s; with every running lane's swap held at 0, the kernel swaps none of theirs
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** The ladder's fourth step (ADR-0210) freezes the least
 important lanes mid-command when memory runs short. Freezing stops a lane

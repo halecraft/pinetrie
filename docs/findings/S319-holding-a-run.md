@@ -1,7 +1,7 @@
 # S319 — Every tool call already waits at its lane's gate; holding a run between tool calls is one more wait there, which must heed the call's abort
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** The ladder's third step (ADR-0210) holds the least
 important runs before their next tool call, so nothing in flight is cut and

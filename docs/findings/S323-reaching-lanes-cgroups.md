@@ -1,7 +1,7 @@
 # S323 — lanehost's privileged role reaches every lane's cgroup once `/sys/fs/cgroup` is bound into it read-write, and its disks role reads them bound read-only; a frozen lane must be thawed before it is stopped
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** ADR-0210's ladder reads each lane's cgroup (`memory.current`,
 `memory.events`, `memory.pressure`) and writes three of its files

@@ -48,6 +48,10 @@
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.
+  - ADR-0212: of its memory ladder, holding starts and pausing at the gate are
+    built now, on every backend; squeezing, freezing into zram and killing are
+    planned and recorded but not done, until a record of real use (S328) says
+    whether they are needed.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

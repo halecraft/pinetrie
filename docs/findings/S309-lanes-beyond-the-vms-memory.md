@@ -1,7 +1,7 @@
 # S309 — Lanes that want more memory than the VM has thrash whatever the kernel's settings; zram and `madvise` huge pages make it worse, and running half the lanes does 24 times the file work with no stalls
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0212
 
 **Question.** On 2026-10-21 the lane VM (12 GiB, 16 CPUs, 27 h up) ran
 four lanes of 4 GiB each (`LANE_MEMORY`) beside the observer and lanehost.
