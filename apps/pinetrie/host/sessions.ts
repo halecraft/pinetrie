@@ -26,6 +26,7 @@ import {
   type HeldLock,
   holderPid,
   type LockAttempt,
+  type OnWaiting,
   removeLockFile,
   tryLock,
   withLock,
@@ -71,9 +72,6 @@ declare const registryLockedBrand: unique symbol
 /** Proof the registry's lock is held: made only by `withRegistryLock`. */
 export type RegistryLocked = { readonly [registryLockedBrand]: true }
 const REGISTRY_LOCKED = {} as RegistryLocked
-
-/** Said once while another process holds the registry's lock, with the pid it wrote. */
-export type OnWaiting = (holder: number | null) => void
 
 /**
  * Run `work` holding the registry's lock, waited for: `onWaiting` is told
@@ -267,7 +265,7 @@ export async function openSession(input: {
         if (attempt.kind === "failed")
           return { refused: lockFailed(dir, attempt.detail) }
         if (attempt.kind === "held") holds.set(name, attempt)
-        else served.set(name, await holderPid(sessionLockFile(dir)))
+        else served.set(name, await saidPidIn(dir))
       }
       const plan = planSession(registry, {
         path: real,
@@ -311,7 +309,7 @@ export async function openSession(input: {
           refused: {
             kind: "served",
             name,
-            pid: await holderPid(sessionLockFile(dir)),
+            pid: await saidPidIn(dir),
           },
         }
       holds.set(name, attempt)
@@ -331,6 +329,10 @@ export async function openSession(input: {
     }
   })
 }
+
+/** The pid the session's lock holder wrote, as a refusal's words take it. */
+const saidPidIn = async (dir: string): Promise<number | null> =>
+  (await holderPid(sessionLockFile(dir)))?.saidPid ?? null
 
 const lockFailed = (dir: string, detail: string): RegistryProblem => ({
   kind: "lock-failed",
@@ -377,7 +379,7 @@ export async function renameSession(
         old,
         next,
         dir !== null && attempt?.kind === "held-by-another"
-          ? { pid: await holderPid(sessionLockFile(dir)) }
+          ? { pid: await saidPidIn(dir) }
           : null,
       )
       if (plan.kind === "refused") return plan

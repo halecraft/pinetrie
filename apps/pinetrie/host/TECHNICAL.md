@@ -763,7 +763,10 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   session's is released after, a refusal's too. A rename holds the
   session's lock while it moves the directories, the file moving with
   them, and removes nothing: a removed lock file is a free lock (S327). A
-  host whose session lock is lost shuts down (`sessionLockLostWords`).
+  host whose session lock is lost shuts down (`sessionLockLostWords`):
+  `server.ts` alone does this, and no suite runs it, so the path is
+  checked only by hand; a test needs a harness for a real `server.ts`
+  process.
 - **A session's directories are removed with `rmdir`,** never a
   recursive delete: when an attach replaces a folder's own empty session,
   a file written since it was found empty refuses the attach, and stays.

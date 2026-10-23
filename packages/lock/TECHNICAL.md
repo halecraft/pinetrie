@@ -46,8 +46,10 @@ pine·trie's install.
   waits. `withLock` releases after its work, also when it throws.
 - **A pid is for words only** (`SaidPid`). A hold given `writePid` writes
   its process's pid into the file once held, and `holderPid` reads it for
-  a waiter's or a refusal's words; nothing that decides takes a
-  `SaidPid`. A lanehost server writes none: a pid in a container's
+  a waiter's (`OnWaiting`) or a refusal's words. It comes as an object, not
+  a branded number: a brand stops a plain number being passed as one, not
+  one being passed as a plain number, so `process.kill` would take it.
+  Only words read `.saidPid`. A lanehost server writes none: a pid in a container's
   namespace means nothing to another.
 - **Only a holder removes its lock's file** (`removeLockFile`). A file
   removed while held is a free lock: the next taker opens a new file

@@ -21,8 +21,8 @@ export async function main(args: readonly string[]): Promise<number> {
     return 2
   }
   const { dirs } = configPlaces(process.env, homedir(), null)
-  const done = await renameSession(dirs, old, next, pid =>
-    console.error(registryWaitWords(pid)),
+  const done = await renameSession(dirs, old, next, holder =>
+    console.error(registryWaitWords(holder?.saidPid ?? null)),
   )
   if ("refused" in done) {
     console.error(sessionWords(done.refused))

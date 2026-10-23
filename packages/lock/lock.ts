@@ -8,7 +8,7 @@ import { spawn } from "node:child_process"
 import { readFile, rm, writeFile } from "node:fs/promises"
 
 /** Whether a hold waits for a lock another holds, or is refused at once. */
-export type LockMode = "try" | "wait"
+type LockMode = "try" | "wait"
 
 /**
  * Linux's: the shell opens the file, `flock` locks that open file, and the
@@ -57,12 +57,17 @@ export function lockCommand(
   }
 }
 
-declare const saidPid: unique symbol
 /**
- * A pid a holder wrote into its lock's file: for words only. Nothing that
- * decides takes one, since the process may be gone and its pid reused.
+ * A pid a holder wrote into its lock's file, for words only: an object, so
+ * nothing that decides by a pid (`process.kill`) can be given one. The
+ * process may be gone and its pid reused.
  */
-export type SaidPid = number & { readonly [saidPid]: true }
+export interface SaidPid {
+  readonly saidPid: number
+}
+
+/** Told once, with what its holder wrote, while another holds the lock. */
+export type OnWaiting = (holder: SaidPid | null) => void
 
 export interface HeldLock {
   readonly kind: "held"
@@ -120,7 +125,7 @@ export function holdOutcome(heard: {
 export async function holderPid(file: string): Promise<SaidPid | null> {
   const text = await readFile(file, "utf8").catch(() => "")
   const pid = Number.parseInt(text, 10)
-  return Number.isInteger(pid) && pid > 0 ? (pid as SaidPid) : null
+  return Number.isInteger(pid) && pid > 0 ? { saidPid: pid } : null
 }
 
 /**
@@ -149,7 +154,7 @@ export function tryLock(
 export async function awaitLock(
   file: string,
   options: LockOptions & {
-    readonly onWaiting: (holder: SaidPid | null) => void
+    readonly onWaiting: OnWaiting
   },
 ): Promise<HeldLock | LockFailed> {
   const attempt = await holdChild(file, "wait", options, () => {
@@ -165,7 +170,7 @@ export async function awaitLock(
 export async function withLock<T>(
   file: string,
   options: Omit<LockOptions, "heldWhile"> & {
-    readonly onWaiting: (holder: SaidPid | null) => void
+    readonly onWaiting: OnWaiting
   },
   work: (held: HeldLock) => Promise<T>,
 ): Promise<{ readonly kind: "done"; readonly value: T } | LockFailed> {

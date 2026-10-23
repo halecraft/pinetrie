@@ -100,7 +100,8 @@ export async function runHost(
     root,
     env,
     dirs: configPlaces(env, home, null).dirs,
-    onWaiting: pid => console.log(`[host] ${registryWaitWords(pid)}`),
+    onWaiting: holder =>
+      console.log(`[host] ${registryWaitWords(holder?.saidPid ?? null)}`),
   })
   if ("refused" in opened) {
     console.error(`[host] ${sessionWords(opened.refused)}`)

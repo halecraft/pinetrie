@@ -3556,7 +3556,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a session another host serves is opened as a new hold's",
     file: "apps/pinetrie/host/sessions.ts",
-    from: '        if (attempt.kind === "held") holds.set(name, attempt)\n        else served.set(name, await holderPid(sessionLockFile(dir)))\n',
+    from: '        if (attempt.kind === "held") holds.set(name, attempt)\n        else served.set(name, await saidPidIn(dir))\n',
     to: '        if (attempt.kind === "held") holds.set(name, attempt)\n',
     command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect:

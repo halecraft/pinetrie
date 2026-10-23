@@ -11,6 +11,7 @@ import {
   type LockOptions,
   lockCommand,
   removeLockFile,
+  type SaidPid,
   tryLock,
   withLock,
 } from "./lock.ts"
@@ -137,7 +138,7 @@ describe.skipIf(PLATFORMS.length === 0).each(PLATFORMS)(
       const file = fresh()
       const first = await tryLock(file, { ...options, writePid: true })
       if (first.kind !== "held") throw new Error(first.kind)
-      const heard: (number | null)[] = []
+      const heard: (SaidPid | null)[] = []
       let releaseAsked = false
       const waiting = awaitLock(file, {
         ...options,
@@ -150,14 +151,14 @@ describe.skipIf(PLATFORMS.length === 0).each(PLATFORMS)(
       const second = await waiting
       expect(second.kind).toBe("held")
       expect(releaseAsked).toBe(true)
-      expect(heard).toEqual([process.pid])
+      expect(heard).toEqual([{ saidPid: process.pid }])
       if (second.kind === "held") await second.release()
     })
 
     test("a holder's pid is in its file, for words", async () => {
       const file = fresh()
       const held = await tryLock(file, { ...options, writePid: true })
-      expect(await holderPid(file)).toBe(process.pid)
+      expect(await holderPid(file)).toEqual({ saidPid: process.pid })
       if (held.kind === "held") await held.release()
     })
 

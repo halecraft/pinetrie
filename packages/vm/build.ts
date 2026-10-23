@@ -300,7 +300,7 @@ export async function buildVmImageInVm(input: {
     {
       platform: process.platform,
       writePid: true,
-      onWaiting: pid => input.log(vmBuildWaitWords(pid)),
+      onWaiting: holder => input.log(vmBuildWaitWords(holder?.saidPid ?? null)),
     },
     async () => {
       if (!input.force && (await checkImageDir(run.image)) === null)

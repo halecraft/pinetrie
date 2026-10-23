@@ -109,7 +109,7 @@ test("a registry lock a killed process held is taken", async () => {
 
 test("a host waiting for the registry's lock says once whom for, then opens", async () => {
   const holder = await heldElsewhere(registryFiles(data).lock)
-  const heard: (number | null)[] = []
+  const heard: unknown[] = []
   const got = await openSession({
     root: folder("website"),
     env: {},
@@ -119,7 +119,7 @@ test("a host waiting for the registry's lock says once whom for, then opens", as
       holder.child.kill("SIGKILL")
     },
   })
-  expect(heard).toEqual([holder.child.pid])
+  expect(heard).toEqual([{ saidPid: holder.child.pid }])
   if ("refused" in got) throw new Error("refused")
   await got.releaseLock()
 })
