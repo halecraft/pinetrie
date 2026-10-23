@@ -1,7 +1,7 @@
 # S326 — A lanehost server dies with its host, at most its call in flight after it, and a flock its child holds keeps a second host out and frees itself, once the server ends the child's stdin as its own ends
 
 - **Status:** Answered
-- **Led to:** ADR-0210
+- **Led to:** ADR-0210, ADR-0211
 
 **Question.** A disks role's server is a `docker exec -i` process in a
 container that outlives its host, stopped only when its host ends its

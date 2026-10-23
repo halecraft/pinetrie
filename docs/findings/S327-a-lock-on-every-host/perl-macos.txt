@@ -1,0 +1,13 @@
+first: held
+second while held: exit 1
+after release: held
+host SIGKILLed (detached 0), tries to take it again: 1
+host SIGKILLed (detached 1), tries to take it again: 1
+group SIGINT (detached 0), lock then: free
+group SIGINT (detached 0), host heard: "child closed null SIGINT"
+group SIGINT (detached 1), lock then: still held
+group SIGINT (detached 1), host heard: ""
+waiter: held, early false
+file removed while held, second taker: held
+pid written, second taker: exit 1
+ms per hold and release: 5.3

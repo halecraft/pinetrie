@@ -32,9 +32,9 @@ lanehost's server runs it from pine·trie's install.
 - **Backends by platform** (`LockPlatform`): Linux's `flock`, which is in
   the lanehost image (busybox 1.37.0) and on every Linux host with
   util-linux. macOS's own `/usr/bin/perl` holds a `flock` with the same
-  protocol (probed 2026-10-22), and comes with the plan that moves the
-  host's other locks here (`host.pid`, the session registry's, a build's
-  `images/<key>.lock`). The launcher's `launcher.lock`
+  protocol (S327), and comes with the host's other locks (`host.pid`, the
+  session registry's, a build's `images/<key>.lock`), proposed in
+  ADR-0211. The launcher's `launcher.lock`
   (`packages/vm/launcher/launcher.swift`) keeps the same contract in Swift,
   which cannot import this package: the one lock outside it.
 

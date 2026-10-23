@@ -45,6 +45,9 @@
     from its thread's base, and its fork row says so. A store serves one
     folder, so no weighing between a jj and a folder project's turns could
     arise within one index.
+- **Amended by:**
+  - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
+    host's own locks too.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

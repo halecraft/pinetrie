@@ -1,0 +1,9 @@
+library/node:24-trixie-slim: /usr/bin/flock | flock from util-linux 2.41.5
+library/debian:bookworm-slim: /usr/bin/flock | flock from util-linux 2.38.1
+library/ubuntu:24.04: /usr/bin/flock | flock from util-linux 2.39.3
+library/ubuntu:22.04: /usr/bin/flock | flock from util-linux 2.37.2
+library/fedora:42: /usr/sbin/flock | flock from util-linux 2.40.4
+rockylinux/rockylinux:9-minimal: /usr/bin/flock | flock from util-linux 2.37.4
+library/archlinux:latest: Run 'docker run --help' for more information
+library/alpine:3.23: /usr/bin/flock | flock: unrecognized option: version (-> /bin/busybox)
+opensuse/leap:15.6: /usr/bin/flock | flock from util-linux 2.39.3

@@ -1,0 +1,46 @@
+== node:24-trixie-slim
+first: held
+second while held: exit 1
+after release: held
+host SIGKILLed (detached 0), tries to take it again: 1
+host SIGKILLed (detached 1), tries to take it again: 1
+group SIGINT (detached 0), lock then: free
+group SIGINT (detached 0), host heard: "child closed null SIGINT"
+group SIGINT (detached 1), lock then: still held
+group SIGINT (detached 1), host heard: ""
+waiter: held, early false
+file removed while held, second taker: held
+pid written, second taker: exit 1
+ms per hold and release: 0.8
+== node:24-alpine
+Unable to find image 'node:24-alpine' locally
+24-alpine: Pulling from library/node
+3e52994cb01f: Pulling fs layer
+d3531b7a4f21: Pulling fs layer
+ddcee9e51d95: Pulling fs layer
+5cef607e5e75: Pulling fs layer
+3e52994cb01f: Download complete
+56332ddce55a: Download complete
+d3531b7a4f21: Download complete
+5cef607e5e75: Download complete
+d3531b7a4f21: Pull complete
+24fc3d95f069: Download complete
+ddcee9e51d95: Download complete
+3e52994cb01f: Pull complete
+5cef607e5e75: Pull complete
+ddcee9e51d95: Pull complete
+Digest: sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+Status: Downloaded newer image for node:24-alpine
+first: held
+second while held: exit 1
+after release: held
+host SIGKILLed (detached 0), tries to take it again: 1
+host SIGKILLed (detached 1), tries to take it again: 1
+group SIGINT (detached 0), lock then: free
+group SIGINT (detached 0), host heard: ""
+group SIGINT (detached 1), lock then: still held
+group SIGINT (detached 1), host heard: ""
+waiter: held, early false
+file removed while held, second taker: held
+pid written, second taker: exit 1
+ms per hold and release: 0.6
