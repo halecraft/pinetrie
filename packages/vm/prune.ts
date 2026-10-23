@@ -4,14 +4,27 @@
 // directory (`planPrune`).
 
 import { execFile } from "node:child_process"
-import { readdir, readFile, rm } from "node:fs/promises"
+import { readdir, rm } from "node:fs/promises"
 import path from "node:path"
-import { isAlive, readBuilderPins, readImageSources } from "./build.ts"
+import { readBuilderPins, readImageSources } from "./build.ts"
 import { gvproxyPath, readGvproxyPin } from "./gvproxy.ts"
 import { imageKey, type PruneEntry, planPrune } from "./plan.ts"
 import { BUILDER, gatherBinary, LAUNCHER } from "./swift.ts"
 
 const OWNED = /\.(?:tmp|old)-(\d+)$/
+
+/**
+ * Whether `pid` names a process. `EPERM` is another user's process: alive.
+ * A reused pid reads as alive, which keeps a leftover until a later prune.
+ */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH"
+  }
+}
 
 async function gatherEntries(stateDir: string): Promise<readonly PruneEntry[]> {
   const entries: PruneEntry[] = []
@@ -20,15 +33,7 @@ async function gatherEntries(stateDir: string): Promise<readonly PruneEntry[]> {
     for (const name of await readdir(dir).catch(() => [])) {
       const p = path.join(dir, name)
       const owned = OWNED.exec(name)?.[1]
-      const locked = name.endsWith(".lock")
-        ? Number.parseInt(await readFile(p, "utf8").catch(() => ""), 10)
-        : Number.NaN
-      const owner =
-        owned !== undefined
-          ? Number(owned)
-          : Number.isNaN(locked)
-            ? null
-            : locked
+      const owner = owned === undefined ? null : Number(owned)
       entries.push({ path: p, owner })
     }
   }

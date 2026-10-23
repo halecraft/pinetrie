@@ -228,9 +228,10 @@ const RUNTIME_MAY = [
   "@pinetrie/install",
   "@pinetrie/lanehost",
   "@pinetrie/lanes",
+  "@pinetrie/lock",
 ]
 
-test("a runtime declares only core, lanes, lanehost with its channel, and install; never another runtime", () => {
+test("a runtime declares only core, lanes, lanehost with its channel and lock, and install; never another runtime", () => {
   for (const dir of WORKSPACE) {
     const m = read(dir)
     if (m.name === undefined || !RUNTIMES.includes(m.name)) continue
@@ -239,8 +240,8 @@ test("a runtime declares only core, lanes, lanehost with its channel, and instal
   }
 })
 
-test("vm declares nothing: it knows nothing of lanes", () => {
-  assert.deepEqual(allDeps(read("packages/vm")), [])
+test("vm declares only lock: it knows nothing of lanes", () => {
+  assert.deepEqual(allDeps(read("packages/vm")), ["@pinetrie/lock"])
 })
 
 test("only the app declares a runtime: it is the one place that picks one", () => {

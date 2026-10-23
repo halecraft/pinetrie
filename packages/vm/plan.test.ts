@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import {
+  BUILD_LOCK,
   type BuilderPins,
   changedImageFiles,
   type Fill,
@@ -17,7 +18,6 @@ import {
   NOTHING_HELD,
   otherHolders,
   parseSums,
-  planLock,
   planPrune,
   planShares,
   planVm,
@@ -364,12 +364,6 @@ test("vmHostRefusal: the Mac with Apple silicon on macOS 13 or later", () => {
   expect(vmHostRefusal({ ...mac, darwin: 21 })).toBe("old-macos")
 })
 
-test("planLock: take a free lock, wait on a live holder, break a dead one's", () => {
-  expect(planLock({ holder: null, alive: false })).toBe("take")
-  expect(planLock({ holder: 7, alive: true })).toBe("wait")
-  expect(planLock({ holder: 7, alive: false })).toBe("break")
-})
-
 describe("planPrune: what a build leaves behind", () => {
   const state = "/s"
   const entry = (p: string, owner: number | null = null) => ({
@@ -408,13 +402,17 @@ describe("planPrune: what a build leaves behind", () => {
     expect(
       planPrune({
         ...base,
-        entries: [
-          entry("images/key.tmp-1", 1),
-          entry("images/key.tmp-2", 2),
-          entry("images/key.lock", 2),
-        ],
+        entries: [entry("images/key.tmp-1", 1), entry("images/key.tmp-2", 2)],
       }),
-    ).toEqual(["/s/images/key.tmp-2", "/s/images/key.lock"])
+    ).toEqual(["/s/images/key.tmp-2"])
+  })
+  test("the build lock stays; an old image's lock goes", () => {
+    expect(
+      planPrune({
+        ...base,
+        entries: [entry(`images/${BUILD_LOCK}`), entry("images/key.lock")],
+      }),
+    ).toEqual(["/s/images/key.lock"])
   })
 })
 
@@ -453,10 +451,10 @@ describe("planVmBuildRun: a build as paths and arguments", () => {
     ])
     expect(run.order).toBe("failover.ko\nvirtio-rng.ko\n")
   })
-  test("a scratch beside the image, and the lock", () => {
+  test("a scratch beside the image, and one build lock for every image", () => {
     expect(run.image).toBe("/s/images/k")
     expect(run.scratch).toBe("/s/images/k.tmp-9")
-    expect(run.lock).toBe("/s/images/k.lock")
+    expect(run.lock).toBe("/s/images/build.lock")
   })
   test("the builder boots the kernel and initrd with a 1 GiB disk and 1 GiB, its console on stdout", () => {
     expect(run.disk).toEqual({

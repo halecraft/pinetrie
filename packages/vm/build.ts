@@ -20,6 +20,7 @@ import os from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
 import { gunzipSync } from "node:zlib"
+import { withLock } from "@pinetrie/lock"
 import { apkFiles, pinnedKernel } from "./apk.ts"
 import {
   ensurePinned,
@@ -42,9 +43,9 @@ import {
   imageSourceSums,
   isBuildLogLine,
   parseSums,
-  planLock,
   planVmBuildRun,
   type VmBuildRun,
+  vmBuildWaitWords,
 } from "./plan.ts"
 import { BUILDER, buildBinary, gatherBinary } from "./swift.ts"
 
@@ -115,49 +116,6 @@ const exec = (program: string, args: readonly string[]) =>
         : reject(new Error(`${program} ${args.join(" ")}: ${stderr.trim()}`)),
     ),
   )
-
-export const isAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH"
-  }
-}
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-
-/**
- * Run `body` holding `lock`, one build per image at a time: a lock a live
- * process holds is waited on, one whose holder is gone is broken.
- */
-async function withLock<T>(lock: string, body: () => Promise<T>): Promise<T> {
-  for (;;) {
-    const taken = await writeFile(lock, String(process.pid), {
-      flag: "wx",
-    }).then(
-      () => true,
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === "EEXIST") return false
-        throw error
-      },
-    )
-    if (taken) break
-    const held = await readFile(lock, "utf8").catch(() => null)
-    const holder = held === null ? null : Number.parseInt(held, 10)
-    const step = planLock({
-      holder: holder === null || Number.isNaN(holder) ? null : holder,
-      alive: holder !== null && isAlive(holder),
-    })
-    if (step === "break") await rm(lock, { force: true })
-    else if (step === "wait") await sleep(1000)
-  }
-  try {
-    return await body()
-  } finally {
-    await rm(lock, { force: true })
-  }
-}
 
 /**
  * Put the checked outputs in `from` at `image`. A whole image already there
@@ -309,8 +267,8 @@ export async function gatherBuildFirst(stateDir: string): Promise<{
 
 /**
  * Build the image for the current sources under `stateDir` in a VM of its
- * own. Waits for a build of the same image another process is making; a
- * whole image already there is kept unless `force`. Returns its directory,
+ * own. Waits for any build another process is making, saying once whose
+ * (`log`); a whole image already there is kept unless `force`. Returns its directory,
  * and whether this call built it.
  */
 export async function buildVmImageInVm(input: {
@@ -337,48 +295,61 @@ export async function buildVmImageInVm(input: {
     kernel,
   })
   await mkdir(path.dirname(run.image), { recursive: true })
-  return withLock(run.lock, async () => {
-    if (!input.force && (await checkImageDir(run.image)) === null)
-      return { dir: run.image, built: false }
-    const rootTarball = await ensurePinned(
-      path.join(run.pinsDir, path.basename(pins.root.url)),
-      pins.root,
-      fetch,
-    ).catch(e => {
-      throw goneWords(e, pins)
-    })
-    const builder = await gatherBinary(input.stateDir, BUILDER)
-    if (builder.state === "no-swiftc")
-      throw new Error(
-        "the lane VM's image builder needs Xcode's command line tools: `xcode-select --install`",
-      )
-    if (builder.state === "buildable")
-      await buildBinary(builder.binary, BUILDER)
-    await rm(run.scratch, { recursive: true, force: true })
-    try {
-      const apk = await readFile(
-        path.join(run.pinsDir, path.basename(pins.kernel.url)),
-      )
-      await writeInitrdDir(run, apk, sources)
-      await writeInitrd(run, rootTarball)
-      const disk = await open(run.disk.path, "w")
-      await disk.truncate(run.disk.bytes)
-      await disk.close()
-      const ran = await runBuilder(builder.binary, run.builderArgs, input.log)
-      if (!ran.built)
+  const done = await withLock(
+    run.lock,
+    {
+      platform: process.platform,
+      writePid: true,
+      onWaiting: pid => input.log(vmBuildWaitWords(pid)),
+    },
+    async () => {
+      if (!input.force && (await checkImageDir(run.image)) === null)
+        return { dir: run.image, built: false }
+      const rootTarball = await ensurePinned(
+        path.join(run.pinsDir, path.basename(pins.root.url)),
+        pins.root,
+        fetch,
+      ).catch(e => {
+        throw goneWords(e, pins)
+      })
+      const builder = await gatherBinary(input.stateDir, BUILDER)
+      if (builder.state === "no-swiftc")
         throw new Error(
-          `the lane VM's image did not build:\n${ran.tail.join("\n")}`,
+          "the lane VM's image builder needs Xcode's command line tools: `xcode-select --install`",
         )
-      await mkdir(run.out)
-      await exec("tar", ["-xf", run.disk.path, "-C", run.out])
-      await writeFile(
-        path.join(run.out, IMAGE_SOURCE_SUMS),
-        imageSourceSums(sources),
-      )
-      const built = await installImage(run.out, run.image, input.force)
-      return { dir: run.image, built }
-    } finally {
+      if (builder.state === "buildable")
+        await buildBinary(builder.binary, BUILDER)
       await rm(run.scratch, { recursive: true, force: true })
-    }
-  })
+      try {
+        const apk = await readFile(
+          path.join(run.pinsDir, path.basename(pins.kernel.url)),
+        )
+        await writeInitrdDir(run, apk, sources)
+        await writeInitrd(run, rootTarball)
+        const disk = await open(run.disk.path, "w")
+        await disk.truncate(run.disk.bytes)
+        await disk.close()
+        const ran = await runBuilder(builder.binary, run.builderArgs, input.log)
+        if (!ran.built)
+          throw new Error(
+            `the lane VM's image did not build:\n${ran.tail.join("\n")}`,
+          )
+        await mkdir(run.out)
+        await exec("tar", ["-xf", run.disk.path, "-C", run.out])
+        await writeFile(
+          path.join(run.out, IMAGE_SOURCE_SUMS),
+          imageSourceSums(sources),
+        )
+        const built = await installImage(run.out, run.image, input.force)
+        return { dir: run.image, built }
+      } finally {
+        await rm(run.scratch, { recursive: true, force: true })
+      }
+    },
+  )
+  if (done.kind === "failed")
+    throw new Error(
+      `the lane VM's image build could not lock ${run.lock}: ${done.detail}`,
+    )
+  return done.value
 }

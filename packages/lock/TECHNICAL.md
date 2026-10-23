@@ -54,6 +54,10 @@ pine·trie's install.
   beside it (S327).
 - **A lock lost is said** (`HeldLock.lockLost`): a child that exits unasked
   has let the lock go, and its holder must stop.
+- **Its users**: lanehost's project lock (`PROJECT_LOCK`), the host's
+  session registry and each served session's lock
+  (`apps/pinetrie/host/sessions.ts`), and the lane VM's image build
+  (`BUILD_LOCK`, `packages/vm`).
 - **The launcher's `launcher.lock`** (`packages/vm/launcher/launcher.swift`)
   keeps the same contract in Swift, which cannot import this package: the
   one lock outside it.

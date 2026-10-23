@@ -558,30 +558,25 @@ export function vmVersionWords(v: VmVersion, asker: VmAsker): string {
 export const vmKeptWords = (change: VmChange, why: string): string =>
   `the lane VM runs ${vmChangeWords(change)}, kept: ${why}`
 
+/** A build's one line while another process builds an image, naming it when it wrote its pid. */
+export const vmBuildWaitWords = (pid: number | null): string =>
+  `waiting for ${pid === null ? "another process" : `process ${pid}`}, which is building the lane VM's image`
+
 /** `vm:build`, finding no lane VM running. */
 export const vmNoneRunningWords = (image: string): string =>
   `no lane VM is running: the next host starts it from ${image}`
 
-/** What a build does with `images/<key>.lock`. */
-type LockStep = "take" | "wait" | "break"
-
 /**
- * One build at a time per image: take a lock no one holds, wait on one a
- * live process holds, break one whose holder is gone. A lock is a file
- * holding its holder's PID, since Node has no `flock`.
+ * One build at a time, of any image, under `images/`: an `@pinetrie/lock`
+ * lock, never removed, since a removed lock's file is a free lock: prune
+ * keeps it whatever is current.
  */
-export function planLock(f: {
-  readonly holder: number | null
-  readonly alive: boolean
-}): LockStep {
-  if (f.holder === null) return "take"
-  return f.alive ? "wait" : "break"
-}
+export const BUILD_LOCK = "build.lock"
 
 /** An entry of `images/`, `bin/` or `builder/`, and the process it belongs to, if any. */
 export interface PruneEntry {
   readonly path: string
-  /** The PID in a `.tmp-<pid>` name or a lock file; null for anything else. */
+  /** The PID in a `.tmp-<pid>` or `.old-<pid>` name; null for anything else. */
   readonly owner: number | null
 }
 
@@ -607,6 +602,7 @@ export function planPrune(f: {
     .filter(e => {
       if (e.owner !== null) return !f.alive(e.owner)
       const name = path.basename(e.path)
+      if (name === BUILD_LOCK) return false
       return !f.current.has(name) && !named.has(name)
     })
     .map(e => e.path)
@@ -680,7 +676,7 @@ export function planVmBuildRun(f: {
   return {
     pinsDir: path.join(f.stateDir, "builder"),
     image,
-    lock: `${image}.lock`,
+    lock: path.join(path.dirname(image), BUILD_LOCK),
     scratch,
     initrdDir: path.join(scratch, "initrd"),
     initrd,

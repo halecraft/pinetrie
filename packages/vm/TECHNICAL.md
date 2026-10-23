@@ -111,9 +111,12 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   Virtualization's NAT, entropy, the console on stdout, and a sparse 1 GiB
   file as its one disk. NAT, not gvproxy: a build lasts 20 s, and NAT's
   fragility (S135) matters to a VM that runs for hours.
-- **One build per image at a time:** `images/<key>.lock`, created `wx` and
-  holding the PID (`planLock`): a live holder is waited on, a dead one's
-  lock broken. Node has no `flock`.
+- **One build at a time, of any image** (ADR-0211): `images/build.lock`
+  (`BUILD_LOCK`), an `@pinetrie/lock` lock, waited for and said once
+  (`vmBuildWaitWords`); the kernel frees it with its holder, so no dead
+  holder's lock is broken by a guess. Two builds of different images (two
+  versions of pine·trie at once) wait for each other. It is never removed:
+  a removed lock's file is a free lock (S327), so prune keeps it.
 - **Installing never removes a whole image** (`installImage`): a build
   that finds one in place discards its own, since a launcher may be
   starting from it. One that is not whole is replaced; `--force` replaces
@@ -122,8 +125,10 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   images, launchers, builders and pins that are not current and that no
   running launcher names in its arguments, matched by name, since the
   contract scenario runs a launcher from another state directory over the
-  same `images/` and `bin/`; and the `.tmp-`, `.old-` and lock files of
-  processes gone. Without `ps`'s listing nothing is removed.
+  same `images/` and `bin/`; and the `.tmp-` and `.old-` entries of
+  processes gone, by the pid in their names (a reused pid keeps one until
+  a later prune). An old image's `<key>.lock` goes as any entry not
+  current. Without `ps`'s listing nothing is removed.
 - **Measured:** 20 s on an M3 Max, 21 s with the builder's compile and the
   pins' first fetch (43 MB); a lease from no image to Docker answering,
   27 s.

@@ -421,7 +421,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/vm: {}
+  packages/vm:
+    dependencies:
+      '@pinetrie/lock':
+        specifier: workspace:*
+        version: link:../lock
 
   packages/web:
     dependencies:

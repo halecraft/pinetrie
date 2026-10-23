@@ -91,10 +91,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "vm declares lanes",
     file: "packages/vm/package.json",
-    from: '    ".": "./index.ts"\n  }\n',
-    to: '    ".": "./index.ts"\n  },\n  "dependencies": { "@pinetrie/lanes": "workspace:*" }\n',
+    from: '    "@pinetrie/lock": "workspace:*"\n',
+    to: '    "@pinetrie/lock": "workspace:*",\n    "@pinetrie/lanes": "workspace:*"\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
-    expect: "vm declares nothing: it knows nothing of lanes",
+    expect: "vm declares only lock: it knows nothing of lanes",
   },
   {
     name: "a source given read-only and read-write is shared read-only",
@@ -291,13 +291,12 @@ export const mutations: readonly Mutation[] = [
     expect: "what a running launcher names stays, from any state directory",
   },
   {
-    name: "a build takes a lock a live process holds",
+    name: "prune removes the build lock",
     file: "packages/vm/plan.ts",
-    from: '  return f.alive ? "wait" : "break"\n',
-    to: '  return "break"\n',
+    from: "      if (name === BUILD_LOCK) return false\n",
+    to: "",
     command: unit,
-    expect:
-      "planLock: take a free lock, wait on a live holder, break a dead one's",
+    expect: "the build lock stays; an old image's lock goes",
   },
   {
     name: "a kept pinned copy is used whatever its hash",
@@ -362,8 +361,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the build records no sources",
     file: "packages/vm/build.ts",
-    from: "      await writeFile(\n        path.join(run.out, IMAGE_SOURCE_SUMS),",
-    to: "      await writeFile(\n        path.join(run.out, `${IMAGE_SOURCE_SUMS}.unread`),",
+    from: "          path.join(run.out, IMAGE_SOURCE_SUMS),",
+    to: "          path.join(run.out, `${IMAGE_SOURCE_SUMS}.unread`),",
     suite: "lanes",
     scenario: "vm-image",
     expect: "the built image records its sources' hashes",
@@ -380,8 +379,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lease boots an image the build did not install",
     file: "packages/vm/build.ts",
-    from: '      await mkdir(run.out)\n      await exec("tar", ["-xf", run.disk.path, "-C", run.out])\n',
-    to: "      await mkdir(run.out)\n",
+    from: '        await mkdir(run.out)\n        await exec("tar", ["-xf", run.disk.path, "-C", run.out])\n',
+    to: "        await mkdir(run.out)\n",
     suite: "lanes",
     scenario: "vm-image",
     expect: "the Mac builds the lane VM's image with no Docker engine",
