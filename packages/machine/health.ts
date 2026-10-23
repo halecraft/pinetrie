@@ -43,6 +43,7 @@ const HOST_STALL_MS = 1000
 const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "room-spent": "red",
   "metadata-full": "red",
+  "room-unrecoverable": "red",
   "room-low": "amber",
   "filesystem-low": "amber",
   "memory-stalls": "amber",
@@ -50,15 +51,18 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "service-oom-killed": "amber",
   "host-stalls": "amber",
   "snapshot-skipped": "amber",
+  "freeing-room": "amber",
   unsampled: "amber",
 }
 
 /** Causes of one state, in the order they are listed: what stops work first. */
 const ORDER: readonly MachineCauseKind[] = [
   "room-spent",
+  "room-unrecoverable",
   "metadata-full",
   "unsampled",
   "room-low",
+  "freeing-room",
   "filesystem-low",
   "memory-stalls",
   "lane-oom-killed",
@@ -190,6 +194,38 @@ function filesystemReading(
       : { kind: "clear" }
 }
 
+/**
+ * What the upkeep's last step found, as levels: over while it says so,
+ * clear once it does not. Unrecoverable names the room the sample read.
+ */
+function upkeepReadings(
+  sample: MachineSample,
+): readonly [string, LevelReading][] {
+  const { store } = sample
+  const unrecoverable: LevelReading =
+    store === null
+      ? UNMEASURED
+      : sample.upkeep.exhausted
+        ? {
+            kind: "over",
+            cause: {
+              kind: "room-unrecoverable",
+              unallocated: store.unallocated,
+              minimum: minimumUnallocated(store.size),
+            },
+          }
+        : { kind: "clear" }
+  return [
+    [
+      "freeing-room",
+      sample.upkeep.freeing
+        ? { kind: "over", cause: { kind: "freeing-room" } }
+        : { kind: "clear" },
+    ],
+    ["room-unrecoverable", unrecoverable],
+  ]
+}
+
 function memoryReading(sample: MachineSample): LevelReading {
   const { pressure } = sample.machine
   if (pressure === null) return UNMEASURED
@@ -305,6 +341,7 @@ export function planHealth(
     ...roomReadings(sample.store),
     ["filesystem-low", filesystemReading(sample, settings)],
     ["memory-stalls", memoryReading(sample)],
+    ...upkeepReadings(sample),
   ]
   for (const [key, r] of levels) {
     const stepped = nextLevelState(memory.causes.get(key), r)

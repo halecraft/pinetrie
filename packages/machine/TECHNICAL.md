@@ -16,7 +16,11 @@ and the words share one.
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`) and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
 | `health.ts` | `planHealth` and its memory: the causes, their thresholds, the state |
-| `manager.ts` | `createMachineManager`: gather, plan, write, on a keeper of its own |
+| `manager.ts` | `createMachineManager`: gather, plan, write, and the disk upkeep's steps, on a keeper of its own; `MANAGE_MODES` |
+| `store.ts` | what the upkeep reads and does: `StoreListed`, `StoreControls`, `StoreRecords` |
+| `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
+| `upkeep.ts` | the next bounded step (`planUpkeepStep`): the index's fill, or deletions of entries, lanes no thread will run (`deletableLanes`) and stopped nested lanes' abandoned inner projects (`abandonedInnerProjects`) |
+| `fixtures.ts` | test support: the index in memory, a store and records to plan over |
 
 ## Rules
 
@@ -80,6 +84,53 @@ and the words share one.
   `SnapshotTaking`; the manager alone is given the whole `SnapshotIndex`,
   so only its keeper moves a row to delete, keeps one again, or settles
   what a dead host reserved. The host composes them once.
+- **No rule subtracts a kept set from the listing.** The listing is split
+  by `snapshotOwner` before any rule sees it (`partitionByOwner`), and each
+  owner's rule decides its own names (`RETENTION`, exhaustive): only the
+  entry rule deletes; folder states are the folder code's (`planKeep`),
+  and the base and names of no owner are nobody's. So a name nothing
+  decided about stays, and a rule written for one owner cannot reach
+  another's. Every entry deleted is made by `deletableSnapshot("entry")`.
+- **The entry rule, in its order** (`planEntryRetention`): rows marked to
+  delete, and rows deleted whose name is still listed (a deletion cut
+  short); then names with no row, but only once the index is complete
+  (a row is written before every snapshot and the project's lock keeps
+  other hosts out, so no row means no one will name it); then the least
+  recently used kept rows, never one branched from nor a lane's newest
+  (by id, a UUIDv7's order of making), until the kept rows' estimated
+  metadata (`snapshotCost`, S320) is within `lanes.store.snapshotMetadata`
+  and the room, with what each frees, is above its floor.
+- **The upkeep is bounded steps** (`planUpkeepStep`): at most
+  `DELETIONS_PER_STEP` deletions and removals, or one batch of
+  `INDEX_ROOTS_PER_STEP` roots of the index's fill, and whether more
+  remain, which queues the next. Samples interleave, and each step is
+  planned against the latest facts. While the index is incomplete the
+  step only fills it, from every root's revision records, and deletes
+  nothing; a kept row whose snapshot is no longer listed is marked
+  deleted with nothing deleted. A lane's disk goes when its thread will
+  never run again (no record, or in an archived canvas), never while it
+  runs, and only under a thread's name; a stopped nested lane's inner
+  projects go when their recorded root is not on the lane's disk
+  (`WORKSPACE_ROOT`), as `planProjectSweep` drops a project whose root is
+  gone.
+- **A dead host's reservations are settled before the first plan**
+  (`settleReserved`, from the first step's listing): the lock and
+  `host.pid` keep any other host out, so each is a dead host's.
+- **Only the manager's keeper changes the index's states** but for a
+  snapshot's own life: an archive's marks (`markArchivedForDeletion`) and a
+  restore's (`keepRestored`) are `run` steps there, and a step plans,
+  marks and deletes inside itself, with nothing awaited between its plan
+  and its marks. So a restore comes before a step plans or after it ends,
+  never between. A row is marked deleted before its snapshot is, so no
+  fork picks one about to go.
+- **Managing or observing** (`ManageMode`, the host's `lanes.manage`): an
+  observing manager samples and reports, and runs no upkeep; an archive's
+  rows are still marked, for a host that manages later.
+- **The upkeep is heard in the health value**: `freeing-room` (amber)
+  while its last step deleted snapshots with the room under its floor,
+  `room-unrecoverable` (red) while its last found nothing left to delete
+  and the room still under it, each a level read from the sample's
+  `upkeep`, which the manager fills, not the sensor.
 - **A change is a change of meaning.** `planHealth`'s `changed` is true
   when the state, or the set of causes by kind and lane, differs from the
   value last written; a cause's measures changing alone is not. So the
@@ -111,6 +162,10 @@ and the words share one.
 
 ## Tests
 
-`health.test.ts`, `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`; the index's
+`health.test.ts`, `manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`,
+`retention.test.ts` (a property, over random listings of every owner's
+names and random rows: no plan deletes another owner's name, a protected
+row, an unindexed name before the index is complete, or more than its
+limit, whatever the clock), `upkeep.test.ts`; the index's
 own, in the host (`apps/pinetrie/host/snapshot-index.test.ts`); mutations in
 `scripts/mutations/machine.ts`.

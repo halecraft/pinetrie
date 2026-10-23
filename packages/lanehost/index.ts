@@ -46,6 +46,7 @@ export type {
   LanehostHello,
   LanehostResult,
   ProjectListed,
+  StoreListing,
 } from "./protocol.ts"
 export {
   isRole,

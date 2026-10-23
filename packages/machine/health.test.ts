@@ -43,6 +43,7 @@ const calm: MachineSample = {
   serviceKills: [],
   hostStalledMs: 0,
   snapshotsSkipped: 0,
+  upkeep: { freeing: false, exhausted: false },
 }
 
 const withUnallocated = (bytes: number): MachineSample => ({
@@ -219,6 +220,34 @@ describe("events", () => {
       { kind: "host-stalls", stalledMs: 1500 },
     ])
     expect(kinds(run([{ ...calm, hostStalledMs: 900 }])[0])).toEqual([])
+  })
+
+  test("the upkeep freeing room is amber, and nothing left to delete with the room under its floor is red", () => {
+    const low = withUnallocated(10 * GiB)
+    const freeing = run(
+      times(ENTER_AFTER, {
+        ...low,
+        upkeep: { freeing: true, exhausted: false },
+      }),
+    ).at(-1)
+    expect(kinds(freeing)).toEqual(["room-low", "freeing-room"])
+    const stuck = run(
+      times(ENTER_AFTER, {
+        ...low,
+        upkeep: { freeing: false, exhausted: true },
+      }),
+    ).at(-1)
+    expect(stuck?.health).toEqual({
+      state: "red",
+      causes: [
+        {
+          kind: "room-unrecoverable",
+          unallocated: 10 * GiB,
+          minimum: 20 * GiB,
+        },
+        { kind: "room-low", unallocated: 10 * GiB, minimum: 20 * GiB },
+      ],
+    })
   })
 
   test("a skipped snapshot is a cause counting them, until LEAVE_AFTER samples without one", () => {

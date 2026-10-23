@@ -96,6 +96,11 @@ export function sqliteSnapshotIndex(db: DatabaseSync): SnapshotIndex {
   const meta = db.prepare(
     "SELECT value FROM pinetrie_snapshots_meta WHERE key = 'complete'",
   )
+  const recorded = db.prepare(
+    `INSERT INTO pinetrie_snapshots (snapshot, lane, changed, used, branched, state)
+     VALUES (?, ?, ?, ${NEXT_USE}, 0, 'kept')
+     ON CONFLICT(snapshot) DO NOTHING`,
+  )
   const complete = db.prepare(
     "INSERT OR REPLACE INTO pinetrie_snapshots_meta (key, value) VALUES ('complete', 1)",
   )
@@ -152,6 +157,11 @@ export function sqliteSnapshotIndex(db: DatabaseSync): SnapshotIndex {
     markDeleted(snapshots) {
       atomically(() => {
         for (const s of snapshots) deleted.run(s)
+      })
+    },
+    indexRecorded(rows) {
+      atomically(() => {
+        for (const r of rows) recorded.run(r.snapshot, r.lane, r.changed)
       })
     },
     isComplete: () => meta.get() !== undefined,

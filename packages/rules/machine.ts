@@ -51,6 +51,12 @@ const CauseSchema = Type.Union([
     kind: Type.Literal("snapshot-skipped"),
     count: Type.Integer({ minimum: 1 }),
   }),
+  Type.Object({ kind: Type.Literal("freeing-room") }),
+  Type.Object({
+    kind: Type.Literal("room-unrecoverable"),
+    unallocated: Bytes,
+    minimum: Bytes,
+  }),
   Type.Object({
     kind: Type.Literal("unsampled"),
     reason: choiceSchema(UNSAMPLED_REASONS),

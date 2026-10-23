@@ -26,8 +26,10 @@ import {
   type FolderDisks,
   type ImageBuild,
   type LaneRuntime,
+  removeLane,
   type Served,
 } from "@pinetrie/lanes"
+import type { StoreControls } from "@pinetrie/machine"
 import type { ProjectRecord } from "@pinetrie/rules"
 import {
   GVPROXY_HOST_ADDRESS,
@@ -88,6 +90,8 @@ export interface MachineReach
    * directory on Linux. Its free space is what the store leaves.
    */
   readonly storeVolume: string
+  /** What the disk upkeep does to the store. */
+  readonly store: StoreControls
 }
 
 /** The runtime's reads, with the store's place on this host. */
@@ -99,6 +103,12 @@ const machineReach = (
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
   storeVolume,
+  store: {
+    listing: () => runtime.storeListing(),
+    deleteSnapshots: ids => runtime.disk({ kind: "delete-snapshots", ids }),
+    deleteLane: lane => removeLane(runtime, lane),
+    removeInnerProject: (lane, key) => runtime.removeInnerProject(lane, key),
+  },
 })
 
 /** Why a host with tools cannot run its lanes here, worded with its fix. */

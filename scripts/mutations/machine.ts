@@ -80,4 +80,54 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a skipped snapshot is a cause counting them, until LEAVE_AFTER samples without one",
   },
+  {
+    name: "planEntryRetention may choose a lane's newest row",
+    file: "packages/machine/retention.ts",
+    from: "  return row.branched || newest.get(row.lane) === row.snapshot\n",
+    to: "  return row.branched\n",
+    command: unit,
+    expect:
+      "a branched row and a lane's newest are never the least recently used to go",
+  },
+  {
+    name: "the budget is met only below it",
+    file: "packages/machine/retention.ts",
+    from: "    if (!(cost > facts.budget || roomLow())) break\n",
+    to: "    if (!(cost >= facts.budget || roomLow())) break\n",
+    command: unit,
+    expect: "kept rows within the budget stay, and one over it goes",
+  },
+  {
+    name: "unindexed entries go before the index is complete",
+    file: "packages/machine/retention.ts",
+    from: "  if (facts.complete)\n",
+    to: "  if (true)\n",
+    command: unit,
+    expect: "no unindexed name goes while the index is incomplete",
+  },
+  {
+    name: "a reserved row is the least recently used to go",
+    file: "packages/machine/retention.ts",
+    from: '  const kept = facts.rows.filter(\n    r => r.state === "kept" && listed.has(r.snapshot),\n  )',
+    to: '  const kept = facts.rows.filter(\n    r => r.state !== "deleted" && listed.has(r.snapshot),\n  )',
+    command: unit,
+    expect:
+      "no plan deletes another owner's name, a protected row, an unindexed name before the index is complete, or more than its limit",
+  },
+  {
+    name: "a dead host's reservations are never settled",
+    file: "packages/machine/manager.ts",
+    from: "    if (!settled) {\n",
+    to: "    if (false) {\n",
+    command: unit,
+    expect: "a first upkeep settles a dead host's reservations",
+  },
+  {
+    name: "the retention table gives folder states the entry rule",
+    file: "packages/machine/retention.ts",
+    from: '  "folder-state": keepAll,\n',
+    to: '  "folder-state": planEntryRetention,\n',
+    command: unit,
+    expect: "only entries have a rule that deletes",
+  },
 ]

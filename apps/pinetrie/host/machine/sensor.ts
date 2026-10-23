@@ -58,7 +58,7 @@ async function readFilesystem(
  * leaves them for the next.
  */
 export function createSensor(
-  reach: MachineReach,
+  reach: Pick<MachineReach, "runningLanes" | "machineSample" | "storeVolume">,
   kills: Pick<ServiceKillWatch, "take">,
 ): MachineSensor & {
   hearStall(stall: Stall): void

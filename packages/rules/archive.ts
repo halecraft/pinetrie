@@ -56,6 +56,8 @@ export interface ArchiveTeardown {
     readonly point: PointId | null
   }[]
   readonly snapshots: readonly SnapshotId[]
+  /** On a restore, the canvas's own lanes: their snapshots marked to delete are kept again. */
+  readonly restored: readonly ThreadId[]
 }
 
 type ArchivePlan =
@@ -149,6 +151,7 @@ function planTeardown(
       return point === null ? [] : [{ lane, point }]
     }),
     snapshots: [],
+    restored: input.own.map(o => o.lane),
   }
 }
 
@@ -173,6 +176,7 @@ export function planLanesGone(
       archived: true,
       keep: endSnapshots(trees, revisions),
     }),
+    restored: [],
   }
 }
 

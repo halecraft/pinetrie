@@ -29,6 +29,7 @@ import {
   observerVersion,
   projectDisks,
   type Role,
+  type StoreListing,
   serverArgs,
 } from "@pinetrie/lanehost"
 import {
@@ -193,6 +194,10 @@ export interface DockerRuntime extends LaneRuntime {
    * lanes directory's room, and each container's cgroup, by full id.
    */
   machineSample(containers: readonly string[]): Promise<MachineRead>
+  /** The project's store, listed by name alone (lanehost's `store-listing`). */
+  storeListing(): Promise<StoreListing>
+  /** An inner project of a nested lane's store, removed (lanehost's `remove-project` within). */
+  removeInnerProject(lane: string, innerKey: string): Promise<void>
   /**
    * Docker's events followed for the kills of this project's lanehost roles
    * and the machine's observer, held until `close`.
@@ -560,6 +565,14 @@ export function dockerRuntime(input: {
       runningLanes(await listLabelled(target, `${PROJECT_LABEL}=${key}`)),
     machineSample: containers =>
       lanehost.call({ kind: "machine-sample", containers }),
+    storeListing: () => lanehost.call({ kind: "store-listing", project: key }),
+    async removeInnerProject(lane, innerKey) {
+      await lanehost.call({
+        kind: "remove-project",
+        project: innerKey,
+        within: { project: key, lane },
+      })
+    },
     watchServiceKills() {
       let heard: MachineService[] = []
       /**

@@ -46,6 +46,8 @@ const POOL: readonly unknown[] = [
   "built-in",
   "drawn",
   "none",
+  "manage",
+  "observe",
   "HOME",
   "a@example.com",
   "b@example.com",

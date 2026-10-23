@@ -28,6 +28,16 @@
     snapshot under its row, reserved first, is taken: nothing the host makes
     is unindexed, so the upkeep needs no clock to tell an old snapshot from
     one in flight.
+  - 2026-10-22: the index's row is a snapshot's lane, the paths its turn
+    changed, its place in the order of uses (never a time), whether someone
+    branched from it, and its state (`reserved`, `kept`, `to-delete`,
+    `deleted`), written before its snapshot; it carries no project, since a
+    store serves one folder. An archive marks its snapshots to delete rather
+    than deleting them, and a restore keeps its lanes' marked rows again; both
+    change the index only on the manager's keeper, where each upkeep step
+    plans and deletes, so a restore never lands between the two. The listing
+    is split by each name's owner before any rule sees it, and only the entry
+    rule deletes.
 
 **Context.** On 2026-10-21 a host's start spent 1:08 removing what a dead
 host had left in its slot (S307), while the lane VM thrashed: four lanes of

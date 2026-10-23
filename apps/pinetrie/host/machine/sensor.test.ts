@@ -2,7 +2,6 @@ import { threadIdFor } from "@pinetrie/core"
 import type { ServiceKillWatch } from "@pinetrie/docker"
 import type { MachineRead } from "@pinetrie/lanehost"
 import { expect, test } from "vitest"
-import type { MachineReach } from "../work/runtime.ts"
 import { createSensor, planSample } from "./sensor.ts"
 
 const a = threadIdFor("0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e6f")
@@ -50,15 +49,12 @@ test("each running lane's cgroup is its sample, and a lane whose cgroup was not 
 
 test("a sample whose read fails leaves the kills heard for the next", async () => {
   let reads = 0
-  const reach: MachineReach = {
+  const reach: Parameters<typeof createSensor>[0] = {
     runningLanes: async () => [],
     machineSample: async () => {
       reads += 1
       if (reads === 1) throw new Error("no answer")
       return { ...read, containers: [] }
-    },
-    watchServiceKills: () => {
-      throw new Error("the sensor is given its watch")
     },
     storeVolume: "/",
   }

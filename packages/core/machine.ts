@@ -43,6 +43,14 @@ export type MachineCause =
   | { readonly kind: "host-stalls"; readonly stalledMs: number }
   /** Turns whose snapshot was skipped since the last sample: its index row could not be written. */
   | { readonly kind: "snapshot-skipped"; readonly count: number }
+  /** The disk upkeep is deleting old turns' snapshots, the store's room under its floor. */
+  | { readonly kind: "freeing-room" }
+  /** The store's room is under its floor, and nothing is left that may be deleted. */
+  | {
+      readonly kind: "room-unrecoverable"
+      readonly unallocated: number
+      readonly minimum: number
+    }
   /**
    * No sample says how the machine is: none yet since the host started,
    * the host stopped, or the last sample failed, with its error.

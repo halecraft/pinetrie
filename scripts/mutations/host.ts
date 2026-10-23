@@ -3472,13 +3472,13 @@ export const mutations: readonly Mutation[] = [
       "a run's start moves its canvas as the host's own write, with no one's name",
   },
   {
-    name: "an archive deletes any name a record holds",
+    name: "an archive marks any name a record holds",
     file: "apps/pinetrie/host/work/archive.ts",
-    from: '        snapshotOwner(s) === "entry" ? [deletableSnapshot("entry", s)] : [],',
-    to: '        true ? [deletableSnapshot("entry", s)] : [],',
+    from: '      const entries = snapshots.filter(s => snapshotOwner(s) === "entry")',
+    to: "      const entries = snapshots.filter(s => true)",
     command: unit,
     expect:
-      "an archive deletes only entries' snapshots, and skips any other name",
+      "an archive marks only entries' snapshots to delete, skips any other name",
   },
   {
     name: "takeIndexedSnapshot takes the snapshot before its row",
@@ -3504,5 +3504,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an index write that fails skips the snapshot, or names none, and is told",
+  },
+  {
+    name: "a restore keeps no row marked to delete",
+    file: "apps/pinetrie/host/work/archive.ts",
+    from: "      if (restored.length > 0) deps.upkeep.keepRestored(restored)\n",
+    to: "",
+    command: unit,
+    expect: "a restore keeps its lanes' snapshots marked to delete",
   },
 ]

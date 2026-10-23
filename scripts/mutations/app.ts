@@ -3375,8 +3375,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive's teardown deletes no snapshot",
     file: "apps/pinetrie/host/work/archive.ts",
-    from: "      if (entries.length > 0)\n        void keeper.track(",
-    to: "      if (false && entries.length > 0)\n        void keeper.track(",
+    from: "      if (entries.length > 0) deps.upkeep.markArchivedForDeletion(entries)",
+    to: "      if (false) deps.upkeep.markArchivedForDeletion(entries)",
     suite: "lanes",
     scenario: "main",
     expect:

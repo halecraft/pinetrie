@@ -28,6 +28,16 @@ export interface SnapshotRow {
   readonly state: RowState
 }
 
+const KiB = 1024
+/** A snapshot's metadata with no path changed: 57 KiB was measured for 5 paths. */
+export const SNAPSHOT_BYTES_BASE = 41 * KiB
+/** What each path its turn changed adds: about 3.2 KiB, as measured. */
+export const SNAPSHOT_BYTES_PER_PATH = Math.round(3.2 * KiB)
+
+/** A snapshot's estimated metadata, in bytes: it follows the paths its turn changed. */
+export const snapshotCost = (row: Pick<SnapshotRow, "changed">): number =>
+  SNAPSHOT_BYTES_BASE + row.changed * SNAPSHOT_BYTES_PER_PATH
+
 declare const reservationBrand: unique symbol
 /** A name the index holds `reserved`: what a snapshot is taken under. No record may name it. */
 export type Reservation = SnapshotId & { readonly [reservationBrand]: true }
@@ -64,6 +74,10 @@ export interface SnapshotIndex extends SnapshotTaking {
    * step deletes it again.
    */
   markDeleted(snapshots: readonly Deletable<"entry">[]): void
+  /** The index's fill: each snapshot a record names, `kept`, unless its name has a row. */
+  indexRecorded(
+    rows: readonly Pick<SnapshotRow, "snapshot" | "lane" | "changed">[],
+  ): void
   /** Whether every root's records have been read in: until then no unindexed entry is deleted. */
   isComplete(): boolean
   markComplete(): void

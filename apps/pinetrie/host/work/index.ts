@@ -23,7 +23,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { SnapshotTaking } from "@pinetrie/machine"
+import type { SnapshotTaking, UpkeepReason } from "@pinetrie/machine"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import {
@@ -39,7 +39,7 @@ import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"
 import type { StartProgress } from "../start-checklist.ts"
 import type { Splits, StartedProject } from "./adapter.ts"
-import { type Archive, createArchive } from "./archive.ts"
+import { type Archive, createArchive, type UpkeepAsks } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, prepareLane } from "./create.ts"
 import type { ActRefusal, Destination } from "./destination.ts"
@@ -136,6 +136,10 @@ export async function startLaneWork(input: {
   readonly snapshots: SnapshotTaking
   /** A snapshot skipped, its index row unwritten: the machine's health says so. */
   readonly snapshotSkipped: () => void
+  /** What lane work asks of the disk upkeep: a run's end, an archive, a restore. */
+  readonly upkeep: UpkeepAsks & {
+    requestUpkeep(reason: UpkeepReason): void
+  }
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -248,6 +252,7 @@ export async function startLaneWork(input: {
     fork: newLanes.fork,
     innerDockerDataRoots,
     snapshots: input.snapshots,
+    requestUpkeep: reason => input.upkeep.requestUpkeep(reason),
   })
   const updates = createUpdates({
     basics,
@@ -266,7 +271,7 @@ export async function startLaneWork(input: {
     destination,
     runtime,
     registry,
-    keeper,
+    upkeep: input.upkeep,
   })
 
   return {

@@ -53,6 +53,7 @@ import {
 import {
   LEAVE_FREE_DEFAULT,
   type LeaveFree,
+  MANAGE_MODES,
   type StoreSettings,
 } from "@pinetrie/machine"
 import type { ListedFolder } from "@pinetrie/pi"
@@ -277,6 +278,12 @@ export const SETTINGS = defineTable({
     }),
     ["system"],
   ),
+  "lanes.manage": pick(choice(MANAGE_MODES), {
+    fallback: "manage",
+    describe:
+      "whether this host keeps the machine lanes run on healthy itself (manage), or only reads and reports it, for a machine something else manages (observe)",
+    order: ["system", "user"],
+  }),
   "lanes.store.snapshotMetadata": pick(size(), {
     fallback: 1024 ** 3,
     describe:

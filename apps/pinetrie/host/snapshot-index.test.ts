@@ -93,6 +93,19 @@ describe("the snapshot index", () => {
     expect(stateOf(index, b)).toBe("deleted")
   })
 
+  test("the fill writes a recorded snapshot kept, and leaves a name that has a row as it is", () => {
+    const index = memorySnapshotIndex()
+    index.markNotTaken(index.reserve({ snapshot: a, lane: LANE, changed: 1 }))
+    index.indexRecorded([
+      { snapshot: a, lane: LANE, changed: 9 },
+      { snapshot: b, lane: OTHER, changed: 4 },
+    ])
+    expect(index.rows()).toMatchObject([
+      { snapshot: a, state: "deleted", changed: 1 },
+      { snapshot: b, lane: OTHER, state: "kept", changed: 4 },
+    ])
+  })
+
   test("the index is incomplete until marked complete", () => {
     const index = memorySnapshotIndex()
     expect(index.isComplete()).toBe(false)

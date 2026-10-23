@@ -207,8 +207,10 @@ While the page syncs, "syncing…" leads its right end.
   lanes' disk low, the disk holding it low, lanes short of memory, a
   command killed for memory, lanehost's disk or privileged service or the
   file observer killed for memory, the host stalling, a turn's snapshot
-  not recorded, or no reading from the host); red, with a barred disc, when work stops (the lanes' disk full,
-  or its metadata). Shape and colour both, never colour alone; never a
+  not recorded, old turns' snapshots being deleted to free room, or no
+  reading from the host); red, with a barred disc, when work stops (the
+  lanes' disk full, or its metadata, or low with nothing left that may be
+  deleted). Shape and colour both, never colour alone; never a
   badge, never moving. Its title, which is also its accessible name, names
   the worst cause in words, with how many more ("The machine lanes run on:
   work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least"); a

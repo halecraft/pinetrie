@@ -16,11 +16,12 @@ import {
   configPlaces,
   readStartLayers,
 } from "@pinetrie/config"
-import type { RootId, ThreadId } from "@pinetrie/core"
+import type { RootId, SnapshotId, ThreadId } from "@pinetrie/core"
 import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
+import type { UpkeepReason } from "@pinetrie/machine"
 import {
   type AgentDirBinding,
   createAgent,
@@ -113,6 +114,7 @@ import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
 import { startMachineWatch } from "./machine/index.ts"
+import { createStoreRecords } from "./machine/records.ts"
 import {
   migrate,
   planStoredStart,
@@ -749,8 +751,12 @@ async function openHost(
   const askSplit = createSplitCall({ basics, keeper, placesWriter })
 
   // --- where lanes work -----------------------------------------------------
-  // A snapshot skipped before the machine is watched is held for it.
+  // What lane work tells or asks of the machine, before it is watched, is
+  // held for it.
   const snapshotSkipped = forward<[]>("the machine", "hold")
+  const requestUpkeep = forward<[UpkeepReason]>("the machine", "hold")
+  const markArchived = forward<[readonly SnapshotId[]]>("the machine", "hold")
+  const keepRestored = forward<[readonly ThreadId[]]>("the machine", "hold")
   const work = await startLaneWork({
     basics: leaseBasics,
     project: openedProject,
@@ -764,6 +770,11 @@ async function openHost(
     progress,
     snapshots: opened.snapshots,
     snapshotSkipped: snapshotSkipped.call,
+    upkeep: {
+      requestUpkeep: requestUpkeep.call,
+      markArchivedForDeletion: markArchived.call,
+      keepRestored: keepRestored.call,
+    },
   })
   progress.begin("agent")
 
@@ -778,6 +789,12 @@ async function openHost(
           keeper,
           records,
           settings: storeSettings(settled),
+          mode: settled["lanes.manage"].value,
+          index: opened.snapshots,
+          storeRecords: createStoreRecords({
+            basics: leaseBasics,
+            reach: found.machine,
+          }),
           log,
         })
       : null
@@ -785,6 +802,10 @@ async function openHost(
   if (machine !== null) {
     closers.defer(() => machine.close())
     snapshotSkipped.bind(() => machine.noteSnapshotSkipped())
+    const { upkeep } = machine
+    requestUpkeep.bind(reason => upkeep.requestUpkeep(reason))
+    markArchived.bind(s => void upkeep.markArchivedForDeletion(s))
+    keepRestored.bind(l => void upkeep.keepRestored(l))
   }
 
   // `put_image` acts through the commands, and the agent's tools ask the
@@ -1057,12 +1078,15 @@ async function openHost(
   drainDue.bind(queueDrain)
   /**
    * Resolves when no queued step remains (a compaction after a run among
-   * them), no lane's queue has work, and every write has reached the store.
+   * them), no lane's queue has work, no disk upkeep is queued or running,
+   * and every write has reached the store.
    */
   async function quiet(): Promise<void> {
     await keeper.idle()
     // Lanes' own queues: snapshots, fetches and stops after a run.
     await work.quiet()
+    // The disk upkeep an archive or a run's end asked for.
+    await machine?.idle()
     await exchange.flush()
   }
 

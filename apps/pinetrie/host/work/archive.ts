@@ -3,16 +3,25 @@
 // Lanes forgotten and their containers and disks removed, a lane whose removal
 // fails reported and passed; their history in the destination moved
 // (`lanesMoved`), which follows each lane's proposed changes (withdrawn, or
-// built again); the snapshots no one will branch from deleted in the
-// background, entries' only.
+// built again); the snapshots no one will branch from marked to delete, which
+// the disk upkeep deletes, and a restore's lanes' marks undone.
 
-import { deletableSnapshot, snapshotOwner } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
+import { type SnapshotId, snapshotOwner, type ThreadId } from "@pinetrie/core"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"
 import type { ArchiveTeardown } from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
+
+/**
+ * What an archive or a restore asks of the disk upkeep, each on the
+ * manager's keeper, so neither comes between an upkeep's plan and its
+ * deletion. Fire and forget: the manager words what fails.
+ */
+export interface UpkeepAsks {
+  markArchivedForDeletion(snapshots: readonly SnapshotId[]): void
+  keepRestored(lanes: readonly ThreadId[]): void
+}
 
 export interface Archive {
   /** Carry out an archive's or a restore's teardown (`planArchive`). */
@@ -26,12 +35,11 @@ export function createArchive(deps: {
   /** What lanes run on. */
   readonly runtime: LaneRuntime
   readonly registry: LaneRegistry
-  /** Work nobody awaits: `quiet` waits for it. */
-  readonly keeper: Keeper
+  readonly upkeep: UpkeepAsks
 }): Archive {
-  const { basics, destination, runtime, registry, keeper } = deps
+  const { basics, destination, runtime, registry } = deps
   return {
-    async teardown({ forget, refs, snapshots }) {
+    async teardown({ forget, refs, snapshots, restored }) {
       // One lane's disk that will not go is waste; a teardown stopped there
       // would strand every lane after it, its history and its snapshots.
       for (const lane of forget) {
@@ -44,17 +52,10 @@ export function createArchive(deps: {
         await destination
           .lanesMoved(refs)
           .catch(failed(basics, "moving archived or restored lanes' history"))
-      // A record's snapshot is an entry's; any other name is left, never
-      // thrown over, so a teardown always finishes.
-      const entries = snapshots.flatMap(s =>
-        snapshotOwner(s) === "entry" ? [deletableSnapshot("entry", s)] : [],
-      )
-      if (entries.length > 0)
-        void keeper.track(
-          runtime
-            .disk({ kind: "delete-snapshots", ids: entries })
-            .catch(failed(basics, "deleting snapshots")),
-        )
+      // A record's snapshot is an entry's; any other name is left.
+      const entries = snapshots.filter(s => snapshotOwner(s) === "entry")
+      if (entries.length > 0) deps.upkeep.markArchivedForDeletion(entries)
+      if (restored.length > 0) deps.upkeep.keepRestored(restored)
     },
   }
 }

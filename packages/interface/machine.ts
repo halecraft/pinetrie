@@ -71,6 +71,10 @@ function causeWords(
       return `${serviceWords(cause.service)} was killed for using too much memory`
     case "host-stalls":
       return `the host stalled for ${(cause.stalledMs / 1000).toFixed(1)} seconds`
+    case "freeing-room":
+      return "the lanes' disk is low: old turns' snapshots are being deleted to free room"
+    case "room-unrecoverable":
+      return `the lanes' disk is low, and nothing is left that may be deleted: ${sizeWords(cause.unallocated)} left, ${sizeWords(cause.minimum)} at least`
     case "snapshot-skipped":
       return cause.count === 1
         ? "a turn's snapshot could not be recorded: branching at it starts from the turn before"

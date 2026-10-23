@@ -90,7 +90,7 @@ describe("planArchive", () => {
   test("archiving tears down", () => {
     expect(plan()).toEqual({
       kind: "cross",
-      teardown: { forget: [], refs: [], snapshots: [] },
+      teardown: { forget: [], refs: [], snapshots: [], restored: [] },
       writes: [],
     })
   })
@@ -201,12 +201,13 @@ describe("planArchive", () => {
         teardown: { snapshots: [] },
       })
     })
-    test("restore: each lane's ref back at its tip's nearest revision", () => {
+    test("restore: each lane's ref back at its tip's nearest revision, and its lanes' snapshots kept again", () => {
       expect(plan({ crossing: "restore", own, revisions })).toMatchObject({
         teardown: {
           forget: [],
           refs: [{ lane: A, point: "c0000000-0000-7000-8000-00000000000a" }],
           snapshots: [],
+          restored: [A, B],
         },
       })
     })
@@ -477,10 +478,12 @@ test("planLanesGone: a deleted thread's lanes forgotten, their refs deleted, no 
     forget: [LANE_X],
     refs: [{ lane: LANE_X, point: null }],
     snapshots: [],
+    restored: [],
   })
   expect(planLanesGone([], new Map(), [])).toEqual({
     forget: [],
     refs: [],
     snapshots: [],
+    restored: [],
   })
 })

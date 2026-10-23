@@ -36,7 +36,17 @@ export interface MachineSample {
   readonly hostStalledMs: number
   /** Turns whose snapshot was skipped since the last sample. The manager counts these, not the sensor. */
   readonly snapshotsSkipped: number
+  /** What the last upkeep step found: the manager's, not the sensor's. */
+  readonly upkeep: UpkeepHeard
+}
+
+/** What the disk upkeep's last step found, with the store's room under its floor. */
+export interface UpkeepHeard {
+  /** It deleted snapshots to free room. */
+  readonly freeing: boolean
+  /** It found nothing left that may be deleted. */
+  readonly exhausted: boolean
 }
 
 /** What the sensor reads: a sample less what the manager hears itself. */
-export type SensedSample = Omit<MachineSample, "snapshotsSkipped">
+export type SensedSample = Omit<MachineSample, "snapshotsSkipped" | "upkeep">
