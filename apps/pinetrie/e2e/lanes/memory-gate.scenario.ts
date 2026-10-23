@@ -149,14 +149,14 @@ async function memoryGateSection(
     check(
       "a paused lane's call waits at its gate",
       bothRunning >= 0 && waited && heldResults === 1 && wentOn >= 0,
-      `both running ${bothRunning}, results while paused ${heldResults}, went on ${wentOn}; ${JSON.stringify(["start a", "start b"].map(t => resultsIn(t).map(m => messageText(m as never).slice(0, 80))))}`,
+      `both running ${bothRunning}, results while paused ${heldResults}, went on ${wentOn}`,
     )
     check(
       "a paused lane's column says why it waits",
       treatment !== null &&
         treatmentWords(treatment) ===
           "paused for memory: its next tool call waits for room",
-      `${treatment?.kind ?? "none"}; ${JSON.stringify(readMachineHealth(host.session)?.treatments)}; ${laneA} ${laneB}`,
+      `${treatment?.kind ?? "none"}`,
     )
     // A run's start held for room, its first call behind it: Stop ends it.
     // Its lane's container stopped first, and memory calm again, so the

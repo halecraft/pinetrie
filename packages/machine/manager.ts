@@ -48,6 +48,7 @@ import {
   ALL_NORMAL,
   FIRST_TREATMENT_STATE,
   isActivityAllowed,
+  isRankingNeeded,
   type LaneActivity,
   planTreatments,
   type TreatmentPlanState,
@@ -167,9 +168,11 @@ export function createMachineManager(deps: {
     const lanesWaitingToStart = [...waiters]
       .filter(w => w.activity === "container-start")
       .map(w => w.lane)
-    const lanesByImportance = await deps.laneFacts.lanesByImportance([
-      ...new Set([...sample.lanesRunning, ...lanesWaitingToStart]),
-    ])
+    const lanesByImportance = isRankingNeeded(treatmentState, rung)
+      ? await deps.laneFacts.lanesByImportance([
+          ...new Set([...sample.lanesRunning, ...lanesWaitingToStart]),
+        ])
+      : []
     const memoryByLane = new Map(sample.lanes.map(l => [l.lane, l]))
     // plan
     const next = planTreatments(treatmentState, {

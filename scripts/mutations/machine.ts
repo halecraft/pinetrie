@@ -5,6 +5,33 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a measurement not written is not told",
+    file: "packages/machine/manager.ts",
+    from: '      tell({ kind: "unmeasured", error: errorText(error) })\n',
+    to: "",
+    command: unit,
+    expect:
+      "a measurement that cannot be written is told, and the sample goes on",
+  },
+  {
+    name: "the lanes are ranked at every sample",
+    file: "packages/machine/treatments.ts",
+    from: "  rung >= 2 || state.startsHeld.length > 0 ||",
+    to: "  rung >= 0 || state.startsHeld.length > 0 ||",
+    command: unit,
+    expect:
+      "the lanes are ranked only once memory is short enough for their order to decide",
+  },
+  {
+    name: "a prefix's option value is taken for the program",
+    file: "packages/machine/measurements.ts",
+    from: "      else if (afterPrefix && OPTIONS_WITH_VALUES.has(word)) at++\n",
+    to: "",
+    command: unit,
+    expect:
+      "commandProgram skips cd, export, assignments, env and time to the program",
+  },
+  {
     name: "the measurements are never trimmed in observe mode",
     file: "packages/machine/manager.ts",
     from: "      if (measured.trim) deps.measurements.trim()\n",

@@ -1757,9 +1757,10 @@ adapter's.
   channel; the whole wait, the queue's included, settles on the call's
   abort (`settledOrAborted`), since a call can wait behind a held start. A
   run's start waits for the machine in its queue step (`holdStart`), so its
-  first tool call waits behind it and the model thinks. A held start holds
-  the lane's queue, and the run's turn (`turnDone`) queues behind it, which
-  pi's abort waits on: so a Stop abandons the held start before it aborts
+  first tool call waits behind it while the model thinks its first reply.
+  Only that far: the run's turn (`turnDone`) queues behind the held start
+  and pi's loop awaits it, so from the first reply's end the whole run
+  waits for room. And pi's abort waits on that turn: so a Stop abandons the held start before it aborts
   (`runs.ts`' `cancel`, `abandonStart`), as do the run's end and the host's
   close; an abandoned start starts nothing and is no failure, so the queue
   does not break. The containers reach `waitUntilAllowed` through a binding

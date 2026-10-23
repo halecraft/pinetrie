@@ -2,7 +2,8 @@
 // machine's leave while memory is short. A start waits in its queue step,
 // so it holds the lane's queue: a Stop, its run's end or the host's close
 // aborts it, or what queues behind it (the run's turn, a Stop's stop) would
-// wait for room.
+// wait for room. The run's turn queued there is awaited by pi's loop, so a
+// run whose start is held waits whole from its first reply's end.
 
 import type { ThreadId } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"

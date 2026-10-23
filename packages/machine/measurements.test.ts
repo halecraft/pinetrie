@@ -18,8 +18,9 @@ test("commandProgram skips cd, export, assignments, env and time to the program"
       "cd /tmp",
       "",
       "(cd a && make)",
+      "env -u HOME -C /tmp nice -n 10 cargo build",
     ].map(commandProgram),
-  ).toEqual(["pnpm", "node", "vitest", null, null, "make"])
+  ).toEqual(["pnpm", "node", "vitest", null, null, "make", "cargo"])
 })
 
 test("commandProgram never returns an argument", () => {
@@ -35,7 +36,7 @@ test("commandProgram never returns an argument", () => {
         WORD.map(w => `${w.toUpperCase().replace(/[.-]/g, "_")}=x`),
         { maxLength: 2 },
       ),
-      fc.subarray(["env", "time"]),
+      fc.subarray(["env", "env -u NAME", "time", "nice -n 5"]),
       WORD.filter(
         w =>
           ![

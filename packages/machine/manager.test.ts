@@ -456,6 +456,37 @@ describe("memory", () => {
     ).resolves.toBe("held")
   })
 
+  test("the lanes are ranked only once memory is short enough for their order to decide", async () => {
+    const { now, sensor } = pressured()
+    let ranked = 0
+    const manager = createMachineManager({
+      sensor,
+      sink: { write: async () => {} },
+      settings: SETTINGS,
+      mode: "manage",
+      capabilities: { grow: false },
+      index: memoryIndex(),
+      store: fakeStore(EMPTY_LISTING).store,
+      records: fakeRecords(),
+      laneFacts: {
+        lanesByImportance: async lanes => {
+          ranked++
+          return lanes
+        },
+        programInFlight: () => null,
+      },
+      measurements: keptMeasurements(),
+      tell: () => {},
+    })
+    await manager.start()
+    now.running = true
+    for (let i = 0; i < ENTER_AFTER + 2; i++) await manager.sample()
+    expect(ranked).toBe(0)
+    now.full = 6
+    await toRung2(manager)
+    expect(ranked).toBeGreaterThan(0)
+  })
+
   test("observing holds nothing, and says memory is short", async () => {
     const { now, sensor } = pressured()
     const { manager, written } = managed(sensor, "observe")
@@ -509,4 +540,31 @@ describe("measurements", () => {
       expect(measurements.trims.count).toBe(1)
     },
   )
+
+  test("a measurement that cannot be written is told, and the sample goes on", async () => {
+    const told: ManagerNews[] = []
+    const written: MachineHealth[] = []
+    const manager = createMachineManager({
+      sensor: steady,
+      sink: { write: async health => void written.push(health) },
+      settings: SETTINGS,
+      mode: "manage",
+      capabilities: { grow: false },
+      index: memoryIndex(),
+      store: fakeStore(EMPTY_LISTING).store,
+      records: fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements: {
+        ...keptMeasurements(),
+        recordSample: () => {
+          throw new Error("disk full")
+        },
+      },
+      tell: news => told.push(news),
+    })
+    await manager.start()
+    await manager.sample()
+    expect(told).toContainEqual({ kind: "unmeasured", error: "disk full" })
+    expect(reasons(written)).toEqual(["waiting", "neutral"])
+  })
 })

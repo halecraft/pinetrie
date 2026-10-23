@@ -21,12 +21,22 @@ const PREFIXES = new Set(["env", "time", "exec", "nice", "nohup", "command"])
 /** Statements that run no program worth naming. */
 const NOT_PROGRAMS = new Set(["cd", "export", "pushd", "popd", "set"])
 
+/** The prefixes' options that take the next word as their value: `env -u NAME`, `nice -n 10`. */
+const OPTIONS_WITH_VALUES = new Set([
+  "-u",
+  "-C",
+  "-S",
+  "-n",
+  "--unset",
+  "--chdir",
+])
+
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 
 /**
  * The program a shell command runs: the first word of its first statement
  * that is not `cd`, `export` or assignments alone, past `env`, `time` and
- * the like and their assignments and flags; its last path segment, so a
+ * the like and their assignments, flags and flags' values; its last path segment, so a
  * path names no directory. Never an argument. Null for none.
  */
 export function commandProgram(command: string): string | null {
@@ -37,14 +47,15 @@ export function commandProgram(command: string): string | null {
       .map(w => w.replace(/^[({"']+|[)}"']+$/g, ""))
       .filter(w => w !== "")
     let afterPrefix = false
-    const program = words.find(word => {
+    let at = 0
+    for (; at < words.length; at++) {
+      const word = words[at] ?? ""
       if (PREFIXES.has(word)) afterPrefix = true
-      return !(
-        ASSIGNMENT.test(word) ||
-        PREFIXES.has(word) ||
-        (afterPrefix && word.startsWith("-"))
-      )
-    })
+      else if (afterPrefix && OPTIONS_WITH_VALUES.has(word)) at++
+      else if (!ASSIGNMENT.test(word) && !(afterPrefix && word.startsWith("-")))
+        break
+    }
+    const program = words[at]
     if (
       program === undefined ||
       program.startsWith("-") ||

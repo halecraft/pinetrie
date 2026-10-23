@@ -53,7 +53,10 @@ and the words share one.
 - **Held starts are let go one a sample**, most important first
   (`rankLanes`: a thread someone reads, the latest run started, a queue not
   held, then by id), so a release never starts every held command at
-  once. A lane let go is `normal` until a sample lists it running.
+  once. A lane let go is `normal` until a sample lists it running. The
+  ranking is gathered only when the order can decide anything
+  (`isRankingNeeded`: from rung 2, or while starts are held or lanes
+  paused), since gathering it leases each lane's root.
 - **At rung 3 only the most important running lanes make tool calls**:
   their count (`lanesAllowedToCall`) starts at every running lane, falls by
   one each sample the rung holds, never below 1, and rises by one each
@@ -78,7 +81,8 @@ and the words share one.
   sample's rung, pressure, memory, its source and the kernel's counters'
   rise since the last (`counterRise`, none across a reset); each running
   lane's memory in MiB and its program, kept only when it changed
-  (`lanesChanged`); every treatment changed and every shadow decision, with
+  (`lanesChanged`), its program past `env`, `time` and their options'
+  values, never an argument (`commandProgram`); every treatment changed and every shadow decision, with
   the pressure and memory at that moment. An action's effect is never
   stored: S328 joins the samples that follow. They are trimmed on the
   sample's own step every `TRIM_MEASUREMENTS_EVERY_SAMPLES`, not by the

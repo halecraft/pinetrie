@@ -23,13 +23,13 @@ export const ACTIVITIES_ALLOWED = {
 } as const satisfies Record<LaneTreatment["kind"], readonly LaneActivity[]>
 
 /** Whether `treatment` lets a lane do `activity`. */
-export const isActivityAllowed = (
+export function isActivityAllowed(
   treatment: LaneTreatment,
   activity: LaneActivity,
-): boolean => allowedActivities(treatment).includes(activity)
-
-const allowedActivities = (treatment: LaneTreatment): readonly LaneActivity[] =>
-  ACTIVITIES_ALLOWED[treatment.kind]
+): boolean {
+  const allowed: readonly LaneActivity[] = ACTIVITIES_ALLOWED[treatment.kind]
+  return allowed.includes(activity)
+}
 
 /** What a rung not built would have done: measured, never done. */
 export type ShadowDecision =
@@ -89,6 +89,18 @@ export const ALL_NORMAL: Treatments = {
   laneTreatment: () => NORMAL,
   held: [],
 }
+
+/**
+ * Whether the lanes' order can decide anything at `rung`: who is paused,
+ * which held start goes first, whom a shadow kill names. Below rung 2,
+ * with no start held and none paused, it decides nothing, and need not be
+ * gathered.
+ */
+export const isRankingNeeded = (
+  state: TreatmentPlanState,
+  rung: Rung,
+): boolean =>
+  rung >= 2 || state.startsHeld.length > 0 || state.lanesAllowedToCall !== null
 
 /** `lanes` in `order`'s order, those it leaves out after, by id. */
 function inOrder(
