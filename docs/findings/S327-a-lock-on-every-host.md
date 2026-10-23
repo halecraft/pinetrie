@@ -108,3 +108,12 @@ and its version in each image. The macOS perl versions are from Brian d
 foy's list of Perls in Mac releases, Apple's community forums (14.7.2 and
 15.2 at 5.34.1), and Homebrew's pull requests for Sonoma support
 (#15522) and for `lockf` (#18516).
+
+**Note (2026-10-23), probed on the Mac, not a spike of its own.** macOS's
+`/usr/bin/perl` `flock` (the lock package's backend there) and libc's
+`flock(2)`, which the lane VM's launcher calls on `launcher.lock`, refuse
+each other in both directions on one file: a host holding the launcher's
+lock through the package keeps any launcher out, and a running launcher
+keeps the package's taker out. The package opens the file for appending and
+writes its holder's pid into it; the launcher writes nothing there, so the
+two share the file harmlessly.

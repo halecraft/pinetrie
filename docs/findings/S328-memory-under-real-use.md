@@ -23,6 +23,21 @@ and on a Linux host, over at least a week each:
   that have both, and how a host in a lane's own-cgroup available (S329)
   tracks its pressure.
 
+**Before it runs.** The export's first line names the numbers the
+samples were planned by, read from the code's constants as they are, with
+no refactor: `RUNG_BOUNDS`, `ENTER_AFTER` and `LEAVE_AFTER`, the room's and
+metadata's thresholds and clears, and `minimumUnallocated`'s share and
+floor. So each sample is read against the numbers that planned it, and a
+week's export from before a change is not read as one from after it.
+
+**What its answers decide, beyond the bounds.** How those numbers are
+changed from then on: an edit of the constants, one set of numbers per
+backend, or a person's setting in `pinetrie.json` where the measurements
+show one machine needs another number. The seam is shaped then, from what
+the answers ask for; none is built ahead of them. `ROOM_SPENT` and
+`METADATA_FULL` are written into the lane VM image's `init` too, so any
+change to them changes the image with them.
+
 **Kill criterion.** A rung's bounds are kept only if crossing them predicts
 harm in the measurements. A shadow rung (squeeze, freeze, kill) is built
 only if it would have fired and freed memory where a pause did not relieve

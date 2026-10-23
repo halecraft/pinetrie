@@ -55,3 +55,10 @@ machine (`builder.swift`), one after the other on the same `data.img`.
 So the host learns of a full disk from the room it samples, or from a
 container's `no space left on device`, not from Docker falling silent; and
 the repair can be a built artifact pinned as the builder's pins are.
+
+**Correction (2026-10-23).** `repair.txt` was written by a first
+`repair-init` that printed sizes with busybox `awk`'s `%d`, which stops at
+2³¹−1 (busybox 1.37, probed on the spike VM): its `size=` reads 2147483647
+before and after the disk grew to 3 GiB, and is not the disk's size. The
+kept `repair-init` prints `%.0f`, which is exact. A test built on
+`repair.txt` reads its other fields, not its `size=`.
