@@ -1,12 +1,20 @@
 # ADR-0211 — Every lock a host takes is the kernel's, held by a child in a process group of its own, so its owner is alive exactly while it is held
 
-- **Status:** Proposed
+- **Status:** Accepted (Duane, 2026-10-22)
 - **Area:** `packages/lock/TECHNICAL.md`, `apps/pinetrie/host/TECHNICAL.md`,
   `packages/vm/TECHNICAL.md`
 - **Evidence:** S326, S327
 - **Amends:**
   - ADR-0210: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.
+- **Revised:**
+  - 2026-10-22 (Duane): built as one child per hold, which says `waiting` then
+    `held`; `tryLock` can be refused and `awaitLock` cannot; a pid is written
+    only where it is read (`SaidPid`, for words), not by a lanehost server;
+    only a holder removes its file (`removeLockFile`); what must run under the
+    registry's lock takes proof of it; a session's lock is tried once and
+    decided by the plan; the project's lock is `PROJECT_LOCK`, the session's
+    `sessionLockFile`.
 
 **Context.** Five locks in the repo share one responsibility: while a
 process lives, it alone owns a name; anyone else is refused or waits; its

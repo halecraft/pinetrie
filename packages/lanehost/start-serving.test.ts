@@ -4,7 +4,7 @@ import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { PassThrough } from "node:stream"
-import { type Held, type Hold, holdLock } from "@pinetrie/lock"
+import { type HeldLock, type LockAttempt, tryLock } from "@pinetrie/lock"
 import { afterAll, describe, expect, test } from "vitest"
 import type { Serving } from "./answer.ts"
 import { dropUnfinishedSnapshots } from "./disks.ts"
@@ -26,14 +26,15 @@ const serving = (holds: string | null): Serving => ({
   holds,
 })
 
-const HELD: Held = {
+const HELD: HeldLock = {
   kind: "held",
+  file: "host.lock",
   release: async () => {},
-  lost: new Promise(() => {}),
+  lockLost: new Promise(() => {}),
 }
 
 /** Ports that record what the start did, in order, holding with `hold`. */
-function recorded(hold: Hold) {
+function recorded(hold: LockAttempt) {
   const did: string[] = []
   let refused: string | null | undefined
   let answer: Parameters<ServingPorts["serve"]>[1] | undefined
@@ -84,7 +85,7 @@ describe("startServing", () => {
   })
 
   test("a lock lost stops the server", async () => {
-    const r = recorded({ ...HELD, lost: Promise.resolve() })
+    const r = recorded({ ...HELD, lockLost: Promise.resolve() })
     await startServing(serving(KEY), r.ports)
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(r.did).toContain("lost")
@@ -99,12 +100,15 @@ test.skipIf(!has("flock"))(
   async () => {
     const disks = projectDisks(dir, KEY)
     await mkdir(disks.snapshots, { recursive: true })
-    const holds: Hold[] = []
+    const holds: LockAttempt[] = []
     const started = () => {
       const r = recorded(HELD)
       const until = new PassThrough()
       r.ports.hold = async file => {
-        const hold = await holdLock(file, { platform: "linux", until })
+        const hold = await tryLock(file, {
+          platform: "linux",
+          heldWhile: until,
+        })
         holds.push(hold)
         return hold
       }

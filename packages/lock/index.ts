@@ -2,10 +2,17 @@
 // to anyone else, whatever the OS (`TECHNICAL.md`).
 
 export {
-  type Held,
-  type Hold,
-  holdLock,
+  awaitLock,
+  type HeldLock,
+  holderPid,
   holdOutcome,
-  type LockPlatform,
+  type LockAttempt,
+  type LockFailed,
+  type LockMode,
+  type LockOptions,
   lockCommand,
+  removeLockFile,
+  type SaidPid,
+  tryLock,
+  withLock,
 } from "./lock.ts"

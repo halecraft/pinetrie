@@ -6,7 +6,7 @@
 // (`start-serving.ts`).
 
 import { serve } from "@pinetrie/channel"
-import { holdLock } from "@pinetrie/lock"
+import { tryLock } from "@pinetrie/lock"
 import { dropUnfinishedSnapshots } from "./disks.ts"
 import type { LanehostCall, LanehostHello } from "./protocol.ts"
 import { servingFrom } from "./serving.ts"
@@ -15,7 +15,8 @@ import { startServing } from "./start-serving.ts"
 const serving = servingFrom(process.argv.slice(2))
 
 await startServing(serving, {
-  hold: file => holdLock(file, { platform: "linux", until: process.stdin }),
+  // No pid written: one in this container's namespace means nothing to another.
+  hold: file => tryLock(file, { platform: "linux", heldWhile: process.stdin }),
   drop: dropUnfinishedSnapshots,
   serve: (refused, answer) =>
     serve<LanehostHello, LanehostCall, never, unknown>(

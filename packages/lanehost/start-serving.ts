@@ -6,16 +6,20 @@
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { PRODUCT_NAME } from "@pinetrie/core"
-import type { Held, Hold } from "@pinetrie/lock"
+import type { HeldLock, LockAttempt } from "@pinetrie/lock"
 import { answer, type Serving } from "./answer.ts"
 import { type ProjectDisks, projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
 
-/** The lock's file, in the project's directory. */
-export const HOST_LOCK = "host.lock"
+/**
+ * The project's lock's file, in its directory: one host per project. Named
+ * `host.lock` on disk since it was first written; a session's lock is
+ * another (`host.pid`, the host's).
+ */
+export const PROJECT_LOCK = "host.lock"
 
 /** Why a server serves nothing, as its client's error says it. */
-export function lockRefusal(hold: Exclude<Hold, Held>): string {
+export function lockRefusal(hold: Exclude<LockAttempt, HeldLock>): string {
   switch (hold.kind) {
     case "held-by-another":
       return `another ${PRODUCT_NAME} host serves this project's lanes, or one that stopped is finishing its last step: stop it, or start again shortly`
@@ -26,8 +30,8 @@ export function lockRefusal(hold: Exclude<Hold, Held>): string {
 
 /** What starting a server does, as ports: the server's script gives the real ones. */
 export interface ServingPorts {
-  hold(file: string): Promise<Hold>
-  drop(held: Held, disks: ProjectDisks): Promise<unknown>
+  hold(file: string): Promise<LockAttempt>
+  drop(held: HeldLock, disks: ProjectDisks): Promise<unknown>
   /** Answer calls with `answer`, the hello saying `refused`. */
   serve(
     refused: string | null,
@@ -50,14 +54,14 @@ export async function startServing(
   if (serving.holds === null) return ports.serve(null, answerCall)
   const disks = projectDisks(serving.lanesDir, serving.holds)
   await mkdir(disks.dir, { recursive: true })
-  const hold = await ports.hold(path.join(disks.dir, HOST_LOCK))
+  const hold = await ports.hold(path.join(disks.dir, PROJECT_LOCK))
   if (hold.kind !== "held") {
     const refused = lockRefusal(hold)
     return ports.serve(refused, async () => {
       throw new Error(refused)
     })
   }
-  void hold.lost.then(() => ports.lost())
+  void hold.lockLost.then(() => ports.lost())
   // One left is dropped at the next start: no reason to refuse calls now.
   await ports.drop(hold, disks).catch(() => {})
   ports.serve(null, answerCall)

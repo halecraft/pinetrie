@@ -14,7 +14,7 @@ import {
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import { type DiskOp, isDiskName, isPathInside } from "@pinetrie/core"
-import type { Held } from "@pinetrie/lock"
+import type { HeldLock } from "@pinetrie/lock"
 import {
   createSubvolume,
   drop,
@@ -236,7 +236,7 @@ export async function snapshotsIn(disks: ProjectDisks): Promise<string[]> {
  * snapshot then. Read by a listing alone; `drop` removes whatever is there.
  */
 export async function dropUnfinishedSnapshots(
-  _held: Held,
+  _held: HeldLock,
   disks: ProjectDisks,
 ): Promise<readonly string[]> {
   const names = await readdir(disks.snapshots).catch(() => [] as string[])

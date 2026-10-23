@@ -29,7 +29,7 @@ server loads (`scripts/shipped.test.ts`).
 | `roles.ts` | `ROLES`, each role's grant; `callModule`, a call's module; `planRoles`, which role serves each module; `planDiff`, how a diff is made and by which role, one value |
 | `answer.ts` | one call answered by its module, refused when another role serves it |
 | `server.ts` | a role's process: `startServing`'s ports, the real ones, over `@pinetrie/channel` |
-| `start-serving.ts` | a server's start, in its order: its project's lock (`HOST_LOCK`), the `.tmp` snapshots dropped, then `answer`; a refusal's words (`lockRefusal`) |
+| `start-serving.ts` | a server's start, in its order: its project's lock (`PROJECT_LOCK`), the `.tmp` snapshots dropped, then `answer`; a refusal's words (`lockRefusal`) |
 | `once.ts` | one call answered and printed, for the suites |
 | `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`), which refuses arguments without a nested disk's values |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
@@ -303,7 +303,9 @@ host, whatever their projects.
 ## One host per project (`start-serving.ts`, S326, ADR-0210)
 
 - **A runtime's own disks server holds its project's lock for its whole
-  life** (`projects/<key>/host.lock`, through `@pinetrie/lock`), taken
+  life** (`projects/<key>/host.lock`, `PROJECT_LOCK`, through
+  `@pinetrie/lock`, writing no pid: one in a container's namespace means
+  nothing to another), taken
   before it answers anything: its arguments name the project it `holds`
   (`serverArgs`), and only the runtime's disks role is given one. Another
   role, and a one-shot (`once.ts`, the suites'), takes no lock and drops
@@ -321,11 +323,11 @@ host, whatever their projects.
   call, at most a diff's 120 s, then exits as its stdin has ended. Until
   then, a host restarted on the project is refused, and says why.
 - **Only a holder of the lock drops what a snapshot cut short left**
-  (`dropUnfinishedSnapshots`, which takes the lock's `Held`): every
+  (`dropUnfinishedSnapshots`, which takes the lock's `HeldLock`): every
   `<id>.tmp` under the project's snapshots, at the server's start, when no
   other host's server is making one. A drop that fails is left for the
   next start; the server serves anyway.
-- **A lock lost stops the server** (`Held.lost`): its child gone, another
+- **A lock lost stops the server** (`HeldLock.lockLost`): its child gone, another
   host may take the project, so the server exits, and the host's next call
   opens a fresh one.
 
