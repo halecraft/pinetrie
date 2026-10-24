@@ -59,6 +59,16 @@
     (the `vm-repair` scenario). The repair boot holds the launcher's own lock
     while it has `data.img` open, so no launcher of any version opens it
     beside the repair.
+  - 2026-10-23 (S307): a slot's sweep stops each container bound into the slot
+    (a kill) and waits until it has died, all at once, then fills, and removes
+    nothing. Killing, filling, then removing in the background would race the
+    new host, which at once starts the same containers again: on the same slot
+    it renders the same specs, for its lanehost roles and the runs it resumes.
+    `planContainer` starts each leftover with the same spec again, the same
+    container, and removes and remakes one with another spec on its own start,
+    which alone pays for the removal. The fill runs the stop and waits for it;
+    no proof value crosses from `@pinetrie/docker` to `@pinetrie/vm`, which
+    may not declare each other, and the order is the fill's own.
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.
@@ -135,8 +145,8 @@ admitted by their limits: two would run on a 12 GiB VM.
   raises it; the delete takes only an `Evictable`, whose maker leaves out
   every protected snapshot; the fork's nearest snapshot is found among
   those still there; the store's size has one maker, held within both settings;
-  the gate requires the call's abort signal; the slot's fill requires the
-  kill's result; the rungs are one table of `enter` and `leave`, so no rung
+  the gate requires the call's abort signal; the slot's fill waits for its
+  leftovers' stop, which settles only once each has died; the rungs are one table of `enter` and `leave`, so no rung
   lacks its undo; the causes are a union worded by one function.
 - **What remembers is a state machine; the rest is reconciled from what is
   found.** The rung, the health value (each with thresholds to enter and
@@ -226,10 +236,12 @@ admitted by their limits: two would run on a 12 GiB VM.
   where today it starts from the thread's base, as it still does for an
   archived one, whose lanes' refs are gone (S320). A folder project's states are its
   history, and keep their own window (`folder.history.states`).
-- **A slot's sweep kills, then fills, then removes** (S307): a dead host's
-  containers bound into the slot are killed, which frees their binds; the
-  slot is filled; their removals run after, together, off the start's
-  path, and a lane's start waits only for its own container's.
+- **A slot's sweep stops, then fills, and removes nothing** (S307): the
+  containers a host that stopped holding the slot left bound into it are
+  killed, all at once, and waited on until each has died, which frees
+  their binds; then the slot is filled. Each is started again or remade on
+  its own start (`planContainer`), so only a lane whose spec changed pays
+  its removal, and nothing races the new host's starts.
 - **A lane VM whose disk is full is repaired automatically, offline.**
   When the room is spent and the disk upkeep cannot free enough, or a
   container fails with `no space left on device` (Docker may still

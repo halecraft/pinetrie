@@ -75,6 +75,15 @@ export type Build =
   /** The lane VM's full disk repaired before it is leased, with the repair boot's last line. */
   | { readonly kind: "vm-disk-repair"; readonly progress: string | null }
 
+/**
+ * What the step running waits on, announced before it. Only a build marks
+ * the step as built: its finished line says so, and its time is kept apart.
+ */
+export type StartWork =
+  | { readonly kind: "build"; readonly build: Build }
+  /** The containers the last host left bound into the slot, stopped before it is filled. */
+  | { readonly kind: "stopping-left"; readonly count: number }
+
 /** How a step that is no longer running came out. */
 export type Ended =
   | {
@@ -93,7 +102,10 @@ export type Now =
       readonly kind: "running"
       readonly step: StartStep
       readonly since: number
-      readonly building: Build | null
+      /** The last build it announced; null when it built nothing. */
+      readonly built: Build | null
+      /** The last work it announced, which its line words. */
+      readonly working: StartWork | null
     }
   | { readonly kind: "failed"; readonly step: StartStep; readonly why: string }
 
@@ -113,7 +125,7 @@ export interface Checklist {
 
 export type StartEvent =
   | { readonly kind: "begin"; readonly step: StartStep; readonly at: number }
-  | { readonly kind: "building"; readonly build: Build }
+  | { readonly kind: "working"; readonly work: StartWork }
   | { readonly kind: "end"; readonly at: number }
   | { readonly kind: "fail"; readonly why: string }
 
@@ -174,7 +186,7 @@ const endedAt = (
   kind: "done",
   step: now.step,
   took: at - now.since,
-  built: now.building,
+  built: now.built,
 })
 
 export function checklistAfter(list: Checklist, event: StartEvent): Checklist {
@@ -194,15 +206,23 @@ export function checklistAfter(list: Checklist, event: StartEvent): Checklist {
           kind: "running",
           step: event.step,
           since: event.at,
-          building: null,
+          built: null,
+          working: null,
         },
         waiting: at < 0 ? list.waiting : list.waiting.slice(at + 1),
       }
     }
-    case "building":
+    case "working":
       return now === null
         ? list
-        : { ...list, now: { ...now, building: event.build } }
+        : {
+            ...list,
+            now: {
+              ...now,
+              working: event.work,
+              built: event.work.kind === "build" ? event.work.build : now.built,
+            },
+          }
     case "end":
       return now === null
         ? list
@@ -239,8 +259,8 @@ export function timesAfter(list: Checklist): StartTimes {
 export interface StartProgress {
   /** `step` begins; the step running, if any, has ended. */
   begin(step: StartStep): void
-  /** A build in the step running; with none running, a line of its own. */
-  building(build: Build): void
+  /** What the step running waits on; with none running, a line of its own. */
+  working(work: StartWork): void
   /** The step running ends, and with it the start. */
   end(): void
   /** The step running failed, and with it the start. */

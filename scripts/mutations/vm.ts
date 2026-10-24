@@ -88,12 +88,13 @@ export const mutations: readonly Mutation[] = [
       "launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy",
   },
   {
-    name: "a slot is filled unswept",
+    name: "a slot is filled before its stop settles",
     file: "packages/vm/lease.ts",
-    from: "      await sweep(slot.slot)\n",
-    to: "",
+    from: "      await stop(slot.slot)\n",
+    to: "      void stop(slot.slot)\n",
     command: unit,
-    expect: "a lease: a slot, swept then filled once with its entries",
+    expect:
+      "a lease: a slot, filled once with its entries after its stop settles",
   },
   {
     name: "a directory held read-only stays so when wanted read-write",
@@ -190,7 +191,8 @@ export const mutations: readonly Mutation[] = [
     from: '      if (filled) throw new Error("a slot is filled once")\n',
     to: "",
     command: unit,
-    expect: "a lease: a slot, swept then filled once with its entries",
+    expect:
+      "a lease: a slot, filled once with its entries after its stop settles",
   },
   {
     name: "a launcher's message of an unknown kind is read as one it knows",

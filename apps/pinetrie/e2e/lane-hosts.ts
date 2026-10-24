@@ -99,7 +99,7 @@ async function withProbe<T>(
       // Nothing listens there: this probe makes no lane.
       hostSocket: path.join(dir, ".no-ssh.sock"),
       log: () => {},
-      building: () => {},
+      working: () => {},
       manage: "manage",
     })
     try {

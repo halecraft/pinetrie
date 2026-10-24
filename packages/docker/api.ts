@@ -324,12 +324,33 @@ export const startContainer = (
     [304],
   )
 
-/** Stop a container, as the CLI does (10 s, then killed); a missing one is fine. */
+/**
+ * Stop a container: `SIGTERM`, then `SIGKILL` after `timeoutSeconds` (0 kills
+ * at once); a missing or stopped one is fine.
+ */
 export const stopContainer = (
   target: Pick<DockerTarget, "socket">,
   name: string,
+  timeoutSeconds: number,
 ): Promise<Answered> =>
-  request(target, "POST", `/containers/${at(name)}/stop?t=10`)
+  request(target, "POST", `/containers/${at(name)}/stop?t=${timeoutSeconds}`)
+
+/**
+ * Settles once the container is not running: at once for one stopped, and a
+ * missing one (404) is settled too. Any other answer throws.
+ */
+export async function waitContainer(
+  target: Pick<DockerTarget, "socket">,
+  name: string,
+): Promise<void> {
+  const answered = await request(
+    target,
+    "POST",
+    `/containers/${at(name)}/wait?condition=not-running`,
+  )
+  if (!ok(answered) && answered.status !== 404)
+    throw new Error(`docker wait ${name} failed: ${apiMessage(answered)}`)
+}
 
 /** Remove a container, running or not; a missing one is fine. */
 export const removeContainer = (

@@ -60,11 +60,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a build lands on no step",
     file: "apps/pinetrie/host/start-checklist.ts",
-    from: "        : { ...list, now: { ...now, building: event.build } }",
-    to: "        : list",
+    from: '              built: event.work.kind === "build" ? event.work.build : now.built,',
+    to: "              built: now.built,",
     command: unit,
     expect:
       "a build lands on the step running, and is what it ended having built",
+  },
+  {
+    name: "a stop of the slot's leftovers is given a build's estimate",
+    file: "apps/pinetrie/host/startup-lines.ts",
+    from: '  step === null || work.kind !== "build"',
+    to: "  step === null",
+    command: unit,
+    expect:
+      "a stop of the slot's leftovers says how many, with no build's estimate",
   },
   {
     name: "a step the start went past is dropped unsaid",

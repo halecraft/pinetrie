@@ -17,7 +17,7 @@ import {
   NESTED_MOUNT,
   planDockerHost,
   SLOT_LABEL,
-  sweepSlot,
+  stopSlot,
 } from "@pinetrie/docker"
 import type { Install } from "@pinetrie/install"
 import { repairFailedWords, vmStartWaitWords } from "@pinetrie/interface"
@@ -59,7 +59,7 @@ import {
   laneVmRepairControls,
   laneVmRepairRead,
 } from "../machine/repair.ts"
-import type { Build } from "../start-checklist.ts"
+import type { Build, StartWork } from "../start-checklist.ts"
 import {
   createShares,
   type HostShares,
@@ -204,8 +204,11 @@ export async function findProject(input: {
    */
   readonly hostSocket: string
   readonly log: (line: string) => void
-  /** Told before each build the runtime or the lane VM's lease runs, now or later. */
-  readonly building: (build: Build) => void
+  /**
+   * Told before each build the runtime or the lane VM's lease runs, now or
+   * later, and before the slot's leftovers are stopped.
+   */
+  readonly working: (work: StartWork) => void
   /** How large the lane VM's data disk should be at a start this host makes; absent, as it is. */
   readonly growData?: DataDiskPlan
   /** `lanes.manage`, from the machine's and your own file. */
@@ -223,7 +226,7 @@ interface RuntimeInput {
   readonly slots: number
   readonly hostSocket: string
   readonly log: (line: string) => void
-  readonly building: (build: Build) => void
+  readonly working: (work: StartWork) => void
   readonly growData?: DataDiskPlan
   /** Whether this host keeps the machine itself: only then does it repair the lane VM's disk. */
   readonly manage: ManageMode
@@ -246,11 +249,16 @@ async function runtimeFound(
     : hostDockerFound(project, input, planned.lanesDir)
 }
 
+const building =
+  (input: RuntimeInput) =>
+  (build: Build): void =>
+    input.working({ kind: "build", build })
+
 /** Docker's builds, as the start's checklist names them. */
 const imageBuilding =
   (input: RuntimeInput) =>
   (image: ImageBuild): void =>
-    input.building({ kind: "image", image })
+    input.working({ kind: "build", build: { kind: "image", image } })
 
 /** Docker on this machine (Linux): its socket, paths as they are. */
 async function hostDockerFound(
@@ -351,7 +359,7 @@ async function vmFound(
       slots,
       agent: hostSocket,
       log,
-      building: input.building,
+      building: building(input),
       ...(input.growData === undefined ? {} : { growData: input.growData }),
       onStartWaiting: () =>
         void readRepair().then(read =>
@@ -363,17 +371,21 @@ async function vmFound(
     controls: repairControls,
     stateDir,
     growData: input.growData ?? null,
-    building: input.building,
+    building: building(input),
     log,
   }).catch((error: unknown) => refusedWith(errorText(error)))
   if ("words" in leased) return leased
   const first = leased
-  /** A slot's containers left by a host that died holding it. */
-  const sweep = async (slot: number) => {
-    const left = await sweepSlot({ socket: first.docker }, slotRoot(slot))
+  /** A slot's containers left by a host that stopped holding it. */
+  const stop = async (slot: number) => {
+    const left = await stopSlot(
+      { socket: first.docker },
+      slotRoot(slot),
+      names => input.working({ kind: "stopping-left", count: names.length }),
+    )
     if (left.length > 0)
       log(
-        `[host] removed ${left.length} containers left in slot ${slot} by a host that stopped holding it`,
+        `[host] stopped ${left.length} containers the last host left in slot ${slot}`,
       )
   }
   // Read by the target each time a lane is made, so a lane made after a
@@ -412,8 +424,8 @@ async function vmFound(
   const held = createShares({
     lease: first,
     ownPort,
-    sweep,
-    extra: dirs => leaseExtra({ stateDir, dirs, sweep, log }),
+    stop,
+    extra: dirs => leaseExtra({ stateDir, dirs, stop, log }),
     grant: async ports => {
       await runtime.grantHostPorts(ports)
     },

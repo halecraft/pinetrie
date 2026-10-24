@@ -84,7 +84,7 @@ describe("the line form", () => {
     const t = fakeTerminal()
     const progress = startProgress({ ...t, isTTY: false }, options)
     progress.begin("store")
-    progress.building({ kind: "runtime" })
+    progress.working({ kind: "build", build: { kind: "runtime" } })
     progress.begin("listening")
     progress.end()
     expect(t.written.join("")).not.toContain(ESC)

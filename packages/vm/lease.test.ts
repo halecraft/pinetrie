@@ -109,29 +109,38 @@ async function standIn(
 
 const log = () => {}
 
-test("a lease: a slot, swept then filled once with its entries, then the end frees it", async () => {
-  const l = await standIn(m =>
-    m.kind === "lease" ? slotReply(2) : { kind: "filled" },
-  )
+test("a lease: a slot, filled once with its entries after its stop settles, then the end frees it", async () => {
+  let isStopSettled = false
+  const fillSeen: boolean[] = []
+  const l = await standIn(m => {
+    if (m.kind === "lease") return slotReply(2)
+    fillSeen.push(isStopSettled)
+    return { kind: "filled" }
+  })
   const socket = await connect(l.control)
   if (socket === null) throw new Error("no stand-in")
   const lease = await leaseOn(socket, { agent: "/a.sock", log })
   expect(lease.slot).toBe(2)
-  const swept: number[] = []
-  const sweep = async (slot: number) => {
-    swept.push(slot)
+  const stopped: number[] = []
+  // Settles a while after it is called, so a fill sent without waiting for
+  // it reaches the launcher first.
+  const stop = async (slot: number) => {
+    stopped.push(slot)
+    await new Promise(r => setTimeout(r, 50))
+    isStopSettled = true
   }
   const filled = await lease.fill(
     [
       { source: "/p", readOnly: true },
       { source: "/p/.plans", readOnly: false },
     ],
-    sweep,
+    stop,
   )
-  expect(swept).toEqual([2])
+  expect(stopped).toEqual([2])
+  expect(fillSeen).toEqual([true])
   expect(filled.slot).toBe(2)
   expect(filled.entries.map(e => e.source).sort()).toEqual(["/p", "/p/.plans"])
-  await expect(lease.fill([], sweep)).rejects.toThrow("a slot is filled once")
+  await expect(lease.fill([], stop)).rejects.toThrow("a slot is filled once")
   expect(l.seen[0]).toEqual({ kind: "lease", agent: "/a.sock" })
   expect(l.seen[1]).toMatchObject({ kind: "fill" })
   expect(l.seen.length).toBe(2)
@@ -208,7 +217,7 @@ test("a launcher that never answers fails the lease in time, naming what it wait
   ).rejects.toThrow("did not answer a lease in 0.1 s")
 })
 
-test("an extra lease: another slot of the same launcher, swept and filled with only what it is given", async () => {
+test("an extra lease: another slot of the same launcher, stopped and filled with only what it is given", async () => {
   let next = 0
   const l = await standIn(m =>
     m.kind === "lease" ? slotReply(next++) : { kind: "filled" },
@@ -216,18 +225,18 @@ test("an extra lease: another slot of the same launcher, swept and filled with o
   const socket = await connect(l.control)
   if (socket === null) throw new Error("no stand-in")
   const host = await leaseOn(socket, { agent: "/a.sock", log })
-  const swept: number[] = []
-  const sweep = async (slot: number) => {
-    swept.push(slot)
+  const stopped: number[] = []
+  const stop = async (slot: number) => {
+    stopped.push(slot)
   }
-  await host.fill([{ source: "/p", readOnly: true }], sweep)
+  await host.fill([{ source: "/p", readOnly: true }], stop)
   const extra = await leaseExtra({
     stateDir: path.dirname(l.control),
     dirs: [{ source: "/p/docs", readOnly: false }],
-    sweep,
+    stop,
     log,
   })
-  expect(swept).toEqual([0, 1])
+  expect(stopped).toEqual([0, 1])
   expect(extra.fill.slot).toBe(1)
   expect(extra.fill.entries.map(e => [e.source, e.readOnly])).toEqual([
     ["/p/docs", false],

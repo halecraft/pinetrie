@@ -58,7 +58,7 @@ describe.skipIf(process.platform === "darwin")(
         slots: 16,
         hostSocket: path.join(dir, ".no-ssh.sock"),
         log: () => {},
-        building: () => {},
+        working: () => {},
         manage: "manage",
       })
     test("a Docker that does not answer, in the runtime's words", () =>
@@ -84,7 +84,7 @@ describe.skipIf(process.platform === "darwin")(
           slots: 16,
           hostSocket: "/no-ssh.sock",
           log: () => {},
-          building: () => {},
+          working: () => {},
           manage: "manage",
         }),
       ).toBeNull()

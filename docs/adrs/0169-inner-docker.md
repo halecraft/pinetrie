@@ -142,7 +142,7 @@
   not list, among those whose disks are in its own lanes directory:** what
   a clone carries of its source's inner lanes, and their networks. Which
   containers are its own is read from where their binds lie, as the slot
-  sweep reads it (`sweepSlot`), not from a label, so another lanes
+  stop reads it (`stopSlot`), not from a label, so another lanes
   directory's containers on the same Docker are never in it. The lane's own inner lanes' containers, lost with its replaced
   data root, are made again at their next start, as any missing container
   is.

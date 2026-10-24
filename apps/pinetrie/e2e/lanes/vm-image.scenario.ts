@@ -105,7 +105,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const extra = await leaseExtra({
           stateDir,
           dirs: [],
-          sweep: async () => {},
+          stop: async () => {},
           log: l => lines.push(l),
         }).then(
           e => e,

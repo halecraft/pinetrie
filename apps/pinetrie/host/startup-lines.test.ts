@@ -8,8 +8,6 @@ import {
 } from "./start-checklist.ts"
 import {
   agentReadyLine,
-  buildingLine,
-  buildWords,
   checklistLines,
   endedLine,
   reportLines,
@@ -17,6 +15,8 @@ import {
   sshLines,
   startStepWords,
   storeLine,
+  workingLine,
+  workWords,
 } from "./startup-lines.ts"
 
 describe("sessionLines", () => {
@@ -170,7 +170,10 @@ describe("the start's checklist", () => {
     { kind: "begin", step: "lane-machine", at: 0 },
     { kind: "begin", step: "store", at: 400 },
     { kind: "begin", step: "lane-images", at: 1000 },
-    { kind: "building", build: { kind: "image", image: "lane" } },
+    {
+      kind: "working",
+      work: { kind: "build", build: { kind: "image", image: "lane" } },
+    },
   ].reduce(
     (l, e) => checklistAfter(l, e as StartEvent),
     startChecklist(
@@ -209,11 +212,19 @@ describe("the start's checklist", () => {
       ),
     ).toBe("[host] ✓ the observer, built (1:01)")
     expect(
-      buildingLine({ kind: "image", image: "observer" }, "observer", {}),
+      workingLine(
+        { kind: "build", build: { kind: "image", image: "observer" } },
+        "observer",
+        {},
+      ),
     ).toBe("[host] building the observer's image (about 1:00)")
-    expect(buildingLine({ kind: "image", image: "lane" }, null, {})).toBe(
-      "[host] building the lane image",
-    )
+    expect(
+      workingLine(
+        { kind: "build", build: { kind: "image", image: "lane" } },
+        null,
+        {},
+      ),
+    ).toBe("[host] building the lane image")
   })
 
   test("the lane machine is named for where lanes run", () => {
@@ -222,11 +233,26 @@ describe("the start's checklist", () => {
   })
 
   test("a VM image's build says what it does first", () => {
-    expect(buildWords({ kind: "vm-image", compile: true, fetch: false })).toBe(
+    const vmImage = (compile: boolean) =>
+      workWords({
+        kind: "build",
+        build: { kind: "vm-image", compile, fetch: false },
+      })
+    expect(vmImage(true)).toBe(
       "building the lane VM's image: compiling its builder first",
     )
-    expect(buildWords({ kind: "vm-image", compile: false, fetch: false })).toBe(
-      "building the lane VM's image",
+    expect(vmImage(false)).toBe("building the lane VM's image")
+  })
+
+  test("a stop of the slot's leftovers says how many, with no build's estimate", () => {
+    expect(workWords({ kind: "stopping-left", count: 10 })).toBe(
+      "stopping 10 containers the last host left",
     )
+    expect(workWords({ kind: "stopping-left", count: 1 })).toBe(
+      "stopping 1 container the last host left",
+    )
+    expect(
+      workingLine({ kind: "stopping-left", count: 2 }, "lanehost", {}),
+    ).toBe("[host] stopping 2 containers the last host left")
   })
 })

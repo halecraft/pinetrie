@@ -420,7 +420,7 @@ async function openHost(
     // Only the machine's and your own file may set it: no project's copy.
     slots: hostOnly["lanes.vm.slots"].value,
     log,
-    building: build => progress.building(build),
+    working: work => progress.working(work),
     // Like the slots, from the machine's and your own file alone.
     manage: hostOnly["lanes.manage"].value,
     growData: facts =>

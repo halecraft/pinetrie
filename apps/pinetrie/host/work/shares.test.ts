@@ -135,19 +135,19 @@ describe("createShares: a host's slots and grant, behind one queue", () => {
     target: `/in${source}`,
     readonly,
   })
-  /** A lease on `slot` that records each fill, with the sweep run first. */
+  /** A lease on `slot` that records each fill, with the stop run first. */
   const leaseOn = (slot: number, fills: string[]) =>
     record<Lease>({
       slot,
-      fill: async (dirs, sweep) => {
-        await sweep(slot)
+      fill: async (dirs, stop) => {
+        await stop(slot)
         fills.push(`${slot}: ${dirs.map(d => d.source).join(" ")}`)
         return { slot, entries: planShares(dirs) }
       },
     }).port
   test("a share still running when the lease is relet lands before the reset, and the new lease's own slot is filled", async () => {
     const fills: string[] = []
-    const swept: number[] = []
+    const stopped: number[] = []
     const closed: number[] = []
     let release = () => {}
     const extraHeld = new Promise<void>(r => {
@@ -156,8 +156,8 @@ describe("createShares: a host's slots and grant, behind one queue", () => {
     const shares = createShares({
       lease: leaseOn(0, fills),
       ownPort: null,
-      sweep: async slot => {
-        swept.push(slot)
+      stop: async slot => {
+        stopped.push(slot)
       },
       extra: async dirs => {
         await extraHeld
@@ -183,7 +183,7 @@ describe("createShares: a host's slots and grant, behind one queue", () => {
     release()
     await Promise.all([widening, relet])
     expect(fills).toEqual(["0: /p", "3: /p /p/docs"])
-    expect(swept).toEqual([0, 3])
+    expect(stopped).toEqual([0, 3])
     // The old lease's extra slot, made before the reset, is closed by it.
     expect(closed).toEqual([7])
     expect(shares.slot()).toBe(3)

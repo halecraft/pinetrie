@@ -203,7 +203,7 @@ export function planShares(dirs: readonly ShareDir[]): readonly ShareEntry[] {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
-/** Where a slot's entries are in the VM, for the sweep of its binds. */
+/** Where a slot's entries are in the VM, for the stop of what binds into it. */
 export const slotRoot = (slot: number): string => `${SHARES_ROOT}/${slot}/`
 
 /** The slots of a host that hold one source: at most one of each kind. */

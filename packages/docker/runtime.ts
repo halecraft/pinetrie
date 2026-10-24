@@ -66,6 +66,7 @@ import {
   runContainer,
   startContainer,
   stopContainer,
+  waitContainer,
 } from "./api.ts"
 import {
   buildImage,
@@ -518,7 +519,7 @@ export function dockerRuntime(input: {
     },
     // Docker's disk needs nothing after a stop: btrfs frees what a lane deletes.
     async stop(name) {
-      await stopContainer(target, name)
+      await stopContainer(target, name, 10)
     },
     async remove(name) {
       await removeContainer(target, name)
@@ -640,15 +641,26 @@ export function dockerRuntime(input: {
 }
 
 /**
- * Before a slot is filled: remove every container of any project with a bind
- * under `root`, the slot's place in Docker's machine, left by a host that died
- * holding it. Returns their names.
+ * Before a slot is filled: kill every container of any project with a bind
+ * under `root`, the slot's place in Docker's machine, all at once, and answer
+ * their names only once each has died, since its binds go only then. A
+ * stop's own answer proves nothing (a 304 for one already stopped, a 404
+ * for one gone): the wait does. Nothing is removed: the next start of each
+ * starts it again or makes it anew, as its spec decides.
  */
-export async function sweepSlot(
+export async function stopSlot(
   target: Pick<DockerTarget, "socket">,
   root: string,
+  /** Told the names before any is stopped, when there are any. */
+  stopping: (names: readonly string[]) => void,
 ): Promise<readonly string[]> {
   const names = planSlotSweep(root, await listLabelled(target, PROJECT_LABEL))
-  for (const name of names) await removeContainer(target, name)
+  if (names.length > 0) stopping(names)
+  await Promise.all(
+    names.map(async name => {
+      await stopContainer(target, name, 0)
+      await waitContainer(target, name)
+    }),
+  )
   return names
 }

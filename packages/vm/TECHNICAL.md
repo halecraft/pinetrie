@@ -178,7 +178,8 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   work names a directory no slot of the host holds, or wants read-write
   one held read-only, the host leases one more slot and fills it with
   those directories alone (`leaseExtra`: a second connection, `agent`
-  null, never starting or retiring a VM; leased and filled in one call, so
+  null, never starting or retiring a VM; leased and filled in one call,
+  its leftovers stopped first as the host slot's are, so
   no extra slot is ever empty or filled twice; `planWidening`). Its own slot
   always holds lanehost's running roles, so it is never refilled; nor is
   an extra slot, and a later widening takes another. A directory is then
@@ -335,7 +336,8 @@ When a host repairs is `@pinetrie/machine`'s; this is the boot and its locks.
   logs before it asks for a slot.
 - **A host keeps its lease** (`keepLease`): one that ends without the host
   closing it (its launcher stopped or died) is leased again, which starts a
-  VM, with a wait doubling from 1 s to 30 s; the slot is swept and filled
+  VM, with a wait doubling from 1 s to 30 s; the slot's leftovers are
+  stopped (on a VM just started, each is stopped already) and it is filled
   again, and the grant written again. The Docker target reads the slot
   through the lease held now, so each lane is made again at its next
   start. Without this, a host whose launcher was killed failed every lane's
@@ -346,13 +348,16 @@ When a host repairs is `@pinetrie/machine`'s; this is the boot and its locks.
 `control.sock` answers), plans (`planVm`: join, start, or a refusal worded
 by `vmWords`), then starts the launcher if need be, takes a slot, and waits
 for Docker's `/_ping`. Its `Lease` is the slot, the Docker socket, `fill`
-and `close`. `fill` takes the slot's sweep and runs it first, so no slot is
-filled with a dead host's containers still bound into it; then it shares
+and `close`. `fill` takes the slot's stop, runs it first and waits for it
+to settle, so no slot is filled while a container the last host left still
+binds into it: the order is `fill`'s own, and no proof value crosses from
+`@pinetrie/docker`, which this package may not declare (the stop settles
+only once each such container has died, `stopSlot`); then it shares
 the directories (`planShares`), once per lease, answering the `Fill` it
 made. `planShares` names each entry by a hash of its source, so a directory
 has one name whatever else is shared; one source given twice is one entry,
 read-write if either is. `slotRoot` is where a slot's entries are, for the
-sweep of what binds into it.
+stop of what binds into it.
 
 ## Gotchas
 

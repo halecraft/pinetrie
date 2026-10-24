@@ -41,6 +41,7 @@ import {
   type LaneMachine,
   type StartStep,
   type StartTimes,
+  type StartWork,
   stepEstimate,
 } from "./start-checklist.ts"
 
@@ -267,8 +268,19 @@ export function startStepWords(step: StartStep, machine: LaneMachine): string {
   }
 }
 
-/** What a step builds, as the checklist says it. */
-export function buildWords(build: Build): string {
+/** What a step waits on, as the checklist says it. */
+export function workWords(work: StartWork): string {
+  switch (work.kind) {
+    case "build":
+      return buildingWords(work.build)
+    case "stopping-left":
+      return `stopping ${work.count} ${work.count === 1 ? "container" : "containers"} the last host left`
+    default:
+      return assertNever(work)
+  }
+}
+
+function buildingWords(build: Build): string {
   switch (build.kind) {
     case "vm-launcher":
       return "building the lane VM's launcher"
@@ -332,10 +344,10 @@ export function checklistLines(
     lines.push(`  ✗ ${startStepWords(current.step, machine)}: ${current.why}`)
   else if (current?.kind === "running") {
     const doing =
-      current.building === null ? "" : `: ${buildWords(current.building)}`
+      current.working === null ? "" : `: ${workWords(current.working)}`
     const estimate = stepEstimate(
       current.step,
-      current.building !== null,
+      current.built !== null,
       list.times,
     )
     lines.push(
@@ -358,12 +370,15 @@ export const failedLine = (
   machine: LaneMachine,
 ): string => `[host] ✗ ${startStepWords(step, machine)}: ${why}`
 
-/** A build beginning, as the line form prints it, with what it is expected to take. */
-export const buildingLine = (
-  build: Build,
+/**
+ * Work beginning, as the line form prints it; a build in a step with what
+ * the step is expected to take when it builds.
+ */
+export const workingLine = (
+  work: StartWork,
   step: StartStep | null,
   times: StartTimes,
 ): string =>
-  step === null
-    ? `[host] ${buildWords(build)}`
-    : `[host] ${buildWords(build)} (about ${durationWords(stepEstimate(step, true, times))})`
+  step === null || work.kind !== "build"
+    ? `[host] ${workWords(work)}`
+    : `[host] ${workWords(work)} (about ${durationWords(stepEstimate(step, true, times))})`

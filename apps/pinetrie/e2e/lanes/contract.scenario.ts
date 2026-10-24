@@ -30,15 +30,18 @@ import { entrySnapshotId } from "@pinetrie/core/fixtures"
 import { LANEHOST_LABEL, NESTED_MOUNT, projectKey } from "@pinetrie/docker"
 import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
 import {
+  type ContainerShape,
   ensureRuntime,
   executeOrThrow,
   type LaneRuntime,
   laneContainer,
   type Mount,
+  planContainer,
   planSnapshot,
   prepareImages,
   RUNTIME_MOUNT,
   run,
+  specHash,
 } from "@pinetrie/lanes"
 import { GVPROXY_HOST_ADDRESS } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
@@ -134,7 +137,7 @@ async function dockerContract(
     // No lane here holds an ssh identity: nothing listens there.
     hostSocket: path.join(projA, ".no-ssh.sock"),
     log,
-    building: build => log(`building ${JSON.stringify(build)}`),
+    working: work => log(`working ${JSON.stringify(work)}`),
     manage: "manage",
   })
   if (a?.kind !== "found")
@@ -163,7 +166,7 @@ async function dockerContract(
     lanes.push(name)
     laneRuntimes.set(name, on)
     await on.disk({ kind: "create", lane: name })
-    await on.run({
+    const shape: ContainerShape = {
       name: laneContainer(name),
       lane: name,
       image,
@@ -175,10 +178,15 @@ async function dockerContract(
       nested: false,
       hostPorts: [],
       states: false,
-    })
+    }
+    laneShapes.set(name, shape)
+    await on.run(shape)
     return name
   }
   const laneRuntimes = new Map<ThreadId, LaneRuntime>()
+  const laneShapes = new Map<ThreadId, ContainerShape>()
+  /** A host of project B's, closed once project A's second host is done. */
+  let slotHeld: { close(): Promise<void> } | null = null
   const contractImage = (name: string) =>
     `pinetrie-lane:contract-${process.pid}-${name}`
   const heldContainer = `pinetrie-contract-${process.pid}-held`
@@ -198,7 +206,7 @@ async function dockerContract(
     // ── a half-close: first, before anything streams through the bridge
     // (the slot's fill sweeps through lanehost's held exec), so a broken
     // bridge fails here and not in a check after it. Only API calls come
-    // before it: Docker's version, the slot's sweep, the pull. ──
+    // before it: Docker's version, the slot's stop, the pull. ──
     const echoed = await quietCli(
       ["run", "--rm", "-i", ALPINE_IMAGE, "cat"],
       "hi\n",
@@ -533,7 +541,7 @@ async function dockerContract(
       slots,
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,
-      building: build => log(`building ${JSON.stringify(build)}`),
+      working: work => log(`working ${JSON.stringify(work)}`),
       manage: "manage",
     })
     if (b?.kind === "found") {
@@ -561,7 +569,84 @@ async function dockerContract(
           "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
           "gvproxy is the Mac's lane VM's network",
         )
-      await b.close()
+      if (onMac) {
+        // ── a host closed with its lane running, and the next one on its
+        // slot: host A keeps the VM up, and the launcher gives the next
+        // host the lowest free slot, B's. It keeps that slot past the
+        // second host on project A below, which so takes a slot never
+        // filled: a slot filled again within about a second of a container
+        // binding one of its entries leaves new binds of that entry empty,
+        // whatever stopped or removed that container. ──
+        const leftLane = await lane(ALPINE_IMAGE, b.runtime, mountsOfB)
+        const before = await projectContainers(projB)
+        await b.close()
+        const next = await findProject({
+          root: projB,
+          install: thisInstall,
+          slots,
+          hostSocket: path.join(projB, ".no-ssh.sock"),
+          log,
+          working: work => log(`working ${JSON.stringify(work)}`),
+          manage: "manage",
+        })
+        if (next?.kind !== "found")
+          throw new Error(
+            `no runtime for the next host: ${next === null ? "no project" : next.words}`,
+          )
+        laneRuntimes.set(leftLane, next.runtime)
+        try {
+          // A leftover still running when the slot is filled loses its
+          // binds: the next host's own roles fail as it serves.
+          const refused = await next
+            .ready({
+              defaultImage: "",
+              hostPorts: [],
+              mounts: [...mountsOfB, ...serverMounts],
+            })
+            .then(
+              () => null,
+              (error: unknown) => errorText(error),
+            )
+          const shape = laneShapes.get(leftLane)
+          const facts = await next.runtime.containerFacts(
+            laneContainer(leftLane),
+          )
+          const plan =
+            shape === undefined
+              ? "no shape"
+              : planContainer({
+                  facts,
+                  want: specHash(next.runtime.runSpec(shape)),
+                })
+          if (plan === "start")
+            await next.runtime.start(laneContainer(leftLane))
+          const after = await projectContainers(projB)
+          check(
+            "a host's start stops the last host's lanes and starts them again",
+            refused === null &&
+              plan === "start" &&
+              after === before &&
+              before !== "",
+            `served: ${refused ?? "yes"} | the lane: ${facts.state}, planned ${plan} | before: ${before.replace(/\n/g, " ")} | after: ${after.replace(/\n/g, " ")}`,
+          )
+          await next.runtime.remove(laneContainer(leftLane)).catch(() => {})
+          await next.runtime
+            .disk({ kind: "delete", lane: leftLane })
+            .catch(() => {})
+          laneRuntimes.delete(leftLane)
+          lanes.splice(lanes.indexOf(leftLane), 1)
+        } catch (error) {
+          await next.close()
+          throw error
+        }
+        slotHeld = next
+      } else {
+        skip(
+          "a host's start stops the last host's lanes and starts them again",
+          "only the Mac's lane VM has slots a host's leftovers bind into",
+        )
+        await b.close()
+      }
     }
     const after = await exec(
       writerLane,
@@ -581,7 +666,7 @@ async function dockerContract(
       slots,
       hostSocket: path.join(projA, ".no-ssh.sock"),
       log,
-      building: build => log(`building ${JSON.stringify(build)}`),
+      working: work => log(`working ${JSON.stringify(work)}`),
       manage: "manage",
     })
     const refusal =
@@ -598,6 +683,8 @@ async function dockerContract(
             )
         : `no runtime: ${second === null ? "no project" : second.words}`
     if (second?.kind === "found") await second.close()
+    await slotHeld?.close()
+    slotHeld = null
     const firstServes = await runtime.snapshots().then(
       () => "serves",
       (error: unknown) => errorText(error),
@@ -732,6 +819,7 @@ async function dockerContract(
         ids: snapshots.map(s => deletableSnapshot("entry", s)),
       })
       .catch(() => {})
+    await slotHeld?.close()
     await a.close()
     if (own !== null) {
       // The contract's VM stops once its last lease ends.
@@ -751,6 +839,27 @@ async function dockerContract(
 const NODE_IMAGE = "docker.io/library/node:24-alpine"
 const PYTHON_IMAGE = "docker.io/library/python:3-alpine"
 const ALPINE_IMAGE = "docker.io/library/alpine:3.23"
+
+/**
+ * Every container of the project at `root`, an id and a name to a line,
+ * sorted: what a host's start keeps or makes anew shows in it.
+ */
+const projectContainers = async (root: string): Promise<string> =>
+  (
+    await cli([
+      "ps",
+      "--all",
+      "--no-trunc",
+      "--filter",
+      `label=pinetrie.project=${projectKey(root)}`,
+      "--format",
+      "{{.ID}} {{.Names}}",
+    ])
+  )
+    .trim()
+    .split("\n")
+    .sort()
+    .join("\n")
 
 /** The runtime's CLI with a failure as its output. */
 const quietCli = (args: readonly string[], input?: string): Promise<string> =>

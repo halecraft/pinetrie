@@ -16,10 +16,10 @@ import {
   timesAfter,
 } from "./start-checklist.ts"
 import {
-  buildingLine,
   checklistLines,
   endedLine,
   failedLine,
+  workingLine,
 } from "./startup-lines.ts"
 
 export interface ProgressOptions {
@@ -40,7 +40,7 @@ export interface ProgressOptions {
 interface Shown {
   /** After `event`, given the list before and after it. */
   shown(before: Checklist, after: Checklist, event: StartEvent): void
-  /** A build announced with no step running. */
+  /** Work announced with no step running. */
   loose(line: string): void
   log(line: string): void
   /** The start is over: draw a last time and let go of the terminal. */
@@ -68,9 +68,9 @@ function progressOver(options: ProgressOptions, show: Shown): StartProgress {
   }
   return {
     begin: step => fold({ kind: "begin", step, at: clock() }),
-    building(build) {
-      if (list.now?.kind === "running") fold({ kind: "building", build })
-      else show.loose(buildingLine(build, null, list.times))
+    working(work) {
+      if (list.now?.kind === "running") fold({ kind: "working", work })
+      else show.loose(workingLine(work, null, list.times))
     },
     end() {
       fold({ kind: "end", at: clock() })
@@ -84,7 +84,7 @@ function progressOver(options: ProgressOptions, show: Shown): StartProgress {
   }
 }
 
-/** The line form: each step's end, each build's start, and a failure, as lines of `log`. */
+/** The line form: each step's end, each work's start, and a failure, as lines of `log`. */
 export function lineProgress(
   log: (line: string) => void,
   options: ProgressOptions,
@@ -94,8 +94,8 @@ export function lineProgress(
     shown(before, after, event) {
       for (const e of after.ended.slice(before.ended.length))
         log(endedLine(e, machine))
-      if (event.kind === "building" && after.now?.kind === "running")
-        log(buildingLine(event.build, after.now.step, after.times))
+      if (event.kind === "working" && after.now?.kind === "running")
+        log(workingLine(event.work, after.now.step, after.times))
       if (after.now?.kind === "failed" && before.now?.kind !== "failed")
         log(failedLine(after.now.step, after.now.why, machine))
     },

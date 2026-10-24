@@ -6,6 +6,10 @@
 - **Amends:**
   - ADR-0205: the runtime's containers part names its project's base lane
     (`baseLane`), from the project's key.
+- **Revised:**
+  - 2026-10-23 (ADR-0210): the Mac's slot sweep stops what it finds and
+    removes nothing, so an old `pinetrie-base-scratch` there is stopped, and
+    removed with its project's folder or by hand, as on Linux.
 
 **Context.** The base snapshot is made in a scratch lane that is no
 thread's. Its name was the constant `base-scratch`, so its container was
@@ -43,10 +47,10 @@ either: lanehost keeps them under the project's own directory
   container, and a disk named `base-scratch` in a project's directory, are
   left only by a host that stopped mid-build: the build removed both in
   every other case. No code names them now (no backwards compatibility).
-  On the Mac, the slot's sweep at the next lease removes the container,
-  as every container bound under the slot. On Linux, the startup sweep
-  removes it, and the disk, once its project's folder is gone; until then
-  `docker rm -f pinetrie-base-scratch` removes the container. A leftover
+  On the Mac, the slot's sweep at the next lease stops the container, as
+  every container bound under the slot. On either machine, the startup
+  sweep removes it, and the disk, once its project's folder is gone; until
+  then `docker rm -f pinetrie-base-scratch` removes the container. A leftover
   disk is a copy-on-write subvolume, and is removed with its project.
   `pinetrie tidy` tidies your repo and touches neither.
 

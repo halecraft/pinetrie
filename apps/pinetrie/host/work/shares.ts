@@ -181,9 +181,12 @@ export interface HostShares {
 export function createShares(input: {
   readonly lease: Lease
   readonly ownPort: number | null
-  /** Removes what a dead host left bound into a slot, before it is filled. */
-  readonly sweep: (slot: number) => Promise<void>
-  /** A new slot for `dirs`, swept and filled. */
+  /**
+   * Stops what the last host left bound into a slot, before it is filled;
+   * settles once each has died (`Lease.fill`).
+   */
+  readonly stop: (slot: number) => Promise<void>
+  /** A new slot for `dirs`, its leftovers stopped, then filled. */
   readonly extra: (dirs: readonly ShareDir[]) => Promise<ExtraLease>
   /** Writes the grant, replacing the last. */
   readonly grant: (ports: readonly number[]) => Promise<void>
@@ -191,7 +194,7 @@ export function createShares(input: {
   readonly relet: () => void
   readonly log: (line: string) => void
 }): HostShares {
-  const { sweep, log } = input
+  const { stop, log } = input
   const queue = createQueue()
   let lease = input.lease
   let extras: ExtraLease[] = []
@@ -204,7 +207,7 @@ export function createShares(input: {
     given = wanted
     const plan = planShareAndGrant(shares, wanted, input.ownPort, true)
     if (plan.fill?.into === "host") {
-      const fill = await lease.fill(plan.fill.dirs, sweep)
+      const fill = await lease.fill(plan.fill.dirs, stop)
       shares = { ...shares, filled: true, held: holdFill(shares.held, fill) }
     } else if (plan.fill?.into === "extra") {
       const dirs = plan.fill.dirs

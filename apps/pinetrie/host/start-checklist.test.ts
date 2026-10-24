@@ -62,7 +62,8 @@ describe("checklistAfter", () => {
       kind: "running",
       step: "project",
       since: 300,
-      building: null,
+      built: null,
+      working: null,
     })
     expect(list.waiting).toEqual(["listening"])
   })
@@ -72,13 +73,26 @@ describe("checklistAfter", () => {
     const list = after(
       start,
       { kind: "begin", step: "store", at: 0 },
-      { kind: "building", build },
+      { kind: "working", work: { kind: "build", build } },
       { kind: "end", at: 50 },
     )
     expect(list.ended).toEqual([
       { kind: "done", step: "store", took: 50, built: build },
     ])
     expect(list.now).toBeNull()
+  })
+
+  test("a stop of the slot's leftovers is what the step waits on, and not a build", () => {
+    const work = { kind: "stopping-left", count: 3 } as const
+    const running = after(
+      start,
+      { kind: "begin", step: "store", at: 0 },
+      { kind: "working", work },
+    )
+    expect(running.now).toMatchObject({ working: work, built: null })
+    expect(after(running, { kind: "end", at: 50 }).ended).toEqual([
+      { kind: "done", step: "store", took: 50, built: null },
+    ])
   })
 
   test("a begin past a waiting step marks it never run", () => {
@@ -132,7 +146,10 @@ describe("timesAfter", () => {
         "lane-images": { usual: 200 },
       }),
       { kind: "begin", step: "lane-images", at: 0 },
-      { kind: "building", build: { kind: "image", image: "lane" } },
+      {
+        kind: "working",
+        work: { kind: "build", build: { kind: "image", image: "lane" } },
+      },
       { kind: "begin", step: "store", at: 100_000 },
       { kind: "end", at: 100_400 },
     )

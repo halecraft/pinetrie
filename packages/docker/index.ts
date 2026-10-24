@@ -20,6 +20,6 @@ export {
   type DockerRuntime,
   dockerRuntime,
   type ServiceKillWatch,
-  sweepSlot,
+  stopSlot,
 } from "./runtime.ts"
 export type { DockerTarget } from "./target.ts"

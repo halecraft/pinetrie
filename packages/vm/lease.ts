@@ -66,13 +66,14 @@ export interface Lease {
   readonly docker: string
   /**
    * Share these directories in the slot, once per lease: refilling a slot
-   * cuts every bind into it. `sweep` runs first, with the slot: it removes
-   * what a host that died holding the slot left bound into it, which the
-   * fill would give the new directories. Resolves when filled.
+   * cuts every bind into it. `stop` runs first, with the slot, and the fill
+   * waits for it: it must settle only once nothing the last host left bound
+   * into the slot still runs, or the fill would cut those binds or give them
+   * the new directories. Resolves when filled.
    */
   fill(
     dirs: readonly ShareDir[],
-    sweep: (slot: number) => Promise<void>,
+    stop: (slot: number) => Promise<unknown>,
   ): Promise<Fill>
   /** What the VM was started from, and how many leases it holds. */
   readonly identity: VmIdentity
@@ -205,16 +206,16 @@ export interface ExtraLease {
 }
 
 /**
- * One more slot of the running VM, leased, swept and filled with `dirs`
- * alone, or none. Never starts, builds or retires a VM: while the host's
- * own lease is held, the launcher refuses to retire the VM, so this joins
- * the same one; a caller whose lease ended drops what this gives it. It
- * bridges no ssh socket; lanes keep the host slot's.
+ * One more slot of the running VM, leased and filled with `dirs` alone, or
+ * none, `stop` run first as `fill` runs it. Never starts, builds or retires
+ * a VM: while the host's own lease is held, the launcher refuses to retire
+ * the VM, so this joins the same one; a caller whose lease ended drops what
+ * this gives it. It bridges no ssh socket; lanes keep the host slot's.
  */
 export async function leaseExtra(input: {
   readonly stateDir: string
   readonly dirs: readonly ShareDir[]
-  readonly sweep: (slot: number) => Promise<void>
+  readonly stop: (slot: number) => Promise<unknown>
   readonly log: (line: string) => void
 }): Promise<ExtraLease> {
   const socket = await connect(path.join(input.stateDir, "control.sock"))
@@ -222,7 +223,7 @@ export async function leaseExtra(input: {
   const lease = await leaseOn(socket, { agent: null, log: input.log })
   try {
     return {
-      fill: await lease.fill(input.dirs, input.sweep),
+      fill: await lease.fill(input.dirs, input.stop),
       close: lease.close,
     }
   } catch (error) {
@@ -665,10 +666,10 @@ export async function leaseOn(
       }
       await closed
     },
-    async fill(dirs, sweep) {
+    async fill(dirs, stop) {
       if (filled) throw new Error("a slot is filled once")
       filled = true
-      await sweep(slot.slot)
+      await stop(slot.slot)
       const entries = planShares(dirs)
       send({ kind: "fill", entries })
       const m = await reply("a fill", 30_000)

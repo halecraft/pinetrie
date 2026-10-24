@@ -175,8 +175,9 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   owns, the base's scratch lane, is named by the project's key: the
   runtime's `baseLane` (ADR-0207). A thread's lane is named by its id,
   unique everywhere. An older install's `pinetrie-base-scratch`, left only
-  by a host that stopped mid-build, goes with the Mac's slot sweep, or on
-  Linux with its project's sweep.
+  by a host that stopped mid-build, is only stopped by the Mac's slot
+  stop, which removes nothing: it goes with its project's sweep, on either
+  machine, or by hand.
 - **No trim:** btrfs frees what a lane deletes. `stop` does nothing more.
 
 ## Networks, and the host's ports (S136)
@@ -230,11 +231,22 @@ never reaches the VM's Docker or the launcher's ports.
 
 ## The sweeps
 
-- **Before a slot is filled:** every container of any project with a bind
-  into it (`sweepSlot`, given the slot's root in the VM: Docker knows no
-  slot layout). They belong to a host that died holding the slot, its own
-  or an extra one, and filling it would cut their mounts, or show them the
-  new host's directories (S130). Read from each container's binds
+- **Before a slot is filled, its leftovers are stopped, and none is
+  removed:** every container of any project with a bind into it
+  (`stopSlot`, given the slot's root in the VM: Docker knows no slot
+  layout). They belong to a host that stopped holding the slot (a Ctrl-C,
+  a crash), its own or an extra one, and filling it would cut their mounts,
+  or show them the new host's directories (S130). Each is killed (a stop
+  with a timeout of 0) and waited on (`wait?condition=not-running`), all at
+  once, and `stopSlot` answers only once each has died: its binds go with
+  its mount namespace, not with the stop's answer (a 304 for one already
+  stopped, a 404 for one gone, S307). Nothing is removed: removing a lane
+  costs the deletion of its writable layer, up to a minute under pressure
+  (S307), and the new host on the same slot renders the same specs, so
+  `planContainer` starts its lanehost roles and the runs it resumes again,
+  the same containers; a leftover with another spec is removed and made
+  again on its own start, which alone pays for it. A removal off the
+  start's path would race those starts. Read from each container's binds
   (`Mounts`), not a label: a container's labels name only its host's first
   slot, and `SLOT_LABEL` serves to name lanehost's containers.
 - **At startup, once the slot is filled:** the containers and disks of every

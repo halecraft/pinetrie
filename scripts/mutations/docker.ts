@@ -16,6 +16,33 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a slot's stop answers before its containers have died",
+    file: "packages/docker/runtime.ts",
+    from: "      await waitContainer(target, name)\n",
+    to: "      void waitContainer(target, name)\n",
+    command: unit("packages/docker"),
+    expect:
+      "stopSlot kills every container bound into the slot, and answers only once each has died, removing none",
+  },
+  {
+    name: "a slot's stop removes what it stops",
+    file: "packages/docker/runtime.ts",
+    from: "      await waitContainer(target, name)\n",
+    to: "      await waitContainer(target, name)\n      await removeContainer(target, name)\n",
+    command: unit("packages/docker"),
+    expect:
+      "stopSlot kills every container bound into the slot, and answers only once each has died, removing none",
+  },
+  {
+    name: "a host stops the leftovers of a slot other than the one it fills (Mac)",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "      slotRoot(slot),\n      names =>",
+    to: "      slotRoot(slot + 1),\n      names =>",
+    suite: "lanes",
+    scenario: "contract",
+    expect: "a host's start stops the last host's lanes and starts them again",
+  },
+  {
     name: "an oom's time is read as a JSON number",
     file: plan,
     from: '      : { timeNano: BigInt(time[1] ?? "0"), name, labels }',

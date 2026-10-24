@@ -21,7 +21,7 @@ knows of.
 | `../command.ts`, `../bin.ts` | `pinetrie <command>`, the command the npm package puts on the PATH: `planCommand` decides which of `serve`, `sign-in`, `sign-out`, `tidy` and `session` an invocation asks for, and `bin.ts` loads only that command's module, each exporting `main(args)` and running nothing when loaded |
 | `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its lock held (`sessionLockFile`); and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
 | `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`readRepoSizes`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`invokedFolder`) |
-| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model; and the start's checklist, drawn (`checklistLines`) or a line per step (`endedLine`, `buildingLine`) |
+| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model; and the start's checklist, drawn (`checklistLines`) or a line per step (`endedLine`, `workingLine`) |
 | `start-checklist.ts` | a start's steps as values (§ Startup): `planStartSteps`, the cursor (`checklistAfter`), estimates (`stepEstimate`, `START_DEFAULTS`), what is remembered (`timesAfter`, `decodeStartTimes`), and the port a start reports through (`StartProgress`) |
 | `start-terminal.ts` | the checklist on its way out: redrawn in place on a terminal, owning its writes while it draws (`terminalProgress`), else a line per step (`lineProgress`) |
 | `host-refused.ts` | `HostRefused`, the one error a start throws as a refusal |
@@ -684,12 +684,17 @@ base snapshot, then the agent, and the server.
   the step before it; `startHost` ends the last, or fails the running one,
   in one place. A `begin` past a waiting step marks it as never run, so a
   planned step the code skips shows.
-- **A build lands on the step running** (`StartProgress.building`): the
-  lane VM's launcher and image (`leaseVm`'s `building`), every image
-  Docker builds (`dockerRuntime`'s `building`), the runtime's extraction
-  and the base snapshot's making. A step that built says so; one that could
-  have and did not says it is up to date. A build with no step running (a
-  tag another host removed, rebuilt later) is a line of its own.
+- **What a step waits on lands on the step running**
+  (`StartProgress.working`, a `StartWork`, worded by `workWords`): a build
+  (the lane VM's launcher and image, `leaseVm`'s `building`; every image
+  Docker builds, `dockerRuntime`'s `building`; the runtime's extraction
+  and the base snapshot's making), or the stop of what the last host left
+  in the slot (`stopping-left`, with how many). Only a build marks the step
+  as built: a step that built says so, and its time is kept as a built
+  one; one that could have and did not says it is up to date. A stop
+  changes only the running line's words, and takes no build's estimate.
+  Work with no step running (a tag another host removed, rebuilt later; a
+  relet's stop) is a line of its own.
 - **Estimates are the last start's** (`stepEstimate`): each step's
   duration, kept apart for a start in which it built, in the session's
   `start-times.json` (`SessionFiles.startTimes`), written once the start
@@ -913,15 +918,18 @@ as it first loads (§ Roots: steps, leases and the upkeep).
     (`leaseVm`), starting the VM if need be. The slot is filled once setup
     knows every directory a lane mounts (`Found.ready`, before the base's
     refresh, the first lane), and never replaced while the host runs. The
-    fill first removes every container with a bind into the slot
-    (`sweepSlot`): a host that died holding it left them (S130).
+    fill first stops every container with a bind into the slot, and waits
+    until each has died (`stopSlot`): a host that stopped holding it left
+    them (S130). The `lanehost` step says so while it waits
+    (`stopping-left`); nothing is removed, and the host's own starts take
+    each again (`packages/docker/TECHNICAL.md`, The sweeps).
   - **What accepted work adds while the host runs** (ADR-0141) is shared
     and granted before it is in force: `refreshBaseNow` in `setup.ts` reads
     accepted work's config (`readAccepted`), hands what lanes may then mount
     and reach to `Found.shareAndGrant`, then puts it in force
     (`takeAccepted`). The decision is a value (`planShareAndGrant`,
     `shares.ts`): the host's slot first; then a directory no slot holds as
-    wanted goes in an extra slot, swept first; ports are written when they
+    wanted goes in an extra slot, its leftovers stopped first; ports are written when they
     changed. The state it reads is `createShares`', changed only in one
     queue, a new lease's reset among its canvases. Nothing
     changed, nothing is done: in a project whose accepted work moves often

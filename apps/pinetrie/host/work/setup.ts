@@ -458,7 +458,7 @@ async function prepare(
   progress.begin("lane-runtime")
   const laidOut: LaidOut = {
     runtime: await ensureRuntime(runtime, files.runtime, runtimeFrom, () =>
-      progress.building({ kind: "runtime" }),
+      progress.working({ kind: "build", build: { kind: "runtime" } }),
     ),
     links: planLinks(root, await gatherLinks(root)),
   }
@@ -482,7 +482,7 @@ async function prepare(
 
   progress.begin("base-snapshot")
   await refreshBaseNow(ready, () =>
-    progress.building({ kind: "base-snapshot" }),
+    progress.working({ kind: "build", build: { kind: "base-snapshot" } }),
   )
   return ready
 }
