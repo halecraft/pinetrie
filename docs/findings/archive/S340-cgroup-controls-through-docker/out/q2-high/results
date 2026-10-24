@@ -1,0 +1,4 @@
+hf: file passes: 940  oom-killed=false
+hf0: file passes: 20673  oom-killed=false
+ha: vm bogo ops: 4483924  oom-killed=false
+ha0: vm bogo ops: 16100173  oom-killed=false

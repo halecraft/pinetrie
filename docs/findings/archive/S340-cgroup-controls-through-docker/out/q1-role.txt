@@ -1,0 +1,15 @@
+lane's memory.high written: 314572800
+lane's memory.min written: 67108864
+lane's memory.low written: 134217728
+lane's cpu.weight written: 50
+lane's pids.max written: 100
+mkdir: can't create directory '/host-cgroup/pinetrie-role-probe': Permission denied
+sh: can't create /host-cgroup/pinetrie-role-probe/memory.low: nonexistent directory
+rmdir: '/host-cgroup/pinetrie-role-probe': No such file or directory
+the role's own oom_score_adj: 0; lowering it to -500: 
+== making a cgroup at the tree's root (dr-xr-xr-x): the grant, then with DAC_OVERRIDE, each with its own and with the host's cgroup namespace
+  grant + nothing: mkdir: can't create directory '/host-cgroup/pinetrie-role-probe': Permission denied 
+  grant + --cap-add DAC_OVERRIDE: made 
+  grant + --cgroupns host: mkdir: can't create directory '/host-cgroup/pinetrie-role-probe': Permission denied 
+  grant + --cap-add DAC_OVERRIDE --cgroupns host: made 
+  the mode of the root and of docker/: dr-xr-xr-x /sys/fs/cgroup drwxr-xr-x /sys/fs/cgroup/docker 

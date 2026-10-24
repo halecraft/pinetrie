@@ -1,0 +1,16 @@
+== pids: pl (--pids-limit 32) and po (no limit) each start 100 sleeps
+  pl: 1 refused forks logged (sh: can't fork: Resource temporarily unavailable); pids.current=31 pids.max=32 pids.events: max 1
+  po: 0 refused forks logged (); pids.current=103 pids.max=max pids.events: max 0
+  a new exec into pl: OCI runtime exec failed: exec failed: unable to start container process: error executing setns process: exit status 1; r (exit 0)
+  the VM: pid_max=32768 tasks=280; another container starts: yes
+== cpu.weight: 8 busy loops in each, 30 s, the VM's 8 CPUs
+  weight 100: 180.5 CPU-s; weight 35: 62.5 CPU-s; ratio 2.89 (weights 2.86)
+  a services parent (/pinetrie-services, cpu.weight 400) with one busy container, against four busy lanes under docker/ (weight 100 each)
+  services parent (weight 400): 196.1 CPU-s; docker/ (weight 100, four lanes): 47.9 CPU-s; share 0.80 (weights 0.80)
+== IO: two containers write O_DIRECT to a volume on the data disk (vdb, 253:16) for 20 s, --blkio-weight 100 and 1000
+  scheduler none [mq-deadline] kyber bfq :
+  weight 100: 544 MB/s; weight 1000: 541 MB/s; ratio 1.00
+  scheduler none mq-deadline kyber [bfq] :
+  weight 100: 587 MB/s; weight 1000: 805 MB/s; ratio 1.37
+  io.max: --device-write-bps /dev/vdb:20mb, one writer for 20 s
+  21.5 MB/s (253:16 rbps=max wbps=20971520 riops=max wiops=max)

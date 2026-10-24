@@ -1,0 +1,55 @@
+# The nested lane's part of pine·trie's lane image (packages/lanes/image/Containerfile),
+# copied verbatim from its rootless Docker on: the same base, without the
+# tools a lane uses and this spike does not (jj, Playwright, bash).
+FROM docker.io/library/node:24-trixie-slim
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates curl procps stress-ng > /dev/null && rm -rf /var/lib/apt/lists/*
+ARG DOCKER_VERSION=29.8.2
+ARG BUILDX_VERSION=0.37.2
+# Docker names the architectures as `uname -m` does; buildx as Go does.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends btrfs-progs uidmap slirp4netns iptables iproute2 libcap2-bin \
+ && rm -rf /var/lib/apt/lists/* \
+ && arch=$(uname -m) \
+ && case "$arch" in aarch64) goarch=arm64 ;; x86_64) goarch=amd64 ;; *) echo "no release builds for $arch" >&2; exit 1 ;; esac \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/${arch}/docker-${DOCKER_VERSION}.tgz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/${arch}/docker-rootless-extras-${DOCKER_VERSION}.tgz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 \
+ && mkdir -p /usr/local/lib/docker/cli-plugins \
+ && curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+    "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${goarch}" \
+ && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx \
+ && chmod u-s /usr/bin/newuidmap /usr/bin/newgidmap \
+ && setcap cap_setuid+ep /usr/bin/newuidmap \
+ && setcap cap_setgid+ep /usr/bin/newgidmap \
+ && groupmod -n rootless node \
+ && usermod -l rootless -d /home/rootless -m node \
+ && echo "rootless:100000:65536" > /etc/subuid \
+ && echo "rootless:100000:65536" > /etc/subgid \
+ && mkdir -p /home/rootless/.config/docker \
+ && chown -R rootless:rootless /home/rootless \
+ && printf '%s\n' \
+    '#!/bin/sh' \
+    '# A nested lane'"'"'s inner Docker: rootless, as uid 1000, on its data root, a subvolume of its own in its inner lanes'"'"' disk.' \
+    '[ -d /var/lib/pinetrie-lanes ] || exit 0' \
+    '# /run outlives a stopped container, and this runs at each start: a pid file' \
+    '# or socket of the daemon before the stop would refuse this one.' \
+    'rm -rf /run/user/1000' \
+    'mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000 && chmod 700 /run/user/1000' \
+    'exec setpriv --reuid=1000 --regid=1000 --init-groups env HOME=/home/rootless XDG_RUNTIME_DIR=/run/user/1000 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/docker > /tmp/inner-docker.log 2>&1' \
+    > /usr/local/bin/pinetrie-inner-docker \
+ && chmod +x /usr/local/bin/pinetrie-inner-docker \
+ && printf '%s\n' \
+    '#!/bin/sh' \
+    '# runc for the inner Docker of a nested lane: run and create get --no-new-keyring, for the containers of BuildKit as for those of Docker.' \
+    'n=$#' \
+    'added=no' \
+    'for a in "$@"; do' \
+    '  set -- "$@" "$a"' \
+    '  if [ "$added" = no ] && { [ "$a" = run ] || [ "$a" = create ]; }; then set -- "$@" --no-new-keyring; added=yes; fi' \
+    'done' \
+    'shift "$n"' \
+    'exec /usr/local/bin/runc "$@"' \
+    > /usr/local/sbin/runc \
+ && chmod +x /usr/local/sbin/runc
+COPY --chown=rootless:rootless daemon.json /home/rootless/.config/docker/daemon.json

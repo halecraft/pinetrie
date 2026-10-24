@@ -1,0 +1,161 @@
+root (46 samples)
+  full_total rose 24796715
+  workingset_refault_file rose 531767125
+  allocstall_normal rose 37765
+  allocstall_movable rose 427884
+  pgscan_direct rose 18054343
+  pgscan_kswapd rose 518802163
+  oom_kill rose 0
+  full_avg10 0 / 9.47 / 11.92
+  some_avg10 0 / 13.66 / 20.79
+  memavail (MiB) 328 / 1115 / 7136
+15ba22154b8a (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 4674
+  st_pgmajfault rose 116
+  full_total rose 106441
+  current (MiB) 2 / 3 / 4
+  st_file (MiB) 0 / 2 / 2
+  st_anon (MiB) 0 / 0 / 0
+  full_avg10 0 / 0 / 0
+  some_avg10 0 / 0 / 0
+  low 0
+  high max
+svc-res (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 67328781
+  st_pgmajfault rose 37
+  full_total rose 2470792
+  current (MiB) 116 / 170 / 490
+  st_file (MiB) 11 / 66 / 386
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0.2 / 1.16
+  some_avg10 0 / 0.33 / 1.78
+  low 838860800
+  high max
+s340-lane2 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 75799538
+  st_pgmajfault rose 11
+  full_total rose 2919755
+  current (MiB) 1330 / 1602 / 1764
+  st_file (MiB) 15 / 63 / 1326
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.45 / 1.76
+  some_avg10 0 / 0.7 / 1.9
+  low 0
+  high max
+s340-lane3 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 77711031
+  st_pgmajfault rose 10
+  full_total rose 2937396
+  current (MiB) 1425 / 1608 / 1751
+  st_file (MiB) 10 / 74 / 1421
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.45 / 1.71
+  some_avg10 0 / 0.76 / 2.42
+  low 0
+  high max
+s340-lane4 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 75701721
+  st_pgmajfault rose 4
+  full_total rose 3024504
+  current (MiB) 1246 / 1614 / 1764
+  st_file (MiB) 4 / 76 / 1242
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.45 / 1.77
+  some_avg10 0 / 0.65 / 2.33
+  low 0
+  high max
+s340-lane1 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 76017521
+  st_pgmajfault rose 10
+  full_total rose 3042732
+  current (MiB) 1410 / 1606 / 1814
+  st_file (MiB) 18 / 66 / 1405
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.51 / 1.56
+  some_avg10 0 / 0.83 / 2.28
+  low 0
+  high max
+svc-none (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 67702712
+  st_pgmajfault rose 57
+  full_total rose 2476004
+  current (MiB) 117 / 167 / 490
+  st_file (MiB) 13 / 63 / 386
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0.21 / 1.28
+  some_avg10 0 / 0.38 / 1.69
+  low 0
+  high max
+pinetrie-ser (46 samples)
+  ev_low rose 5527208
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 91037002
+  st_pgmajfault rose 393
+  full_total rose 2268682
+  current (MiB) 249 / 737 / 1007
+  st_file (MiB) 70 / 524 / 778
+  st_anon (MiB) 201 / 201 / 226
+  full_avg10 0 / 0.04 / 1.66
+  some_avg10 0 / 0.16 / 2.57
+  low 2147483648
+  high max
+svc-prot (46 samples)
+  ev_low rose 5526425
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 26756785
+  st_pgmajfault rose 161
+  full_total rose 1283836
+  current (MiB) 150 / 490 / 504
+  st_file (MiB) 18 / 387 / 392
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0.06 / 1.07
+  some_avg10 0 / 0.12 / 1.22
+  low 838860800
+  high max
+svc-parent (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 64311839
+  st_pgmajfault rose 232
+  full_total rose 1646128
+  current (MiB) 138 / 241 / 504
+  st_file (MiB) 29 / 147 / 389
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0 / 0.94
+  some_avg10 0 / 0.01 / 1.25
+  low 0
+  high max

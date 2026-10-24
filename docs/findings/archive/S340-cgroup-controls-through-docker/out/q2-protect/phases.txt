@@ -1,0 +1,11 @@
+service          phase  samples  current MiB  refaults/sample  low events/sample  full avg10
+services parent  full   11       409          4153433          410097             1.42
+services parent  room   35       753          2014784          9329               0
+svc-none         full   11       133          1295614          0                  1.04
+svc-none         room   35       187          1583640          0                  0.13
+svc-parent       full   11       152          2072956          0                  0.83
+svc-parent       room   35       269          2013079          0                  0
+svc-prot         full   11       229          2114346          407420             0.81
+svc-prot         room   35       491          0                9368               0.01
+svc-res          full   11       140          1294166          0                  1.01
+svc-res          room   35       175          1579523          0                  0.15

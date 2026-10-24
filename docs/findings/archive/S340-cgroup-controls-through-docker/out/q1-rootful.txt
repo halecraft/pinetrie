@@ -1,0 +1,79 @@
+== docker 29.5.2, API 1.54, driver cgroupfs, cgroup v2
+== the VM: root cgroup.controllers, subtree_control, mount options, vdb's scheduler, io.cost
+  controllers: cpuset cpu io memory hugetlb pids dmem
+  root subtree_control: cpuset cpu io memory hugetlb pids dmem
+  docker/ subtree_control: cpuset cpu io memory hugetlb pids dmem
+  docker/ memory.low=0 memory.min=0
+  mount: cgroup2 /sys/fs/cgroup cgroup2 rw,relatime 0 0
+  vdb scheduler: none [mq-deadline] kyber bfq 
+  io.cost.qos at the root: ls: /sys/fs/cgroup/io.cost.qos: No such file or directory
+== q1-all: --memory 1g --memory-reservation 256m --pids-limit 64 --cpu-shares 512 --blkio-weight 300 --device-write-bps /dev/vdb:20mb --oom-score-adj 500
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+cgroup: /sys/fs/cgroup/docker/4314d63116cc1e210dabfd70152ddca3096586cf92fe22be50768d8e0a5a34d5
+  memory.max       1073741824 
+  memory.high      max 
+  memory.low       268435456 
+  memory.min       0 
+  pids.max         64 
+  cpu.weight       59 
+  cpu.max          max 100000 
+  io.weight        (no such file)
+  io.bfq.weight    default 300 
+  io.max           253:16 rbps=max wbps=20971520 riops=max wiops=max 
+  cgroup.controllers cpuset cpu io memory hugetlb pids dmem 
+  pid 8005 /sbin/docker-init -- sleep infinity  oom_score_adj=500
+  pid 8080 sleep infinity  oom_score_adj=500
+  docker's own: MemoryReservation=268435456 PidsLimit=64 CpuShares=512 BlkioWeight=300 OomScoreAdj=500
+  an exec'd process: 500
+== --oom-score-adj -500 (below dockerd's own, which is 0)
+  pid 8454 /sbin/docker-init -- sleep infinity  oom_score_adj=-500
+  pid 8530 sleep infinity  oom_score_adj=-500
+== --cpu-shares to cpu.weight, several values
+  cpu-shares 2 -> cpu.weight 1
+  cpu-shares 256 -> cpu.weight 35
+  cpu-shares 1024 -> cpu.weight 100
+  cpu-shares 4096 -> cpu.weight 303
+  cpu-shares 262144 -> cpu.weight 10000
+== memory.high: no flag; through the API, a HostConfig.Unified and an annotation
+{"Id":"17a666e0b708e731d4cacdd20334f2af8f15bcdbdeac68518073e064d72d7939","Warnings":["Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap."]}
+
+  memory.max       1073741824 
+  memory.high      max 
+  docker run --annotation memory.high=256m:
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+  memory.max       1073741824 
+  memory.high      max 
+== memory.high written after the start, from the VM's root, then docker restart and docker stop/start
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+  memory.high      268435456 
+  after docker restart:
+  memory.high      max 
+  after docker stop, start:
+  memory.high      max 
+  after docker update --memory 900m (high written again before):
+  memory.max       838860800 
+  memory.high      268435456 
+== --cgroup-parent /pinetrie-services: where it lands, and the parent's own memory.low and memory.high
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+cgroup: /sys/fs/cgroup/pinetrie-services/322043c20f963f24b157d529d946225bbb1ea23bf2b5afaa6294aa5acd34e2bc
+  memory.max       1073741824 
+  memory.high      max 
+  memory.low       536870912 
+  memory.min       0 
+  pids.max         max 
+  cpu.weight       100 
+  cpu.max          max 100000 
+  io.weight        (no such file)
+  io.bfq.weight    default 100 
+  io.max           
+  cgroup.controllers cpuset cpu io memory hugetlb pids dmem 
+  pid 12509 /sbin/docker-init -- sleep infinity  oom_score_adj=0
+  pid 12584 sleep infinity  oom_score_adj=0
+  parent: controllers=cpuset cpu io memory hugetlb pids dmem subtree_control=cpuset cpu io memory hugetlb pids dmem low=0 high=max
+  written: low=1073741824 high=2147483648
+  after the container restart: low=1073741824 high=2147483648
+  after the container is removed: /sys/fs/cgroup/pinetrie-services low=1073741824
+  a parent made before Docker, with its settings, then a container in it:
+  made: controllers=cpuset cpu io memory hugetlb pids dmem low=805306368
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+  with a container: low=805306368 subtree_control=cpuset cpu io memory hugetlb pids dmem

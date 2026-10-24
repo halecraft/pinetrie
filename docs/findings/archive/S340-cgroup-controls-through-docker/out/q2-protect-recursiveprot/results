@@ -1,0 +1,8 @@
+svc-prot: file passes: 25638 vm bogo ops: 36622157  oom-killed=false
+svc-parent: file passes: 25568 vm bogo ops: 36600620  oom-killed=false
+svc-res: file passes: 17894 vm bogo ops: 29458846  oom-killed=false
+svc-none: file passes: 18170 vm bogo ops: 29980658  oom-killed=false
+s340-lane1: file passes: 209 vm bogo ops: 16825373  oom-killed=false
+s340-lane2: file passes: 209 vm bogo ops: 16822438  oom-killed=false
+s340-lane3: file passes: 209 vm bogo ops: 16825000  oom-killed=false
+s340-lane4: file passes: 210 vm bogo ops: 16823313  oom-killed=false

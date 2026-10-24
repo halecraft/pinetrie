@@ -1,0 +1,63 @@
+inner lanes subvolume: UNKNOWN:UNKNOWN 1000
+WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+== the inner Docker: 29.8.2, API 1.56, driver none, cgroup v2, ["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]
+  docker info's warnings:
+    WARNING: Running in rootless-mode without cgroups. Systemd is required to enable cgroups in rootless-mode.
+  dockerd's cgroup: 0::/
+== the lane's cgroup, seen inside it
+  mount: cgroup /sys/fs/cgroup cgroup2 ro,nosuid,nodev,noexec,relatime 0 0
+  cgroup.controllers: cpuset cpu io memory hugetlb pids dmem
+  cgroup.subtree_control: 
+  owner of cgroup.procs, memory.high, cgroup.subtree_control: 0 0 0 
+sh: 1: cannot create /sys/fs/cgroup/memory.high: Read-only file system
+  root writes memory.high: 
+  root makes a child cgroup: mkdir: cannot create directory '/sys/fs/cgroup/probe': Read-only file system
+  the lane's cgroup in the VM: cpuset cpu io memory hugetlb pids dmem
+== each control through the inner Docker
+-- --memory 1g: accepted
+   docker inspect: Memory=1073741824 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --memory-reservation 256m: accepted
+   docker inspect: Memory=0 MemoryReservation=268435456 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --pids-limit 32: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=32 CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --cpu-shares 512: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=512 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --blkio-weight 300: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=300 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --device-write-bps /dev/vda:20mb: refused
+   says: docker: Error response from daemon: stat /dev/vda: no such file or directory
+   says: 
+   says: Run 'docker run --help' for more information
+-- --oom-score-adj 500: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=500 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 500
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=500
+-- --oom-score-adj -500: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --cgroup-parent /pinetrie-services: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=/pinetrie-services
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+-- --annotation memory.high=268435456: accepted
+   docker inspect: Memory=0 MemoryReservation=0 PidsLimit=<no value> CpuShares=0 BlkioWeight=0 OomScoreAdj=0 CgroupParent=
+   inside it: /proc/self/cgroup 0::/ oom_score_adj 0
+   in the VM: cgroup /docker/ca3a5bcf4d6c90ff00b199ee61900b720b34ed1b59a88f4609a15b0f35716752 memory.max=4294967296 memory.low=0 pids.max=max cpu.weight=100 io.bfq.weight=default 100  io.max= oom_score_adj=0
+== --pids-limit 32 under the inner Docker, with a load: 100 sleeps
+  sleeps running in it: 100
+== --memory 256m under the inner Docker, with a load: 400 MiB anonymous (stress-ng, 20 s)
+stress-ng: metrc: [1] vm              4262962     20.20     20.19      0.01    211041.99      211048.16
+stress-ng: info:  [1] passed: 1: vm (1)
+stress-ng: info:  [1] successful run completed in 20.20 secs
+  the lane's memory.events after it: low 0 high 0 max 0 oom 0 oom_kill 0 oom_group_kill 0 

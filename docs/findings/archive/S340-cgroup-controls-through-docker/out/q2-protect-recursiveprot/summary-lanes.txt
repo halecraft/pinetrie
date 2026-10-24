@@ -1,0 +1,161 @@
+root (46 samples)
+  full_total rose 24545533
+  workingset_refault_file rose 501866753
+  allocstall_normal rose 58001
+  allocstall_movable rose 468657
+  pgscan_direct rose 21604217
+  pgscan_kswapd rose 485326074
+  oom_kill rose 0
+  full_avg10 0 / 8.99 / 11.97
+  some_avg10 0 / 13.58 / 23.08
+  memavail (MiB) 334 / 1105 / 7039
+s340-lane3 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 78104205
+  st_pgmajfault rose 5
+  full_total rose 3581365
+  current (MiB) 1352 / 1580 / 1884
+  st_file (MiB) 16 / 55 / 1349
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.58 / 2.22
+  some_avg10 0 / 0.93 / 2.64
+  low 0
+  high max
+s340-lane4 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 77614104
+  st_pgmajfault rose 8
+  full_total rose 3737588
+  current (MiB) 1239 / 1574 / 1741
+  st_file (MiB) 12 / 48 / 1237
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.68 / 2.74
+  some_avg10 0 / 0.85 / 3.05
+  low 0
+  high max
+6862fde871ca (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 5190
+  st_pgmajfault rose 124
+  full_total rose 184602
+  current (MiB) 2 / 4 / 5
+  st_file (MiB) 0 / 2 / 2
+  st_anon (MiB) 0 / 0 / 0
+  full_avg10 0 / 0 / 0.12
+  some_avg10 0 / 0 / 0.12
+  low 0
+  high max
+s340-lane2 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 78104524
+  st_pgmajfault rose 2
+  full_total rose 3827630
+  current (MiB) 1402 / 1574 / 1810
+  st_file (MiB) 18 / 60 / 1398
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.57 / 2.58
+  some_avg10 0 / 0.8 / 2.96
+  low 0
+  high max
+s340-lane1 (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 78023650
+  st_pgmajfault rose 3
+  full_total rose 3849946
+  current (MiB) 1374 / 1577 / 1834
+  st_file (MiB) 14 / 57 / 1370
+  st_anon (MiB) 0 / 1501 / 1688
+  full_avg10 0 / 0.63 / 2.51
+  some_avg10 0 / 0.79 / 2.9
+  low 0
+  high max
+svc-res (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 68964301
+  st_pgmajfault rose 46
+  full_total rose 3240514
+  current (MiB) 118 / 157 / 502
+  st_file (MiB) 15 / 51 / 386
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0.46 / 2.03
+  some_avg10 0 / 0.63 / 2.6
+  low 838860800
+  high max
+svc-none (46 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 68766123
+  st_pgmajfault rose 52
+  full_total rose 3202504
+  current (MiB) 119 / 159 / 491
+  st_file (MiB) 16 / 50 / 386
+  st_anon (MiB) 103 / 103 / 115
+  full_avg10 0 / 0.45 / 1.84
+  some_avg10 0 / 0.63 / 2.19
+  low 0
+  high max
+pinetrie-ser (46 samples)
+  ev_low rose 12769671
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 51456890
+  st_pgmajfault rose 469
+  full_total rose 2766190
+  current (MiB) 362 / 983 / 999
+  st_file (MiB) 83 / 773 / 778
+  st_anon (MiB) 203 / 203 / 225
+  full_avg10 0 / 0.21 / 2.4
+  some_avg10 0 / 0.47 / 3.59
+  low 2147483648
+  high max
+svc-parent (46 samples)
+  ev_low rose 6546902
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 25594441
+  st_pgmajfault rose 231
+  full_total rose 1963659
+  current (MiB) 124 / 490 / 504
+  st_file (MiB) 16 / 387 / 388
+  st_anon (MiB) 101 / 101 / 113
+  full_avg10 0 / 0.12 / 1.81
+  some_avg10 0 / 0.18 / 2
+  low 0
+  high max
+svc-prot (46 samples)
+  ev_low rose 6230629
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 25890344
+  st_pgmajfault rose 238
+  full_total rose 1806954
+  current (MiB) 128 / 492 / 509
+  st_file (MiB) 16 / 387 / 391
+  st_anon (MiB) 103 / 103 / 115
+  full_avg10 0 / 0.15 / 1.29
+  some_avg10 0 / 0.22 / 1.58
+  low 838860800
+  high max

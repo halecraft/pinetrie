@@ -1,0 +1,92 @@
+root (19 samples)
+  some_total rose 25506171
+  full_total rose 20880897
+  workingset_refault_file rose 112673548
+  allocstall_normal rose 0
+  allocstall_movable rose 0
+  pgscan_direct rose 0
+  pgscan_kswapd rose 0
+  oom_kill rose 0
+  full_avg10 3.11 / 16.36 / 47.51
+  some_avg10 3.21 / 22.45 / 50.63
+  memavail (MiB) 6621 / 6686 / 7164
+ha0 (16 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 0
+  st_pgmajfault rose 0
+  some_total rose 0
+  full_total rose 0
+  current (MiB) 409 / 409 / 459
+  st_file (MiB) 6 / 6 / 6
+  st_anon (MiB) 401 / 401 / 451
+  full_avg10 0 / 0 / 0
+  some_avg10 0 / 0 / 0
+  low 0
+  high max
+ha (19 samples)
+  ev_low rose 0
+  ev_high rose 698
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 0
+  st_pgmajfault rose 0
+  some_total rose 69093047
+  full_total rose 69093047
+  current (MiB) 405 / 411 / 455
+  st_file (MiB) 2 / 2 / 2
+  st_anon (MiB) 401 / 407 / 451
+  full_avg10 8.24 / 76.76 / 94.98
+  some_avg10 8.24 / 76.76 / 94.98
+  low 0
+  high 268435456
+hf0 (17 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 0
+  st_pgmajfault rose 0
+  some_total rose 0
+  full_total rose 0
+  current (MiB) 514 / 515 / 516
+  st_file (MiB) 512 / 512 / 512
+  st_anon (MiB) 0 / 0 / 0
+  full_avg10 0 / 0 / 0
+  some_avg10 0 / 0 / 0
+  low 0
+  high max
+hf (17 samples)
+  ev_low rose 0
+  ev_high rose 466623
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 108745663
+  st_pgmajfault rose 0
+  some_total rose 5768551
+  full_total rose 5768551
+  current (MiB) 255 / 256 / 256
+  st_file (MiB) 253 / 253 / 254
+  st_anon (MiB) 0 / 0 / 0
+  full_avg10 2.46 / 6.07 / 8.14
+  some_avg10 2.46 / 6.07 / 8.14
+  low 0
+  high 268435456
+b7c796e86e1a (19 samples)
+  ev_low rose 0
+  ev_high rose 0
+  ev_max rose 0
+  ev_oom_kill rose 0
+  st_workingset_refault_file rose 0
+  st_pgmajfault rose 0
+  some_total rose 0
+  full_total rose 0
+  current (MiB) 2 / 4 / 8
+  st_file (MiB) 0 / 0 / 0
+  st_anon (MiB) 0 / 0 / 0
+  full_avg10 0 / 0 / 0
+  some_avg10 0 / 0 / 0
+  low 0
+  high max

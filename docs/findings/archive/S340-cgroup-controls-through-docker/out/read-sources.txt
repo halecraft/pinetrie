@@ -1,0 +1,162 @@
+What was read, not run (fetched 2026-10-24).
+
+== Docker Engine API v1.54 (moby api/docs/v1.54.yaml): every field of Resources, which HostConfig embeds
+  CpuShares:
+  Memory:
+  CgroupParent:
+  BlkioWeight:
+  BlkioWeightDevice:
+  BlkioDeviceReadBps:
+  BlkioDeviceWriteBps:
+  BlkioDeviceReadIOps:
+  BlkioDeviceWriteIOps:
+  CpuPeriod:
+  CpuQuota:
+  CpuRealtimePeriod:
+  CpuRealtimeRuntime:
+  CpusetCpus:
+  CpusetMems:
+  Devices:
+  DeviceCgroupRules:
+  DeviceRequests:
+  MemoryReservation:
+  MemorySwap:
+  MemorySwappiness:
+  NanoCpus:
+  OomKillDisable:
+  Init:
+  PidsLimit:
+  Ulimits:
+  CpuCount:
+  CpuPercent:
+  IOMaximumIOps:
+  IOMaximumBandwidth:
+  (no Unified, no MemoryHigh, no CpuWeight, no IOWeight)
+  HostConfig.Annotations: "Arbitrary non-identifying metadata attached to container and provided to the runtime when the container is started."
+
+== moby docker-v29.5.2, daemon/daemon_unix.go
+  	if cfg.Rootless {
+  		return cgroupNoneDriver
+  	}
+  	return cgroupFsDriver
+  }
+  
+  // verifyCgroupDriver validates native.cgroupdriver
+  func verifyCgroupDriver(config *config.Config) error {
+  
+  	if cd == cgroupSystemdDriver {
+  		return true
+  	}
+  	// On cgroup v2 hosts, default to systemd driver
+  	if cd == "" && cgroups.Mode() == cgroups.Unified && isRunningSystemd() {
+  		return true
+  	}
+  	return false
+  }
+  
+  var (
+  	}
+  	if hostConfig.CgroupParent != "" && UsingSystemd(&daemonCfg.Config) {
+  		// CgroupParent for systemd cgroup should be named as "xxx.slice"
+  		if len(hostConfig.CgroupParent) <= 6 || !strings.HasSuffix(hostConfig.CgroupParent, ".slice") {
+  			return warnings, errors.New(`cgroup-parent for systemd cgroup should be a valid slice named as "xxx.slice"`)
+  		}
+== moby docker-v29.5.2, daemon/internal/rootless/specconv/specconv_linux.go: toRootless
+  func toRootless(spec *specs.Spec, v2Controllers []string, currentOOMScoreAdj int) error {
+  	if len(v2Controllers) == 0 {
+  		if spec.Linux != nil {
+  			// Remove cgroup settings.
+  			spec.Linux.Resources = nil
+  			spec.Linux.CgroupsPath = ""
+  		}
+  	} else {
+  		if spec.Linux != nil && spec.Linux.Resources != nil {
+  			m := make(map[string]struct{})
+  			for _, s := range v2Controllers {
+  				m[s] = struct{}{}
+  			}
+  			// Remove devices: https://github.com/containers/crun/issues/255
+  			spec.Linux.Resources.Devices = nil
+  			if _, ok := m["memory"]; !ok {
+  				spec.Linux.Resources.Memory = nil
+  			}
+  			if _, ok := m["cpu"]; !ok {
+  				spec.Linux.Resources.CPU = nil
+  			}
+  			if _, ok := m["cpuset"]; !ok {
+  				if spec.Linux.Resources.CPU != nil {
+  					spec.Linux.Resources.CPU.Cpus = ""
+  					spec.Linux.Resources.CPU.Mems = ""
+  				}
+  			}
+  			if _, ok := m["pids"]; !ok {
+  				spec.Linux.Resources.Pids = nil
+  			}
+  			if _, ok := m["io"]; !ok {
+  				spec.Linux.Resources.BlockIO = nil
+  			}
+  			if _, ok := m["rdma"]; !ok {
+  				spec.Linux.Resources.Rdma = nil
+  			}
+  			spec.Linux.Resources.HugepageLimits = nil
+  			spec.Linux.Resources.Network = nil
+  		}
+  	}
+  
+  	if spec.Process != nil && spec.Process.OOMScoreAdj != nil && *spec.Process.OOMScoreAdj < currentOOMScoreAdj {
+  		*spec.Process.OOMScoreAdj = currentOOMScoreAdj
+  	}
+
+== Ubuntu 24.04 (noble-updates), systemd 255.4-1ubuntu8.17: debian/systemd-oomd.install
+  etc/systemd/oomd.conf
+  usr/lib/systemd/systemd-oomd
+  usr/lib/systemd/system/systemd-oomd.service
+  usr/lib/systemd/system/systemd-oomd.socket
+  usr/bin/oomctl
+  usr/lib/sysusers.d/systemd-oom.conf
+  usr/share/dbus-1/system.d/org.freedesktop.oom1.conf
+  usr/share/dbus-1/system-services/org.freedesktop.oom1.service
+  usr/share/bash-completion/completions/oomctl
+  usr/share/zsh/vendor-completions/_oomctl
+  ../extra/systemd-oomd-defaults/oomd.conf.d/* usr/lib/systemd/oomd.conf.d/
+  ../extra/systemd-oomd-defaults/-.slice.d/* usr/lib/systemd/system/-.slice.d/
+  ../extra/systemd-oomd-defaults/user@.service.d/* usr/lib/systemd/system/user@.service.d/
+-- debian/extra/systemd-oomd-defaults/oomd.conf.d/10-oomd-defaults.conf
+  [OOM]
+  DefaultMemoryPressureDurationSec=20s
+-- debian/extra/systemd-oomd-defaults/-.slice.d/10-oomd-root-slice-defaults.conf
+  [Slice]
+  ManagedOOMSwap=auto
+-- debian/extra/systemd-oomd-defaults/user@.service.d/10-oomd-user-service-defaults.conf
+  [Service]
+  ManagedOOMMemoryPressure=kill
+  ManagedOOMMemoryPressureLimit=50%
+-- units/user@.service.in
+  Delegate=pids memory cpu
+  DelegateSubgroup=init.scope
+  OOMScoreAdjust=100
+== Ubuntu's seeds for noble (~ubuntu-core-dev/ubuntu-seeds): which name systemd-oomd
+  desktop-minimal:  * (systemd-oomd)
+  desktop: (not named)
+  server: (not named)
+  minimal: (not named)
+  standard: (not named)
+  cloud-image: (not named)
+
+== systemd v255, man/systemd-oomd.service.xml
+    Cgroups of units with ManagedOOMSwap= or
+    ManagedOOMMemoryPressure= set to kill will be monitored.
+    systemd-oomd periodically polls PSI statistics for the system and those cgroups to
+    decide when to take action. If the configured limits are exceeded, systemd-oomd will
+    select a cgroup to terminate, and send SIGKILL to all processes in it. Note that
+    only descendant cgroups are eligible candidates for killing; the unit with its property set to
+    kill is not a candidate (unless one of its ancestors set their property to
+    kill). Also only leaf cgroups and cgroups with memory.oom.group set
+    to 1 are eligible candidates; see OOMPolicy= in
+== systemd v255, src/oom/oomd-util.c and oomd-manager.c
+  oomd_cgroup_context_acquire reads memory.pressure's full line (PRESSURE_TYPE_FULL), avg10, against the limit for DefaultMemoryPressureDurationSec;
+  a target is acted on only with reclaim activity in it within RECLAIM_DURATION_USEC; the victim is the descendant with the highest pgscan rate (then memory use),
+  killed whole (oomd_kill_by_pgscan_rate, recurse=true); one kill, then a post-action delay.
+== systemd v255, src/shared/mount-setup.c
+          { "cgroup2",     "/sys/fs/cgroup",            "cgroup2",    "nsdelegate,memory_recursiveprot",          MS_NOSUID|MS_NOEXEC|MS_NODEV,
+            check_recursiveprot_supported, MNT_IN_CONTAINER|MNT_CHECK_WRITABLE },

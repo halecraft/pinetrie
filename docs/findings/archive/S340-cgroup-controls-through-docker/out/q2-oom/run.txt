@@ -1,0 +1,20 @@
+== service at oom_score_adj 0: before the second lane, MemAvailable 2507 MiB
+  oom-svc: pid 29695 MainThread oom_score_adj=0 oom_score=966;
+  oom-lane-a: pid 29817 MainThread oom_score_adj=0 oom_score=797;
+  oom-svc 3637de6c809e: running=false exit=137 OOMKilled=true memory.events oom_kill=
+  oom-lane-a 716d408af51c: running=true exit=0 OOMKilled=false memory.events oom_kill=oom_kill 0
+  oom-lane-b e5d2553950f5: running=true exit=0 OOMKilled=false memory.events oom_kill=oom_kill 0
+  the kernel:
+    dockerd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+    oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/docker/3637de6c809e1963a05ebb3f67f13c43f8dbb6f050c22b2d3c250525ad92c0be,task=MainThread,pid=29695,uid=0
+    Out of memory: Killed process 29695 (MainThread) total-vm:4741704kB, anon-rss:3610536kB, file-rss:0kB, shmem-rss:0kB, UID:0 pgtables:7512kB oom_score_adj:0
+== service at oom_score_adj -500: before the second lane, MemAvailable 2503 MiB
+  oom-svc: pid 31381 MainThread oom_score_adj=-500 oom_score=634;
+  oom-lane-a: pid 31502 MainThread oom_score_adj=0 oom_score=797;
+  oom-svc d7e73ba204de: running=true exit=0 OOMKilled=false memory.events oom_kill=oom_kill 0
+  oom-lane-a ac273abfda7d: running=true exit=0 OOMKilled=false memory.events oom_kill=oom_kill 0
+  oom-lane-b 1ef1abf59273: running=false exit=137 OOMKilled=true memory.events oom_kill=
+  the kernel:
+    dockerd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+    oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/docker/1ef1abf592738ab5060c954d284ffa70e0cc2f87126e276ed35d09246d58eed7,task=MainThread,pid=32073,uid=0
+    Out of memory: Killed process 32073 (MainThread) total-vm:3820104kB, anon-rss:2688936kB, file-rss:24kB, shmem-rss:0kB, UID:0 pgtables:5708kB oom_score_adj:0
