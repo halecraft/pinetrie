@@ -18,6 +18,7 @@ import {
 } from "@pinetrie/config"
 import {
   errorText,
+  MACHINE_SAMPLE_MS,
   type RootId,
   type SnapshotId,
   type ThreadId,
@@ -26,7 +27,12 @@ import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
-import { planStoreCapabilities, planStoreSize } from "@pinetrie/machine"
+import {
+  numbersInForce,
+  planStoreCapabilities,
+  planStoreSize,
+  READING_OVERDUE_AFTER_TICKS,
+} from "@pinetrie/machine"
 import {
   type AgentDirBinding,
   createAgent,
@@ -123,7 +129,10 @@ import { createLater } from "./later.ts"
 import { gatherDiagnostics, hostVersion } from "./machine/diagnostics.ts"
 import { createRunStarts, gatherLaneImportance } from "./machine/importance.ts"
 import { type MachineWatchOptions, startMachineWatch } from "./machine/index.ts"
-import { memoryMachineMeasurements } from "./machine/measurements.ts"
+import {
+  type MeasuredOn,
+  memoryMachineMeasurements,
+} from "./machine/measurements.ts"
 import { machinePageFacts } from "./machine/page.ts"
 import { createStoreRecords } from "./machine/records.ts"
 import { createShellCalls } from "./machine/shell-calls.ts"
@@ -1227,10 +1236,17 @@ async function openHost(
 
   progress.begin("listening")
   // What the measurements' export and the diagnostics say they were measured on.
-  const measuredOn = {
+  const measuredOn: MeasuredOn = {
     version: await hostVersion(install.root),
     backend: found?.kind === "found" ? found.machine.target : null,
     source: found?.kind === "found" ? found.machine.memorySource : null,
+    numbers: numbersInForce({
+      sampleEveryMs: machineOptions.sampleEveryMs ?? MACHINE_SAMPLE_MS,
+      readingOverdueAfterTicks:
+        machineOptions.readingOverdueAfterTicks ?? READING_OVERDUE_AFTER_TICKS,
+      memoryLimits:
+        found?.kind === "found" ? found.machine.memoryLimits() : null,
+    }),
   }
   const machinePage = () =>
     machine === null
@@ -1253,14 +1269,14 @@ async function openHost(
     blobs,
     destination: work.destination,
     page,
-    measurements: { store: opened.measurements, heading: measuredOn },
+    measurements: { store: opened.measurements, measuredOn },
     machine: {
       facts: machinePage,
       diagnostics: () =>
         gatherDiagnostics({
           facts: machinePage,
           measurements: opened.measurements,
-          heading: measuredOn,
+          measuredOn,
           vmStateDir:
             found?.kind === "found" && found.machine.target === "lane-vm"
               ? found.machine.storeVolume

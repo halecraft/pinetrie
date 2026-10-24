@@ -5,12 +5,14 @@ import {
   isContainerId,
   memoryCounters,
   parseInactiveFile,
+  parseLimitHits,
   parseMeminfo,
   parseMemoryEvents,
   parseMemoryMax,
   parseMemoryStat,
   parsePressure,
   parsePressureTotals,
+  parseReclaim,
   planBtrfsRoom,
 } from "./machine.ts"
 
@@ -38,6 +40,22 @@ const MEMORY_EVENTS = [
   "oom 2",
   "oom_kill 2",
   "oom_group_kill 0",
+].join("\n")
+// A lane VM short of memory: tasks stalled to reclaim in two zones.
+const VMSTAT = [
+  "workingset_refault_anon 0",
+  "workingset_refault_file 136994458",
+  "pgmajfault 753",
+  "pgscan_kswapd 138109863",
+  "pgscan_direct 1297949",
+  "pgscan_khugepaged 0",
+  "pgscan_proactive 0",
+  "pgscan_anon 0",
+  "pgscan_file 139407812",
+  "allocstall_dma 0",
+  "allocstall_normal 322",
+  "allocstall_movable 27674",
+  "allocstall_device 0",
 ].join("\n")
 const ID = "6785fca0587a9b4f0b1c305c652fb18e5b0ee0306239a70602a80c44cd7a1717"
 
@@ -71,6 +89,29 @@ describe("parsers", () => {
   test("memory.events' OOM kills", () => {
     expect(parseMemoryEvents(MEMORY_EVENTS)).toBe(2)
     expect(parseMemoryEvents("oom_kill 0")).toBe(0)
+  })
+
+  test("memory.events' limit hits: max met and high gone over", () => {
+    expect(parseLimitHits(MEMORY_EVENTS)).toEqual({ max: 31, high: 0 })
+    expect(parseLimitHits("low 0\nhigh 7\nmax 0\n")).toEqual({
+      max: 0,
+      high: 7,
+    })
+  })
+
+  test("vmstat's reclaim: every zone's stalls summed, and both scans", () => {
+    expect(parseReclaim(VMSTAT)).toEqual({
+      allocStalls: 322 + 27674,
+      scannedDirect: 1297949,
+      scannedByKswapd: 138109863,
+    })
+  })
+
+  test("a vmstat without reclaim's counters reads none", () => {
+    expect(
+      parseReclaim("workingset_refault_file 7\npgscan_kswapd 0\n"),
+    ).toBeNull()
+    expect(parseReclaim(VMSTAT.replace("pgscan_direct 1297949", ""))).toBeNull()
   })
 
   test("memory.max's bytes, and max as no ceiling", () => {

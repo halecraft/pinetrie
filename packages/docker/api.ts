@@ -21,7 +21,11 @@ export interface Answered {
   readonly body: string
 }
 
-/** One request to Docker's API at the target's socket. */
+/**
+ * One request to Docker's API at the target's socket, on a connection of
+ * its own: the socket is local, so keeping one buys nothing, and one the
+ * lane VM's proxy reset would be used again.
+ */
 export function request(
   target: Pick<DockerTarget, "socket">,
   method: "GET" | "POST" | "DELETE",
@@ -33,6 +37,7 @@ export function request(
     const req = http.request(
       {
         socketPath: target.socket,
+        agent: false,
         method,
         path,
         headers:
@@ -59,6 +64,36 @@ export function request(
     if (data !== undefined) req.write(data)
     req.end()
   })
+}
+
+/** A connection that ended under a request: reset, closed to a write, or closed before an answer. */
+function isConnectionDropped(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const { code } = error as NodeJS.ErrnoException
+  return (
+    code === "ECONNRESET" ||
+    code === "EPIPE" ||
+    error.message === "socket hang up"
+  )
+}
+
+/**
+ * `request`, for one that changes nothing when repeated (a list, an
+ * inspect, a stop, a wait, a start, a removal): tried once more when its
+ * connection dropped, as the lane VM's proxy drops some just after the VM
+ * boots. The second try's error is the one thrown.
+ */
+export async function requestRetried(
+  target: Pick<DockerTarget, "socket">,
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+): Promise<Answered> {
+  try {
+    return await request(target, method, path)
+  } catch (error) {
+    if (!isConnectionDropped(error)) throw error
+    return request(target, method, path)
+  }
 }
 
 /** The events the host follows: a container's kill for memory, and nothing else. */
@@ -153,11 +188,9 @@ async function requestOrThrow(
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
-  alsoFine: readonly number[] = [],
 ): Promise<Answered> {
   const answered = await request(target, method, path, body)
-  if (!ok(answered) && !alsoFine.includes(answered.status))
-    throw new Error(`${what}: ${apiMessage(answered)}`)
+  if (!ok(answered)) throw new Error(`${what}: ${apiMessage(answered)}`)
   return answered
 }
 
@@ -274,7 +307,11 @@ export async function inspectContainer(
   target: Pick<DockerTarget, "socket">,
   name: string,
 ): Promise<ContainerFacts> {
-  const answered = await request(target, "GET", `/containers/${at(name)}/json`)
+  const answered = await requestRetried(
+    target,
+    "GET",
+    `/containers/${at(name)}/json`,
+  )
   if (!ok(answered)) return { state: "missing", label: null }
   try {
     const found = JSON.parse(answered.body) as {
@@ -311,18 +348,19 @@ export async function containerPid(
 }
 
 /** Start a container; one already running is fine. */
-export const startContainer = (
+export async function startContainer(
   target: Pick<DockerTarget, "socket">,
   name: string,
-): Promise<Answered> =>
-  requestOrThrow(
+): Promise<Answered> {
+  const answered = await requestRetried(
     target,
-    `docker start ${name}`,
     "POST",
     `/containers/${at(name)}/start`,
-    undefined,
-    [304],
   )
+  if (!ok(answered) && answered.status !== 304)
+    throw new Error(`docker start ${name}: ${apiMessage(answered)}`)
+  return answered
+}
 
 /**
  * Stop a container: `SIGTERM`, then `SIGKILL` after `timeoutSeconds` (0 kills
@@ -333,7 +371,11 @@ export const stopContainer = (
   name: string,
   timeoutSeconds: number,
 ): Promise<Answered> =>
-  request(target, "POST", `/containers/${at(name)}/stop?t=${timeoutSeconds}`)
+  requestRetried(
+    target,
+    "POST",
+    `/containers/${at(name)}/stop?t=${timeoutSeconds}`,
+  )
 
 /**
  * Settles once the container is not running: at once for one stopped, and a
@@ -343,7 +385,7 @@ export async function waitContainer(
   target: Pick<DockerTarget, "socket">,
   name: string,
 ): Promise<void> {
-  const answered = await request(
+  const answered = await requestRetried(
     target,
     "POST",
     `/containers/${at(name)}/wait?condition=not-running`,
@@ -357,7 +399,7 @@ export const removeContainer = (
   target: Pick<DockerTarget, "socket">,
   name: string,
 ): Promise<Answered> =>
-  request(target, "DELETE", `/containers/${at(name)}?force=true`)
+  requestRetried(target, "DELETE", `/containers/${at(name)}?force=true`)
 
 /** Every container carrying `label` (`k` or `k=v`), running or not. */
 export async function listLabelled(
@@ -365,7 +407,7 @@ export async function listLabelled(
   label: string,
 ): Promise<readonly Listed[]> {
   const filters = at(JSON.stringify({ label: [label] }))
-  const answered = await request(
+  const answered = await requestRetried(
     target,
     "GET",
     `/containers/json?all=true&filters=${filters}`,

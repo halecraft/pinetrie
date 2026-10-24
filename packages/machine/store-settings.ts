@@ -41,6 +41,14 @@ export const leaveFreeBytes = (
 ): number =>
   Math.max(0, ...settings.leaveFree.map(f => bytesToLeave(f, filesystemSize)))
 
-/** The store's unallocated space below which it is low: 10% of it, and 8 GiB at least. */
+/** The share of the store, in percent, under whose unallocated space it is low. */
+export const MINIMUM_UNALLOCATED_PERCENT = 10
+/** The least unallocated space a store of any size keeps before it is low. */
+export const MINIMUM_UNALLOCATED_FLOOR = 8 * GiB
+
+/** The store's unallocated space below which it is low: its share of it, and the floor at least. */
 export const minimumUnallocated = (storeSize: number): number =>
-  Math.max(Math.floor(storeSize / 10), 8 * GiB)
+  Math.max(
+    Math.floor((storeSize * MINIMUM_UNALLOCATED_PERCENT) / 100),
+    MINIMUM_UNALLOCATED_FLOOR,
+  )

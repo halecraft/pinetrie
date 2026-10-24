@@ -25,6 +25,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a full 2 GiB disk's room is its 1 MiB unallocated",
   },
+  {
+    name: "the reclaim reads one zone's stalls",
+    file: "packages/lanehost/machine.ts",
+    from: '  const stalls = [...counts].filter(([name]) => name.startsWith("allocstall_"))',
+    to: '  const stalls = [...counts].filter(([name]) => name === "allocstall_normal")',
+    command: unit,
+    expect: "vmstat's reclaim: every zone's stalls summed, and both scans",
+  },
   // ── the observer's client ──
   {
     name: "connect opens no channel",

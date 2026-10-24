@@ -13,6 +13,23 @@ const command = [
 export const mutations: readonly Mutation[] = [
   // ── the Machine page's reads ──
   {
+    name: "a host in a lane keeps the machine's reclaim as its own",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: '        : { ...ownCgroupMachine(input.own, read.memory), source: "own-cgroup" },',
+    to: '        : { ...ownCgroupMachine(input.own, read.memory), reclaim: read.reclaim, source: "own-cgroup" },',
+    command: unit,
+    expect: "its sample keeps no reclaim: the machine's is other threads' too",
+  },
+  {
+    name: "the reclaim is never kept",
+    file: "apps/pinetrie/host/machine/measurements.ts",
+    from: "      if (reclaim !== null)\n",
+    to: "      if (reclaim === undefined)\n",
+    command: unit,
+    expect:
+      "each kind of row is kept in its table, stamped with the host's clock, and exported naming it",
+  },
+  {
     name: "the rung changes at every sample",
     file: "apps/pinetrie/host/machine/measurements.ts",
     from: "before === undefined || before.rung === s.rung",

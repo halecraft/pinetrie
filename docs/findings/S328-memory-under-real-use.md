@@ -24,16 +24,29 @@ and on a Linux host, over at least a week each:
   tracks its pressure.
 
 **Before it runs.** The export's first line names the numbers the
-samples were planned by, read from the code's constants as they are, with
-no refactor: `RUNG_BOUNDS`, `ENTER_AFTER` and `LEAVE_AFTER`, the room's and
-metadata's thresholds and clears, and `minimumUnallocated`'s share and
-floor. So each sample is read against the numbers that planned it, and a
-week's export from before a change is not read as one from after it.
+samples were planned by (`numbers`), read from the code's constants as
+they are: `RUNG_BOUNDS`, `ENTER_AFTER` and `LEAVE_AFTER`, the overdue
+bound and the sample's interval, the room's and metadata's thresholds and
+clears, `minimumUnallocated`'s share and floor, and the memory limits the
+services' and lanes' containers are made with. So each sample is read
+against the numbers that planned it, and a week's export from before a
+change is not read as one from after it. Beside the samples, the export
+keeps the machine's own reclaim's rise per sample
+(`pinetrie_machine_reclaim`: `allocstall_*` summed, `pgscan_direct`,
+`pgscan_kswapd`; none on a host in a lane) and, as a `cgroup-at-limit`
+event, every lane, service or host in a lane's own cgroup whose
+`memory.events` `max` or `high` rose since the last sample.
 
-**What its answers decide, beyond the bounds.** How those numbers are
-changed from then on: an edit of the constants, one set of numbers per
-backend, or a person's setting in `pinetrie.json` where the measurements
-show one machine needs another number. The seam is shaped then, from what
+**What its answers decide, beyond the bounds.** Whether S335's rule (a
+rung's pressure bounds count only in a sample in which the machine's own
+reclaim rose) holds on a long-running machine whose page cache fills its
+memory, where reclaim is routine: whether a cgroup's own stall coincides
+with reclaim from a lane's build there. The services' memory budgets: how
+often, and when, the observer, which fills by connections (S325), and
+lanehost's roles meet their limits, and each lane meets its own. How those
+numbers are changed from then on: an edit of the constants, one set of
+numbers per backend, or a person's setting in `pinetrie.json` where the
+measurements show one machine needs another number. The seam is shaped then, from what
 the answers ask for; none is built ahead of them. `ROOM_SPENT` and
 `METADATA_FULL` are written into the lane VM image's `init` too, so any
 change to them changes the image with them.

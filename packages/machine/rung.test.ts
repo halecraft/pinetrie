@@ -16,6 +16,8 @@ const machine = (full: number | null, available = 8, some = full): Machine => ({
       ? null
       : { someAvg10: some, fullAvg10: full },
   counters: null,
+  reclaim: null,
+  limitHits: null,
   source: "whole-machine",
 })
 

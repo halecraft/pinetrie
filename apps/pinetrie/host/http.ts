@@ -23,7 +23,11 @@ import type { ReviewAsk } from "@pinetrie/rules"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { classifyUpload, MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
-import type { HostMeasurements } from "./machine/measurements.ts"
+import {
+  type HostMeasurements,
+  type MeasuredOn,
+  measurementsHeading,
+} from "./machine/measurements.ts"
 import type { PageSource } from "./page.ts"
 import {
   blobResponse,
@@ -75,10 +79,10 @@ export async function startHttp(input: {
   readonly destination: LaneWork["destination"]
   /** Where the page comes from: Vite, or the built page in `dist/`. */
   readonly page: PageSource
-  /** The machine's measurements, and the line that heads their export: what it was measured on. */
+  /** The machine's measurements, and what they were measured on: their export's first line. */
   readonly measurements: {
     readonly store: Pick<HostMeasurements, "exportRows">
-    readonly heading: Readonly<Record<string, string | number | null>>
+    readonly measuredOn: MeasuredOn
   }
   /** The Machine page's reads: its facts, null where the host reads no machine; and its diagnostics' text. */
   readonly machine: {
@@ -148,9 +152,9 @@ export async function startHttp(input: {
       case "review":
         return void serveReviewRead(to.ask, res)
       case "measurements": {
-        const { store, heading } = input.measurements
+        const { store, measuredOn } = input.measurements
         const lines = [
-          JSON.stringify({ ...heading, days: to.days }),
+          measurementsHeading(measuredOn, to.days),
           ...store.exportRows(to.days),
         ]
         send(res, machineResponse("measurements", `${lines.join("\n")}\n`))

@@ -1,10 +1,15 @@
 import { DatabaseSync } from "node:sqlite"
 import { threadIdFor } from "@pinetrie/core"
-import type { SampleMeasured } from "@pinetrie/machine"
+import {
+  numbersInForce,
+  RUNG_BOUNDS,
+  type SampleMeasured,
+} from "@pinetrie/machine"
 import { expect, test } from "vitest"
 import {
   eventFromRow,
   MEASUREMENTS_KEPT_DAYS,
+  measurementsHeading,
   memoryMachineMeasurements,
   rungChanges,
   sqliteMachineMeasurements,
@@ -25,6 +30,7 @@ const sample: SampleMeasured = {
     stallSomeUs: 3,
     stallFullUs: 4,
   },
+  reclaim: { allocStalls: 5, scannedDirect: 6, scannedByKswapd: 7 },
   lanesRunning: 1,
   mode: "observe",
 }
@@ -100,7 +106,20 @@ test("each kind of row is kept in its table, stamped with the host's clock, and 
       kind: "kill",
       program: "tsc",
     }),
+    {
+      table: "reclaim",
+      at: now,
+      alloc_stalls: 5,
+      scanned_direct: 6,
+      scanned_by_kswapd: 7,
+    },
   ])
+})
+
+test("a sample with no reclaim to compare keeps no reclaim row", () => {
+  const m = memoryMachineMeasurements(() => DAY)
+  m.recordSample({ ...sample, reclaim: null })
+  expect(rows(m.exportRows(1)).map(r => r.table)).toEqual(["samples"])
 })
 
 test("a trim deletes the rows older than what is kept, and an export reads only its days", () => {
@@ -110,12 +129,23 @@ test("a trim deletes the rows older than what is kept, and an export reads only 
   now = 3 * DAY
   m.recordSample({ ...sample, rung: 3 })
   now = (MEASUREMENTS_KEPT_DAYS + 1) * DAY
-  expect(rows(m.exportRows(MEASUREMENTS_KEPT_DAYS)).map(r => r.rung)).toEqual([
-    3,
+  expect(
+    rows(m.exportRows(MEASUREMENTS_KEPT_DAYS)).map(r => [
+      r.table,
+      r.rung ?? r.alloc_stalls,
+    ]),
+  ).toEqual([
+    ["samples", 3],
+    ["reclaim", 5],
   ])
   m.trim()
   now = 0
-  expect(rows(m.exportRows(1000)).map(r => r.rung)).toEqual([3])
+  expect(
+    rows(m.exportRows(1000)).map(r => [r.table, r.rung ?? r.alloc_stalls]),
+  ).toEqual([
+    ["samples", 3],
+    ["reclaim", 5],
+  ])
 })
 
 test("each event is kept in its own table, exported, read back as it was, and trimmed", () => {
@@ -131,6 +161,24 @@ test("each event is kept in its own table, exported, read back as it was, and tr
     { kind: "slow-step", where: null, ms: 800 },
     { kind: "slow-command", program: "jj", subcommand: "log", ms: 700 },
     { kind: "slow-command", program: "git", subcommand: null, ms: 600 },
+    {
+      kind: "cgroup-at-limit",
+      subject: { kind: "service", service: "observer" },
+      maxHits: 41,
+      highHits: 0,
+    },
+    {
+      kind: "cgroup-at-limit",
+      subject: { kind: "lane", lane },
+      maxHits: 3,
+      highHits: 2,
+    },
+    {
+      kind: "cgroup-at-limit",
+      subject: { kind: "own" },
+      maxHits: 0,
+      highHits: 9,
+    },
   ] as const
   m.recordEvents(events)
   const exported = rows(m.exportRows(1)).filter(r => r.table === "events")
@@ -237,4 +285,33 @@ test("shadow decisions newer than what happened crowd none of it out of Lately",
   expect(m.recentRows(2)).toEqual([
     { at: 1000, kind: "treatment", lane, from: "normal", to: "paused" },
   ])
+})
+
+test("the export's first line names the numbers in force, as their modules have them", () => {
+  const numbers = numbersInForce({
+    sampleEveryMs: 5000,
+    readingOverdueAfterTicks: 6,
+    memoryLimits: null,
+  })
+  const heading = JSON.parse(
+    measurementsHeading(
+      {
+        version: "0.1.0",
+        backend: "lane-vm",
+        source: "whole-machine",
+        numbers,
+      },
+      7,
+    ),
+  ) as Record<string, unknown>
+  expect(heading).toEqual({
+    version: "0.1.0",
+    backend: "lane-vm",
+    source: "whole-machine",
+    numbers: JSON.parse(JSON.stringify(numbers)),
+    days: 7,
+  })
+  expect((heading.numbers as Record<string, unknown>).RUNG_BOUNDS).toEqual(
+    RUNG_BOUNDS,
+  )
 })

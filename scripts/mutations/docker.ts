@@ -16,6 +16,24 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a request whose connection dropped is not tried again",
+    file: "packages/docker/api.ts",
+    from: "    if (!isConnectionDropped(error)) throw error\n    return request(target, method, path)\n",
+    to: "    throw error\n",
+    command: unit("packages/docker"),
+    expect:
+      "a request that changes nothing when repeated is answered on a second connection when its first drops",
+  },
+  {
+    name: "a slot's stops are sent all at once",
+    file: "packages/docker/runtime.ts",
+    from: "      { length: Math.min(SLOT_STOPS_AT_ONCE, names.length) },\n",
+    to: "      { length: names.length },\n",
+    command: unit("packages/docker"),
+    expect:
+      "stopSlot over ten containers never has more than SLOT_STOPS_AT_ONCE stops or waits in flight",
+  },
+  {
     name: "a slot's stop answers before its containers have died",
     file: "packages/docker/runtime.ts",
     from: "      await waitContainer(target, name)\n",

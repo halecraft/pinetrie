@@ -10,6 +10,7 @@ import {
   errorText,
   type HeldLane,
   type MachineHealth,
+  type MachineReclaim,
   type MemoryCounters,
   type SnapshotId,
   snapshotId,
@@ -40,8 +41,11 @@ import {
   counterRise,
   type DecisionMeasured,
   type LaneMeasured,
+  type LimitsRead,
   lanesChanged,
   lanesMeasured,
+  limitEvents,
+  reclaimRise,
   treatmentChanges,
 } from "./measurements.ts"
 import type {
@@ -194,8 +198,13 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   }
   const waiters = new Set<Waiter>()
   let closed = false
-  /** The last counters a sample read, and each lane as last kept: what the measurements store differences from. */
+  /**
+   * The last counters, reclaim and cgroups' limit hits a sample read, and
+   * each lane as last kept: what the measurements store differences from.
+   */
   let counters: MemoryCounters | null = null
+  let reclaim: MachineReclaim | null = null
+  let limitsBefore: LimitsRead | null = null
   let lanesKept = new Map<ThreadId, LaneMeasured>()
   /** Samples since the measurements were last trimmed. */
   let untrimmed = 0
@@ -329,6 +338,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
         memoryAvailable: sample.machine.memoryAvailable,
         source: sample.machine.source,
         since: counterRise(counters, sample.machine.counters),
+        reclaim: reclaimRise(reclaim, sample.machine.reclaim),
         lanesRunning: sample.lanesRunning.length,
         mode: deps.mode,
       },
@@ -351,6 +361,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     lanesSeen = sample.lanesRunning
     lastMemory = at
     counters = sample.machine.counters
+    reclaim = sample.machine.reclaim
     lanesKept = new Map(lanesNow.map(l => [l.lane, l]))
     untrimmed = measured.trim ? 0 : untrimmed + 1
     record(() => {
@@ -513,7 +524,13 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
       memory: { ...memoryShort, held: treatments.held },
       repair: repairCause(facts),
     })
-    const events = causeEvents(planned.seen)
+    const events = [
+      ...causeEvents(planned.seen),
+      ...(result.kind === "sampled"
+        ? limitEvents(limitsBefore, result.sample)
+        : []),
+    ]
+    if (result.kind === "sampled") limitsBefore = result.sample
     if (events.length > 0) record(() => deps.measurements.recordEvents(events))
     const sampled = result.kind === "sampled" ? result.sample : lastRead?.sample
     if (sampled !== undefined) {

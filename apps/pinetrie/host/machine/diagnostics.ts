@@ -13,7 +13,11 @@ import {
   machinePageWords,
 } from "@pinetrie/interface"
 import { readVmLogTail, type VmLog } from "@pinetrie/vm"
-import type { HostMeasurements } from "./measurements.ts"
+import {
+  type HostMeasurements,
+  type MeasuredOn,
+  measurementsHeading,
+} from "./measurements.ts"
 
 /** How many of the measurements' rows the diagnostics hold, the newest. */
 export const DIAGNOSTIC_ROWS = 200
@@ -89,7 +93,7 @@ const VM_LOGS: readonly VmLog[] = ["console.log", "launcher.log"]
 export async function gatherDiagnostics(deps: {
   readonly facts: () => MachinePageFacts | null
   readonly measurements: Pick<HostMeasurements, "exportRows">
-  readonly heading: Readonly<Record<string, string | number | null>>
+  readonly measuredOn: MeasuredOn
   /** The lane VM's state directory, where its logs are; null where lanes run on no VM. */
   readonly vmStateDir: string | null
 }): Promise<string> {
@@ -106,7 +110,7 @@ export async function gatherDiagnostics(deps: {
   return diagnosticsText(
     machinePageView(deps.facts(), () => null),
     {
-      heading: JSON.stringify({ ...deps.heading, days: 1 }),
+      heading: measurementsHeading(deps.measuredOn, 1),
       rows: deps.measurements.exportRows(1),
     },
     logTails,

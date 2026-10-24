@@ -1,9 +1,10 @@
-// host/machine/measurements — the machine's measurements in five tables
+// host/machine/measurements — the machine's measurements in six tables
 // beside the documents' in the session's file, on the store's connection, as
 // the snapshot index's are: each row stamped with the host's clock, kept for
-// `MEASUREMENTS_KEPT_DAYS`, and exported as JSON lines. No planner reads the
-// time: it is for tuning the memory rungs later, from what was kept, and for
-// the Machine page's Lately, decoded here (`recentRows`).
+// `MEASUREMENTS_KEPT_DAYS`, and exported as JSON lines under a first line
+// naming what they were measured on and the numbers in force. No planner
+// reads the time: it is for tuning the memory rungs later, from what was
+// kept, and for the Machine page's Lately, decoded here (`recentRows`).
 
 import { DatabaseSync, type SQLInputValue } from "node:sqlite"
 import {
@@ -12,8 +13,10 @@ import {
   isThreadId,
   LANE_TREATMENTS,
   type LaneTreatment,
+  type LimitSubject,
   MACHINE_SERVICES,
   type MachineLately,
+  type MemorySource,
   REPAIR_STEPS,
   type RepairStep,
   TIMED_PROGRAMS,
@@ -22,7 +25,9 @@ import type {
   DecisionMeasured,
   LaneMeasured,
   MachineMeasurements,
+  NumbersInForce,
   SampleMeasured,
+  StoreTarget,
 } from "@pinetrie/machine"
 import type { ShellCallEnded } from "./shell-calls.ts"
 
@@ -37,6 +42,7 @@ const TABLES = {
   "shell-calls": "pinetrie_machine_shell_calls",
   decisions: "pinetrie_machine_decisions",
   events: "pinetrie_machine_events",
+  reclaim: "pinetrie_machine_reclaim",
 } as const
 
 /** How many of what happened the Machine page shows, newest first. */
@@ -51,6 +57,7 @@ const EVENT_TAGS = {
   "repair-asked-again": "repair-asked-again",
   "slow-step": "slow-step",
   "slow-command": "slow-command",
+  "cgroup-at-limit": "cgroup-at-limit",
 } as const satisfies Record<EventMeasured["kind"], string>
 
 /** An `events` row's columns after `at`: kind, subject, count, bytes, ms. */
@@ -62,7 +69,43 @@ type EventColumns = [
   number | null,
 ]
 
-/** An event as its row: its kind's tag, and only the columns it has. */
+/** A cgroup at its limit's `subject`: `lane:<id>`, `service:<name>` or `own`. */
+function limitSubjectText(subject: LimitSubject): string {
+  switch (subject.kind) {
+    case "lane":
+      return `lane:${subject.lane}`
+    case "service":
+      return `service:${subject.service}`
+    case "own":
+      return "own"
+    default:
+      return assertNever(subject)
+  }
+}
+
+/** A stored `subject` as the cgroup it names; null for one this version cannot read. */
+function limitSubjectFromText(text: unknown): LimitSubject | null {
+  if (text === "own") return { kind: "own" }
+  if (typeof text !== "string" || !text.includes(":")) return null
+  const colon = text.indexOf(":")
+  const name = text.slice(colon + 1)
+  switch (text.slice(0, colon)) {
+    case "lane":
+      return isThreadId(name) ? { kind: "lane", lane: name } : null
+    case "service":
+      return isOneOf(MACHINE_SERVICES, name)
+        ? { kind: "service", service: name }
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * An event as its row: its kind's tag, and only the columns it has. A
+ * cgroup at its limit keeps its `max` hits in `count` and its `high` hits
+ * in `bytes`, the table's integer columns.
+ */
 function eventRow(e: EventMeasured): EventColumns {
   const tag = EVENT_TAGS[e.kind]
   switch (e.kind) {
@@ -86,6 +129,8 @@ function eventRow(e: EventMeasured): EventColumns {
         null,
         e.ms,
       ]
+    case "cgroup-at-limit":
+      return [tag, limitSubjectText(e.subject), e.maxHits, e.highHits, null]
     default:
       return assertNever(e)
   }
@@ -132,6 +177,12 @@ export function eventFromRow(
           }
         : null
     }
+    case EVENT_TAGS["cgroup-at-limit"]: {
+      const limited = limitSubjectFromText(subject)
+      return limited !== null && isNumber(count) && isNumber(bytes)
+        ? { kind, subject: limited, maxHits: count, highHits: bytes }
+        : null
+    }
     default:
       return null
   }
@@ -173,10 +224,23 @@ export function rungChanges(
   })
 }
 
+/** What the measurements were measured on: the export's first line, with its days. */
+export interface MeasuredOn {
+  /** The install's version; null where it could not be read. */
+  readonly version: string | null
+  readonly backend: StoreTarget | null
+  readonly source: MemorySource | null
+  readonly numbers: NumbersInForce
+}
+
+/** The export's first line: what its rows were measured on, the numbers in force among it, and its days. */
+export const measurementsHeading = (on: MeasuredOn, days: number): string =>
+  JSON.stringify({ ...on, days })
+
 export interface HostMeasurements extends MachineMeasurements {
   /** A `bash` call ended: its lane, program, start and duration. */
   recordShellCall(call: ShellCallEnded): void
-  /** Every row of the last `days` days, each a JSON line naming its table, oldest first within each. */
+  /** Every row of the last `days` days, each a JSON line naming its table, oldest first within each: the lines under `measurementsHeading`'s. */
   exportRows(days: number): readonly string[]
   /**
    * The newest `limit` of what happened, newest first: treatments changed,
@@ -240,6 +304,12 @@ export function sqliteMachineMeasurements(
     bytes INTEGER,
     ms INTEGER
   )`)
+  db.exec(`CREATE TABLE IF NOT EXISTS ${TABLES.reclaim} (
+    at INTEGER NOT NULL,
+    alloc_stalls INTEGER NOT NULL,
+    scanned_direct INTEGER NOT NULL,
+    scanned_by_kswapd INTEGER NOT NULL
+  )`)
   for (const table of Object.values(TABLES))
     db.exec(`CREATE INDEX IF NOT EXISTS ${table}_at ON ${table} (at)`)
 
@@ -257,6 +327,9 @@ export function sqliteMachineMeasurements(
   )
   const insertEvent = db.prepare(
     `INSERT INTO ${TABLES.events} VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+  const insertReclaim = db.prepare(
+    `INSERT INTO ${TABLES.reclaim} VALUES (?, ?, ?, ?)`,
   )
   const recentDecisions = db.prepare(
     `SELECT * FROM ${TABLES.decisions} WHERE kind IN ('treatment', 'repair') ORDER BY at DESC LIMIT ?`,
@@ -298,7 +371,7 @@ export function sqliteMachineMeasurements(
 
   return {
     recordSample(row: SampleMeasured) {
-      const { since } = row
+      const { since, reclaim } = row
       const at = now()
       if (lastRung !== null && lastRung !== row.rung)
         rungs.push({ at, kind: "rung", from: lastRung, to: row.rung })
@@ -318,6 +391,13 @@ export function sqliteMachineMeasurements(
         row.lanesRunning,
         row.mode,
       )
+      if (reclaim !== null)
+        insertReclaim.run(
+          at,
+          reclaim.allocStalls,
+          reclaim.scannedDirect,
+          reclaim.scannedByKswapd,
+        )
     },
     recordLaneSamples(rows: readonly LaneMeasured[]) {
       const at = now()

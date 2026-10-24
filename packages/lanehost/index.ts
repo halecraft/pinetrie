@@ -25,6 +25,7 @@ export {
   type MachineRead,
   memoryCounters,
   parseInactiveFile,
+  parseLimitHits,
   parseMemoryMax,
   parsePressure,
 } from "./machine.ts"

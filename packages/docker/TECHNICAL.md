@@ -55,6 +55,23 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   create: built again from how this host built it when it is one of its
   own (another host removed it, below), else pulled, as `docker run` would
   (`isCreateRefusedForMissingImage`).
+- **Each request opens a connection of its own** (`request`, with
+  `agent: false`): Docker's socket is local, so keeping connections alive buys
+  nothing, and Node 24's client keeps them by default, so one the lane VM's
+  proxy reset would be used for the next request. The requests that change
+  nothing when repeated (a list, an inspect, a stop, a wait, a start, a
+  removal) are tried once more after `ECONNRESET`, `EPIPE` or a socket hang
+  up (`requestRetried`), the second try's error the one thrown. A create
+  (`runContainer`) is not: `ensureContainer` already settles a create that
+  lost a race by inspecting the name.
+- **Gotcha: a lane VM just booted resets connections.** On 2026-10-24 a
+  host's start failed at the lanes' disks and grants with `socket hang up`
+  while the launcher logged about 24 `vsock 2375 … Connection reset by
+  peer` lines, as it does at every VM start, and `stopSlot` sent a stop and
+  a wait for each of the 15 containers the VM's last life left in the slot,
+  all at once; the next start, a minute later, succeeded, and the same
+  burst against the settled VM passed three times. So a slot's stops go
+  four at a time, and a reset request is tried again.
 - **The CLI stays for three things:** `buildx build`, `exec -i` (a lane's
   channel and lanehost's), and a throwaway container's stdout as bytes
   (`runInImage`). The startup's check that the CLI and buildx answer is the
@@ -244,8 +261,9 @@ never reaches the VM's Docker or the launcher's ports.
   layout). They belong to a host that stopped holding the slot (a Ctrl-C,
   a crash), its own or an extra one, and filling it would cut their mounts,
   or show them the new host's directories (S130). Each is killed (a stop
-  with a timeout of 0) and waited on (`wait?condition=not-running`), all at
-  once, and `stopSlot` answers only once each has died: its binds go with
+  with a timeout of 0) and waited on (`wait?condition=not-running`),
+  `SLOT_STOPS_AT_ONCE` (4) at a time, never all at once (below), and
+  `stopSlot` answers only once each has died: its binds go with
   its mount namespace, not with the stop's answer (a 304 for one already
   stopped, a 404 for one gone, S307). Nothing is removed: removing a lane
   costs the deletion of its writable layer, up to a minute under pressure

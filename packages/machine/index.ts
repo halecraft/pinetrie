@@ -6,6 +6,7 @@ export {
   type StoreCapabilities,
   type StoreTarget,
 } from "./capabilities.ts"
+export { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
 export { ROOM_SPENT, WAITING } from "./health.ts"
 export { type LaneImportance, rankLanes } from "./importance.ts"
 export {
@@ -19,6 +20,9 @@ export {
   commandProgram,
   type DecisionMeasured,
   type LaneMeasured,
+  type MemoryLimits,
+  type NumbersInForce,
+  numbersInForce,
   type SampleMeasured,
 } from "./measurements.ts"
 export type {
@@ -39,6 +43,7 @@ export {
   repairStateNow,
 } from "./repair.ts"
 export { runRepairSteps } from "./repair-steps.ts"
+export { RUNG_BOUNDS } from "./rung.ts"
 export type {
   LaneSample,
   MachineReading,

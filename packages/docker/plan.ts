@@ -405,6 +405,13 @@ const OBSERVER_GRANT = {
   tmpfs: ["/run"],
 } as const
 
+/** Each service's memory limit, as its container is made with. */
+export const SERVICE_MEMORY: Readonly<Record<MachineService, string>> = {
+  disks: ROLES.disks.memory,
+  privileged: ROLES.privileged.memory,
+  observer: OBSERVER_GRANT.memory,
+}
+
 /**
  * The machine role's container: the observer for every project and host on
  * the machine, so it carries no project's or slot's label, and no sweep

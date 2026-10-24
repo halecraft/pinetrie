@@ -20,6 +20,7 @@ import {
   type MachineRead,
   memoryCounters,
   parseInactiveFile,
+  parseLimitHits,
   parseMemoryMax,
   parsePressure,
 } from "@pinetrie/lanehost"
@@ -33,6 +34,7 @@ export interface OwnCgroupFiles {
   readonly current: string | null
   readonly stat: string | null
   readonly pressure: string | null
+  readonly events: string | null
 }
 
 /** Where a host in a lane finds its own cgroup: its cgroup namespace's root. */
@@ -42,7 +44,8 @@ const OWN_CGROUP = "/sys/fs/cgroup"
  * The machine's memory as a host in a lane has it: its own cgroup's limit,
  * and as available that limit less what its use is not inactive page cache,
  * since cache fills a cgroup to its limit with no pressure. Without a limit
- * (`max`), the whole machine's; its pressure and counters its cgroup's.
+ * (`max`), the whole machine's; its pressure, counters and limit hits its
+ * cgroup's, and no reclaim: the machine's is other threads' too.
  */
 export function ownCgroupMachine(
   own: OwnCgroupFiles,
@@ -63,6 +66,8 @@ export function ownCgroupMachine(
     memoryAvailable: memory.available,
     pressure: own.pressure === null ? null : parsePressure(own.pressure),
     counters: memoryCounters(own.stat, own.pressure),
+    reclaim: null,
+    limitHits: own.events === null ? null : parseLimitHits(own.events),
   }
 }
 
@@ -103,6 +108,7 @@ export function serviceReadings(
             kind: "read",
             currentBytes: memory.current,
             limitBytes: memory.limit,
+            limitHits: memory.limitHits,
           },
         }
   })
@@ -112,8 +118,8 @@ export function serviceReadings(
  * One sample from what was read: each running lane's cgroup by its id, a
  * lane whose cgroup was not found left out of `lanes` but in `lanesRunning`,
  * each service's (`serviceReadings`), the filesystem as found, and the
- * machine's memory the whole machine's or, given `own`, the host's own
- * cgroup's.
+ * machine's memory the whole machine's, with its reclaim, or, given `own`,
+ * the host's own cgroup's, with none.
  */
 export function planSample(input: {
   readonly running: readonly RunningLane[]
@@ -138,6 +144,8 @@ export function planSample(input: {
             memoryAvailable: read.memory.available,
             pressure: read.pressure,
             counters: read.counters,
+            reclaim: read.reclaim,
+            limitHits: null,
             source: "whole-machine",
           }
         : { ...ownCgroupMachine(input.own, read.memory), source: "own-cgroup" },
@@ -161,28 +169,33 @@ async function readFilesystem(
     : { size: fs.blocks * fs.bsize, free: fs.bavail * fs.bsize }
 }
 
-/**
- * The sensor over `reach` and `kills`; `hearStall` takes each of the host's
- * stalls. Kills are taken after the reads, so a sample whose read fails
- * leaves them for the next.
- */
 /** The host's own cgroup's files, each null when it cannot be read. */
 async function readOwnCgroup(): Promise<OwnCgroupFiles> {
   const read = (f: string) =>
     readFile(path.join(OWN_CGROUP, f), "utf8").catch(() => null)
-  const [max, current, stat, pressure] = await Promise.all(
-    ["memory.max", "memory.current", "memory.stat", "memory.pressure"].map(
-      read,
-    ),
+  const [max, current, stat, pressure, events] = await Promise.all(
+    [
+      "memory.max",
+      "memory.current",
+      "memory.stat",
+      "memory.pressure",
+      "memory.events",
+    ].map(read),
   )
   return {
     max: max ?? null,
     current: current ?? null,
     stat: stat ?? null,
     pressure: pressure ?? null,
+    events: events ?? null,
   }
 }
 
+/**
+ * The sensor over `reach` and `kills`; `hearStall` takes each of the host's
+ * stalls. Kills are taken after the reads, so a sample whose read fails
+ * leaves them for the next.
+ */
 export function createSensor(
   reach: Pick<
     MachineReach,

@@ -151,6 +151,28 @@ export interface MemoryCounters {
 }
 
 /**
+ * The machine's own reclaim, counted since it started, in `/proc/vmstat`:
+ * tasks stalled to reclaim (`allocstall_*`, every zone's together) and
+ * pages scanned by them and by kswapd. A cgroup reclaiming at its own
+ * limit counts in none of them, so they rise only when the machine is
+ * short.
+ */
+export interface MachineReclaim {
+  readonly allocStalls: number
+  readonly scannedDirect: number
+  readonly scannedByKswapd: number
+}
+
+/**
+ * A cgroup's `memory.events` counts since it was made: the times its use
+ * met `memory.max` and went over `memory.high`.
+ */
+export interface CgroupLimitHits {
+  readonly max: number
+  readonly high: number
+}
+
+/**
  * What a host reads as the machine's memory: the whole machine's, or, for a
  * host inside a lane, its own cgroup's, which its inner lanes share; the
  * lane VM's whole is other threads' too.
@@ -168,6 +190,7 @@ export interface CgroupMemory {
   readonly limit: number | null
   /** Its processes the kernel killed for memory, since the cgroup was made. */
   readonly oomKills: number
+  readonly limitHits: CgroupLimitHits
   /** null where the kernel has no PSI. */
   readonly pressure: Pressure | null
 }

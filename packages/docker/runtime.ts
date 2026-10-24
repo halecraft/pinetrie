@@ -672,12 +672,19 @@ export function dockerRuntime(input: {
 }
 
 /**
+ * Containers a slot's stop stops and waits for at once: a lane VM just
+ * booted reset connections when a slot's 15 were met all together.
+ */
+export const SLOT_STOPS_AT_ONCE = 4
+
+/**
  * Before a slot is filled: kill every container of any project with a bind
- * under `root`, the slot's place in Docker's machine, all at once, and answer
- * their names only once each has died, since its binds go only then. A
- * stop's own answer proves nothing (a 304 for one already stopped, a 404
- * for one gone): the wait does. Nothing is removed: the next start of each
- * starts it again or makes it anew, as its spec decides.
+ * under `root`, the slot's place in Docker's machine, `SLOT_STOPS_AT_ONCE`
+ * at a time, and answer their names only once each has died, since its
+ * binds go only then. A stop's own answer proves nothing (a 304 for one
+ * already stopped, a 404 for one gone): the wait does. Nothing is removed:
+ * the next start of each starts it again or makes it anew, as its spec
+ * decides.
  */
 export async function stopSlot(
   target: Pick<DockerTarget, "socket">,
@@ -687,11 +694,18 @@ export async function stopSlot(
 ): Promise<readonly string[]> {
   const names = planSlotSweep(root, await listLabelled(target, PROJECT_LABEL))
   if (names.length > 0) stopping(names)
-  await Promise.all(
-    names.map(async name => {
+  const left = [...names]
+  const stopEach = async () => {
+    for (let name = left.shift(); name !== undefined; name = left.shift()) {
       await stopContainer(target, name, 0)
       await waitContainer(target, name)
-    }),
+    }
+  }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(SLOT_STOPS_AT_ONCE, names.length) },
+      stopEach,
+    ),
   )
   return names
 }

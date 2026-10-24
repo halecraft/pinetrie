@@ -1,11 +1,16 @@
 import { threadIdFor } from "@pinetrie/core"
 import fc from "fast-check"
 import { describe, expect, test } from "vitest"
+import { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
 import {
   commandProgram,
   counterRise,
+  type LimitsRead,
   lanesChanged,
   lanesMeasured,
+  limitEvents,
+  numbersInForce,
+  reclaimRise,
   treatmentChanges,
 } from "./measurements.ts"
 
@@ -100,6 +105,7 @@ describe("rows from a sample and a plan", () => {
       file: 500 * MiB,
       limit: null,
       oomKills: 0,
+      limitHits: { max: 0, high: 0 },
       pressure: null,
     }
     const [kept] = lanesMeasured([sample], () => null)
@@ -131,4 +137,109 @@ describe("rows from a sample and a plan", () => {
       { lane: b, from: "normal", to: "paused" },
     ])
   })
+})
+
+test("the reclaim's rise since the last sample, and none across a reboot", () => {
+  const reclaim = {
+    allocStalls: 300,
+    scannedDirect: 1_000,
+    scannedByKswapd: 50_000,
+  }
+  expect(
+    reclaimRise(reclaim, {
+      ...reclaim,
+      allocStalls: 320,
+      scannedDirect: 1_400,
+    }),
+  ).toEqual({ allocStalls: 20, scannedDirect: 400, scannedByKswapd: 0 })
+  expect(reclaimRise(reclaim, { ...reclaim, scannedByKswapd: 10 })).toBeNull()
+  expect(reclaimRise(null, reclaim)).toBeNull()
+})
+
+describe("a cgroup at its limit", () => {
+  const lane = threadIdFor("t-1")
+  const other = threadIdFor("t-2")
+  const hits = (max: number, high = 0) => ({ max, high })
+  const laneAt = (l: typeof lane, max: number, high = 0) => ({
+    lane: l,
+    current: 0,
+    anon: 0,
+    file: 0,
+    limit: null,
+    oomKills: 0,
+    limitHits: hits(max, high),
+    pressure: null,
+  })
+  const observerAt = (max: number) => ({
+    service: "observer" as const,
+    memory: {
+      kind: "read" as const,
+      currentBytes: 0,
+      limitBytes: null,
+      limitHits: hits(max),
+    },
+  })
+  const read = (
+    lanes: LimitsRead["lanes"],
+    services: LimitsRead["services"],
+    own: { max: number; high: number } | null = null,
+  ): LimitsRead => ({ lanes, services, machine: { limitHits: own } })
+
+  test("each cgroup whose max or high rose is one event, with each rise", () => {
+    expect(
+      limitEvents(
+        read([laneAt(lane, 2), laneAt(other, 5)], [observerAt(100)]),
+        read([laneAt(lane, 2, 3), laneAt(other, 5)], [observerAt(141)]),
+      ),
+    ).toEqual([
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "lane", lane },
+        maxHits: 0,
+        highHits: 3,
+      },
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "service", service: "observer" },
+        maxHits: 41,
+        highHits: 0,
+      },
+    ])
+  })
+
+  test("a cgroup new in the sample, or made again, has no rise yet", () => {
+    expect(
+      limitEvents(
+        read([laneAt(lane, 9)], []),
+        read([laneAt(lane, 1), laneAt(other, 7)], [observerAt(4)]),
+      ),
+    ).toEqual([])
+    expect(limitEvents(null, read([laneAt(lane, 9)], []))).toEqual([])
+  })
+
+  test("a host in a lane's own cgroup is own", () => {
+    expect(limitEvents(read([], [], hits(10)), read([], [], hits(12)))).toEqual(
+      [
+        {
+          kind: "cgroup-at-limit",
+          subject: { kind: "own" },
+          maxHits: 2,
+          highHits: 0,
+        },
+      ],
+    )
+  })
+})
+
+test("the numbers in force name the overdue bound's constant and the bound a host set", () => {
+  const numbers = numbersInForce({
+    sampleEveryMs: 100,
+    readingOverdueAfterTicks: 40,
+    memoryLimits: null,
+  })
+  expect([
+    numbers.READING_OVERDUE_AFTER_TICKS,
+    numbers.readingOverdueAfterTicks,
+    numbers.sampleEveryMs,
+  ]).toEqual([READING_OVERDUE_AFTER_TICKS, 40, 100])
 })

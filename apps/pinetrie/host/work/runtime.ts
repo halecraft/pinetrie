@@ -16,6 +16,7 @@ import {
   gatherDockerHost,
   NESTED_MOUNT,
   planDockerHost,
+  SERVICE_MEMORY,
   SLOT_LABEL,
   stopSlot,
 } from "@pinetrie/docker"
@@ -33,6 +34,7 @@ import {
 import {
   isRepairRunning,
   type ManageMode,
+  type MemoryLimits,
   type RepairRead,
   repairFacts,
   repairStateNow,
@@ -60,6 +62,7 @@ import {
   laneVmRepairRead,
 } from "../machine/repair.ts"
 import type { Build, StartWork } from "../start-checklist.ts"
+import { LANE_MEMORY } from "./setup.ts"
 import {
   createShares,
   type HostShares,
@@ -120,6 +123,8 @@ export interface MachineReach
   readonly target: StoreTarget
   /** Whose memory is the machine's: a host in a lane reads its own cgroup's. */
   readonly memorySource: MemorySource
+  /** The memory limits its services' and lanes' containers are made with. */
+  memoryLimits(): MemoryLimits
   /** The lane VM's repair: its shared state, and what repairs it; null where nothing is repaired. */
   readonly repair: {
     readonly read: () => Promise<RepairRead>
@@ -142,6 +147,7 @@ const machineReach = (
   runningServices: () => runtime.runningServices(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
+  memoryLimits: () => ({ services: SERVICE_MEMORY, lane: LANE_MEMORY }),
   storeVolume,
   store: {
     listing: () => runtime.storeListing(),

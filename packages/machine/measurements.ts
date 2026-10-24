@@ -1,23 +1,42 @@
 // machine/measurements — what the host keeps of the machine to tune the
-// memory rungs by: its samples, each lane's memory and program, each `bash`
-// call's duration, every treatment changed or shadow decision, and the
-// events no decision holds (`EventMeasured`), each row a value built here
-// from what was planned; the host's store stamps its time.
-// No command's arguments or output is kept: only its program.
+// memory rungs by: its samples and the machine's reclaim, each lane's
+// memory and program, each `bash` call's duration, every treatment changed
+// or shadow decision, and the events no decision holds (`EventMeasured`),
+// each row a value built here from what was planned; the host's store
+// stamps its time. No command's arguments or output is kept: only its
+// program.
 
-import type {
-  EventMeasured,
-  HeldLane,
-  LaneTreatment,
-  MachineCause,
-  MemoryCounters,
-  MemorySource,
-  ThreadId,
+import {
+  assertNever,
+  type CgroupLimitHits,
+  type EventMeasured,
+  type HeldLane,
+  type LaneTreatment,
+  type LimitSubject,
+  MACHINE_SAMPLE_MS,
+  type MachineCause,
+  type MachineReclaim,
+  type MachineService,
+  type MemoryCounters,
+  type MemorySource,
+  type ThreadId,
 } from "@pinetrie/core"
+import { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
+import {
+  METADATA_CLEAR,
+  METADATA_FULL,
+  ROOM_SPENT,
+  ROOM_SPENT_CLEAR,
+} from "./health.ts"
+import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import type { ManageMode } from "./manager.ts"
 import type { RepairState } from "./repair.ts"
-import type { Rung } from "./rung.ts"
-import type { LaneSample } from "./sample.ts"
+import { RUNG_BOUNDS, type Rung } from "./rung.ts"
+import type { LaneSample, MachineSample } from "./sample.ts"
+import {
+  MINIMUM_UNALLOCATED_FLOOR,
+  MINIMUM_UNALLOCATED_PERCENT,
+} from "./store-settings.ts"
 import type { ShadowDecision } from "./treatments.ts"
 
 /** Words a statement starts with that are not its program: `env X=1 time pnpm` runs `pnpm`. */
@@ -72,7 +91,7 @@ export function commandProgram(command: string): string | null {
   return null
 }
 
-/** A sample as the measurements keep it. Sizes in bytes, stall time in µs. */
+/** A sample as the measurements keep it. Sizes in bytes, stall time in µs, reclaim in stalls and pages scanned. */
 export interface SampleMeasured {
   readonly rung: Rung
   readonly someAvg10: number | null
@@ -82,6 +101,8 @@ export interface SampleMeasured {
   readonly source: MemorySource
   /** The kernel's counters' rise since the last sample read them; null for none to compare. */
   readonly since: MemoryCounters | null
+  /** The machine's reclaim's rise since the last sample read it; null for none to compare, as on an own-cgroup read. */
+  readonly reclaim: MachineReclaim | null
   readonly lanesRunning: number
   readonly mode: ManageMode
 }
@@ -134,19 +155,136 @@ export const causeEvents = (
   })
 
 /** The rise of each counter from `before` to `now`; null when either is missing or one fell, as at a reboot. */
-export function counterRise(
+function countersRise<K extends string>(
+  before: Readonly<Record<K, number>> | null,
+  now: Readonly<Record<K, number>> | null,
+): Record<K, number> | null {
+  if (before === null || now === null) return null
+  const names = Object.keys(now) as K[]
+  const rise = names.map(name => [name, now[name] - before[name]] as const)
+  return rise.some(([, v]) => v < 0)
+    ? null
+    : (Object.fromEntries(rise) as Record<K, number>)
+}
+
+/** The kernel's memory counters' rise; null when either is missing or one fell, as at a reboot. */
+export const counterRise = (
   before: MemoryCounters | null,
   now: MemoryCounters | null,
-): MemoryCounters | null {
-  if (before === null || now === null) return null
-  const rise = {
-    refaultAnon: now.refaultAnon - before.refaultAnon,
-    refaultFile: now.refaultFile - before.refaultFile,
-    stallSomeUs: now.stallSomeUs - before.stallSomeUs,
-    stallFullUs: now.stallFullUs - before.stallFullUs,
-  }
-  return Object.values(rise).some(v => v < 0) ? null : rise
+): MemoryCounters | null => countersRise(before, now)
+
+/** The machine's reclaim's rise; null when either is missing or one fell, as at a reboot. */
+export const reclaimRise = (
+  before: MachineReclaim | null,
+  now: MachineReclaim | null,
+): MachineReclaim | null => countersRise(before, now)
+
+/** What `limitEvents` reads of a sample: each cgroup's limit hits. */
+export type LimitsRead = Pick<MachineSample, "lanes" | "services"> & {
+  readonly machine: Pick<MachineSample["machine"], "limitHits">
 }
+
+/** Each cgroup a sample read the limit hits of, by its subject. */
+function limitHitsRead(read: LimitsRead): readonly {
+  readonly subject: LimitSubject
+  readonly hits: CgroupLimitHits
+}[] {
+  return [
+    ...read.lanes.map(l => ({
+      subject: { kind: "lane", lane: l.lane } as const,
+      hits: l.limitHits,
+    })),
+    ...read.services.flatMap(s =>
+      s.memory.kind === "read"
+        ? [
+            {
+              subject: { kind: "service", service: s.service } as const,
+              hits: s.memory.limitHits,
+            },
+          ]
+        : [],
+    ),
+    ...(read.machine.limitHits === null
+      ? []
+      : [{ subject: { kind: "own" } as const, hits: read.machine.limitHits }]),
+  ]
+}
+
+const subjectKey = (subject: LimitSubject): string => {
+  switch (subject.kind) {
+    case "lane":
+      return `lane:${subject.lane}`
+    case "service":
+      return `service:${subject.service}`
+    case "own":
+      return "own"
+    default:
+      return assertNever(subject)
+  }
+}
+
+/**
+ * One event per cgroup whose `max` or `high` count rose from `before` to
+ * `now`. A cgroup new in `now`, or whose counts fell (a container made
+ * again), has no rise yet.
+ */
+export function limitEvents(
+  before: LimitsRead | null,
+  now: LimitsRead,
+): readonly EventMeasured[] {
+  if (before === null) return []
+  const was = new Map(
+    limitHitsRead(before).map(r => [subjectKey(r.subject), r.hits]),
+  )
+  return limitHitsRead(now).flatMap(({ subject, hits }): EventMeasured[] => {
+    const then = was.get(subjectKey(subject))
+    if (then === undefined) return []
+    const maxHits = hits.max - then.max
+    const highHits = hits.high - then.high
+    return maxHits < 0 || highHits < 0 || maxHits + highHits === 0
+      ? []
+      : [{ kind: "cgroup-at-limit", subject, maxHits, highHits }]
+  })
+}
+
+/** The memory limits a host's containers are made with, as Docker's `--memory` takes them (`512m`). */
+export interface MemoryLimits {
+  readonly services: Readonly<Record<MachineService, string>>
+  readonly lane: string
+}
+
+/**
+ * Every number the host decides memory and room by, read from the
+ * constants themselves so a tuned one shows in the next export, with the
+ * sample's interval, the overdue bound and the containers' memory limits
+ * this host runs with. `memoryLimits` is null on a host that runs no
+ * containers.
+ */
+export function numbersInForce(inForce: {
+  readonly sampleEveryMs: number
+  readonly readingOverdueAfterTicks: number
+  readonly memoryLimits: MemoryLimits | null
+}) {
+  return {
+    RUNG_BOUNDS,
+    ENTER_AFTER,
+    LEAVE_AFTER,
+    READING_OVERDUE_AFTER_TICKS,
+    readingOverdueAfterTicks: inForce.readingOverdueAfterTicks,
+    MACHINE_SAMPLE_MS,
+    sampleEveryMs: inForce.sampleEveryMs,
+    ROOM_SPENT,
+    ROOM_SPENT_CLEAR,
+    METADATA_FULL,
+    METADATA_CLEAR,
+    MINIMUM_UNALLOCATED_PERCENT,
+    MINIMUM_UNALLOCATED_FLOOR,
+    memoryLimits: inForce.memoryLimits,
+  }
+}
+
+/** The numbers a host's measurements were planned by, as its export's first line names them. */
+export type NumbersInForce = ReturnType<typeof numbersInForce>
 
 const MiB = 1024 ** 2
 const inMiB = (bytes: number) => Math.round(bytes / MiB)

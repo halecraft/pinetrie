@@ -6,7 +6,7 @@ import { thisInstall } from "@pinetrie/install"
 import { baseLane } from "@pinetrie/lanes"
 import { expect, test } from "vitest"
 import { PROJECT_LABEL, projectKey } from "./plan.ts"
-import { dockerRuntime, stopSlot } from "./runtime.ts"
+import { dockerRuntime, SLOT_STOPS_AT_ONCE, stopSlot } from "./runtime.ts"
 import type { DockerTarget } from "./target.ts"
 
 const linux: DockerTarget = {
@@ -127,6 +127,69 @@ test("stopSlot kills every container bound into the slot, and answers only once 
       "POST /containers/stopped/stop?t=0",
       "POST /containers/stopped/wait?condition=not-running",
     ])
+  } finally {
+    await docker.close()
+  }
+})
+
+/**
+ * A Docker API on a socket of its own, `count` containers bound into slot 0,
+ * that holds every stop and wait until the client sends no more: what it
+ * held at once is what the client had in flight.
+ */
+async function heldDocker(count: number) {
+  const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-docker-"))
+  const socket = path.join(dir, "docker.sock")
+  const listed = Array.from({ length: count }, (_, i) => ({
+    Names: [`/c${i}`],
+    Mounts: [{ Source: "/mnt/host-shares/0/a" }],
+    Labels: { [PROJECT_LABEL]: "k" },
+  }))
+  const held: (() => void)[] = []
+  let arrived = 0
+  let mostHeld = 0
+  /** Every request held is answered once ten turns of the loop bring no other. */
+  const answerWhenQuiet = async () => {
+    const seen = arrived
+    for (let turn = 0; turn < 10; turn++)
+      await new Promise(r => setImmediate(r))
+    if (arrived === seen) for (const answer of held.splice(0)) answer()
+  }
+  const server = http.createServer((req, res) => {
+    const url = req.url ?? ""
+    if (url.startsWith("/containers/json")) {
+      res.end(JSON.stringify(listed))
+      return
+    }
+    arrived++
+    held.push(() => {
+      res.statusCode = url.includes("/stop?") ? 204 : 200
+      res.end(url.includes("/wait?") ? '{"StatusCode":137}' : undefined)
+    })
+    mostHeld = Math.max(mostHeld, held.length)
+    void answerWhenQuiet()
+  })
+  await new Promise<void>(r => server.listen(socket, r))
+  return {
+    socket,
+    mostHeld: () => mostHeld,
+    async close() {
+      server.close()
+      await rm(dir, { recursive: true, force: true })
+    },
+  }
+}
+
+test("stopSlot over ten containers never has more than SLOT_STOPS_AT_ONCE stops or waits in flight", async () => {
+  const docker = await heldDocker(10)
+  try {
+    const names = await stopSlot(
+      { socket: docker.socket },
+      "/mnt/host-shares/0/",
+      () => {},
+    )
+    expect(names).toHaveLength(10)
+    expect(docker.mostHeld()).toBe(SLOT_STOPS_AT_ONCE)
   } finally {
     await docker.close()
   }

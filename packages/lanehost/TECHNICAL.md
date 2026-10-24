@@ -289,7 +289,13 @@ host, whatever their projects.
   `/proc/meminfo`, `/proc/pressure/memory` (absent where the kernel's PSI
   is off: no pressure), its `total=`s and `/proc/vmstat`'s
   `workingset_refault_*` as the kernel's counters (`memoryCounters`, which
-  the host's measurements difference, ADR-0212), and btrfs's counters under
+  the host's measurements difference, ADR-0212), the machine's own reclaim
+  from the same `/proc/vmstat` (`parseReclaim`: every zone's
+  `allocstall_*` summed, since which zones there are differs by machine,
+  and `pgscan_direct` and `pgscan_kswapd`; none when one is missing; a
+  cgroup reclaiming at its own limit counts in none of them, S335), each
+  container's `memory.events` `max` and `high` beside its OOM kills
+  (`parseLimitHits`, from the one read), and btrfs's counters under
   `/sys/fs/btrfs/<fsid>/`. The filesystem is the one whose `devices/`
   lists the device the lanes directory is mounted from (`holdingMount`); a
   device not named by its path under `/dev` (a mapper's) is not found,

@@ -24,6 +24,8 @@ const calm: MachineSample = {
     memoryAvailable: 8 * GiB,
     pressure: { someAvg10: 0, fullAvg10: 0 },
     counters: null,
+    reclaim: null,
+    limitHits: null,
     source: "whole-machine",
   },
   lanes: [
@@ -34,6 +36,7 @@ const calm: MachineSample = {
       file: GiB / 2,
       limit: 4 * GiB,
       oomKills: 0,
+      limitHits: { max: 0, high: 0 },
       pressure: { someAvg10: 0, fullAvg10: 0 },
     },
   ],

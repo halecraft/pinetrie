@@ -4,6 +4,33 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
+  // ── what the measurements keep ──
+  {
+    name: "a cgroup at its limit keeps no high",
+    file: "packages/machine/measurements.ts",
+    from: "    const highHits = hits.high - then.high\n",
+    to: "    const highHits = 0\n",
+    command: unit,
+    expect: "each cgroup whose max or high rose is one event, with each rise",
+  },
+  {
+    name: "the cgroups at their limits are not recorded",
+    file: "packages/machine/manager.ts",
+    from: "        ? limitEvents(limitsBefore, result.sample)\n",
+    to: "        ? []\n",
+    command: unit,
+    expect:
+      "a sample after one whose observer's max was lower records it at its limit",
+  },
+  {
+    name: "the numbers in force leave out the overdue bound's constant",
+    file: "packages/machine/measurements.ts",
+    from: "    READING_OVERDUE_AFTER_TICKS,\n    readingOverdueAfterTicks:",
+    to: "    readingOverdueAfterTicks:",
+    command: unit,
+    expect:
+      "the numbers in force name the overdue bound's constant and the bound a host set",
+  },
   // ── what the Machine page reads ──
   {
     name: "a lane's snapshots count every row, not only those kept",

@@ -77,17 +77,20 @@ const shownReading = (reading: MachineReading | null): ReadingPlanned | null =>
       ? null
       : { ...reading.last, health: reading.health, held: [] }
 
+/** The lanes one of Lately names, which the page needs the names of. */
+function latelyLanes(l: MachineLately): readonly ThreadId[] {
+  if (l.kind === "treatment") return [l.lane]
+  if (l.kind !== "event") return []
+  const { event } = l
+  if (event.kind === "lane-oom-killed") return [event.lane]
+  if (event.kind === "cgroup-at-limit" && event.subject.kind === "lane")
+    return [event.subject.lane]
+  return []
+}
+
 export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
   const reading = shownReading(g.reading)
-  const mentioned = new Set(
-    g.lately.flatMap(l =>
-      l.kind === "treatment"
-        ? [l.lane]
-        : l.kind === "event" && l.event.kind === "lane-oom-killed"
-          ? [l.event.lane]
-          : [],
-    ),
-  )
+  const mentioned = new Set(g.lately.flatMap(latelyLanes))
   const common = {
     vmMemoryCeilingBytes: g.vmMemoryCeilingBytes,
     lately: g.lately,

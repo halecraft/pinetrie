@@ -21,7 +21,7 @@ and the words share one.
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
 | `importance.ts` | which lanes matter most (`rankLanes`) |
 | `treatments.ts` | each lane's treatment (`planTreatments`, `Treatments`), what each allows (`ACTIVITIES_ALLOWED`), the shadow decisions of the rungs not built |
-| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`) and a command's program (`commandProgram`) |
+| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`, `limitEvents`), the counters' rises (`counterRise`, `reclaimRise`), a command's program (`commandProgram`), and the numbers in force the export names (`numbersInForce`) |
 | `manager.ts` | `createMachineManager`: gather, plan, write, and the disk upkeep's steps, on a keeper of its own; `MANAGE_MODES` |
 | `store.ts` | what the upkeep reads and does: `StoreListed`, `StoreControls`, `StoreRecords` |
 | `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
@@ -91,8 +91,11 @@ and the words share one.
   treatments are planned for their shadow decisions only, every lane is
   `normal`, and memory short is said without a hold (`isHolding`).
 - **The measurements are kept in both modes** (`MachineMeasurements`): each
-  sample's rung, pressure, memory, its source and the kernel's counters'
-  rise since the last (`counterRise`, none across a reset); each running
+  sample's rung, pressure, memory, its source, the kernel's counters'
+  rise since the last (`counterRise`, none across a reset) and the
+  machine's own reclaim's (`reclaimRise`: `allocstall_*`, `pgscan_direct`,
+  `pgscan_kswapd`; none on an own-cgroup sample, whose machine's counters
+  are other threads' too); each running
   lane's memory in MiB and its program, kept only when it changed
   (`lanesChanged`), its program past `env`, `time` and their options'
   values, never an argument (`commandProgram`); every treatment changed and every shadow decision, with
@@ -100,7 +103,12 @@ and the words share one.
   holds (core's `EventMeasured`, one row each through `recordEvents`): a
   lane's or a service's OOM kill and the host's stall, from `planHealth`'s
   `seen` (the sample's events, `causeEvents`), each once, at the sample
-  that saw it; the upkeep's deletion, with its snapshots' cost from their
+  that saw it; each cgroup (a lane, a service, a host in a lane's own)
+  whose `memory.events` `max` or `high` rose since the last sample, from
+  the two samples (`limitEvents`, kept with the OOM kills; a cgroup new in
+  the sample, or made again, has no rise yet), since a cgroup thrashing
+  at its own limit is killed by nothing and named by nothing else; the
+  upkeep's deletion, with its snapshots' cost from their
   rows, once the deletion returned; a person's retry of the repair. The
   host records the slow step and the slow `jj` or `git` command. A kind
   of event added to core is a type error until the host's store tags and
@@ -110,6 +118,14 @@ and the words share one.
   upkeep, which runs only in `manage` mode. The manager reads no clock: the
   host's store stamps each row. A write that fails is told (`unmeasured`)
   and the sample goes on.
+- **The export names the numbers in force** (`numbersInForce`): the
+  rungs' bounds, the hysteresis' counts, the overdue bound, the sample's
+  interval, the room's and metadata's thresholds and clears and
+  `minimumUnallocated`'s share and floor, each read from its constant,
+  never copied, so a tuned one shows in the next export; and the bound and
+  interval a host runs with, which a suite may shorten. The containers'
+  memory limits are the host's to pass in (from `@pinetrie/docker` and
+  its lanes' setup), so this package declares no dependency for them.
 
 - **No I/O lives here.** It declares only `@pinetrie/core` and
   `@pinetrie/keeper` (`workspace.test.ts`), and `boundary.test.ts` refuses

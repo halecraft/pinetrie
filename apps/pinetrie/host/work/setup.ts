@@ -59,7 +59,7 @@ import type { Wanted } from "./shares.ts"
 import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
 
 /** A running lane's memory ceiling. */
-const LANE_MEMORY = "4G"
+export const LANE_MEMORY = "4G"
 
 /**
  * The Playwright whose browser the default lane image carries: the app's

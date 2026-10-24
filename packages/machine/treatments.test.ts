@@ -26,6 +26,7 @@ const running = (
     file: GiB / 2,
     limit: null,
     oomKills: 0,
+    limitHits: { max: 0, high: 0 },
     pressure: null,
   },
   programInFlight,

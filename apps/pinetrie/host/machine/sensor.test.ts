@@ -17,12 +17,18 @@ const memory = {
   file: 50,
   limit: 400,
   oomKills: 0,
+  limitHits: { max: 0, high: 0 },
   pressure: null,
 }
 const read: MachineRead = {
   memory: { total: 1000, available: 600 },
   pressure: { someAvg10: 1, fullAvg10: 0 },
   counters: null,
+  reclaim: {
+    allocStalls: 28_000,
+    scannedDirect: 1_300_000,
+    scannedByKswapd: 138_000_000,
+  },
   store: null,
   containers: [
     { id: "id-a", memory },
@@ -50,6 +56,8 @@ test("each running lane's cgroup is its sample, and a lane whose cgroup was not 
     memoryAvailable: 600,
     pressure: { someAvg10: 1, fullAvg10: 0 },
     counters: null,
+    reclaim: read.reclaim,
+    limitHits: null,
     source: "whole-machine",
   })
   expect([sample.filesystem, sample.hostStalledMs]).toEqual([
@@ -96,7 +104,12 @@ test("a service's memory is its container's cgroup, against its limit; one not r
   expect(serviceReadings(services, memoryById, false)).toEqual([
     {
       service: "disks",
-      memory: { kind: "read", currentBytes: 100, limitBytes: 400 },
+      memory: {
+        kind: "read",
+        currentBytes: 100,
+        limitBytes: 400,
+        limitHits: { max: 0, high: 0 },
+      },
     },
     {
       service: "privileged",
@@ -129,6 +142,7 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
     stat: `anon 1048576\ninactive_file ${504 * MiB}\nworkingset_refault_anon 3\nworkingset_refault_file 7\n`,
     pressure:
       "some avg10=0.13 avg60=0.05 avg300=0.01 total=54829\nfull avg10=0.13 avg60=0.05 avg300=0.01 total=54000\n",
+    events: "low 0\nhigh 0\nmax 41\noom 0\noom_kill 0\noom_group_kill 0\n",
   }
 
   test("its available is its limit less its use but its inactive cache, so a cgroup full of cache has room", () => {
@@ -143,6 +157,8 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
           stallSomeUs: 54829,
           stallFullUs: 54000,
         },
+        reclaim: null,
+        limitHits: { max: 41, high: 0 },
       },
     )
   })
@@ -171,5 +187,18 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
     })
     expect(sample.machine.source).toBe("own-cgroup")
     expect(sample.machine.pressure).not.toEqual(read.pressure)
+  })
+
+  test("its sample keeps no reclaim: the machine's is other threads' too", () => {
+    const sample = planSample({
+      running: [],
+      services: [],
+      read,
+      own,
+      filesystem: null,
+      serviceKills: [],
+      hostStalledMs: 0,
+    })
+    expect(sample.machine.reclaim).toBeNull()
   })
 })

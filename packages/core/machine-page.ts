@@ -5,6 +5,7 @@
 
 import type { ThreadId } from "./ids.ts"
 import type {
+  CgroupLimitHits,
   LaneTreatment,
   MachineHealth,
   MachineService,
@@ -28,6 +29,12 @@ export type Measured<T> =
 /** The programs whose slow commands the host times. */
 export const TIMED_PROGRAMS = ["jj", "git"] as const
 
+/** A cgroup the host reads: a lane's, a service's, or a host in a lane's own. */
+export type LimitSubject =
+  | { readonly kind: "lane"; readonly lane: ThreadId }
+  | { readonly kind: "service"; readonly service: MachineService }
+  | { readonly kind: "own" }
+
 /**
  * Something the host saw happen that no decision row holds: each kept in
  * the measurements' `events` table, and shown in Lately.
@@ -35,6 +42,16 @@ export const TIMED_PROGRAMS = ["jj", "git"] as const
 export type EventMeasured =
   | { readonly kind: "lane-oom-killed"; readonly lane: ThreadId }
   | { readonly kind: "service-oom-killed"; readonly service: MachineService }
+  /**
+   * A cgroup met its memory limit since the last sample: the rise of its
+   * `memory.events` `max` and `high`. Kept only when one rose.
+   */
+  | {
+      readonly kind: "cgroup-at-limit"
+      readonly subject: LimitSubject
+      readonly maxHits: number
+      readonly highHits: number
+    }
   /** The disk upkeep deleted snapshots, `bytes` their metadata's estimated cost. */
   | {
       readonly kind: "snapshots-deleted"
@@ -110,6 +127,7 @@ export interface ServiceReading {
   readonly memory: Measured<{
     readonly currentBytes: number
     readonly limitBytes: number | null
+    readonly limitHits: CgroupLimitHits
   }>
 }
 

@@ -197,6 +197,7 @@ export {
   type RunnableLane,
 } from "./lanes.ts"
 export {
+  type CgroupLimitHits,
   type CgroupMemory,
   type HeldLane,
   LANE_TREATMENTS,
@@ -206,6 +207,7 @@ export {
   type MachineCause,
   type MachineCauseKind,
   type MachineHealth,
+  type MachineReclaim,
   type MachineService,
   type MachineState,
   type MemoryCounters,
@@ -216,6 +218,7 @@ export {
 } from "./machine.ts"
 export {
   type EventMeasured,
+  type LimitSubject,
   MACHINE_SAMPLE_MS,
   type MachineAction,
   type MachineLately,

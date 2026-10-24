@@ -1,5 +1,6 @@
 import {
   canvasIdFor,
+  type EventMeasured,
   type MachinePageFacts,
   type ThreadName,
   threadIdFor,
@@ -178,6 +179,42 @@ describe("the Machine page", () => {
     expect(words(facts).sections.lately.lines.map(l => l.text)).toEqual([
       "a command in quiet-river was killed for using too much memory",
       "memory grew short: short: new runs wait for room",
+    ])
+  })
+
+  test("a cgroup at its limit is worded by its thread's name, its service or this host's lane, with each count", () => {
+    const at = (at: number, event: EventMeasured) => ({
+      at,
+      kind: "event" as const,
+      event,
+    })
+    const lately = words({
+      ...facts,
+      lately: [
+        at(3, {
+          kind: "cgroup-at-limit",
+          subject: { kind: "service", service: "observer" },
+          maxHits: 41,
+          highHits: 0,
+        }),
+        at(2, {
+          kind: "cgroup-at-limit",
+          subject: { kind: "lane", lane: a },
+          maxHits: 1,
+          highHits: 2,
+        }),
+        at(1, {
+          kind: "cgroup-at-limit",
+          subject: { kind: "own" },
+          maxHits: 0,
+          highHits: 1,
+        }),
+      ],
+    }).sections.lately.lines.map(l => l.text)
+    expect(lately).toEqual([
+      "the file observer met its memory limit 41 times",
+      "quiet-river met its memory limit 1 time and its memory's high mark 2 times",
+      "this host's lane met its memory's high mark 1 time",
     ])
   })
 

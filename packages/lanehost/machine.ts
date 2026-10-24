@@ -6,20 +6,24 @@
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import type {
+  CgroupLimitHits,
   CgroupMemory,
+  MachineReclaim,
   MemoryCounters,
   Pressure,
   StoreRoom,
 } from "@pinetrie/core"
 import { holdingMount } from "./mountinfo.ts"
 
-/** What one `machine-sample` read. */
+/** What one `machine-sample` read: the machine's memory, its btrfs room, and each container's cgroup. */
 export interface MachineRead {
   readonly memory: { readonly total: number; readonly available: number }
   /** null where the kernel has no PSI. */
   readonly pressure: Pressure | null
   /** The kernel's refaults and memory stall time; null where either file could not be read. */
   readonly counters: MemoryCounters | null
+  /** The machine's own reclaim; null where `/proc/vmstat` could not be read or lacks its counters. */
+  readonly reclaim: MachineReclaim | null
   /** null where the lanes directory is not on btrfs, or its counters cannot be found. */
   readonly store: StoreRoom | null
   /** Each container asked for, in order; `memory` null when its cgroup was not found. */
@@ -121,9 +125,36 @@ export function parseMemoryStat(text: string): {
   return { anon: stat.get("anon") ?? 0, file: stat.get("file") ?? 0 }
 }
 
-/** `memory.events`' count of processes killed for memory. */
+/** `memory.events`' count of processes killed for memory; its limits' counts are `parseLimitHits`'. */
 export const parseMemoryEvents = (text: string): number =>
   keyedCounts(text).get("oom_kill") ?? 0
+
+/** `memory.events`' counts of the cgroup's use meeting `memory.max` and going over `memory.high`. */
+export function parseLimitHits(text: string): CgroupLimitHits {
+  const events = keyedCounts(text)
+  return { max: events.get("max") ?? 0, high: events.get("high") ?? 0 }
+}
+
+/**
+ * `/proc/vmstat`'s reclaim counters. `allocstall_*` is one line per memory
+ * zone, and which zones there are differs by machine, so every one is
+ * summed. Null when any is missing.
+ */
+export function parseReclaim(vmstat: string): MachineReclaim | null {
+  const counts = keyedCounts(vmstat)
+  const stalls = [...counts].filter(([name]) => name.startsWith("allocstall_"))
+  const scannedDirect = counts.get("pgscan_direct")
+  const scannedByKswapd = counts.get("pgscan_kswapd")
+  return stalls.length === 0 ||
+    scannedDirect === undefined ||
+    scannedByKswapd === undefined
+    ? null
+    : {
+        allocStalls: stalls.reduce((sum, [, n]) => sum + n, 0),
+        scannedDirect,
+        scannedByKswapd,
+      }
+}
 
 /** `memory.max`: bytes, or null for `max`, no ceiling. */
 export function parseMemoryMax(text: string): number | null {
@@ -213,6 +244,7 @@ async function readCgroup(dir: string): Promise<CgroupMemory | null> {
     ...parseMemoryStat(stat),
     limit: max == null ? null : parseMemoryMax(max),
     oomKills: parseMemoryEvents(events),
+    limitHits: parseLimitHits(events),
     pressure: pressure == null ? null : parsePressure(pressure),
   }
 }
@@ -309,6 +341,7 @@ export async function readMachine(input: {
     memory,
     pressure: pressure === null ? null : parsePressure(pressure),
     counters: memoryCounters(vmstat, pressure),
+    reclaim: vmstat === null ? null : parseReclaim(vmstat),
     store,
     containers,
   }

@@ -18,6 +18,8 @@ const sample: MachineSample = {
     memoryAvailable: 6 * GiB,
     pressure: null,
     counters: null,
+    reclaim: null,
+    limitHits: null,
     source: "whole-machine",
   },
   lanes: [
@@ -28,6 +30,7 @@ const sample: MachineSample = {
       file: GiB / 2,
       limit: 4 * GiB,
       oomKills: 0,
+      limitHits: { max: 0, high: 0 },
       pressure: null,
     },
   ],
@@ -97,6 +100,33 @@ describe("the Machine page's facts", () => {
         memory: { kind: "unreadable", why: "its cgroup could not be read" },
         snapshots: { count: 0, bytes: 0 },
       },
+    ])
+  })
+
+  test("a lane Lately names, at its limit or killed, carries its thread's name", () => {
+    const facts = planMachinePage({
+      ...gathered,
+      names: new Map([
+        [a, named],
+        [b, "still-pond" as ThreadName],
+      ]),
+      lately: [
+        {
+          at: 2,
+          kind: "event",
+          event: {
+            kind: "cgroup-at-limit",
+            subject: { kind: "lane", lane: a },
+            maxHits: 4,
+            highHits: 0,
+          },
+        },
+        { at: 1, kind: "event", event: { kind: "lane-oom-killed", lane: b } },
+      ],
+    })
+    expect(facts.names).toEqual([
+      { lane: a, name: named },
+      { lane: b, name: "still-pond" },
     ])
   })
 

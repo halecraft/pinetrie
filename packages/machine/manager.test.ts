@@ -52,6 +52,8 @@ const calm: SensedSample = {
     memoryAvailable: 8 * GiB,
     pressure: { someAvg10: 0, fullAvg10: 0 },
     counters: null,
+    reclaim: null,
+    limitHits: null,
     source: "whole-machine",
   },
   lanes: [],
@@ -787,6 +789,7 @@ describe("measurements", () => {
       file: 0,
       limit: 2 * GiB,
       oomKills,
+      limitHits: { max: 0, high: 0 },
       pressure: null,
     })
     const samples: SensedSample[] = [
@@ -816,6 +819,77 @@ describe("measurements", () => {
       { kind: "lane-oom-killed", lane },
       { kind: "service-oom-killed", service: "disks" },
       { kind: "host-stalled", ms: 1500 },
+    ])
+  })
+
+  test("a sample after one whose observer's max was lower records it at its limit", async () => {
+    const observer = (max: number): SensedSample["services"][number] => ({
+      service: "observer",
+      memory: {
+        kind: "read",
+        currentBytes: GiB / 2,
+        limitBytes: GiB / 2,
+        limitHits: { max, high: 0 },
+      },
+    })
+    const samples: SensedSample[] = [
+      { ...calm, services: [observer(100)] },
+      { ...calm, services: [observer(141)] },
+      { ...calm, services: [observer(141)] },
+    ]
+    let at = 0
+    const measurements = keptMeasurements()
+    const manager = createMachineManager({
+      ...managedDeps({
+        sample: async () => samples[Math.min(at++, 2)] ?? calm,
+      }),
+      measurements,
+    })
+    await manager.start()
+    await manager.sample()
+    await manager.sample()
+    await manager.idle()
+    expect(measurements.events).toEqual([
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "service", service: "observer" },
+        maxHits: 41,
+        highHits: 0,
+      },
+    ])
+  })
+
+  test("the machine's reclaim is recorded as its rise with each sample, and none for an own-cgroup sample", async () => {
+    const reclaim = (allocStalls: number) => ({
+      allocStalls,
+      scannedDirect: 10 * allocStalls,
+      scannedByKswapd: 100 * allocStalls,
+    })
+    const whole = (stalls: number): SensedSample => ({
+      ...calm,
+      machine: { ...calm.machine, reclaim: reclaim(stalls) },
+    })
+    const own: SensedSample = {
+      ...calm,
+      machine: { ...calm.machine, source: "own-cgroup", reclaim: null },
+    }
+    const samples = [whole(300), whole(320), own, own]
+    let at = 0
+    const measurements = keptMeasurements()
+    const manager = createMachineManager({
+      ...managedDeps({ sample: async () => samples[at++] ?? own }),
+      measurements,
+    })
+    await manager.start()
+    await manager.sample()
+    await manager.sample()
+    await manager.sample()
+    await manager.idle()
+    expect(measurements.samples.map(s => s.reclaim)).toEqual([
+      null,
+      reclaim(20),
+      null,
+      null,
     ])
   })
 

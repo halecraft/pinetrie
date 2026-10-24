@@ -3,9 +3,11 @@
 // empty.
 
 import type {
+  CgroupLimitHits,
   CgroupMemory,
   HeldLane,
   MachineHealth,
+  MachineReclaim,
   MachineService,
   MemoryCounters,
   MemorySource,
@@ -30,6 +32,14 @@ export interface MachineSample {
     readonly pressure: Pressure | null
     /** The kernel's refaults and stall time since it started; null where they could not be read. */
     readonly counters: MemoryCounters | null
+    /**
+     * The machine's own reclaim since it started; null on an own-cgroup
+     * read, whose machine's counters are other threads' too, or where
+     * they could not be read.
+     */
+    readonly reclaim: MachineReclaim | null
+    /** A host in a lane's own cgroup's limit hits; null on a whole-machine read, or where they could not be read. */
+    readonly limitHits: CgroupLimitHits | null
     /** Whose memory these are: the whole machine's, or a host in a lane's own cgroup's. */
     readonly source: MemorySource
   }

@@ -8,6 +8,7 @@ import {
   assertNever,
   type EventMeasured,
   type LaneTreatment,
+  type LimitSubject,
   type MachineCause,
   type MachineLately,
   type MachinePageFacts,
@@ -381,6 +382,25 @@ const REPAIR_MOVE_WORDS: Readonly<Record<RepairStep, string>> = {
   failed: "the lane VM's disk repair failed",
 }
 
+/** The cgroup a limit was met in, as the subject of a clause. */
+function limitSubjectWords(
+  subject: LimitSubject,
+  nameOf: (lane: ThreadId) => string,
+): string {
+  switch (subject.kind) {
+    case "lane":
+      return nameOf(subject.lane)
+    case "service":
+      return serviceWords(subject.service)
+    case "own":
+      return "this host's lane"
+    default:
+      return assertNever(subject)
+  }
+}
+
+const timesWords = (n: number) => `${n} time${n === 1 ? "" : "s"}`
+
 /** One event, as a clause; `nameOf` names a thread's lane. */
 function eventWords(
   event: EventMeasured,
@@ -401,6 +421,17 @@ function eventWords(
       return `a step of ${event.where ?? "the host's documents"} took ${event.ms} ms`
     case "slow-command":
       return `\`${event.subcommand === null ? event.program : `${event.program} ${event.subcommand}`}\` took ${event.ms} ms`
+    case "cgroup-at-limit": {
+      const met = [
+        event.maxHits === 0
+          ? null
+          : `its memory limit ${timesWords(event.maxHits)}`,
+        event.highHits === 0
+          ? null
+          : `its memory's high mark ${timesWords(event.highHits)}`,
+      ].filter(m => m !== null)
+      return `${limitSubjectWords(event.subject, nameOf)} met ${met.join(" and ")}`
+    }
     default:
       return assertNever(event)
   }

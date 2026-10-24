@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises"
+import http from "node:http"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { MACHINE_SOCKET, OBSERVER_LOADER } from "@pinetrie/lanehost"
 import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
@@ -8,6 +12,8 @@ import {
   memoryBytes,
   parseImages,
   parseListed,
+  requestRetried,
+  runContainer,
 } from "./api.ts"
 import { type ContainerSpec, renderObserver } from "./plan.ts"
 
@@ -177,4 +183,64 @@ test("an image's removal is settled when done, gone, or held by a container", ()
   const status = (s: number) => isImageRemovalSettled({ status: s, body: "" })
   expect([200, 404, 409].map(status)).toEqual([true, true, true])
   expect(status(500)).toBe(false)
+})
+
+/**
+ * A Docker API on a socket of its own whose first connection is destroyed
+ * before it answers, as the lane VM's proxy resets one just after it boots;
+ * every later request is answered. Each request is recorded.
+ */
+async function droppingDocker() {
+  const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-docker-"))
+  const socket = path.join(dir, "docker.sock")
+  const requests: string[] = []
+  const server = http.createServer((req, res) => {
+    requests.push(`${req.method} ${req.url ?? ""}`)
+    if (requests.length === 1) {
+      req.socket.destroy()
+      return
+    }
+    res.end("{}")
+  })
+  await new Promise<void>(r => server.listen(socket, r))
+  return {
+    socket,
+    requests,
+    async close() {
+      server.close()
+      await rm(dir, { recursive: true, force: true })
+    },
+  }
+}
+
+test("a request that changes nothing when repeated is answered on a second connection when its first drops", async () => {
+  const docker = await droppingDocker()
+  try {
+    const answered = await requestRetried(
+      { socket: docker.socket },
+      "POST",
+      "/containers/c/stop?t=0",
+    )
+    expect(answered.status).toBe(200)
+    expect(docker.requests).toEqual([
+      "POST /containers/c/stop?t=0",
+      "POST /containers/c/stop?t=0",
+    ])
+  } finally {
+    await docker.close()
+  }
+})
+
+test("a create whose connection drops is not tried again", async () => {
+  const docker = await droppingDocker()
+  try {
+    await expect(
+      runContainer({ socket: docker.socket }, spec),
+    ).rejects.toThrow()
+    expect(docker.requests).toEqual([
+      "POST /containers/create?name=pinetrie-t-1",
+    ])
+  } finally {
+    await docker.close()
+  }
 })
