@@ -39,6 +39,23 @@ export async function seeInMenu(p: Page, trigger: string, item: string) {
       "xpath=ancestor::*[contains(@class,'sidebar-item') or contains(@class,'thread-card')][1]",
     )
   if ((await holder.count()) > 0) await holder.hover()
+  // A scroll that moves the trigger closes its menu (`popover.tsx`), and
+  // scrolling a column into view moves it for some frames after the click
+  // Playwright's own scroll precedes: so the trigger is shown first, and
+  // clicked once it stops moving.
+  await p.locator(trigger).first().scrollIntoViewIfNeeded()
+  await p.waitForFunction(
+    s => {
+      const w = window as unknown as { __triggerAt?: string }
+      const r = document.querySelector(s)?.getBoundingClientRect()
+      const at = r === undefined ? "" : `${r.left},${r.top}`
+      const still = at !== "" && at === w.__triggerAt
+      w.__triggerAt = at
+      return still
+    },
+    trigger,
+    { polling: "raf", timeout: 5_000 },
+  )
   await p.click(trigger)
   const el = await p
     .waitForSelector(`.menu ${item}`, { timeout: 15_000 })
