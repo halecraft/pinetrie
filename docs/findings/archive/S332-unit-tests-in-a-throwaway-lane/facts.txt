@@ -1,0 +1,17 @@
+uid=0(root) gid=0(root) groups=0(root)
+Linux pinetrie-t-s332-83888 6.18.58-0-virt #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-21 13:45:15 aarch64 GNU/Linux
+btrfs
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vdb        400G  249G  147G  63% /workspace
+v24.22.1
+Downloading the pnpm 12.15.0 binary for linux-arm64...
+12.15.0
+16
+               total        used        free      shared  buff/cache   available
+Mem:           11946         896       10298           0         927       11049
+Swap:              0           0           0
+CapInh:	0000000000000000
+CapPrm:	00000000a80425fb
+CapEff:	00000000a80425fb
+CapBnd:	00000000a80425fb
+CapAmb:	0000000000000000
