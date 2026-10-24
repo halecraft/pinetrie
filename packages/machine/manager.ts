@@ -1,8 +1,8 @@
 // machine/manager — the loop that samples, plans and writes the health
 // value, and the disk upkeep's steps, on a keeper of its own: its steps
-// never overlap, and only the sink's write reaches the host's documents.
-// It reads no clock: the host's timers ask for each sample and each
-// backstop upkeep. Only its keeper changes a row's state but for the
+// never overlap, and only the sink's write reaches the host's documents,
+// queued and never awaited. It reads no clock: the host's timers ask for
+// each sample, count each tick and ask each backstop upkeep. Only its keeper changes a row's state but for the
 // snapshot's own life (`SnapshotTaking`), so a restore never comes between
 // a step's plan and its deletion.
 
@@ -18,11 +18,20 @@ import {
 import { createKeeper, KeeperClosed } from "@pinetrie/keeper"
 import type { StoreCapabilities } from "./capabilities.ts"
 import {
+  FIRST_FRESHNESS,
+  type FreshnessState,
+  isOverdue,
+  nextTickFreshness,
+  READING_OVERDUE_AFTER_TICKS,
+  sampleEndFreshness,
+} from "./freshness.ts"
+import {
   FIRST_HEALTH_STATE,
   type HealthPlanState,
   MEMORY_CALM,
   type MemoryShort,
   planHealth,
+  planOverdueHealth,
   type SampleResult,
   STOPPED,
 } from "./health.ts"
@@ -56,8 +65,18 @@ import {
   repairStateNow,
 } from "./repair.ts"
 import { type RepairRequest, runRepairSteps } from "./repair-steps.ts"
-import { FIRST_RUNG_STATE, planRung, type RungPlanState } from "./rung.ts"
-import type { MachineReading, MachineSample, UpkeepHeard } from "./sample.ts"
+import {
+  FIRST_RUNG_STATE,
+  planRung,
+  type Rung,
+  type RungPlanState,
+} from "./rung.ts"
+import type {
+  MachineReading,
+  MachineSample,
+  ReadingPlanned,
+  UpkeepHeard,
+} from "./sample.ts"
 import { type SnapshotIndex, snapshotCost } from "./snapshot-index.ts"
 import type { StoreControls, StoreRecords } from "./store.ts"
 import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
@@ -100,6 +119,11 @@ export type ManagerNews =
   | { readonly kind: "slow"; readonly ms: number }
   /** The sink refused a write; the next sample tries again. */
   | { readonly kind: "unwritten"; readonly error: string }
+  /**
+   * A sample that started before the reading went overdue ended, `ticks`
+   * after it started: nothing it read is planned or measured.
+   */
+  | { readonly kind: "stale-sample"; readonly ticks: number }
   /** An upkeep step failed; the next trigger tries again. */
   | { readonly kind: "upkeep-failed"; readonly error: string }
   /** The measurements could not be written; the next sample writes its own. */
@@ -115,7 +139,10 @@ export type ManagerNews =
 
 export function createMachineManager<Held, LauncherHeld>(deps: {
   readonly sensor: MachineSensor
-  readonly sink: HealthSink
+  /** The health's sink, made with what the manager is told of a write it refused. */
+  readonly makeSink: (onUnwritten: (error: string) => void) => HealthSink
+  /** `READING_OVERDUE_AFTER_TICKS` unless given: a suite's ticks may be shorter. */
+  readonly readingOverdueAfterTicks?: number
   readonly settings: StoreSettings
   readonly mode: ManageMode
   /** What this backend can do to the store: on Linux nothing grows. */
@@ -131,7 +158,9 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   readonly repair: RepairControls<Held, LauncherHeld> | null
   readonly tell: (news: ManagerNews) => void
 }): MachineManager {
-  const { sensor, sink, settings, tell, index, store, records } = deps
+  const { sensor, settings, tell, index, store, records } = deps
+  const overdueAfter =
+    deps.readingOverdueAfterTicks ?? READING_OVERDUE_AFTER_TICKS
   const keeper = createKeeper<"sample" | "disk-upkeep">({
     onSlow: step => tell({ kind: "slow", ms: Math.round(step.ran) }),
   })
@@ -181,22 +210,41 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   let settled = false
   /** The roots the index's fill has read since this host started. */
   const read = new Set<string>()
-  /** The last sample that read, and what was planned since: `latestReading`. */
+  /** The last sample that read, and what was planned since. */
+  let lastRead: ReadingPlanned | null = null
+  /** What `latestReading` answers. */
   let reading: MachineReading | null = null
+  /** The repair as the last fresh sample read it: what an overdue health says of it. */
+  let lastRepair: RepairFacts = NO_REPAIR
+  let freshness: FreshnessState = FIRST_FRESHNESS
+  /** A write was refused since the last: the next sample writes though nothing changed. */
+  let unwritten = false
+  /** The upkeep step running, if any: `close` waits for it, never for a sample. */
+  let upkeepRunning: Promise<void> | null = null
 
-  /** One write; on a refusal the memory forgets it, so the next sample writes again. */
-  const writeHealth = async (
-    health: MachineHealth,
-    written: HealthPlanState,
-  ) => {
-    try {
-      await sink.write(health)
-      memory = written
-    } catch (error) {
-      memory = { ...written, health: memory.health }
-      tell({ kind: "unwritten", error: errorText(error) })
-    }
+  const sink = deps.makeSink(error => {
+    unwritten = true
+    tell({ kind: "unwritten", error })
+  })
+
+  /**
+   * Queued, never awaited: the sink writes in a step of the host's
+   * documents, which may wait on this manager's gate. `memory` takes the
+   * value at once; a refusal, told later, makes the next sample write again.
+   */
+  const writeHealth = (health: MachineHealth, written: HealthPlanState) => {
+    memory = written
+    unwritten = false
+    sink.write(health)
   }
+
+  const isLaneActivityAllowed = (
+    lane: ThreadId,
+    activity: LaneActivity,
+  ): boolean =>
+    deps.mode !== "manage" ||
+    isOverdue(freshness) ||
+    isActivityAllowed(treatments.laneTreatment(lane), activity)
 
   const hasRoomLow = (h: MachineHealth) =>
     h.causes.some(c => c.kind === "room-low")
@@ -204,8 +252,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   /** Every waiter its lane's treatment now allows, settled. */
   const settleAllowed = () => {
     for (const w of waiters)
-      if (isActivityAllowed(treatments.laneTreatment(w.lane), w.activity))
-        w.allow()
+      if (isLaneActivityAllowed(w.lane, w.activity)) w.allow()
   }
 
   /** A measurements write; one that fails is told, and the sample goes on. */
@@ -218,24 +265,43 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   }
 
   /**
-   * Memory's rung and each lane's treatment from one sample, and what the
-   * measurements keep of it. Observing, the treatments are planned only for
-   * their shadow decisions: every lane is `normal`.
+   * What memory's plan needs gathered before it: the rung this sample
+   * reads, and, when the lanes' order can decide anything at it, their
+   * order. Nothing is changed: a sample judged stale plans nothing.
    */
-  const planMemory = async (sample: MachineSample): Promise<void> => {
+  const gatherMemory = async (sample: MachineSample) => {
     const planned = planRung(rungState, sample.machine)
-    rungState = planned.state
-    const { rung } = planned
-    const isHolding = deps.mode === "manage"
-    // gather
     const lanesWaitingToStart = [...waiters]
       .filter(w => w.activity === "container-start")
       .map(w => w.lane)
-    const lanesByImportance = isRankingNeeded(treatmentState, rung)
+    const lanesByImportance = isRankingNeeded(treatmentState, planned.rung)
       ? await deps.laneFacts.lanesByImportance([
           ...new Set([...sample.lanesRunning, ...lanesWaitingToStart]),
         ])
       : []
+    return { planned, lanesWaitingToStart, lanesByImportance }
+  }
+
+  /**
+   * Memory's rung and each lane's treatment from one sample, and what the
+   * measurements keep of it. Observing, the treatments are planned only for
+   * their shadow decisions: every lane is `normal`.
+   */
+  const planMemory = (
+    sample: MachineSample,
+    gathered: {
+      readonly planned: {
+        readonly rung: Rung
+        readonly state: RungPlanState
+      }
+      readonly lanesWaitingToStart: readonly ThreadId[]
+      readonly lanesByImportance: readonly ThreadId[]
+    },
+  ): void => {
+    const { planned, lanesWaitingToStart, lanesByImportance } = gathered
+    rungState = planned.state
+    const { rung } = planned
+    const isHolding = deps.mode === "manage"
     const memoryByLane = new Map(sample.lanes.map(l => [l.lane, l]))
     // plan
     const next = planTreatments(treatmentState, {
@@ -393,7 +459,14 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     return repairInFlight
   }
 
+  /**
+   * One sample: gather, then judge, then plan. Every await comes first, so
+   * a sample that started before the reading went overdue, or ends after
+   * `close`, changes nothing it read.
+   */
   const sampleOnce = async (): Promise<void> => {
+    const startedAt = freshness.ticks
+    // gather
     let result: SampleResult
     try {
       const sensed = await sensor.sample()
@@ -401,17 +474,33 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
         kind: "sampled",
         sample: { ...sensed, snapshotsSkipped: skipped, upkeep },
       }
-      skipped = 0
-      if (sensed.store !== null)
-        room = {
-          unallocated: sensed.store.unallocated,
-          minimum: minimumUnallocated(sensed.store.size),
-        }
     } catch (error) {
       result = { kind: "failed", error: errorText(error) }
     }
-    if (result.kind === "sampled") await planMemory(result.sample)
+    const gathered =
+      result.kind === "sampled" ? await gatherMemory(result.sample) : null
     const { facts, text } = await readRepairFacts()
+    // judge
+    if (closed) return
+    const judged = sampleEndFreshness(freshness, startedAt)
+    if (!judged.isFresh) {
+      tell({ kind: "stale-sample", ticks: freshness.ticks - startedAt })
+      return
+    }
+    freshness = judged.state
+    // plan
+    if (result.kind === "sampled") {
+      skipped -= result.sample.snapshotsSkipped
+      const { store } = result.sample
+      if (store !== null)
+        room = {
+          unallocated: store.unallocated,
+          minimum: minimumUnallocated(store.size),
+        }
+    }
+    if (result.kind === "sampled" && gathered !== null)
+      planMemory(result.sample, gathered)
+    lastRepair = facts
     applyTreatments(facts)
     // Never awaited: the samples go on while it runs.
     void askRepair(
@@ -426,22 +515,43 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     })
     const events = causeEvents(planned.seen)
     if (events.length > 0) record(() => deps.measurements.recordEvents(events))
-    const sampled = result.kind === "sampled" ? result.sample : reading?.sample
-    if (sampled !== undefined)
-      reading = {
+    const sampled = result.kind === "sampled" ? result.sample : lastRead?.sample
+    if (sampled !== undefined) {
+      lastRead = {
         sample: sampled,
         health: planned.health,
         rung: memoryShort.rung,
         held: treatments.held,
         repair: facts,
       }
-    if (!planned.changed) {
+      reading = { kind: "fresh", ...lastRead }
+    } else reading = null
+    if (!planned.changed && !unwritten) {
       memory = planned.state
       return
     }
-    await writeHealth(planned.health, planned.state)
+    writeHealth(planned.health, planned.state)
+    if (!planned.changed) return
     tell({ kind: "changed", health: planned.health })
     if (hasRoomLow(planned.health) && !hasRoomLow(before)) queueUpkeep()
+  }
+
+  /**
+   * The reading went overdue: every waiter let go, and the health written
+   * as the last planned causes with `unsampled` (`overdue`), memory short
+   * holding nothing. Outside the keeper, which a sample that never ends
+   * holds; synchronous, so it never falls inside a sample's plan.
+   */
+  const goOverdue = () => {
+    for (const w of waiters) w.allow()
+    const planned = planOverdueHealth(memory, {
+      memory: { ...memoryShort, isHolding: false, held: [] },
+      repair: repairCause(lastRepair),
+    })
+    reading = { kind: "overdue", health: planned.health, last: lastRead }
+    if (!planned.changed && !unwritten) return
+    writeHealth(planned.health, planned.state)
+    if (planned.changed) tell({ kind: "changed", health: planned.health })
   }
 
   const upkeepOnce = async (): Promise<void> => {
@@ -514,7 +624,16 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   /** An upkeep step queued, merged with one already queued. Observing, none runs. */
   function queueUpkeep() {
     if (deps.mode !== "manage") return
-    void keeper.later("disk-upkeep", upkeepOnce).catch(error => {
+    const step = async () => {
+      const running = upkeepOnce()
+      upkeepRunning = running.catch(() => {})
+      try {
+        await running
+      } finally {
+        upkeepRunning = null
+      }
+    }
+    void keeper.later("disk-upkeep", step).catch(error => {
       // A step a stopping host dropped is no failure.
       if (!(error instanceof KeeperClosed))
         tell({ kind: "upkeep-failed", error: errorText(error) })
@@ -527,11 +646,19 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
 
   return {
     async start() {
-      await keeper.run(() => writeHealth(memory.health, memory))
+      writeHealth(memory.health, memory)
       void sample()
     },
     sample,
+    sampleTick() {
+      if (closed) return
+      const wasOverdue = isOverdue(freshness)
+      freshness = nextTickFreshness(freshness, overdueAfter)
+      if (!wasOverdue && isOverdue(freshness)) goOverdue()
+      void sample()
+    },
     latestReading: () => reading,
+    isLaneActivityAllowed,
     askRepairAgain() {
       retryAsked = true
       void sample()
@@ -549,11 +676,9 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
       queueUpkeep()
     },
     waitUntilAllowed(lane, activity, signal) {
-      if (deps.mode !== "manage") return Promise.resolve()
       if (closed) return Promise.reject(new KeeperClosed())
       if (signal?.aborted) return Promise.reject(signal.reason)
-      if (isActivityAllowed(treatments.laneTreatment(lane), activity))
-        return Promise.resolve()
+      if (isLaneActivityAllowed(lane, activity)) return Promise.resolve()
       return new Promise<void>((resolve, reject) => {
         const onAbort = () => waiter.refuse(signal?.reason)
         const waiter: Waiter = {
@@ -579,11 +704,14 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
       closed = true
       for (const w of waiters) w.refuse(new KeeperClosed())
       keeper.close("drop")
-      await keeper.idle()
+      // A sample may never end, so only the upkeep's store calls are
+      // waited out.
+      await upkeepRunning
       // A repair is never left half done by its host's close: its boot
       // holds the disk while its locks are this host's.
       await repairInFlight
-      await writeHealth(STOPPED, { ...memory, health: STOPPED })
+      writeHealth(STOPPED, { ...memory, health: STOPPED })
+      await sink.writesFlushed()
     },
   }
 }

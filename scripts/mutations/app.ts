@@ -5,6 +5,8 @@
 // Run: pnpm mutate scripts/mutations/app.ts [name-substring]
 import type { Mutation } from "../mutate.ts"
 
+const HOST = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
+
 export const mutations: readonly Mutation[] = [
   {
     name: "a repair keeps its lock, and no VM starts after it",
@@ -3658,5 +3660,114 @@ export const mutations: readonly Mutation[] = [
     to: "    const attempt: LockAttempt | null = null\n",
     command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "a session a live host serves is not renamed",
+  },
+  // ── the gate never deadlocks the host ──
+  {
+    name: "a refusing start waits for room anyway",
+    file: "apps/pinetrie/host/work/memory-holds.ts",
+    from: '      if (whenHeld === "refuse") {\n',
+    to: "      if (whenHeld !== whenHeld) {\n",
+    command: HOST,
+    expect:
+      "a refusing start the machine holds starts nothing, answers start-held, and leaves the queue open",
+  },
+  {
+    name: "a refusing start notes its run before it is allowed",
+    file: "apps/pinetrie/host/work/memory-holds.ts",
+    from: '          if (!machine.isLaneActivityAllowed(lane, "container-start"))\n            return "start-held"\n          machine.noteRunStarted(lane)\n',
+    to: '          machine.noteRunStarted(lane)\n          if (!machine.isLaneActivityAllowed(lane, "container-start"))\n            return "start-held"\n',
+    command: HOST,
+    expect:
+      "a refusing start notes its run started only once allowed, and a waiting one at once",
+  },
+  {
+    name: "a held start stops the lane it never started",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: '  if (prepared.kind === "start-held") return prepared\n',
+    to: "",
+    command: HOST,
+    expect: "a start the machine holds merges nothing and stops nothing",
+  },
+  {
+    name: "a get-the-latest held for room ends the drain as a run would",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: '    open.apply([{ kind: "write", record: card }])\n    return "start-held"\n',
+    to: '    open.apply([{ kind: "write", record: card }])\n    return "ran"\n',
+    command: HOST,
+    expect:
+      "its start held: the card goes back on top as it was, with its command, and the drain waits for the start",
+  },
+  {
+    name: "a popped message held for room ends the drain as a run would",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: '      open.apply([{ kind: "write", record: sending }])\n      return "start-held"\n',
+    to: '      open.apply([{ kind: "write", record: sending }])\n      return "ran"\n',
+    command: HOST,
+    expect:
+      "a popped message whose send finds its start held goes back on top, and the drain waits for the start",
+  },
+  {
+    name: "a lane with no container of its own is held for its start",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: "            deps.work.hasOwnContainer(lane) &&\n",
+    to: "",
+    command: HOST,
+    expect: "a lane with no container of its own is never held for its start",
+  },
+  {
+    name: "a chat that gets the latest first sends on though its start is held",
+    file: "apps/pinetrie/host/commands/send.ts",
+    from: '  if (prepared.kind === "start-held") return prepared\n',
+    to: "",
+    command: HOST,
+    expect:
+      "a lane whose start the machine holds is not caught up nor written: start-held, which its sender is told as busy",
+  },
+  {
+    name: "a held start is sent out as it is",
+    file: "apps/pinetrie/host/commands/send.ts",
+    from: '  sent.kind === "start-held" ? { kind: "busy" } : sent',
+    to: "  sent as Outcome",
+    command: HOST,
+    expect:
+      "a lane whose start the machine holds is not caught up nor written: start-held, which its sender is told as busy",
+  },
+  {
+    name: "the host's log drops the time",
+    file: "apps/pinetrie/host/basics.ts",
+    from: "      `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())} ${line}`,\n",
+    to: "      line,\n",
+    command: HOST,
+    expect:
+      "timestampedLog prefixes each line with the local time of the clock it is given",
+  },
+  {
+    name: "the health's sink writes each value in a step of its own",
+    file: "apps/pinetrie/host/machine/sink.ts",
+    from: '      const step = deps.keeper.once("machine-health", writeLatest)\n',
+    to: "      const step = deps.keeper.run(writeLatest)\n",
+    command: HOST,
+    expect:
+      "writes asked while the documents' keeper is held land as one write of the last",
+  },
+  {
+    name: "a queue held for its lane's start never waits for room",
+    file: "apps/pinetrie/host/index.ts",
+    from: "        startHeld,\n",
+    to: "        startHeld: () => {},\n",
+    suite: "lanes",
+    scenario: "memory-gate",
+    expect:
+      "a get-the-latest waits for room in its queue, and the host's commands go on",
+  },
+  {
+    name: "a queue held for its lane's start is never drained again",
+    file: "apps/pinetrie/host/index.ts",
+    from: '        .waitUntilAllowed(card.place.thread, "container-start", signal)\n        .catch(() => {}),\n',
+    to: '        .waitUntilAllowed(card.place.thread, "container-start", signal)\n        .then(() => new Promise<void>(() => {}), () => {}),\n',
+    suite: "lanes",
+    scenario: "memory-gate",
+    expect:
+      "once there is room, the waiting get-the-latest is popped and its update is in its thread",
   },
 ]

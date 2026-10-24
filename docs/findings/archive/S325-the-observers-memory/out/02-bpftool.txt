@@ -1,0 +1,95 @@
+5: ringbuf  name events  flags 0x0
+	key 0B  value 0B  max_entries 67108864  memlock 67383624B
+	pids observe(1486)
+6: hash  name registered  flags 0x0
+	key 8B  value 1B  max_entries 16384  memlock 1312448B
+	btf_id 58
+	pids observe(1486)
+7: hash  name tags  flags 0x0
+	key 4B  value 32B  max_entries 262144  memlock 27264896B
+	btf_id 58
+	pids observe(1486)
+8: hash  name live  flags 0x0
+	key 16B  value 8B  max_entries 65536  memlock 5768960B
+	btf_id 58
+	pids observe(1486)
+9: hash  name lost_by_run  flags 0x0
+	key 16B  value 8B  max_entries 65536  memlock 5768960B
+	btf_id 58
+	pids observe(1486)
+10: hash  name ended  flags 0x0
+	key 16B  value 8B  max_entries 65536  memlock 5768960B
+	btf_id 58
+	pids observe(1486)
+11: percpu_array  name scratch  flags 0x0
+	key 4B  value 8824B  max_entries 1  memlock 70912B
+	btf_id 58
+	pids observe(1486)
+12: ringbuf  name output_events  flags 0x0
+	key 0B  value 0B  max_entries 16777216  memlock 16855368B
+	btf_id 58
+	pids observe(1486)
+13: hash  name pipes  flags 0x0
+	key 8B  value 24B  max_entries 16384  memlock 1574720B
+	btf_id 58
+	pids observe(1486)
+14: hash  name pipes_by_run  flags 0x0
+	key 16B  value 16B  max_entries 16384  memlock 1574720B
+	btf_id 58
+	pids observe(1486)
+15: hash  name output_lost  flags 0x0
+	key 16B  value 8B  max_entries 65536  memlock 5768960B
+	btf_id 58
+	pids observe(1486)
+16: hash  name refusals  flags 0x0
+	key 16B  value 8B  max_entries 4096  memlock 362240B
+	btf_id 58
+	pids observe(1486)
+17: hash  name writing  flags 0x0
+	key 4B  value 24B  max_entries 65536  memlock 6293312B
+	btf_id 58
+	pids observe(1486)
+18: hash  name wfiles  flags 0x0
+	key 8B  value 24B  max_entries 262144  memlock 25167680B
+	btf_id 58
+	pids observe(1486)
+19: hash  name openings  flags 0x0
+	key 4B  value 16B  max_entries 65536  memlock 5768960B
+	btf_id 58
+	pids observe(1486)
+20: percpu_array  name envbufs  flags 0x0
+	key 4B  value 4096B  max_entries 1  memlock 33088B
+	btf_id 58
+	pids observe(1486)
+25: array  name libbpf_global  flags 0x0
+	key 4B  value 32B  max_entries 1  memlock 344B
+	btf_id 58
+26: array  name pid_iter.rodata  flags 0x480
+	key 4B  value 4B  max_entries 1  memlock 8192B
+	btf_id 69  frozen
+	pids bpftool(1942)
+27: array  name libbpf_det_bind  flags 0x0
+	key 4B  value 32B  max_entries 1  memlock 344B
+	btf_id 69
+===
+12: cgroup_device  tag b8f4fb5f08605bc5		xlated 552B  jited 464B  memlock 4096B
+18: raw_tracepoint  name on_newtask  tag 4c2d08fc85b21049  gpl		xlated 952B  jited 720B  memlock 4096B  map_ids 7,9,8
+19: raw_tracepoint  name on_exit  tag 6c07a6899b74e6e6  gpl		xlated 2504B  jited 1712B  memlock 4096B  map_ids 7,19,17,11,5,10,9,8,14,13
+20: raw_tracepoint  name on_exec  tag ff23d7c6f03939fa  gpl		xlated 2792B  jited 1960B  memlock 4096B  map_ids 7,6,9,8,20
+21: kprobe  name on_open  tag d440a967d9ba3bd7  gpl		xlated 4168B  jited 2728B  memlock 8192B  map_ids 7,19,11,18,9,8,5,10
+22: kprobe  name on_lookup  tag 7bd5a218894f06ca  gpl		xlated 584B  jited 480B  memlock 4096B  map_ids 7,19,9
+23: kprobe  name on_lookup_ret  tag 00c83aef125a9f7c  gpl		xlated 3456B  jited 2272B  memlock 4096B  map_ids 19,7,11,5,10,9
+24: kprobe  name on_fput  tag b05cc596f3da61ad  gpl		xlated 2944B  jited 1976B  memlock 4096B  map_ids 18,11,5,10,9,8,14,13
+25: kprobe  name on_unlink  tag 5472b62db9253a2b  gpl		xlated 2856B  jited 1896B  memlock 4096B  map_ids 7,11,5,10,9
+26: kprobe  name on_rmdir  tag 5472b62db9253a2b  gpl		xlated 2856B  jited 1896B  memlock 4096B  map_ids 7,11,5,10,9
+27: kprobe  name on_mkdir  tag 90303b4ecbaf9afd  gpl		xlated 2856B  jited 1896B  memlock 4096B  map_ids 7,11,5,10,9
+28: kprobe  name on_symlink  tag f3cfddcd6f5d5f36  gpl		xlated 2856B  jited 1896B  memlock 4096B  map_ids 7,11,5,10,9
+29: kprobe  name on_link  tag cb504b2e3dcbbbcb  gpl		xlated 3672B  jited 2384B  memlock 4096B  map_ids 7,11,5,10,9
+30: kprobe  name on_rename  tag ad8f13e4836c32dd  gpl		xlated 3976B  jited 2552B  memlock 4096B  map_ids 7,11,5,10,9
+31: kprobe  name attr_signal  tag a2ee3063f6dd9397  gpl		xlated 2448B  jited 1680B  memlock 4096B  map_ids 7,16,14,13,15,12
+32: kprobe  name attr_pipe_write  tag b800a63fce3ec62d  gpl		xlated 696B  jited 536B  memlock 4096B  map_ids 13,17,15
+33: kprobe  name attr_copy  tag 12996783907d226c  gpl		xlated 2816B  jited 1944B  memlock 4096B  map_ids 17,13,15,7,12
+34: kprobe  name attr_pipe_unlock  tag 94b013574ce3530a  gpl		xlated 1520B  jited 1128B  memlock 4096B  map_ids 13,15,7,12
+35: kprobe  name attr_wait_writable  tag 94b013574ce3530a  gpl		xlated 1520B  jited 1128B  memlock 4096B  map_ids 13,15,7,12
+36: kprobe  name attr_free_pipe  tag 58a0e3ea7b1249ee  gpl		xlated 72B  jited 120B  memlock 4096B  map_ids 13
+46: cgroup_device  tag b1e4e8bab2078b38		xlated 64B  jited 88B  memlock 4096B

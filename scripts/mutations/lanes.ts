@@ -218,8 +218,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a Start's sends lose their mention of the agent",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "          outgoing => send(step, writer, newId(), outgoing),\n          fact => queueFact(deps, fact),\n",
-    to: "          outgoing => send(step, writer, newId(), { ...outgoing, mentions: [] }),\n          fact => queueFact(deps, fact),\n",
+    from: "          async outgoing =>\n            wireOutcome(await send(step, writer, newId(), outgoing)),\n          fact => queueFact(deps, fact),\n",
+    to: "          async outgoing =>\n            wireOutcome(await send(step, writer, newId(), { ...outgoing, mentions: [] })),\n          fact => queueFact(deps, fact),\n",
     suite: "lanes",
     scenario: "proposal",
     expect:

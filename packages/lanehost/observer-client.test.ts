@@ -12,6 +12,7 @@ import type {
   RunTraces,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
+import { ClientClosed } from "./closed.ts"
 import { MIN_BATCH } from "./gathered.ts"
 import type { ObserverUpdate } from "./observer.ts"
 import { type ObserverChannel, observerClient } from "./observer-client.ts"
@@ -327,4 +328,26 @@ test("behind a role whose hello holds no attribution, a lane's is off", async ()
     why: "other-version",
     version: "v0",
   })
+})
+
+test("close ends the channel, and a call after it is refused", async () => {
+  const role = fakeRole()
+  let opened = 0
+  const client = observerClient({
+    open: async () => {
+      opened++
+      return role.open()
+    },
+  })
+  await client.connect()
+  await client.close()
+  await expect(client.connect()).rejects.toBeInstanceOf(ClientClosed)
+  await expect(
+    client.observe({
+      pid: async () => 4,
+      remote: [],
+      fold: firstEventFold().fold,
+    }),
+  ).rejects.toBeInstanceOf(ClientClosed)
+  expect(opened).toBe(1)
 })

@@ -405,6 +405,25 @@ export function planHealth(
   )
 }
 
+/**
+ * The health value once no sample has ended for the overdue bound: the
+ * causes kept, as a failed sample keeps them, `unsampled` (`overdue`)
+ * beside them, and `beside` as the manager says it now (nothing held).
+ */
+export function planOverdueHealth(
+  state: HealthPlanState,
+  beside: Beside,
+): Planned {
+  const health = rankedHealth(
+    [
+      ...activeCauses(state.causes),
+      { kind: "unsampled", reason: "overdue", error: null },
+    ],
+    beside,
+  )
+  return plannedHealth(state, state, health, [])
+}
+
 const activeCauses = (
   causes: ReadonlyMap<string, Tracked<MachineCause>>,
 ): readonly MachineCause[] =>

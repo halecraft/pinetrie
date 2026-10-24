@@ -3,7 +3,8 @@
 - **Status:** Accepted (Duane, 2026-10-22)
 - **Area:** `packages/machine/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `docs/06-interface.md`
-- **Evidence:** S309, S316, S317, S318, S319, S323, S329
+- **Evidence:** S309, S316, S317, S318, S319, S323, S329, S334, S336, S337,
+  S338
 - **Amends:**
   - ADR-0210: of its memory ladder, holding starts and pausing at the gate are
     built now, on every backend; squeezing, freezing into zram and killing are
@@ -14,6 +15,23 @@
     less its use *but its inactive file pages*: page cache fills a cgroup to
     its limit with no pressure, so the limit less the use reads almost nothing
     left on a calm lane and would enter rung 3 (S329).
+  - 2026-10-24: the gate can no longer deadlock the host (S334, S338, S336). A
+    get-the-latest on a stopped lane waited at the gate inside a step of the
+    documents' keeper, and the sample that would have let it start awaited its
+    health's write, a step behind it: every command waited for an hour. So: -
+    a sample never waits on the documents' keeper: the health's write is one
+    merged step that writes the latest value, queued and not awaited; - no
+    step of the documents' keeper waits at the gate: a get-the-latest's start
+    refuses when held, and its card goes back on top or its chat is queued,
+    and a queue whose lane may not start waits for it, which its column shows;
+    - a reading no fresh sample replaces for `READING_OVERDUE_AFTER_TICKS`
+    ticks of the sample timer holds nothing and says so, and a sample that
+    started before that point holds nothing when it ends. Letting go risks
+    starting lanes in a shortage the host cannot read; the kernel's OOM killer
+    still guards it, and keeping the holds would hold lanes as long as the
+    host runs. Bounds on each await a sample makes wait on S336's
+    measurements; - a host's close closes its lanehost and observer channels
+    (S337), and the host's log tells the time.
 
 **Context.** ADR-0210 decided a ladder of six rungs (calm, squeeze, hold
 starts, pause at the gate, freeze into zram, kill one command), all to be

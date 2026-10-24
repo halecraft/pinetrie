@@ -40,6 +40,7 @@ import type { InnerDockerDataRootsHeld } from "./inner-docker-data-roots.ts"
 import {
   createStartHolds,
   type LaneMachineAsks,
+  type StartAnswer,
   settledOrAborted,
 } from "./memory-holds.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -83,8 +84,15 @@ const RETIRED =
 export interface Containers {
   /** Where a lane's tools run: its container; null for a lane with no copy of its own. */
   access(lane: ThreadId): LaneAccess | null
-  /** Before any run: queue a lane of its own's container to start. */
+  /** Before any run: queue a lane of its own's container to start, waiting in its step for room. */
   beforeRun(lane: ThreadId): void
+  /**
+   * Before a get-the-latest, which awaits it in a step of the documents'
+   * keeper: the lane's start queued as `beforeRun`'s, which never waits
+   * for room. One the machine holds when its step runs starts nothing, and
+   * answers `start-held`. A start that fails throws.
+   */
+  startForUpdate(lane: ThreadId): Promise<StartAnswer>
   /** After a run: stop its container, and follow its proposed changes. */
   runEnded(lane: ThreadId): void
   /**
@@ -249,6 +257,19 @@ export function createContainers(deps: {
     )
   }
 
+  /** `lane`'s start queued on its queue, broken by a failure, held as `whenHeld` says. */
+  const queueStart = (lane: ThreadId, whenHeld: "wait" | "refuse") => {
+    registry.handleOf(lane).queue.reset()
+    const startHeld = startHolds.holdStart(lane, whenHeld)
+    return keeper.track(
+      registry.withHistory(
+        lane,
+        (h, _, record) => startHeld(() => startContainer(record, h)),
+        { fatal: true },
+      ),
+    )
+  }
+
   return {
     access(lane) {
       // A lane with no copy of its own, or no record, gets no tools.
@@ -286,27 +307,17 @@ export function createContainers(deps: {
 
     beforeRun(lane) {
       if (!registry.isOwn(lane)) return
-      deps.machine.noteRunStarted(lane)
-      registry.handleOf(lane).queue.reset()
-      // The start waits for room in its step, so the run's first tool call
+      // The start waits for room in its step on the lane's queue, awaited
+      // by no step of the documents' keeper, so the run's first tool call
       // waits behind it and the model thinks.
-      const startWhenAllowed = startHolds.holdStart(lane)
-      void keeper.track(
-        registry
-          .withHistory(
-            lane,
-            (h, _, record) => startWhenAllowed(() => startContainer(record, h)),
-            {
-              fatal: true,
-            },
-          )
-          .catch(error =>
-            log(
-              `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,
-            ),
-          ),
+      void queueStart(lane, "wait").catch(error =>
+        log(
+          `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,
+        ),
       )
     },
+
+    startForUpdate: lane => queueStart(lane, "refuse"),
 
     runEnded(lane) {
       if (!registry.isOwn(lane)) return

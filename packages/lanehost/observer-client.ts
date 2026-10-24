@@ -34,6 +34,7 @@ import {
   type RunTraces,
   type Settled,
 } from "@pinetrie/core"
+import { ClientClosed } from "./closed.ts"
 import {
   drainEnded,
   drainStarted,
@@ -96,6 +97,8 @@ export interface ObserverClient {
   connect(): Promise<void>
   /** Close the channel: the next call opens it again, and registers every lane again. */
   reset(): void
+  /** Close the channel and wait for it to end: every call after it is refused (`ClientClosed`). */
+  close(): Promise<void>
 }
 
 interface Held {
@@ -185,6 +188,7 @@ export function observerClient(input: {
   let attribution: Attribution = planAttribution([])
   /** The channel last reset, until it has closed. */
   let closing: Promise<void> = Promise.resolve()
+  let closed = false
   /**
    * Notices of a namespace no lane here holds yet: the role sends a lane's
    * held notices as it registers it, before its answer names the namespace.
@@ -205,6 +209,7 @@ export function observerClient(input: {
   }
 
   function opened(): Promise<ObserverChannel> {
+    if (closed) return Promise.reject(new ClientClosed())
     if (channel !== null) return channel
     const opening = closing.then(input.open).then(async c => {
       const hello = await c.ready
@@ -244,6 +249,17 @@ export function observerClient(input: {
       if (channel === opening) channel = null
     })
     return opening
+  }
+
+  function reset() {
+    const c = channel
+    channel = null
+    closing = (c ?? Promise.reject())
+      .then(open => {
+        open.close()
+        return open.closed
+      })
+      .catch(() => {})
   }
 
   return {
@@ -334,6 +350,7 @@ export function observerClient(input: {
           let c: ObserverChannel
           let hello: ObserverHello
           try {
+            if (closed) throw new ClientClosed()
             c = await input.open()
             hello = await c.ready
           } catch (error) {
@@ -348,15 +365,11 @@ export function observerClient(input: {
         },
       }
     },
-    reset() {
-      const c = channel
-      channel = null
-      closing = (c ?? Promise.reject())
-        .then(open => {
-          open.close()
-          return open.closed
-        })
-        .catch(() => {})
+    reset,
+    async close() {
+      closed = true
+      reset()
+      await closing
     },
   }
 }

@@ -85,9 +85,17 @@ export interface RepairControls<Held, LauncherHeld> {
   ): Promise<void>
 }
 
-/** Where the health value goes: the session's `pinetrie.machine`. */
+/**
+ * Where the health value goes: the session's `pinetrie.machine`. A write
+ * the sink refuses is told to the `onUnwritten` it was made with, never to
+ * the writer, which does not wait: the write may queue behind a step that
+ * waits on the gate.
+ */
 export interface HealthSink {
-  write(health: MachineHealth): Promise<void>
+  /** Queues `health` as the value to write; never waits for the write. */
+  write(health: MachineHealth): void
+  /** Settles once every value queued so far has been written or refused. */
+  writesFlushed(): Promise<void>
 }
 
 export interface MachineManager {
@@ -96,9 +104,17 @@ export interface MachineManager {
   /** Queues a sample, merged with one already queued; never two at once. */
   sample(): Promise<void>
   /**
+   * A tick of the sample timer: a sample queued, as `sample` does, and the
+   * tick counted, outside the manager's keeper, which a sample that never
+   * ends holds. The tick that makes the reading overdue lets every hold go
+   * and writes `unsampled` (`overdue`).
+   */
+  sampleTick(): void
+  /**
    * The last sample with what was planned from it, as its step ended: what
    * the Machine page shows. Null before a sample has read; a failed sample
-   * keeps the last that read, with the health planned since.
+   * keeps the last that read, with the health planned since; overdue, the
+   * last that read under the overdue health.
    */
   latestReading(): MachineReading | null
   /**
@@ -121,11 +137,17 @@ export interface MachineManager {
   /** A restore's lanes' rows marked to delete kept again, a step on the manager's keeper; then an upkeep. */
   keepRestored(lanes: readonly ThreadId[]): Promise<void>
   /**
-   * Settles once `lane`'s treatment allows `activity`: at once, or after a
-   * later sample's plan. Rejects with `signal`'s reason when it aborts, and
-   * with `KeeperClosed` at `close`. Observing, it settles at once. A
-   * `container-start` waiting is what the next plan counts among the lanes
-   * waiting to start.
+   * Whether `lane`'s treatment allows `activity` now: what
+   * `waitUntilAllowed` checks first. Observing, or with the reading
+   * overdue, always.
+   */
+  isLaneActivityAllowed(lane: ThreadId, activity: LaneActivity): boolean
+  /**
+   * Settles once `lane`'s treatment allows `activity` (`isLaneActivityAllowed`):
+   * at once, after a later sample's plan, or once the reading goes overdue.
+   * Rejects with `signal`'s reason when it aborts, and with `KeeperClosed`
+   * at `close`. A `container-start` waiting is what the next plan counts
+   * among the lanes waiting to start.
    */
   waitUntilAllowed(
     lane: ThreadId,
@@ -134,6 +156,12 @@ export interface MachineManager {
   ): Promise<void>
   /** Settles once no sample or upkeep step is queued or running, those they queue included. */
   idle(): Promise<void>
-  /** Waits for a sample that runs, then writes `unsampled`: a stopped host's value never outlives it. */
+  /**
+   * Refuses every waiter, drops what is queued, and writes `unsampled`
+   * (`stopped`), waiting for the write: a stopped host's value never
+   * outlives it. A running sample is not waited for, since it may never
+   * end; it ends into a closed manager and changes nothing. A running
+   * upkeep step and a repair are.
+   */
   close(): Promise<void>
 }

@@ -92,7 +92,11 @@ export interface Found {
    * call at a time; nothing is done when nothing changed.
    */
   shareAndGrant(wanted: Wanted): Promise<void>
-  /** After the lanes stop, at shutdown: on the Mac, the lease ends and the slot empties. */
+  /**
+   * After the lanes stop, at shutdown: the runtime's channels close (a
+   * forwarded observer's connection too), then, on the Mac, the lease ends
+   * and the slot empties.
+   */
   close(): Promise<void>
   /** What the machine lanes run on is read through, for its health. */
   readonly machine: MachineReach
@@ -318,7 +322,7 @@ async function hostDockerFound(
       return served
     },
     shareAndGrant,
-    close: async () => {},
+    close: () => runtime.close(),
     // A host whose observer an outer host relays runs in a lane: the
     // machine its inner lanes share is its own cgroup.
     machine: machineReach(
@@ -468,6 +472,8 @@ async function vmFound(
     },
     shareAndGrant: held.share,
     async close() {
+      // Before the lease ends: a channel is a process in the lane VM.
+      await runtime.close()
       await held.close()
       await kept.close()
       await repairBootMade

@@ -61,7 +61,11 @@ export const inStep = <B extends object>(
  * What the documents' keeper merges by: a lane's drain, a root's directory
  * record, and the upkeep (`roots.ts`).
  */
-export type HostKey = `drain:${ThreadId}` | `root:${RootId}` | "upkeep"
+export type HostKey =
+  | `drain:${ThreadId}`
+  | `root:${RootId}`
+  | "upkeep"
+  | "machine-health"
 
 /**
  * The documents' keeper: every command, drain and write of the host's. Each
@@ -166,5 +170,19 @@ export function slow(
       where: where ?? null,
       ms: Math.round(s.ran),
     })
+  }
+}
+
+/** `write`, each line prefixed with the local time `now` reads, `HH:MM:SS`. */
+export function timestampedLog(
+  write: (line: string) => void,
+  now: () => number,
+): (line: string) => void {
+  const two = (n: number) => String(n).padStart(2, "0")
+  return line => {
+    const at = new Date(now())
+    write(
+      `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())} ${line}`,
+    )
   }
 }

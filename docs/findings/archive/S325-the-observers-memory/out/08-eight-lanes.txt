@@ -1,0 +1,5 @@
+== eight lanes registered by the one host connection, no run yet
+current=286425088 peak=452767744 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 104427520 file 8192 kernel 180461568 kernel_stack 360448 pagetables 2125824 sec_pagetables 0 percpu 12560 sock 0 vmalloc 92975104 shmem 0 file_mapped 83902464 slab_reclaimable 394120 slab_unreclaimable 641640 slab 1035760 workingset_refault_file 0 pgmajfault 0 
+server pid 1467 before gc {"rss":95.3,"heapTotal":11.1,"heapUsed":8.6,"external":9.7,"arrayBuffers":0.4}
+server pid 1467 after gc  {"rss":92.3,"heapTotal":8.5,"heapUsed":6.8,"external":9.4,"arrayBuffers":0.2}

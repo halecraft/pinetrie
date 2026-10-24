@@ -1,0 +1,6 @@
+== one host connection, no lane, about 60 s after start
+current=251994112 peak=254091264 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 72552448 file 8192 kernel 179433472 kernel_stack 245760 pagetables 1552384 sec_pagetables 0 percpu 12040 sock 0 vmalloc 92962816 shmem 0 file_mapped 83902464 slab_reclaimable 179352 slab_unreclaimable 536824 slab 716176 workingset_refault_file 0 pgmajfault 0 
+pid=1467 VmRSS:=91916 RssAnon:=43116 RssFile:=48800 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local
+pid=1486 VmRSS:=164912 RssAnon:=224 RssFile:=164688 RssShmem:=0 /usr/local/bin/observe 
+pid=1670 VmRSS:=69400 RssAnon:=27512 RssFile:=41888 RssShmem:=0 node /pinetrie/packages/lanehost/observer-connect.ts /run/observer/observer.sock 

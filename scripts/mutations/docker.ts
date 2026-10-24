@@ -646,4 +646,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "after a build, an image of pine·trie's no container uses is removed, and one a stopped container uses stays",
   },
+  {
+    name: "a runtime's close leaves its channels open",
+    file: "packages/docker/runtime.ts",
+    from: "      await Promise.all([lanehost.close(), observer?.close()])\n",
+    to: "",
+    suite: "lanes",
+    scenario: "contract",
+    expect: "a host's close closes its observer connection",
+  },
 ]

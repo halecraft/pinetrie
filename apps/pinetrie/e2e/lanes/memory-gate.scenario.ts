@@ -1,8 +1,12 @@
 // e2e/lanes/memory-gate — lanes held for memory: a host given a sensor whose
 // pressure the scenario sets pauses the less important of two running lanes
 // at its gate, says why in the record its column reads, and lets it go on
-// when the pressure clears; a run whose start is held ends at once on Stop.
+// when the pressure clears; a run whose start is held ends at once on Stop;
+// a get-the-latest on a stopped lane waits in its queue while the host's
+// commands go on.
 
+import { writeFileSync } from "node:fs"
+import path from "node:path"
 import { entryId, ROOT, type ThreadId } from "@pinetrie/core"
 import { treatmentWords } from "@pinetrie/interface"
 import type { MachineSensor } from "@pinetrie/machine"
@@ -14,14 +18,17 @@ import { type Gate, gateClose, gateCommand, newGate } from "../gate.ts"
 import {
   at,
   heldEntries,
+  heldLanes,
   heldTree,
   laneHolding,
   START_AGENT,
+  START_CHAT,
   waitFor,
 } from "../harness.ts"
 import { inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import { container, isRunning } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
+import { bringUpToDate, jj } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -59,11 +66,25 @@ async function memoryGateSection(
 ): Promise<void> {
   const pressed: Pressed = { fullAvg10: 0, samples: 0 }
   const h = await lanes.sectionHost({
-    files: { "a.txt": "a\n" },
-    machine: { wrapSensor: pressedSensor(pressed), sampleEveryMs: 100 },
+    files: {
+      "a.txt": "a\n",
+      // A publish here accepts your commit: a lane's base moves.
+      "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
+    },
+    machine: {
+      wrapSensor: pressedSensor(pressed),
+      sampleEveryMs: 100,
+      // Thirty seconds of ticks, as the host's own bound is: no sample of
+      // this scenario's waits that long.
+      readingOverdueAfterTicks: 300,
+    },
   })
   try {
     const { host, script, user } = h
+    const laneTip = (lane: ThreadId) =>
+      heldLanes(host, heldTree(host), readPlaces(host.places)).find(
+        l => l.name === lane,
+      )?.tip ?? null
     const running = (lane: ThreadId | undefined) =>
       lane !== undefined && readRunning(host.live, lane)
     const treatmentOf = (lane: ThreadId | undefined) =>
@@ -208,6 +229,68 @@ async function memoryGateSection(
     pressed.fullAvg10 = 0
     if (going.lane !== undefined)
       await inLaneQuiet(going.lane, gateClose(going.gate))
+    await h.idle()
+
+    // A get-the-latest on a stopped lane while starts are held: it waits in
+    // its queue for room, its column says so, and the host's commands go on.
+    await jj(h.dir, "bookmark", "create", "main", "-r", "pinetrie-accepted")
+    writeFileSync(path.join(h.dir, "landed.txt"), "landed\n")
+    await jj(h.dir, "commit", "-m", "you land landed.txt")
+    await user.actOnAccepted("publish")
+    await h.idle()
+    const waitingLane = paused.lane
+    await waitFor(
+      async () =>
+        waitingLane !== undefined &&
+        !running(waitingLane) &&
+        !(await isRunning(container(waitingLane))),
+      120_000,
+    )
+    pressed.fullAvg10 = 15
+    await waitFor(memoryShort, 60_000)
+    const updatesIn = () => {
+      const tip = waitingLane === undefined ? null : laneTip(waitingLane)
+      const onPath = new Set(ancestry(heldTree(host), tip).path)
+      return Object.values(heldEntries(host))
+        .filter(r => onPath.has(entryId(r.id)))
+        .map(r => rowMessage(r) as { customType?: string })
+        .filter(m => m.customType === "pinetrie.update").length
+    }
+    const updatesBefore = updatesIn()
+    const card =
+      waitingLane === undefined
+        ? undefined
+        : await bringUpToDate(user, waitingLane, laneTip(waitingLane), "")
+    const isQueued = () =>
+      readPlaces(host.places).some(
+        c => c.id === card && c.place.kind === "queued",
+      )
+    const waiting = await waitFor(
+      () => treatmentOf(waitingLane)?.kind === "waiting-to-start",
+      60_000,
+    )
+    // A chat to a thread of its own, answered while the card waits.
+    let answered: { readonly kind: string } | undefined
+    void user.send("still here", ROOT, START_CHAT).then(sent => {
+      answered = sent
+    })
+    const chatted = await waitFor(() => answered !== undefined, 30_000)
+    const stillQueued = isQueued() && updatesIn() === updatesBefore
+    check(
+      "a get-the-latest waits for room in its queue, and the host's commands go on",
+      waiting >= 0 && chatted >= 0 && stillQueued,
+      `waiting ${waiting}, chat ${answered?.kind ?? "unanswered"}, queued ${isQueued()}, updates ${updatesIn() - updatesBefore}`,
+    )
+    pressed.fullAvg10 = 0
+    const popped = await waitFor(
+      () => !isQueued() && updatesIn() > updatesBefore,
+      120_000,
+    )
+    check(
+      "once there is room, the waiting get-the-latest is popped and its update is in its thread",
+      popped >= 0,
+      `queued ${isQueued()}, updates ${updatesIn() - updatesBefore}`,
+    )
     await h.idle()
   } finally {
     await h.close()

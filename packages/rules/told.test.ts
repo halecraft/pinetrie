@@ -361,6 +361,7 @@ describe("planQueuedPop", () => {
       away: false,
       held: false,
       typing: new Set(),
+      isStartHeld: false,
       texts: texts as never,
       quotes: new Map(),
     })

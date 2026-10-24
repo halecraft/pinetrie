@@ -106,4 +106,20 @@ export const mutations: readonly Mutation[] = [
     scenario: "contract",
     expect: "a second host on a served project is refused",
   },
+  {
+    name: "a closed lanehost client still calls",
+    file: "packages/lanehost/client.ts",
+    from: "      closed = true\n      const opened",
+    to: "      const opened",
+    command: unit,
+    expect: "close ends every channel, and a call after it is refused",
+  },
+  {
+    name: "a closed observer client still connects",
+    file: "packages/lanehost/observer-client.ts",
+    from: "      closed = true\n      reset()\n",
+    to: "      reset()\n",
+    command: unit,
+    expect: "close ends the channel, and a call after it is refused",
+  },
 ]

@@ -1,0 +1,5 @@
+== 3 s after start, no connection
+current=223899648 peak=224399360 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 44265472 file 8192 kernel 178683904 kernel_stack 131072 pagetables 1044480 sec_pagetables 0 percpu 11520 sock 0 vmalloc 92950528 shmem 0 file_mapped 83902464 slab_reclaimable 156792 slab_unreclaimable 442160 slab 598952 workingset_refault_file 0 pgmajfault 0 
+pid=1467 VmRSS:=91612 RssAnon:=43004 RssFile:=48608 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local
+pid=1486 VmRSS:=164912 RssAnon:=224 RssFile:=164688 RssShmem:=0 /usr/local/bin/observe 

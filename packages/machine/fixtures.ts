@@ -6,6 +6,7 @@ import type {
   Deletable,
   EventMeasured,
   IndexedSnapshot,
+  MachineHealth,
   SnapshotId,
   ThreadId,
 } from "@pinetrie/core"
@@ -14,7 +15,7 @@ import type {
   LaneMeasured,
   SampleMeasured,
 } from "./measurements.ts"
-import type { HostLaneFacts, MachineMeasurements } from "./ports.ts"
+import type { HealthSink, HostLaneFacts, MachineMeasurements } from "./ports.ts"
 import type {
   Reservation,
   RowState,
@@ -190,3 +191,20 @@ export function keptMeasurements(): MachineMeasurements & {
     },
   }
 }
+
+/**
+ * A sink that writes each value as it is asked, into `written`, unless
+ * `refuse` says no: then the refusal is told, as the host's would be.
+ */
+export const recordingSink =
+  (
+    written: MachineHealth[] = [],
+    refuse: (health: MachineHealth) => boolean = () => false,
+  ) =>
+  (onUnwritten: (error: string) => void): HealthSink => ({
+    write(health) {
+      if (refuse(health)) onUnwritten("refused")
+      else written.push(health)
+    },
+    writesFlushed: async () => {},
+  })

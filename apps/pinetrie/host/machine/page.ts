@@ -16,6 +16,7 @@ import {
   leaveFreeBytes,
   type MachineReading,
   minimumUnallocated,
+  type ReadingPlanned,
   type SnapshotReads,
   type StoreSettings,
   type StoreTarget,
@@ -50,7 +51,7 @@ const unreadable = (why: string) => ({ kind: "unreadable", why }) as const
  * it holds the repair's controls and the last repair failed.
  */
 export function machineActions(
-  reading: MachineReading | null,
+  reading: ReadingPlanned | null,
   repairs: boolean,
 ): readonly MachineAction[] {
   const state = reading?.repair.state
@@ -65,8 +66,19 @@ export function machineActions(
   ]
 }
 
+/**
+ * What the page shows of `reading`: an overdue one's last numbers, under
+ * its health, holding nothing.
+ */
+const shownReading = (reading: MachineReading | null): ReadingPlanned | null =>
+  reading === null || reading.kind === "fresh"
+    ? reading
+    : reading.last === null
+      ? null
+      : { ...reading.last, health: reading.health, held: [] }
+
 export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
-  const { reading } = g
+  const reading = shownReading(g.reading)
   const mentioned = new Set(
     g.lately.flatMap(l =>
       l.kind === "treatment"
@@ -86,7 +98,11 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
     actions: machineActions(reading, g.repairs),
   }
   if (reading === null)
-    return { health: WAITING, reading: { kind: "unsampled" }, ...common }
+    return {
+      health: g.reading?.health ?? WAITING,
+      reading: { kind: "unsampled" },
+      ...common,
+    }
   const { sample } = reading
   const memoryByLane = new Map(sample.lanes.map(l => [l.lane, l]))
   const treatmentByLane = new Map(

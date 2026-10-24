@@ -1,0 +1,6 @@
+current=300830720 peak=452767744 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 118657024 file 8192 kernel 180436992 kernel_stack 360448 pagetables 2093056 sec_pagetables 0 percpu 12560 sock 0 vmalloc 92975104 shmem 0 file_mapped 83902464 slab_reclaimable 401048 slab_unreclaimable 649600 slab 1050648 workingset_refault_file 0 pgmajfault 0 
+pid=1467 VmRSS:=95228 RssAnon:=42076 RssFile:=53152 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local
+pid=1486 VmRSS:=169076 RssAnon:=4388 RssFile:=164688 RssShmem:=0 /usr/local/bin/observe 
+pid=1670 VmRSS:=69404 RssAnon:=27516 RssFile:=41888 RssShmem:=0 node /pinetrie/packages/lanehost/observer-connect.ts /run/observer/observer.sock 
+pid=3842 VmRSS:=89608 RssAnon:=41896 RssFile:=47712 RssShmem:=0 node /pinetrie/packages/lanehost/observer-connect.ts /run/observer/observer.sock 

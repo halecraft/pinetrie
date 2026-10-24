@@ -5551,4 +5551,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "from a turn whose snapshot is gone in an open lane: the nearest older snapshot, and the turn's commit",
   },
+  {
+    name: "a lane's held start is ignored by the pop",
+    file: "packages/rules/queue.ts",
+    from: '  if (facts.isStartHeld) return { kind: "start-held", card: top }\n',
+    to: "",
+    command: unit,
+    expect:
+      "planNextQueuedCardPop: a lane whose start is held pops no message, but a fact on top; a held queue says so first",
+  },
 ]

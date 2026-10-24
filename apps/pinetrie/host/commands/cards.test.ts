@@ -114,6 +114,7 @@ const idle = {
   away: false,
   held: false,
   typing: new Set<CardId>(),
+  isStartHeld: false,
 }
 const queuedKey = {
   kind: "queued",

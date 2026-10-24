@@ -55,6 +55,7 @@ import {
 } from "@pinetrie/reads"
 import {
   type ModelLine,
+  type QueuedCard,
   type QueuedText,
   SETUP,
   type SetupSession,
@@ -94,6 +95,7 @@ import {
   type LeaseBasics,
   SLOW_COMPACTION_MS,
   slow,
+  timestampedLog,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { createCanvasContext } from "./canvas.ts"
@@ -120,11 +122,7 @@ import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
 import { gatherDiagnostics, hostVersion } from "./machine/diagnostics.ts"
 import { createRunStarts, gatherLaneImportance } from "./machine/importance.ts"
-import {
-  type MachineWatch,
-  type MachineWatchOptions,
-  startMachineWatch,
-} from "./machine/index.ts"
+import { type MachineWatchOptions, startMachineWatch } from "./machine/index.ts"
 import { memoryMachineMeasurements } from "./machine/measurements.ts"
 import { machinePageFacts } from "./machine/page.ts"
 import { createStoreRecords } from "./machine/records.ts"
@@ -192,6 +190,7 @@ import {
 import { type OpenedStore, openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
+import { EVERYTHING_ALLOWED, type LaneGate } from "./work/memory-holds.ts"
 import { findProject } from "./work/runtime.ts"
 import { openProject } from "./work/setup.ts"
 import { type PersonalSshPlaces, prepareSshDir } from "./work/ssh.ts"
@@ -342,6 +341,12 @@ export interface RunningHost {
 }
 
 /**
+ * The host's own log, when no caller gives one: the console, each line
+ * stamped with the time, so a line can be placed beside another's.
+ */
+const hostLog = (now: () => number) => timestampedLog(console.log, now)
+
+/**
  * Start a host: every step of its start reported to `progress` (by default
  * a line of `log` per step), and listening last. A start that throws, a
  * `HostRefused` among them, first closes what it opened.
@@ -351,7 +356,7 @@ export async function startHost(
 ): Promise<RunningHost> {
   const progress =
     options.progress ??
-    lineProgress(options.log ?? console.log, {
+    lineProgress(options.log ?? hostLog(options.now ?? Date.now), {
       steps: planStartSteps({ tools: options.project?.tools === true }),
       machine: laneMachine(process.platform),
       times: {},
@@ -392,7 +397,7 @@ async function openHost(
     presenceDecay = PRESENCE_DECAY,
     machine: machineOptions = {},
     keepRootsRead = false,
-    log = console.log,
+    log = hostLog(now),
   }: StartHostOptions,
   progress: StartProgress,
   closers: AsyncDisposableStack,
@@ -795,8 +800,15 @@ async function openHost(
   const markArchived = forward<[readonly SnapshotId[]]>("the machine", "hold")
   const keepRestored = forward<[readonly ThreadId[]]>("the machine", "hold")
   // Before the machine is watched, and on a host that watches none, every
-  // lane is let through at once.
-  let waitUntilAllowed: MachineWatch["waitUntilAllowed"] = async () => {}
+  // lane is let through at once. One object answers both the wait and the
+  // check, so the drain's check and a lane's start never disagree.
+  let gate: LaneGate = EVERYTHING_ALLOWED
+  const laneGate: LaneGate = {
+    waitUntilAllowed: (lane, activity, signal) =>
+      gate.waitUntilAllowed(lane, activity, signal),
+    isLaneActivityAllowed: (lane, activity) =>
+      gate.isLaneActivityAllowed(lane, activity),
+  }
   const runStarts = createRunStarts()
   const shellCalls = createShellCalls({
     now,
@@ -821,8 +833,7 @@ async function openHost(
       keepRestored: keepRestored.call,
     },
     machine: {
-      waitUntilAllowed: (lane, activity, signal) =>
-        waitUntilAllowed(lane, activity, signal),
+      ...laneGate,
       noteRunStarted: runStarts.noteRunStarted,
       shellStarted: shellCalls.shellStarted,
     },
@@ -862,7 +873,7 @@ async function openHost(
   // Its `unsampled` is a step on the documents' keeper: it closes first.
   if (machine !== null) {
     closers.defer(() => machine.close())
-    waitUntilAllowed = machine.waitUntilAllowed
+    gate = machine
     snapshotSkipped.bind(() => machine.noteSnapshotSkipped())
     const { upkeep } = machine
     requestUpkeep.bind(() => upkeep.requestUpkeep())
@@ -1046,6 +1057,15 @@ async function openHost(
     wait(card, signal => untilNotTyped(presence, card.id, signal))
   const blank = (card: QueuedText) =>
     wait(card, signal => cardPort.whenWritten(card.id, signal))
+  // A wait the machine counts among the lanes waiting to start, so the
+  // lane's column says it waits for room. Its rejection, on the card
+  // leaving the queue or the host's close, ends it as well.
+  const startHeld = (card: QueuedCard) =>
+    wait(card, signal =>
+      laneGate
+        .waitUntilAllowed(card.place.thread, "container-start", signal)
+        .catch(() => {}),
+    )
   // A lane's drain, in the step whose documents are `step`: the lane's root
   // loaded first, which pi's appends and runs there need.
   const drain = async (step: StepDocs, lane: ThreadId) => {
@@ -1058,6 +1078,7 @@ async function openHost(
         blobs,
         agent,
         work,
+        machine: laneGate,
         start: (l, s) => runs.start(step, l, s),
         send: async popped => {
           const root = readThreads(session).get(popped.card.place.thread)?.root
@@ -1074,6 +1095,7 @@ async function openHost(
         behind,
         typing,
         blank,
+        startHeld,
         placesWriter,
         relay: (to, relay) => relays.relayCard(step, to, relay),
         scribe,

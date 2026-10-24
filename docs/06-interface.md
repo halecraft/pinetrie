@@ -211,7 +211,9 @@ While the page syncs, "syncing…" leads its right end.
   command killed for memory, lanehost's disk or privileged service or the
   file observer killed for memory, the host stalling, a turn's snapshot
   not recorded, old turns' snapshots being deleted to free room, or no
-  reading from the host); red, with a barred disc, when work stops (the
+  reading from the host, among them a reading no sample has replaced for
+  a while, "the machine has not been read for a while: nothing is held",
+  which lets every held lane go); red, with a barred disc, when work stops (the
   lanes' disk full, or its metadata, or low with nothing left that may be
   deleted, which on Linux names the balance the person can run; the lane
   VM's disk being repaired, "the lane VM's disk is full: repairing it",
@@ -321,7 +323,9 @@ nothing; Ctrl+Shift+L still folds the sidebar.
   sampled it, asked for again at each sample while the page shows (it
   never makes the host sample sooner). Every reading pine·trie could not
   take says why ("not read: the host outside this lane runs it"), never
-  0; before the first sample, each section waits for it.
+  0; before the first sample, each section waits for it. With no sample
+  ended for a while, the page shows the last numbers read under that
+  cause, and no lane held.
   - **Now**: each cause the glyph would name, worst first, with what
     pine·trie is doing about it ("it holds new runs' starts until there is
     room") and what you can do ("archive the canvases you are done with:

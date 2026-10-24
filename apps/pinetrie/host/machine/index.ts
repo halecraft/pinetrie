@@ -40,6 +40,8 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
       return `[host] the machine: a sample took ${news.ms} ms`
     case "unwritten":
       return `[host] the machine: its health was not written: ${news.error}`
+    case "stale-sample":
+      return `[host] the machine: a sample ended ${news.ticks} ticks after it started, after the reading went overdue: nothing it read was planned`
     case "upkeep-failed":
       return `[host] the machine: the lanes' disk upkeep failed: ${news.error}`
     case "unmeasured":
@@ -57,11 +59,15 @@ export interface MachineWatchOptions {
   readonly wrapSensor?: (own: MachineSensor) => MachineSensor
   /** How often a sample is taken, in ms; `MACHINE_SAMPLE_MS` by default. */
   readonly sampleEveryMs?: number
+  /** Ticks with no fresh sample before the reading holds nothing; `READING_OVERDUE_AFTER_TICKS` by default. */
+  readonly readingOverdueAfterTicks?: number
 }
 
 export interface MachineWatch {
   /** What a lane's gate and its start wait on: its treatment allowing it. */
   readonly waitUntilAllowed: MachineManager["waitUntilAllowed"]
+  /** Whether a lane's treatment allows an activity now: `waitUntilAllowed`'s first check. */
+  readonly isLaneActivityAllowed: MachineManager["isLaneActivityAllowed"]
   /** What the Machine page shows: the manager's last reading. */
   readonly latestReading: MachineManager["latestReading"]
   /** Whether this host holds the lane VM's repair's controls: it manages, and the disk can be repaired. */
@@ -89,7 +95,7 @@ export interface MachineWatch {
 export async function startMachineWatch(deps: {
   readonly reach: MachineReach
   readonly session: SessionDocHandle
-  readonly keeper: Pick<HostKeeper, "run">
+  readonly keeper: Pick<HostKeeper, "once">
   readonly records: Pick<Records, "writeValues">
   readonly settings: StoreSettings
   readonly mode: ManageMode
@@ -112,7 +118,10 @@ export async function startMachineWatch(deps: {
       : null
   const manager = createMachineManager({
     sensor: deps.options.wrapSensor?.(sensor) ?? sensor,
-    sink: createHealthSink(deps),
+    makeSink: onUnwritten => createHealthSink({ ...deps, onUnwritten }),
+    ...(deps.options.readingOverdueAfterTicks === undefined
+      ? {}
+      : { readingOverdueAfterTicks: deps.options.readingOverdueAfterTicks }),
     settings: deps.settings,
     mode: deps.mode,
     capabilities,
@@ -126,8 +135,10 @@ export async function startMachineWatch(deps: {
     tell: news => deps.log(newsLine(news, deps.session)),
   })
   await manager.start()
+  // Each tick also counts toward the reading going overdue, which a sample
+  // that never ends cannot stop.
   const timer = setInterval(
-    () => void manager.sample(),
+    () => manager.sampleTick(),
     deps.options.sampleEveryMs ?? MACHINE_SAMPLE_MS,
   )
   timer.unref()
@@ -141,6 +152,8 @@ export async function startMachineWatch(deps: {
   return {
     waitUntilAllowed: (lane, activity, signal) =>
       manager.waitUntilAllowed(lane, activity, signal),
+    isLaneActivityAllowed: (lane, activity) =>
+      manager.isLaneActivityAllowed(lane, activity),
     latestReading: () => manager.latestReading(),
     repairs: repair !== null,
     askRepairAgain: () => manager.askRepairAgain(),

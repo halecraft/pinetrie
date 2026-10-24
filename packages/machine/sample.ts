@@ -63,7 +63,7 @@ export interface MachineSample {
 }
 
 /** The last sample that read, and what the step that took it, or a later one, planned. */
-export interface MachineReading {
+export interface ReadingPlanned {
   readonly sample: MachineSample
   readonly health: MachineHealth
   readonly rung: Rung
@@ -71,6 +71,19 @@ export interface MachineReading {
   readonly held: readonly HeldLane[]
   readonly repair: RepairFacts
 }
+
+/**
+ * What the Machine page shows: fresh, as the last sample planned it; or
+ * overdue, no sample having ended for the bound, its health saying so and
+ * holding nothing, with the last reading kept (null before any read).
+ */
+export type MachineReading =
+  | ({ readonly kind: "fresh" } & ReadingPlanned)
+  | {
+      readonly kind: "overdue"
+      readonly health: MachineHealth
+      readonly last: ReadingPlanned | null
+    }
 
 /** What the disk upkeep's last step found, with the store's room under its floor. */
 export interface UpkeepHeard {

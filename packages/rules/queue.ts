@@ -115,6 +115,11 @@ export type NextQueuedCardPopStep =
    * it waits for `card`, the first, to be written in.
    */
   | { readonly kind: "blank"; readonly card: QueuedText }
+  /**
+   * The machine holds its lane's start, and `card`, on top, would start a
+   * run or catch the lane up: it waits for room.
+   */
+  | { readonly kind: "start-held"; readonly card: QueuedCard }
   | { readonly kind: "pop"; readonly card: QueuedCard }
 
 /**
@@ -160,12 +165,12 @@ export const NONE_BLANK: ReadonlySet<CardId> = new Set()
 /**
  * The next queued card to pop for a lane: none while it runs; only a fact on
  * top while its thread is in an inventory, or its lane of another kind;
- * else its top
- * card that is not blank (`blank`, each `isBlankMessage`), unless the queue
- * is held or someone is typing in that card. A blank card is passed over
+ * else its top card that is not blank (`blank`, each `isBlankMessage`),
+ * unless the queue is held, someone is typing in that card, or the machine
+ * holds the lane's start, read in that order. A blank card is passed over
  * and stays where it is, so the cards behind it are not stuck behind
- * nothing. A fact is popped whatever the hold or the typing: it is nobody's
- * instruction, and starts no run.
+ * nothing. A fact is popped whatever the hold, the typing or the machine:
+ * it is nobody's instruction, and starts no run.
  */
 export function planNextQueuedCardPop(
   cards: readonly CardRecord[],
@@ -183,6 +188,8 @@ export function planNextQueuedCardPop(
     readonly typing: ReadonlySet<CardId>
     /** The queued cards that are blank messages now. */
     readonly blank: ReadonlySet<CardId>
+    /** The machine holds the start of the lane's own container. */
+    readonly isStartHeld: boolean
   },
 ): NextQueuedCardPopStep {
   if (facts.running) return { kind: "idle" }
@@ -206,6 +213,7 @@ export function planNextQueuedCardPop(
   // An ask starts a run, as a message does, but nobody types in it.
   if (isQueuedText(top) && facts.typing.has(top.id))
     return { kind: "typing", card: top }
+  if (facts.isStartHeld) return { kind: "start-held", card: top }
   return { kind: "pop", card: top }
 }
 

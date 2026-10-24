@@ -3,6 +3,7 @@ import {
   LEAVE_FREE_DEFAULT,
   type MachineReading,
   type MachineSample,
+  type ReadingPlanned,
 } from "@pinetrie/machine"
 import { describe, expect, test } from "vitest"
 import { machineActions, planMachinePage } from "./page.ts"
@@ -45,7 +46,8 @@ const sample: MachineSample = {
   upkeep: { freeing: false, exhausted: false },
 }
 
-const reading: MachineReading = {
+const reading: MachineReading & { readonly kind: "fresh" } = {
+  kind: "fresh",
   sample,
   health: { state: "amber", causes: [], treatments: [] },
   rung: 2,
@@ -122,7 +124,7 @@ describe("the Machine page's facts", () => {
 })
 
 test("repair again is offered only to a host holding the repair's controls, after a failure", () => {
-  const failed: MachineReading = {
+  const failed: ReadingPlanned = {
     ...reading,
     repair: {
       lockHeld: false,

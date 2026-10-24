@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { type LanehostChannel, lanehostClient } from "./client.ts"
+import { ClientClosed } from "./closed.ts"
 import type { LanehostCall } from "./protocol.ts"
 import type { Role } from "./roles.ts"
 
@@ -89,5 +90,22 @@ describe("lanehostClient", () => {
       "no container yet",
     )
     expect(await client.call({ kind: "projects" })).toBe("projects")
+  })
+  test("close ends every channel, and a call after it is refused", async () => {
+    const made: ReturnType<typeof fakeChannel>[] = []
+    const client = lanehostClient({
+      open: async role => {
+        const c = fakeChannel(role)
+        made.push(c)
+        return c.channel
+      },
+      facts: async () => ({ rootless: false }),
+    })
+    await client.call({ kind: "projects" })
+    await client.close()
+    await expect(client.call({ kind: "projects" })).rejects.toBeInstanceOf(
+      ClientClosed,
+    )
+    expect(made).toHaveLength(1)
   })
 })

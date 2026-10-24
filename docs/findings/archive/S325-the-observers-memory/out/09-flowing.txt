@@ -1,0 +1,5 @@
+== after 25,000 writes in each lane, subscribed (notices flowing to the host)
+current=320761856 peak=452767744 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 137875456 file 8192 kernel 180953088 kernel_stack 360448 pagetables 2592768 sec_pagetables 0 percpu 12560 sock 0 vmalloc 92975104 shmem 0 file_mapped 83902464 slab_reclaimable 395016 slab_unreclaimable 660536 slab 1055552 workingset_refault_file 0 pgmajfault 0 
+server pid 1467 before gc {"rss":116.1,"heapTotal":20.3,"heapUsed":16.6,"external":9.8,"arrayBuffers":0.6}
+server pid 1467 after gc  {"rss":97.1,"heapTotal":8.7,"heapUsed":6.1,"external":9.4,"arrayBuffers":0.2}

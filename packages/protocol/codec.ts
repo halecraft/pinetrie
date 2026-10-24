@@ -104,8 +104,9 @@ export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
   | { readonly kind: "appended"; readonly id: EntryId }
   /**
-   * The thread's lane is running, or has cards queued: nothing was written.
-   * A chat sent from a card is queued instead (`queued`).
+   * The thread's lane is running, has cards queued, or would get the latest
+   * first and the machine holds its start for room: nothing was written. A
+   * chat sent from a card is queued instead (`queued`).
    */
   | { readonly kind: "busy" }
   /** The lane was busy, so the host queued the chat's card behind the others. */

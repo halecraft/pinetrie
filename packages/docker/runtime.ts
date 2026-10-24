@@ -191,6 +191,13 @@ export interface DockerRuntime extends LaneRuntime {
    * call that needs them, as they were at the first.
    */
   vmRestarted(): void
+  /**
+   * The host is closing, its lanes' links closed: lanehost's channels and
+   * the observer's are closed, and waited out, and every call after is
+   * refused (`ClientClosed`). A host closed in a process that goes on
+   * would otherwise hold them, each a process in the machine's observer.
+   */
+  close(): Promise<void>
   /** The project's lanes whose containers run, by one listing of Docker's. */
   runningLanes(): Promise<readonly RunningLane[]>
   /**
@@ -647,6 +654,9 @@ export function dockerRuntime(input: {
       observer?.reset()
       built = null
       network = null
+    },
+    async close() {
+      await Promise.all([lanehost.close(), observer?.close()])
     },
     async grantHostPorts(ports) {
       if (target.hostAddress === null) return false

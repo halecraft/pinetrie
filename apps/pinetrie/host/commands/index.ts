@@ -56,7 +56,13 @@ import {
 } from "./lane.ts"
 import { handleMark } from "./mark.ts"
 import { handlePicture, type PictureDeps } from "./picture.ts"
-import { type SendDeps, sendMessage, spendsCard } from "./send.ts"
+import {
+  type SendDeps,
+  type SendOutcome,
+  sendMessage,
+  spendsCard,
+  wireOutcome,
+} from "./send.ts"
 
 export interface CommandDeps {
   readonly basics: Basics
@@ -175,7 +181,7 @@ export interface Commands {
     writer: WriterId,
     sendId: string,
     outgoing: Send,
-  ): Promise<Outcome>
+  ): Promise<SendOutcome>
 }
 
 /**
@@ -321,7 +327,9 @@ export function createCommands(deps: CommandDeps): Commands {
       case "send": {
         // The command's id is the send's id: its column finds its message by it.
         const sendId = id === "" ? newId() : id
-        const sent = await sendMessage(deps, writer, sendId, intent)
+        const sent = wireOutcome(
+          await sendMessage(deps, writer, sendId, intent),
+        )
         const card = intent.card
         if (card === null) return settled(sent)
         if (spendsCard(sent))
@@ -347,7 +355,8 @@ export function createCommands(deps: CommandDeps): Commands {
           writer,
           intent,
           canvases,
-          outgoing => send(step, writer, newId(), outgoing),
+          async outgoing =>
+            wireOutcome(await send(step, writer, newId(), outgoing)),
           fact => queueFact(deps, fact),
         )
       case "paste":
@@ -360,7 +369,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.spinOff(
           writer,
           intent,
-          outgoing => send(step, writer, newId(), outgoing),
+          async outgoing =>
+            wireOutcome(await send(step, writer, newId(), outgoing)),
           canvases,
         )
       case "queue-card":
@@ -450,7 +460,7 @@ export function createCommands(deps: CommandDeps): Commands {
     writer: WriterId,
     sendId: string,
     outgoing: Send,
-  ): Promise<Outcome> {
+  ): Promise<SendOutcome> {
     const gate = await clear(
       step,
       step.basics.roots,

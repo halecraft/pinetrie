@@ -825,9 +825,14 @@ which are swept.
   one it speaks of. It answers `idle` while the lane runs or nothing is
   queued; `held` when its queue is held and its top card is a message;
   `typing` when someone types in its top card (presence `typingIn`);
-  `blank` when every card queued is blank; else `pop`. A fact on top is
-  popped whatever the hold or the typing: it is nobody's instruction, and
-  starts no run. `planUnsent` is the
+  `blank` when every card queued is blank; `start-held` when the machine
+  holds the start of the lane's own container (`isStartHeld`, the host's
+  fact, read after the hold and the typing), so the queue waits for room
+  rather than pop a card whose run or catch-up would start the lane; else
+  `pop`. A fact on top is popped whatever the hold, the typing or the
+  machine: it is nobody's instruction, and starts no run. The column's
+  `laneNext` (`@pinetrie/interface`) passes no held start: it shows the
+  hold from the machine's health. `planUnsent` is the
   step a refused pop writes back: a note in the note column nearest its
   thread, saying why, never queued (above).
 - **`planCardSweep`**: records whose text is empty and that carry no

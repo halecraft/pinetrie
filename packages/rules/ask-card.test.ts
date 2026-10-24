@@ -51,6 +51,7 @@ describe("an ask card", () => {
         held,
         typing: new Set(),
         blank: new Set(),
+        isStartHeld: false,
       })
     expect(pop(false)).toEqual({ kind: "pop", card })
     expect(pop(true)).toEqual({ kind: "held" })

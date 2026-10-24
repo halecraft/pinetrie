@@ -74,7 +74,8 @@ export type MachineCause =
   | { readonly kind: "disk-repair-failed"; readonly why: string }
   /**
    * No sample says how the machine is: none yet since the host started,
-   * the host stopped, or the last sample failed, with its error.
+   * the host stopped, the last sample failed, with its error, or no sample
+   * has ended for a while, so nothing is held on a reading gone stale.
    */
   | {
       readonly kind: "unsampled"
@@ -87,7 +88,12 @@ export const MACHINE_SERVICES = ["disks", "privileged", "observer"] as const
 /** A process pine·trie runs beside the lanes: a lanehost role, or the observer. */
 export type MachineService = (typeof MACHINE_SERVICES)[number]
 
-export const UNSAMPLED_REASONS = ["waiting", "stopped", "failed"] as const
+export const UNSAMPLED_REASONS = [
+  "waiting",
+  "stopped",
+  "failed",
+  "overdue",
+] as const
 
 type UnsampledReason = (typeof UNSAMPLED_REASONS)[number]
 

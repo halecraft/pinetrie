@@ -1,0 +1,6 @@
+== lane1 past its bound (30,000 writes, 100,000 held), lanes 2-4 at about 24,000
+current=327372800 peak=329469952 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 144863232 file 0 kernel 181248000 kernel_stack 245760 pagetables 3231744 sec_pagetables 0 percpu 12040 sock 0 vmalloc 92962816 shmem 0 file_mapped 83902464 slab_reclaimable 209016 slab_unreclaima
+pid=5175 VmRSS:=161844 RssAnon:=110292 RssFile:=51552 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local
+server pid 5175 before gc {"rss":166.3,"heapTotal":81.5,"heapUsed":78.2,"external":9.6,"arrayBuffers":0.4,"heapLimit":271.6}
+server pid 5175 after gc  {"rss":153.1,"heapTotal":70.8,"heapUsed":68,"external":9.4,"arrayBuffers":0.2,"heapLimit":271.6}

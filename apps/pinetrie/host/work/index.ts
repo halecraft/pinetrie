@@ -104,6 +104,11 @@ export type LaneWork = Pick<
      * not: what every run's start must hold (`Runs.start`).
      */
     runnable(lane: ThreadId): RunnableLane | ForeignLane
+    /**
+     * Whether `lane` has a container of its own here, which a run starts:
+     * only such a lane's start is ever held for room.
+     */
+    hasOwnContainer(lane: ThreadId): boolean
   }
 
 /**
@@ -357,6 +362,7 @@ export async function startLaneWork(input: {
     },
     onSshNews: listener => setup.ssh.onNews(listener),
     runnable: lane => proveRunnable(lane, registry.recordOf(lane), opened.kind),
+    hasOwnContainer: lane => registry.isOwn(lane),
   }
 }
 
@@ -397,4 +403,5 @@ const NO_LANES: LaneWork = {
   onSshNews: () => {},
   // Every lane runs with no tools here, whatever its history.
   runnable: lane => proveRunnable(lane, undefined, null),
+  hasOwnContainer: () => false,
 }

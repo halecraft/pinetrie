@@ -1,0 +1,4 @@
+== lanes 1-6 at their bound (100,000 held each)
+current=499167232 peak=509444096 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 313184256 file 0 kernel 184549376 kernel_stack 245760 pagetables 6062080 sec_pagetables 0 percpu 12040 sock 0 vmalloc 92962816 shmem 0 file_mapped 83902464 slab_reclaimable 443768 slab_unreclaima
+pid=5175 VmRSS:=328072 RssAnon:=274664 RssFile:=53408 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local

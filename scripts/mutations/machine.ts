@@ -25,8 +25,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the latest reading keeps the first sample, not the last",
     file: "packages/machine/manager.ts",
-    from: 'const sampled = result.kind === "sampled" ? result.sample : reading?.sample',
-    to: 'const sampled = reading?.sample ?? (result.kind === "sampled" ? result.sample : undefined)',
+    from: 'const sampled = result.kind === "sampled" ? result.sample : lastRead?.sample',
+    to: 'const sampled = lastRead?.sample ?? (result.kind === "sampled" ? result.sample : undefined)',
     command: unit,
     expect:
       "the latest reading is none before a sample, then the last sample with what was planned from it",
@@ -273,7 +273,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "close leaves the last health value standing",
     file: "packages/machine/manager.ts",
-    from: "      await writeHealth(STOPPED, { ...memory, health: STOPPED })\n",
+    from: "      writeHealth(STOPPED, { ...memory, health: STOPPED })\n",
     to: "",
     command: unit,
     expect: "unsampled is written at start and again at close",
@@ -298,7 +298,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "skipped snapshots are counted again each sample",
     file: "packages/machine/manager.ts",
-    from: "      skipped = 0\n",
+    from: "      skipped -= result.sample.snapshotsSkipped\n",
     to: "",
     command: unit,
     expect: "a skipped snapshot is counted in the next sample, and only in it",
@@ -378,5 +378,82 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "a backend that cannot grow plans nothing",
+  },
+  // ── the gate never deadlocks the host ──
+  {
+    name: "a sample waits for its health's write",
+    file: "packages/machine/manager.ts",
+    from: "    writeHealth(planned.health, planned.state)\n    if (!planned.changed) return\n",
+    to: "    writeHealth(planned.health, planned.state)\n    await sink.writesFlushed()\n    if (!planned.changed) return\n",
+    command: unit,
+    expect: "a sample never waits on a documents step that waits at the gate",
+  },
+  {
+    name: "a stale sample's end plans as a fresh one's",
+    file: "packages/machine/manager.ts",
+    from: "    if (!judged.isFresh) {\n",
+    to: "    if (judged.isFresh && !judged.isFresh) {\n",
+    command: unit,
+    expect:
+      "a sample that hung holds nothing when it ends, and the next plans as usual",
+  },
+  {
+    name: "a sample started before the overdue tick is judged fresh",
+    file: "packages/machine/freshness.ts",
+    from: "startedAt < state.overdueAt)",
+    to: "startedAt < 0)",
+    command: unit,
+    expect:
+      "a sample started before the overdue tick is stale, and one started at it or after is fresh",
+  },
+  {
+    name: "the tick count never reaches its bound",
+    file: "packages/machine/freshness.ts",
+    from: "overdueAt: since >= bound ? ticks : null",
+    to: "overdueAt: null",
+    command: unit,
+    expect: "a reading no sample replaces lets every hold go, and says so",
+  },
+  {
+    name: "an overdue reading keeps its waiters waiting",
+    file: "packages/machine/manager.ts",
+    from: "    for (const w of waiters) w.allow()\n",
+    to: "",
+    command: unit,
+    expect: "a reading no sample replaces lets every hold go, and says so",
+  },
+  {
+    name: "the overdue write bypasses the health's memory",
+    file: "packages/machine/manager.ts",
+    from: "    writeHealth(planned.health, planned.state)\n    if (planned.changed) tell",
+    to: "    sink.write(planned.health)\n    if (planned.changed) tell",
+    command: unit,
+    expect:
+      "after an overdue health, a fresh sample writes its health though it is the one from before",
+  },
+  {
+    name: "close waits for a running sample",
+    file: "packages/machine/manager.ts",
+    from: "      await upkeepRunning\n",
+    to: "      await keeper.idle()\n",
+    command: unit,
+    expect:
+      "close returns with a sample that never ends, whose end then changes nothing",
+  },
+  {
+    name: "close does not wait for its last write",
+    file: "packages/machine/manager.ts",
+    from: "      await sink.writesFlushed()\n    },\n",
+    to: "    },\n",
+    command: unit,
+    expect: "close waits for its last write to land",
+  },
+  {
+    name: "the check of a lane's activity ignores its treatment",
+    file: "packages/machine/manager.ts",
+    from: "    isOverdue(freshness) ||\n    isActivityAllowed(treatments.laneTreatment(lane), activity)\n",
+    to: "    isOverdue(freshness)\n",
+    command: unit,
+    expect: "isLaneActivityAllowed answers as waitUntilAllowed settles",
   },
 ]

@@ -90,6 +90,7 @@ export function laneNext(lane: LaneView, facts: NextFacts): Next {
       held: false,
       typing: new Set(),
       blank,
+      isStartHeld: false,
     })
     return {
       kind: "held",
@@ -105,6 +106,8 @@ export function laneNext(lane: LaneView, facts: NextFacts): Next {
     held: false,
     typing: facts.typing,
     blank,
+    // The machine's hold is shown from its health, beside what is next.
+    isStartHeld: false,
   })
   if (step.kind === "pop" || step.kind === "typing")
     return {

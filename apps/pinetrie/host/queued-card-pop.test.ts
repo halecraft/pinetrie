@@ -12,7 +12,6 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
-import type { Outcome } from "@pinetrie/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
   CARD_HISTORY,
@@ -42,6 +41,7 @@ import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import type { CardPort } from "./cards.ts"
+import type { SendOutcome } from "./commands/send.ts"
 import {
   applyWrites,
   basics,
@@ -113,6 +113,7 @@ const IDLE = {
   away: false,
   held: false,
   typing: new Set<CardId>(),
+  isStartHeld: false,
 }
 const poppedOf = (top: NextQueuedCardPop): PoppedText | null =>
   top.kind === "popped" && isQueuedText(top.popped.card)
@@ -251,11 +252,16 @@ const textsIn = (places: Parameters<typeof readPlaces>[0]) =>
 
 function setUp(
   texts: Record<string, string>,
-  answers: readonly Outcome[],
+  answers: readonly SendOutcome[],
   prepared: Awaited<ReturnType<QueuedCardPopDeps["work"]["prepareUpdate"]>> = {
     kind: "nothing",
   },
   behind: readonly string[] = [],
+  /** Whether the lane has its own container, and whether the machine holds its start. */
+  lane: { readonly own: boolean; readonly startHeld: boolean } = {
+    own: true,
+    startHeld: false,
+  },
 ) {
   const b = basics()
   // The lane's thread on a canvas: an unsent card goes to its notes.
@@ -298,6 +304,7 @@ function setUp(
     }).port,
     work: record<QueuedCardPopDeps["work"]>({
       ...RUNS_ANY,
+      hasOwnContainer: () => lane.own,
       prepareUpdate: async (_lane, by, intent) => {
         events.push(`update by ${by}: ${intent}`)
         return prepared
@@ -332,6 +339,10 @@ function setUp(
     },
     blank: card => {
       events.push(`blank ${card.id}`)
+    },
+    machine: { isLaneActivityAllowed: () => !lane.startHeld },
+    startHeld: card => {
+      events.push(`start held ${card.id}`)
     },
     placesWriter: placesFor(b, {
       presence,
@@ -563,6 +574,7 @@ describe("drain", () => {
       ...deps,
       work: {
         ...deps.work,
+        hasOwnContainer: () => true,
         runnable: lane => ({ kind: "foreign", lane, history: "folder" }),
       },
     }
@@ -639,6 +651,61 @@ describe("drain", () => {
     expect(textsIn(b.places)[0]?.place.kind).toBe("queued")
   })
 
+  test("a lane whose start the machine holds pops nothing, and waits for the start", async () => {
+    const { b, events, deps } = setUp(
+      { [cardIdFor("c1")]: "x" },
+      [],
+      undefined,
+      [],
+      {
+        own: true,
+        startHeld: true,
+      },
+    )
+    queue(b.places, cardIdFor("c1"), "a")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      `hydrate ${cardIdFor("c1")}`,
+      `start held ${cardIdFor("c1")}`,
+    ])
+    expect(textsIn(b.places)[0]?.place.kind).toBe("queued")
+  })
+
+  test("a lane with no container of its own is never held for its start", async () => {
+    const { b, events, deps } = setUp(
+      { [cardIdFor("c1")]: "x" },
+      [],
+      undefined,
+      [],
+      {
+        own: false,
+        startHeld: true,
+      },
+    )
+    queue(b.places, cardIdFor("c1"), "a")
+    await drain(deps, LANE)
+    expect(events).toContain(`send ${cardIdFor("c1")}: x`)
+  })
+
+  test("a popped message whose send finds its start held goes back on top, and the drain waits for the start", async () => {
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "x" }, [
+      { kind: "start-held" },
+    ])
+    queue(b.places, cardIdFor("c1"), "a")
+    await drain(deps, LANE)
+    expect(events.at(-1)).toBe(`start held ${cardIdFor("c1")}`)
+    expect(textsIn(b.places)[0]?.place.kind).toBe("queued")
+  })
+
+  test("a busy send still ends the drain with no wait: the run's end drains again", async () => {
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "x" }, [
+      { kind: "busy" },
+    ])
+    queue(b.places, cardIdFor("c1"), "a")
+    await drain(deps, LANE)
+    expect(events.some(e => e.startsWith("start held"))).toBe(false)
+  })
+
   test("a send that throws writes the card back below the line, saying the host failed, and the next is popped", async () => {
     const { b, events, deps } = setUp(
       {
@@ -676,6 +743,28 @@ describe("drain", () => {
 
 describe("drain: bring up to date", () => {
   const CMD = "get-latest" as const
+
+  test("its start held: the card goes back on top as it was, with its command, and the drain waits for the start", async () => {
+    const { b, events, deps } = setUp(
+      { [cardIdFor("c1")]: "x", [cardIdFor("c2")]: "next" },
+      [],
+      { kind: "start-held" },
+    )
+    queue(b.places, cardIdFor("c1"), "a", CMD)
+    queue(b.places, cardIdFor("c2"), "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `update by ${BEA}: x`,
+      `start held ${cardIdFor("c1")}`,
+    ])
+    expect(
+      textsIn(b.places).map(c => [c.id, c.place.kind, c.content.command]),
+    ).toEqual([
+      [cardIdFor("c1"), "queued", CMD],
+      [cardIdFor("c2"), "queued", null],
+    ])
+  })
 
   test("clean: the update, then the card's text as a message", async () => {
     const { b, events, deps } = setUp(
@@ -780,6 +869,7 @@ describe("drain: bring up to date", () => {
       ...deps,
       work: record<QueuedCardPopDeps["work"]>({
         ...RUNS_ANY,
+        hasOwnContainer: () => true,
         prepareUpdate: async () => {
           throw new Error("jj broke")
         },

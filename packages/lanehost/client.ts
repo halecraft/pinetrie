@@ -5,6 +5,7 @@
 // Docker.
 
 import type { Channel } from "@pinetrie/channel"
+import { ClientClosed } from "./closed.ts"
 import type { LanehostCall, LanehostHello, LanehostResult } from "./protocol.ts"
 import { callModule, planRoles, type Role, type RoleFacts } from "./roles.ts"
 
@@ -19,6 +20,8 @@ export interface Lanehost {
   call<C extends LanehostCall>(call: C): Promise<LanehostResult<C>>
   /** Close every channel: the next call opens one again. */
   reset(): void
+  /** Close every channel and wait for each to end: every call after it is refused (`ClientClosed`). */
+  close(): Promise<void>
 }
 
 /** The words of a call in the log: its kind, and a disk operation's. */
@@ -34,6 +37,7 @@ export function lanehostClient(input: {
 }): Lanehost {
   const open = new Map<Role, Promise<LanehostChannel>>()
   let roles: Promise<ReadonlyMap<string, Role>> | null = null
+  let closed = false
 
   function channelOf(role: Role): Promise<LanehostChannel> {
     const held = open.get(role)
@@ -71,7 +75,10 @@ export function lanehostClient(input: {
 
   return {
     async call(call) {
+      if (closed) throw new ClientClosed()
       const role = await roleOf(call)
+      // A channel opened after `close` would outlive the host.
+      if (closed) throw new ClientClosed()
       const started = performance.now()
       let ok = false
       try {
@@ -91,6 +98,22 @@ export function lanehostClient(input: {
         void opening.then(channel => channel.close()).catch(() => {})
       open.clear()
       roles = null
+    },
+    async close() {
+      closed = true
+      const opened = [...open.values()]
+      open.clear()
+      roles = null
+      await Promise.all(
+        opened.map(opening =>
+          opening
+            .then(channel => {
+              channel.close()
+              return channel.closed
+            })
+            .catch(() => {}),
+        ),
+      )
     },
   }
 }

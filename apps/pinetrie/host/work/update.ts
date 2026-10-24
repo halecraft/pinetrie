@@ -58,6 +58,7 @@ import type { Records } from "../records.ts"
 import type { Containers } from "./containers.ts"
 import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
+import type { StartAnswer } from "./memory-holds.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import { type TakenSnapshot, takeIndexedSnapshot } from "./snapshot-taking.ts"
@@ -65,13 +66,15 @@ import type { Turns } from "./turns.ts"
 
 /**
  * What popping an update's card comes to: the update written in the thread, a
- * resolution run's prompt, nothing new, or why not.
+ * resolution run's prompt, nothing new, why not, or the lane's start held
+ * for room, with nothing merged.
  */
 export type Prepared =
   | { readonly kind: "clean" }
   | { readonly kind: "conflicted"; readonly message: LandMessage }
   | { readonly kind: "nothing" }
   | { readonly kind: "refused"; readonly reason: string }
+  | { readonly kind: "start-held" }
 
 const refused = (reason: string) => ({ kind: "refused", reason }) as const
 
@@ -85,17 +88,25 @@ export type UpdateFollows = "run" | "send"
 /**
  * Start the lane, run `update`, and stop the lane again unless a run
  * follows: the one `follows` names, or the resolution of a conflicted merge.
- * That run's end stops it. A throw is a refusal saying why.
+ * That run's end stops it. A throw is a refusal saying why. The caller holds
+ * a step of the documents' keeper, so the start never waits for room: one
+ * the machine holds answers `start-held`, with nothing merged, started or
+ * stopped.
  */
 export async function withLaneStarted(
-  ports: { readonly beforeRun: () => void; readonly runEnded: () => void },
+  ports: {
+    readonly startForUpdate: () => Promise<StartAnswer>
+    readonly runEnded: () => void
+  },
   follows: UpdateFollows,
   update: () => Promise<Prepared>,
 ): Promise<Prepared> {
-  const prepared = await (async () => {
-    ports.beforeRun()
+  const prepared = await (async (): Promise<Prepared> => {
+    const started = await ports.startForUpdate()
+    if (started === "start-held") return { kind: "start-held" }
     return update()
   })().catch((error: unknown) => refused(errorText(error)))
+  if (prepared.kind === "start-held") return prepared
   if (follows === "send" && prepared.kind !== "conflicted") ports.runEnded()
   return prepared
 }
@@ -141,7 +152,9 @@ export interface Updates {
    * `intent` (the card's text) after the conflicts. Nothing new: nothing to do
    * but what the merge's adapter does after a move to accepted work. Refused, with the lane untouched,
    * when even the smallest resolution prompt would not fit. The lane is stopped
-   * after, unless a run follows (`follows`).
+   * after, unless a run follows (`follows`). Its caller holds a step of the
+   * documents' keeper, so a lane whose start the machine holds is not
+   * waited for: `start-held`, with nothing merged.
    */
   prepareUpdate(
     handle: Pick<ThreadLaneHandle, "name" | "append">,
@@ -172,7 +185,7 @@ export function createUpdates(deps: {
   readonly destination: Pick<Destination, "baseNow">
   readonly registry: LaneRegistry
   readonly piSetup: Pick<PiSetup, "skill">
-  readonly containers: Pick<Containers, "beforeRun" | "runEnded">
+  readonly containers: Pick<Containers, "startForUpdate" | "runEnded">
   readonly records: Pick<Records, "writeValues">
   readonly writeRevision: Turns["writeRevision"]
   readonly snapshots: SnapshotTaking
@@ -390,7 +403,7 @@ export function createUpdates(deps: {
         return refused("the lane has no copy of its own")
       return withLaneStarted(
         {
-          beforeRun: () => containers.beforeRun(lane),
+          startForUpdate: () => containers.startForUpdate(lane),
           runEnded: () => containers.runEnded(lane),
         },
         follows,

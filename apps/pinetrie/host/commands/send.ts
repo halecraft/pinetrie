@@ -105,11 +105,23 @@ interface SendContext {
 }
 
 /**
+ * What a send comes to, on the host: an `Outcome`, or `start-held`, a chat
+ * that gets the latest first whose lane's start the machine holds, with
+ * nothing written. Never sent out as it is (`wireOutcome`): the drain tells
+ * it from pi's `busy`, which waits for a run's end, not for room.
+ */
+export type SendOutcome = Outcome | { readonly kind: "start-held" }
+
+/** A send's answer as its sender is told it: a held start is `busy`, and its chat is queued. */
+export const wireOutcome = (sent: SendOutcome): Outcome =>
+  sent.kind === "start-held" ? { kind: "busy" } : sent
+
+/**
  * Whether a send's answer took its card's text: written or running. A busy
  * lane, a conflict, a refusal or a failure leaves the card, so nothing typed
  * is lost: the sender's client queues a card the lane was busy for.
  */
-export const spendsCard = (sent: Outcome): boolean =>
+export const spendsCard = (sent: SendOutcome): boolean =>
   sent.kind === "appended" || sent.kind === "started"
 
 /**
@@ -129,7 +141,7 @@ export async function sendMessage(
   send: Cleared<Send>,
   /** This send has caught its lane up already (`get-latest-first`). */
   upToDate = false,
-): Promise<Outcome> {
+): Promise<SendOutcome> {
   const { work, blobs, cards } = deps
   const { roots, session, live, places } = deps.basics
   const threads = readThreads(session)
@@ -241,7 +253,8 @@ function sendRefusal(why: SendRefusal): Outcome {
  * chat runs on it, as a card's catch-up is: the update, then the chat planned
  * again, after the update's entry; or, should the merge conflict after all, the
  * resolution run carrying the chat's text. The lane is kept started: a run
- * follows either way.
+ * follows either way. A lane whose start the machine holds is not caught up,
+ * nor written: `start-held`, and the chat waits in its queue for room.
  */
 async function getLatestFirst(
   deps: SendDeps,
@@ -249,7 +262,7 @@ async function getLatestFirst(
   sendId: string,
   send: Cleared<Send>,
   lane: ThreadId,
-): Promise<Outcome> {
+): Promise<SendOutcome> {
   const prepared = await deps.work.prepareUpdate(
     deps.agent.lane(lane),
     writer,
@@ -257,6 +270,7 @@ async function getLatestFirst(
     "get-latest",
     "run",
   )
+  if (prepared.kind === "start-held") return prepared
   if (prepared.kind === "conflicted")
     return startRun(deps, deps.basics.roots, lane, {
       kind: "prompt",

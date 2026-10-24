@@ -141,6 +141,8 @@ export function causeWords(
           return "the host has stopped"
         case "failed":
           return `it could not be read: ${cause.error ?? "no reason given"}`
+        case "overdue":
+          return "the machine has not been read for a while: nothing is held"
         default:
           return assertNever(cause.reason)
       }

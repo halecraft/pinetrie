@@ -43,6 +43,7 @@ export type {
   LaneSample,
   MachineReading,
   MachineSample,
+  ReadingPlanned,
   SensedSample,
   UpkeepHeard,
 } from "./sample.ts"

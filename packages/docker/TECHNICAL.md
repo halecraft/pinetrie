@@ -170,6 +170,11 @@ hosts lanehost's roles; its disks are lanehost's client, spread
 - **After a new lease** (`vmRestarted`) lanehost's channels are closed, and
   its image, containers and the network are made again at the next call
   that needs them.
+- **A host's close closes the runtime** (`close`, from `Found.close`, after
+  the lanes' links closed): lanehost's channels and the observer's, a
+  forwarded observer's connection to the helper's socket too, each
+  waited out, and every call after it refused (`ClientClosed`). On the
+  Mac it runs before the lease ends.
 - **Each project's disks are under its key** (`projectKey`, a hash of its
   root), as lanehost's `layout.ts` lays them out. A project's disks go with
   it, as one directory.

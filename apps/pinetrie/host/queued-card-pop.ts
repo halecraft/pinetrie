@@ -20,7 +20,6 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { Agent, Scribe } from "@pinetrie/pi"
-import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readParticipantNames,
   readPlaces,
@@ -62,10 +61,12 @@ import {
 } from "@pinetrie/threads"
 import { notWritten, type StepBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
+import type { SendOutcome } from "./commands/send.ts"
 import type { OpenChange, Places } from "./places.ts"
 import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
+import type { LaneGate } from "./work/memory-holds.ts"
 
 /**
  * A queued card the host popped: its record as it was, and its words at the
@@ -93,14 +94,15 @@ const hostFailedWords = (why: string): string => `the host failed: ${why}`
 
 /**
  * What a pop found: nothing to pop, a held queue, a top card someone is
- * typing in, only blank cards, a top card whose text is behind, or a card
- * popped.
+ * typing in, only blank cards, a lane whose start the machine holds, a top
+ * card whose text is behind, or a card popped.
  */
 export type NextQueuedCardPop =
   | { readonly kind: "idle" }
   | { readonly kind: "held" }
   | { readonly kind: "typing"; readonly card: QueuedText }
   | { readonly kind: "blank"; readonly card: QueuedText }
+  | { readonly kind: "start-held"; readonly card: QueuedCard }
   | { readonly kind: "behind"; readonly card: QueuedText }
   | { readonly kind: "popped"; readonly popped: PoppedQueuedCard }
 
@@ -109,7 +111,8 @@ export type NextQueuedCardPop =
  * text, and remove its record. Synchronous: an unqueue is a step on the same
  * keeper as the drain, so it runs before the pop or after it, never between,
  * and one after it is refused as gone. Idle when the lane runs or nothing is
- * queued; `held`, `typing` and `blank` as `planNextQueuedCardPop` says. A card
+ * queued; `held`, `typing`, `blank` and `start-held` as
+ * `planNextQueuedCardPop` says. A card
  * whose text the host does not yet hold as its queuer had it is `behind`, and
  * stays: Kyneta keeps no order between documents, so its record can arrive
  * before its text. Such a card is not blank, though its text reads empty so
@@ -123,7 +126,7 @@ export function popNextQueuedCard(
   lane: ThreadId,
   facts: Pick<
     Parameters<typeof planQueuedPop>[0],
-    "running" | "away" | "held" | "typing"
+    "running" | "away" | "held" | "typing" | "isStartHeld"
   >,
   texts: Pick<CardPort, "textNow" | "holds">,
   quotes: ReadonlyMap<Sha256, string> = new Map(),
@@ -188,13 +191,18 @@ export interface QueuedCardPopDeps {
   readonly agent: Pick<Agent, "lane">
   /** Where a fact is appended, in a thread with no lane: only a lane appends. */
   readonly scribe: Pick<Scribe, "appendToTree">
-  readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
+  readonly work: Pick<
+    LaneWork,
+    "prepareUpdate" | "prepareSplit" | "runnable" | "hasOwnContainer"
+  >
+  /** Whether the machine lets a lane start now: the pop waits while it does not. */
+  readonly machine: Pick<LaneGate, "isLaneActivityAllowed">
   /** Start a run in the drain's step, whose documents lease its root. */
   readonly start: (
     ...args: Parameters<Runs["start"]> extends [unknown, ...infer R] ? R : never
   ) => ReturnType<Runs["start"]>
   /** Send a popped card's text as its queuer's message, through the gate and `sendMessage`. */
-  readonly send: (popped: PoppedMessage) => Promise<Outcome>
+  readonly send: (popped: PoppedMessage) => Promise<SendOutcome>
   /** Where a queued reference's quote is read. */
   readonly blobs: Pick<BlobStore, "get">
   /** The top card's text is behind: drain the lane again once the host holds it. */
@@ -203,6 +211,8 @@ export interface QueuedCardPopDeps {
   readonly typing: (card: QueuedText) => void
   /** Only blank cards are queued: drain the lane again once `card` is written in. */
   readonly blank: (card: QueuedText) => void
+  /** The machine holds the lane's start: drain it again once it lets the lane start. */
+  readonly startHeld: (card: QueuedCard) => void
   /**
    * The writer of the places: each pop is one change of the host's, so a
    * popped card's text goes as it closes unless the card was written back.
@@ -222,8 +232,10 @@ export interface QueuedCardPopDeps {
  * not be sent goes back below the line, saying why (`planUnsent`). A held queue
  * ends the drain; a top card whose text is behind, or that someone types in,
  * ends it with a wait that drains again; so does a queue of blank cards alone,
- * until one is written in. A run's end, startup, a move that queues a card on
- * an idle lane, and a release each drain again.
+ * until one is written in, and a lane whose start the machine holds, read
+ * before the pop or answered by the card's start, until it lets the lane
+ * start. A run's end, startup, a move that queues a card on an idle lane, and
+ * a release each drain again.
  */
 export async function drain(
   deps: QueuedCardPopDeps,
@@ -261,6 +273,10 @@ export async function drain(
             typeof deps.work.runnable(lane) === "object",
           held: readQueueHolds(deps.basics.session).has(lane),
           typing: readTypingIn(deps.presence),
+          // A lane with no container of its own starts none, so is never held.
+          isStartHeld:
+            deps.work.hasOwnContainer(lane) &&
+            !deps.machine.isLaneActivityAllowed(lane, "container-start"),
         },
         deps.texts,
         quotes,
@@ -268,6 +284,7 @@ export async function drain(
       return next.kind === "popped"
         ? ({
             kind: "carried",
+            card: next.popped.card,
             done: await carryOut(deps, open, lane, next.popped),
           } as const)
         : next
@@ -278,6 +295,9 @@ export async function drain(
     if (top.kind === "behind") return deps.behind(top.card)
     if (top.kind === "typing") return deps.typing(top.card)
     if (top.kind === "blank") return deps.blank(top.card)
+    if (top.kind === "start-held") return deps.startHeld(top.card)
+    // Put back on top by its carrying: the queue waits for the start.
+    if (top.done === "start-held") return deps.startHeld(top.card)
     if (top.done === "ran") return
   }
 }
@@ -300,16 +320,23 @@ function queuedQuotes(
 }
 
 /**
- * One popped card, carried out as `planCarry` decides. "ran": a run started,
- * whose end drains again. The pop deleted its record, so a throw while it is
- * carried out writes it back too, or the card would be lost.
+ * What carrying out a popped card came to: "ran", a run started, whose end
+ * drains again; "next", the next card's turn; "start-held", the machine held
+ * the lane's start, and the card is back on top.
+ */
+type Carried = "ran" | "next" | "start-held"
+
+/**
+ * One popped card, carried out as `planCarry` decides. The pop deleted its
+ * record, so a throw while it is carried out writes it back too, or the card
+ * would be lost.
  */
 async function carryOut(
   deps: QueuedCardPopDeps,
   open: OpenChange,
   lane: ThreadId,
   popped: PoppedQueuedCard,
-): Promise<"ran" | "next"> {
+): Promise<Carried> {
   const plan = planCarry(popped.card, popped.text)
   switch (plan.kind) {
     case "fact":
@@ -388,7 +415,8 @@ async function appendFact(
 
 /**
  * A card that catches the thread up: the update, then the card's text sent, or
- * carried into the resolution run when the merge conflicts.
+ * carried into the resolution run when the merge conflicts. A lane whose start
+ * the machine holds merges nothing, and the card goes back on top, as it was.
  */
 async function getLatestThenSend(
   deps: QueuedCardPopDeps,
@@ -396,7 +424,7 @@ async function getLatestThenSend(
   lane: ThreadId,
   popped: PoppedText,
   plan: Extract<CarryPlan, { readonly kind: "get-latest" }>,
-): Promise<"ran" | "next"> {
+): Promise<Carried> {
   const { card } = popped
   const prepared = await deps.work
     .prepareUpdate(
@@ -411,6 +439,10 @@ async function getLatestThenSend(
       return null
     })
   if (prepared === null) return "next"
+  if (prepared.kind === "start-held") {
+    open.apply([{ kind: "write", record: card }])
+    return "start-held"
+  }
   if (prepared.kind === "refused") {
     await unsent(deps, open, card, prepared.reason)
     return "next"
@@ -471,7 +503,7 @@ async function sendCard(
   open: OpenChange,
   popped: PoppedMessage,
   sending: QueuedMessage,
-): Promise<"ran" | "next"> {
+): Promise<Carried> {
   const sent = await deps.send(popped).catch(async (error: unknown) => {
     await unsent(deps, open, sending, hostFailedWords(errorText(error)))
     return null
@@ -487,6 +519,10 @@ async function sendCard(
       // A run started under the pop: the card goes back on top, as it was.
       open.apply([{ kind: "write", record: sending }])
       return "ran"
+    case "start-held":
+      // It got the latest first, and the machine held the lane's start.
+      open.apply([{ kind: "write", record: sending }])
+      return "start-held"
     case "refused":
       await unsent(deps, open, sending, sent.message)
       return "next"

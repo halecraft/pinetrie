@@ -1,0 +1,4 @@
+== after 6,000 writes (about 24,000 notices) held in each of 4 lanes
+current=297631744 peak=297820160 ev_low=0 ev_high=0 ev_max=0 ev_oom=0 ev_oom_kill=0 ev_oom_group_kill=0 
+anon 116187136 file 0 kernel 180539392 kernel_stack 245760 pagetables 2572288 sec_pagetables 0 percpu 12040 sock 0 vmalloc 92962816 shmem 0 file_mapped 83902464 slab_reclaimable 209016 slab_unreclaima
+pid=5175 VmRSS:=133844 RssAnon:=82292 RssFile:=51552 RssShmem:=0 node /pinetrie/packages/lanehost/observer-server.ts /run/observer/observer.sock /usr/local

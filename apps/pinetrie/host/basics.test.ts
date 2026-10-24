@@ -2,7 +2,13 @@ import type { EventMeasured } from "@pinetrie/core"
 import { threadIdFor } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"
 import { expect, test } from "vitest"
-import { compactionLine, failed, slow, slowStepLine } from "./basics.ts"
+import {
+  compactionLine,
+  failed,
+  slow,
+  slowStepLine,
+  timestampedLog,
+} from "./basics.ts"
 import { basics } from "./fakes.ts"
 import { slowCommand } from "./jj/index.ts"
 
@@ -89,4 +95,14 @@ test("a slow step and a slow command are logged as before, and each recorded", (
     { kind: "slow-step", where: "your repo", ms: 1234 },
     { kind: "slow-command", program: "jj", subcommand: "log", ms: 901 },
   ])
+})
+
+test("timestampedLog prefixes each line with the local time of the clock it is given", () => {
+  const lines: string[] = []
+  const at = new Date(2026, 9, 24, 9, 7, 4).getTime()
+  timestampedLog(
+    line => lines.push(line),
+    () => at,
+  )("[host] ready")
+  expect(lines).toEqual(["09:07:04 [host] ready"])
 })

@@ -31,6 +31,7 @@ import {
   storedMessage,
 } from "../fakes.ts"
 import { memorySnapshotIndex } from "../snapshot-index.ts"
+import type { StartAnswer } from "./memory-holds.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Ready } from "./setup.ts"
 import {
@@ -135,11 +136,15 @@ describe("withLaneStarted: the lane an update starts", () => {
   const run = async (
     update: () => Promise<Prepared>,
     follows: "run" | "send" = "send",
+    start: StartAnswer = "started",
   ) => {
     const calls: string[] = []
     const prepared = await withLaneStarted(
       {
-        beforeRun: () => calls.push("start"),
+        startForUpdate: async () => {
+          calls.push("start")
+          return start
+        },
         runEnded: () => calls.push("stop"),
       },
       follows,
@@ -177,6 +182,12 @@ describe("withLaneStarted: the lane an update starts", () => {
         "update",
       ])
   })
+  test("a start the machine holds merges nothing and stops nothing", async () => {
+    for (const follows of ["run", "send"] as const)
+      expect(
+        await run(async () => ({ kind: "clean" }), follows, "start-held"),
+      ).toEqual({ prepared: { kind: "start-held" }, calls: ["start"] })
+  })
   test("a throw is a refusal saying why, and stops the lane", async () => {
     expect(
       await run(async () => {
@@ -187,6 +198,44 @@ describe("withLaneStarted: the lane an update starts", () => {
       calls: ["start", "update", "stop"],
     })
   })
+})
+
+test("prepareUpdate on a lane whose start the machine holds answers start-held, and queues no merge", async () => {
+  const asked: string[] = []
+  const history = record<LaneHistory>({
+    readyToMerge: async () => {
+      asked.push("readyToMerge")
+      throw new Error("merged")
+    },
+  }).port
+  const updates = createUpdates({
+    basics: basics(),
+    setup: { ready: { image: "img" } as Ready },
+    destination:
+      record<Parameters<typeof createUpdates>[0]["destination"]>().port,
+    registry: registryWith(history),
+    piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>({
+      skill: async () => null,
+    }).port,
+    containers: record<Parameters<typeof createUpdates>[0]["containers"]>({
+      startForUpdate: async () => "start-held",
+    }).port,
+    records: record<Parameters<typeof createUpdates>[0]["records"]>().port,
+    writeRevision: async () => {},
+    snapshots: memorySnapshotIndex(),
+    snapshotSkipped: () => {},
+  })
+  const prepared = await updates.prepareUpdate(
+    {
+      name: LANE,
+      append: async () => ({ kind: "appended", id: entryId("e") }),
+    },
+    ADA,
+    "",
+    "get-latest",
+    "send",
+  )
+  expect([prepared, asked]).toEqual([{ kind: "start-held" }, []])
 })
 
 describe("askedAboutConflict", () => {

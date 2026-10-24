@@ -1,0 +1,2 @@
+server pid 1467 before gc {"rss":97.2,"heapTotal":13,"heapUsed":11.2,"external":9.5,"arrayBuffers":0.3}
+server pid 1467 after gc  {"rss":89.4,"heapTotal":7.9,"heapUsed":6.5,"external":9.4,"arrayBuffers":0.2}

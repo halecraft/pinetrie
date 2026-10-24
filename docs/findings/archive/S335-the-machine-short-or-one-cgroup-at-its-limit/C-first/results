@@ -1,0 +1,5 @@
+thrash: held 440 MiB anonymous, 128 MiB of files  oom-killed=true
+lane1: file passes: 555 vm bogo ops: 45576331  oom-killed=false
+lane2: file passes: 548 vm bogo ops: 45251441  oom-killed=false
+lane3: file passes: 525 vm bogo ops: 44386718  oom-killed=false
+lane4: file passes: 518 vm bogo ops: 44833881  oom-killed=false

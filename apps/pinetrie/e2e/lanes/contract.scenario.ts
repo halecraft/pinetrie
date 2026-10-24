@@ -187,6 +187,8 @@ async function dockerContract(
   const laneShapes = new Map<ThreadId, ContainerShape>()
   /** A host of project B's, closed once project A's second host is done. */
   let slotHeld: { close(): Promise<void> } | null = null
+  /** What host A serves, once ready: its observer is opened before its close. */
+  let served: Awaited<ReturnType<typeof a.ready>> | null = null
   const contractImage = (name: string) =>
     `pinetrie-lane:contract-${process.pid}-${name}`
   const heldContainer = `pinetrie-contract-${process.pid}-held`
@@ -236,7 +238,7 @@ async function dockerContract(
         readonly: true,
       },
     ]
-    await a.ready({
+    served = await a.ready({
       defaultImage: "",
       hostPorts: [grantedPort.port],
       mounts: [...mountsOfA, ...serverMounts],
@@ -831,7 +833,16 @@ async function dockerContract(
       })
       .catch(() => {})
     await slotHeld?.close()
+    // Opened last: a new lease during the scenario closes the channel.
+    await served?.observer().catch(() => {})
+    const before = await observerConnections()
     await a.close()
+    const after = await observerConnections()
+    check(
+      "a host's close closes its observer connection",
+      before > 0 && after === 0,
+      `before ${before}, after ${after}`,
+    )
     if (own !== null) {
       // The contract's VM stops once its last lease ends.
       await waitFor(
@@ -881,3 +892,15 @@ const quietCli = (args: readonly string[], input?: string): Promise<string> =>
   )
 
 const quietSh = (script: string): Promise<string> => sh(script).catch(() => "")
+
+/**
+ * This process's children that hold an observer connection: a host runs in
+ * the scenario's process, and each connection is a child of it (a `docker
+ * exec` into the observer, or the helper's connection inside a lane), so
+ * no scenario running beside it is counted.
+ */
+const observerConnections = async (): Promise<number> =>
+  (await quietSh(`pgrep -P ${process.pid} -f observer-connect || true`))
+    .trim()
+    .split("\n")
+    .filter(l => l !== "").length

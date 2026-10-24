@@ -1,0 +1,2 @@
+FROM node:24-trixie-slim
+COPY thrash.mjs /thrash.mjs

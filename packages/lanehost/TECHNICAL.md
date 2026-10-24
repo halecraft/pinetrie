@@ -581,6 +581,13 @@ out, every call checked and planned into paths first (`planApply`,
   runtime's): a message on a held channel, not a `docker exec` per call
   (S147). A channel that ends is opened again at the next call; a
   failed open is tried again then too. `reset` closes them all.
+- **`close` is the host's last word** (`client.ts`, `observer-client.ts`):
+  it closes every channel and waits for each to end, and every call after
+  it is refused with `ClientClosed` (`closed.ts`), never answered by a
+  channel opened again. A host closed in a process that goes on (a
+  suite's) would otherwise leave each one open, a process in the
+  machine's observer (S337). A relayed connection is its lane's, closed
+  with the lane's link, not the client's.
 - **Each call is one line in the host's log:** its role, its kind, its time
   and whether it failed.
 

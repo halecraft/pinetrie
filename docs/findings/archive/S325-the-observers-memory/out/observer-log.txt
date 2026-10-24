@@ -1,0 +1,21 @@
+Debugger listening on ws://127.0.0.1:9229/36609a07-0525-4d6c-acef-d059948bb75a
+For help, see: https://nodejs.org/learn/getting-started/debugging
+Debugger attached.
+
+<--- Last few GCs --->
+
+[5175:0xffff7c8e0000]    39285 ms: Scavenge (interleaved) 254.1 (257.0) -> 253.3 (257.0) MB, pooled: 1 MB, 0.21 / 0.00 ms  (average mu = 0.133, current mu = 0.011) allocation failure; 
+[5175:0xffff7c8e0000]    39335 ms: Mark-Compact (reduce) 254.3 (257.2) -> 253.7 (256.5) MB, pooled: 0 MB, 43.73 / 0.00 ms  (+ 0.1 ms in 15 steps since start of marking, biggest step 0.1 ms, walltime since start of marking 45 ms) (average mu = 0.156, curre
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x90e9bc  [/pinetrie-runtime/node/node]
+ 2: 0x75ab88 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/pinetrie-runtime/node/node]
+ 3: 0xc1ee4c  [/pinetrie-runtime/node/node]
+ 4: 0xc1ef24  [/pinetrie-runtime/node/node]
+ 5: 0xe9b30c  [/pinetrie-runtime/node/node]
+ 6: 0xe9b33c  [/pinetrie-runtime/node/node]
+ 7: 0xe9b694  [/pinetrie-runtime/node/node]
+ 8: 0xeaae44  [/pinetrie-runtime/node/node]
+ 9: 0xeaeaa4  [/pinetrie-runtime/node/node]
+10: 0x18a50f4  [/pinetrie-runtime/node/node]

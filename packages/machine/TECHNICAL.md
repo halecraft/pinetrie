@@ -12,10 +12,11 @@ and the words share one.
 | module | holds |
 |---|---|
 | `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager`, `HostLaneFacts`, `MachineMeasurements`, `RepairControls` |
-| `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it; `MachineReading`, the last sample with what was planned from it |
+| `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it; `MachineReading`, fresh or overdue, and `ReadingPlanned`, the last sample with what was planned from it |
+| `freshness.ts` | whether the reading is fresh, in ticks of the sample timer (`FreshnessState`, `nextTickFreshness`, `sampleEndFreshness`, `READING_OVERDUE_AFTER_TICKS`) |
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`), each lane's kept ones and their cost (`snapshotsByLane`), and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
-| `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it |
+| `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it; `planOverdueHealth`, once the reading is overdue |
 | `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
 | `importance.ts` | which lanes matter most (`rankLanes`) |
@@ -72,10 +73,20 @@ and the words share one.
   kind for them, so nothing can be asked to do one.
 - **`waitUntilAllowed` is what waits** (the host's gate and its start): it
   settles when the last plan's treatment allows the activity, rejects on
-  its signal's abort, settles at once observing and before the first
-  plan, and is refused (`KeeperClosed`) at `close`, so a stopping host
-  waits on none. A start waiting is what the next plan counts among the
-  lanes waiting to start.
+  its signal's abort, settles at once observing, before the first plan
+  and while the reading is overdue, and is refused (`KeeperClosed`) at
+  `close`, so a stopping host waits on none. A start waiting is what the
+  next plan counts among the lanes waiting to start.
+  `isLaneActivityAllowed` is its first check, answered at once; the two
+  read one function, so a caller that checks and then waits never meets
+  a different answer.
+- **No caller waits at the gate inside a step of the host's documents'
+  keeper.** A sample's health is written by a step on that keeper, so a
+  step there that waits for a sample's plan waits on itself: the
+  incident of 2026-10-24 froze every command for an hour so. A start
+  asked from such a step refuses when held instead
+  (`apps/pinetrie/host/TECHNICAL.md`, "Getting the latest holds its
+  step").
 - **Observing, the rung is planned and measured, and nothing is held**: the
   treatments are planned for their shadow decisions only, every lane is
   `normal`, and memory short is said without a hold (`isHolding`).
@@ -280,7 +291,8 @@ and the words share one.
 - **The latest reading is kept as a sample's step ends**
   (`latestReading`): the last sample that read, with the health, the rung,
   the lanes held and the repair's facts planned in that step or a later
-  failed one; null before a sample has read. The Machine page reads it,
+  failed one; null before a sample has read; overdue, that reading under
+  the overdue health, holding nothing. The Machine page reads it,
   and never asks for a sample: every threshold counts samples, so a
   watched host must not sample faster.
 - **Services' memory is read as lanes' is**: each lanehost role's and the
@@ -310,16 +322,41 @@ and the words share one.
   known, so the setting holds every amount (`LeaveFree`) and
   `leaveFreeBytes` takes the largest.
 - **The record is written at start and at close.** `start` writes
-  `unsampled` ("waiting") before the first sample, and `close`, after any
-  sample that runs, writes it again ("stopped"), so a stopped host's red
-  never outlives it. A write the sink refuses is tried again at the next
-  sample.
+  `unsampled` ("waiting") before the first sample, and `close` writes it
+  again ("stopped") and waits for the sink to have written it
+  (`writesFlushed`), so a stopped host's red never outlives it. `close`
+  never waits for a running sample, which may never end: it waits out a
+  running upkeep step and a repair, and a sample that ends after it
+  changes nothing. A write the sink refuses is told to the manager
+  (`makeSink`'s `onUnwritten`), and the next sample writes its value
+  though nothing changed.
 - **A keeper of its own.** The host's timer asks for a sample with the
   manager's `later("sample")`, which merges asks made while one is queued:
-  samples never overlap, and never wait behind or hold up the documents'
-  keeper, on which only the sink's write runs. The keeper's own rules are
+  samples never overlap. A sample never waits on the documents' keeper:
+  the health's write is queued (`HealthSink.write` returns nothing) and
+  `memory` takes the value at once, since a step on that keeper may wait
+  on this manager's gate. The keeper's own rules are
   `packages/keeper/TECHNICAL.md`'s; its `onSlow` reports a sample that
   drags.
+- **A sample is gathered, then judged, then planned.** Every await (the
+  sensor, the lanes' ranking, the repair's state) comes before any state
+  changes, so a sample judged stale, or ending into a closed manager,
+  changes nothing.
+- **A reading no sample replaces holds nothing** (`freshness.ts`). Each
+  tick of the host's timer (`sampleTick`) is counted outside the
+  manager's keeper, which a sample that never ends holds. Once
+  `READING_OVERDUE_AFTER_TICKS` ticks pass with no fresh sample ended (a
+  suite's shorter ticks give their own bound), the reading is overdue:
+  every waiter is let go, every activity is allowed, and the health says
+  `unsampled` (`overdue`) with the last causes, memory short holding
+  nothing, and no treatments. A sample that started before that tick is
+  stale when it ends: it plans, writes and measures nothing, its rows
+  being stamped long after its reading, and is told (`stale-sample`). The
+  next sample, started after, is fresh and plans as usual, its hysteresis
+  kept, so a rung that still holds holds again. Counted in ticks, never
+  in time, as every threshold here. Letting go risks starting lanes in a
+  shortage the host can no longer read; the kernel's OOM killer still
+  guards it, and the health says the reading is overdue.
 
 ## Tests
 
@@ -329,7 +366,9 @@ lanes, rungs and rankings), `repair.test.ts` (properties over random
 states and events: every move the table allows and no other, what leaves
 `failed`, the shared state's text both ways), `repair-steps.test.ts`, `measurements.test.ts` (a property:
 `commandProgram` never returns an argument), `types.test.ts`,
-`manager.test.ts`, `store-settings.test.ts`, `boundary.test.ts`,
+`manager.test.ts` (the incident's deadlock among them: a documents step
+waiting at the gate, and a sample that still ends), `freshness.test.ts`,
+`store-settings.test.ts`, `boundary.test.ts`,
 `retention.test.ts` (a property, over random listings of every owner's
 names and random rows: no plan deletes another owner's name, a protected
 row, an unindexed name before the index is complete, or more than its

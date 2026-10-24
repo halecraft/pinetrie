@@ -631,7 +631,8 @@ export const queuedTextCards = (
 
 /**
  * A lane's next queued card popped (`planNextQueuedCardPop`): idle when the
- * lane runs or nothing is queued, `held`, `typing` and `blank` as it says. A
+ * lane runs or nothing is queued, `held`, `typing`, `blank` and `start-held`
+ * as it says. A
  * card whose text the host does not yet hold as its queuer had it is
  * `behind`, and stays: its record can arrive before its text, and such a
  * card is not blank, though its text reads empty so far. Otherwise the
@@ -644,6 +645,7 @@ export function planQueuedPop(input: {
   readonly away: boolean
   readonly held: boolean
   readonly typing: ReadonlySet<CardId>
+  readonly isStartHeld: boolean
   /** The texts of `queuedTextCards`, as the host holds them. */
   readonly texts: ReadonlyMap<CardId, QueuedTextNow>
   /** Each queued reference's quote. */
@@ -669,6 +671,7 @@ export function planQueuedPop(input: {
     held: input.held,
     typing: input.typing,
     blank,
+    isStartHeld: input.isStartHeld,
   })
   if (step.kind !== "pop") return step
   const { card } = step

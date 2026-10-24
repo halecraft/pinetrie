@@ -1102,6 +1102,7 @@ describe("the queue", () => {
     held: false,
     typing: new Set<CardId>(),
     blank: new Set<CardId>(),
+    isStartHeld: false,
   }
 
   test("planNextQueuedCardPop: nothing while the lane runs; else its top queued card", () => {
@@ -1164,6 +1165,26 @@ describe("the queue", () => {
         ...idle,
         running: true,
       }),
+    ).toEqual({ kind: "idle" })
+  })
+
+  test("planNextQueuedCardPop: a lane whose start is held pops no message, but a fact on top; a held queue says so first", () => {
+    const top = queued(cardIdFor("c1"), "a")
+    const startHeld = { ...idle, isStartHeld: true }
+    expect(planNextQueuedCardPop([top], LANE, startHeld)).toEqual({
+      kind: "start-held",
+      card: top,
+    })
+    const fact = factCard({ place: { ...queuedPlace, order: "0" } })
+    expect(planNextQueuedCardPop([fact, top], LANE, startHeld)).toEqual({
+      kind: "pop",
+      card: fact,
+    })
+    expect(
+      planNextQueuedCardPop([top], LANE, { ...startHeld, held: true }),
+    ).toEqual({ kind: "held" })
+    expect(
+      planNextQueuedCardPop([top], LANE, { ...startHeld, running: true }),
     ).toEqual({ kind: "idle" })
   })
 

@@ -4,7 +4,7 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { entrySnapshotId } from "@pinetrie/core/fixtures"
-import { KeeperClosed } from "@pinetrie/keeper"
+import { createKeeper, KeeperClosed } from "@pinetrie/keeper"
 import { describe, expect, test } from "vitest"
 import {
   EMPTY_LISTING,
@@ -13,7 +13,9 @@ import {
   fakeStore,
   keptMeasurements,
   memoryIndex,
+  recordingSink,
 } from "./fixtures.ts"
+import { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
 import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import {
   createMachineManager,
@@ -61,27 +63,33 @@ const calm: SensedSample = {
   hostStalledMs: 0,
 }
 
+/** What a manager over `sensor` is made with, writing nowhere and telling nothing. */
+const managedDeps = (
+  sensor: MachineSensor,
+  mode: ManageMode = "manage",
+): Parameters<typeof createMachineManager>[0] => ({
+  sensor,
+  makeSink: recordingSink(),
+  settings: SETTINGS,
+  mode,
+  capabilities: { grow: false, repairDisk: false },
+  index: memoryIndex(),
+  store: fakeStore(EMPTY_LISTING).store,
+  records: fakeRecords(),
+  laneFacts: fakeLaneFacts(),
+  measurements: keptMeasurements(),
+  readRepair: null,
+  repair: null,
+  tell: () => {},
+})
+
 /** A manager over `sensor`, with what its sink was written and what it told. */
 function managed(sensor: MachineSensor, mode: ManageMode = "manage") {
   const written: MachineHealth[] = []
   const told: ManagerNews[] = []
   const manager = createMachineManager({
-    sensor,
-    sink: {
-      write: async health => {
-        written.push(health)
-      },
-    },
-    settings: SETTINGS,
-    mode,
-    capabilities: { grow: false, repairDisk: false },
-    index: memoryIndex(),
-    store: fakeStore(EMPTY_LISTING).store,
-    records: fakeRecords(),
-    laneFacts: fakeLaneFacts(),
-    measurements: keptMeasurements(),
-    readRepair: null,
-    repair: null,
+    ...managedDeps(sensor, mode),
+    makeSink: recordingSink(written),
     tell: news => told.push(news),
   })
   return { manager, written, told }
@@ -96,6 +104,7 @@ const reasons = (written: readonly MachineHealth[]) =>
 test("unsampled is written at start and again at close", async () => {
   const { manager, written } = managed(steady)
   await manager.start()
+  await manager.idle()
   await manager.close()
   expect(reasons(written)).toEqual(["waiting", "neutral", "stopped"])
 })
@@ -156,23 +165,11 @@ test("a refused write is written again at the next sample", async () => {
   const written: MachineHealth[] = []
   const told: ManagerNews[] = []
   const manager = createMachineManager({
-    sensor: steady,
-    sink: {
-      write: async health => {
-        if (refuse && health.state === "neutral") throw new Error("closed")
-        written.push(health)
-      },
-    },
-    settings: SETTINGS,
-    mode: "manage",
-    capabilities: { grow: false, repairDisk: false },
-    index: memoryIndex(),
-    store: fakeStore(EMPTY_LISTING).store,
-    records: fakeRecords(),
-    laneFacts: fakeLaneFacts(),
-    measurements: keptMeasurements(),
-    readRepair: null,
-    repair: null,
+    ...managedDeps(steady),
+    makeSink: recordingSink(
+      written,
+      health => refuse && health.state === "neutral",
+    ),
     tell: news => told.push(news),
   })
   await manager.start()
@@ -223,19 +220,12 @@ describe("the disk upkeep", () => {
     )
     const measurements = keptMeasurements()
     const manager = createMachineManager({
-      sensor: steady,
-      sink: { write: async () => {} },
-      settings: SETTINGS,
+      ...managedDeps(steady),
       mode: input.mode ?? "manage",
-      capabilities: { grow: false, repairDisk: false },
       index: input.index,
       store,
       records: input.records ?? fakeRecords(),
-      laneFacts: fakeLaneFacts(),
       measurements,
-      readRepair: null,
-      repair: null,
-      tell: () => {},
     })
     return { manager, did, measurements }
   }
@@ -320,11 +310,7 @@ describe("the disk upkeep", () => {
       nested: [],
     })
     const manager = createMachineManager({
-      sensor: steady,
-      sink: { write: async () => {} },
-      settings: SETTINGS,
-      mode: "manage",
-      capabilities: { grow: false, repairDisk: false },
+      ...managedDeps(steady),
       index,
       store: {
         ...store,
@@ -333,12 +319,6 @@ describe("the disk upkeep", () => {
           return store.listing()
         },
       },
-      records: fakeRecords(),
-      laneFacts: fakeLaneFacts(),
-      measurements: keptMeasurements(),
-      readRepair: null,
-      repair: null,
-      tell: () => {},
     })
     manager.requestUpkeep()
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -371,19 +351,9 @@ describe("the disk upkeep", () => {
       }),
     }
     const manager = createMachineManager({
-      sensor: low,
-      sink: { write: async () => {} },
-      settings: SETTINGS,
-      mode: "manage",
-      capabilities: { grow: false, repairDisk: false },
+      ...managedDeps(low),
       index,
       store,
-      records: fakeRecords(),
-      laneFacts: fakeLaneFacts(),
-      measurements: keptMeasurements(),
-      readRepair: null,
-      repair: null,
-      tell: () => {},
     })
     await manager.start()
     for (let i = 0; i < ENTER_AFTER; i++) await manager.sample()
@@ -483,7 +453,8 @@ describe("memory", () => {
     await toRung2(manager)
     const start = manager.waitUntilAllowed(LANE, "container-start")
     await manager.sample()
-    const reading = manager.latestReading()
+    const latest = manager.latestReading()
+    const reading = latest?.kind === "fresh" ? latest : null
     expect([
       reading?.sample.machine.pressure?.fullAvg10,
       reading?.rung,
@@ -521,14 +492,7 @@ describe("memory", () => {
     const { now, sensor } = pressured()
     let ranked = 0
     const manager = createMachineManager({
-      sensor,
-      sink: { write: async () => {} },
-      settings: SETTINGS,
-      mode: "manage",
-      capabilities: { grow: false, repairDisk: false },
-      index: memoryIndex(),
-      store: fakeStore(EMPTY_LISTING).store,
-      records: fakeRecords(),
+      ...managedDeps(sensor),
       laneFacts: {
         lanesByImportance: async lanes => {
           ranked++
@@ -536,10 +500,6 @@ describe("memory", () => {
         },
         programInFlight: () => null,
       },
-      measurements: keptMeasurements(),
-      readRepair: null,
-      repair: null,
-      tell: () => {},
     })
     await manager.start()
     now.running = true
@@ -573,6 +533,228 @@ describe("memory", () => {
     await manager.close()
     await expect(start).rejects.toBeInstanceOf(KeeperClosed)
   })
+
+  /** Settles after every microtask queued now: what has not settled by then waits on something else. */
+  const turn = () => new Promise(resolve => setImmediate(resolve))
+
+  test("a sample never waits on a documents step that waits at the gate", async () => {
+    const { now, sensor } = pressured()
+    // The host's documents' keeper, and its sink writing the latest value
+    // in a merged step on it.
+    const docs = createKeeper<string>()
+    const written: MachineHealth[] = []
+    let latest: MachineHealth | null = null
+    const manager = createMachineManager({
+      ...managedDeps(sensor),
+      makeSink: () => ({
+        write(health) {
+          latest = health
+          void docs.once("health", async () => {
+            if (latest !== null) written.push(latest)
+          })
+        },
+        writesFlushed: () => docs.idle(),
+      }),
+    })
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    // A get-the-latest's step, waiting at the gate for its lane's start.
+    let stepEnded = false
+    void docs
+      .run(() => manager.waitUntilAllowed(LANE, "container-start"))
+      .then(() => {
+        stepEnded = true
+      })
+    let sampled = false
+    void manager.sample().then(() => {
+      sampled = true
+    })
+    await turn()
+    expect(sampled).toBe(true)
+    now.full = 0
+    for (let i = 0; i < LEAVE_AFTER + 2 && !stepEnded; i++)
+      await manager.sample()
+    await turn()
+    expect(stepEnded).toBe(true)
+  })
+
+  test("isLaneActivityAllowed answers as waitUntilAllowed settles", async () => {
+    const answers = async (mode: ManageMode) => {
+      const { now, sensor } = pressured()
+      const { manager } = managed(sensor, mode)
+      await manager.start()
+      const both = async () => {
+        let settled = false
+        void manager.waitUntilAllowed(LANE, "container-start").then(
+          () => {
+            settled = true
+          },
+          () => {},
+        )
+        await turn()
+        return [manager.isLaneActivityAllowed(LANE, "container-start"), settled]
+      }
+      const before = await both()
+      now.full = 6
+      await toRung2(manager)
+      const short = await both()
+      await manager.close().catch(() => {})
+      return [before, short]
+    }
+    expect(await answers("manage")).toEqual([
+      [true, true],
+      [false, false],
+    ])
+    expect(await answers("observe")).toEqual([
+      [true, true],
+      [true, true],
+    ])
+  })
+
+  /** `pressured`, whose sample waits while `hang.on`, until `hang.release`. */
+  const hanging = () => {
+    const p = pressured()
+    let release = Promise.withResolvers<void>()
+    const hang = {
+      on: false,
+      release: () => {
+        hang.on = false
+        release.resolve()
+        release = Promise.withResolvers<void>()
+      },
+    }
+    const sensor: MachineSensor = {
+      sample: async () => {
+        if (hang.on) await release.promise
+        return p.sensor.sample()
+      },
+    }
+    return { now: p.now, sensor, hang }
+  }
+  const ticks = (manager: MachineManager, count: number) => {
+    for (let i = 0; i < count; i++) manager.sampleTick()
+  }
+  /** A sample started at the next tick, hanging, then ticks until the reading is overdue. */
+  const hungUntilOverdue = async (
+    manager: MachineManager,
+    hang: { on: boolean },
+  ) => {
+    hang.on = true
+    ticks(manager, 1)
+    await turn()
+    ticks(manager, READING_OVERDUE_AFTER_TICKS - 1)
+    await turn()
+  }
+
+  test("a reading no sample replaces lets every hold go, and says so", async () => {
+    const { now, sensor, hang } = hanging()
+    const { manager, written } = managed(sensor)
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    let started = false
+    void manager.waitUntilAllowed(LANE, "container-start").then(() => {
+      started = true
+    })
+    await manager.sample()
+    hang.on = true
+    ticks(manager, 1)
+    await turn()
+    ticks(manager, READING_OVERDUE_AFTER_TICKS - 2)
+    await turn()
+    expect(started).toBe(false)
+    ticks(manager, 1)
+    await turn()
+    expect(started).toBe(true)
+    expect(manager.isLaneActivityAllowed(LANE, "container-start")).toBe(true)
+    expect(written.at(-1)).toEqual({
+      state: "amber",
+      causes: [
+        { kind: "unsampled", reason: "overdue", error: null },
+        { kind: "memory-short", rung: 2, isHolding: false },
+      ],
+      treatments: [],
+    })
+    expect(manager.latestReading()?.kind).toBe("overdue")
+    hang.release()
+    await manager.close()
+  })
+
+  test("a sample that hung holds nothing when it ends, and the next plans as usual", async () => {
+    const { now, sensor, hang } = hanging()
+    const measurements = keptMeasurements()
+    const told: ManagerNews[] = []
+    const manager = createMachineManager({
+      ...managedDeps(sensor),
+      measurements,
+      tell: news => told.push(news),
+    })
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    expect(manager.isLaneActivityAllowed(LANE, "container-start")).toBe(false)
+    const measured = measurements.samples.length
+    await hungUntilOverdue(manager, hang)
+    expect(manager.isLaneActivityAllowed(LANE, "container-start")).toBe(true)
+    hang.release()
+    await manager.idle()
+    expect(told.filter(n => n.kind === "stale-sample")).toHaveLength(1)
+    // Only the sample queued behind it is measured, and holds again.
+    expect(measurements.samples.length).toBe(measured + 1)
+    expect(manager.isLaneActivityAllowed(LANE, "container-start")).toBe(false)
+    expect(manager.latestReading()?.kind).toBe("fresh")
+    await manager.close()
+  })
+
+  test("after an overdue health, a fresh sample writes its health though it is the one from before", async () => {
+    const { sensor, hang } = hanging()
+    const { manager, written } = managed(sensor)
+    await manager.start()
+    await manager.idle()
+    await hungUntilOverdue(manager, hang)
+    hang.release()
+    await manager.idle()
+    expect(reasons(written)).toEqual([
+      "waiting",
+      "neutral",
+      "overdue",
+      "neutral",
+    ])
+    await manager.close()
+  })
+
+  test("close returns with a sample that never ends, whose end then changes nothing", async () => {
+    const { sensor, hang } = hanging()
+    const { manager, written } = managed(sensor)
+    await manager.start()
+    await manager.idle()
+    hang.on = true
+    void manager.sample()
+    await turn()
+    await manager.close()
+    hang.release()
+    await turn()
+    expect(reasons(written)).toEqual(["waiting", "neutral", "stopped"])
+  })
+
+  test("close waits for its last write to land", async () => {
+    const written: MachineHealth[] = []
+    let landing = Promise.resolve()
+    const manager = createMachineManager({
+      ...managedDeps(steady),
+      makeSink: () => ({
+        write(health) {
+          landing = landing.then(turn).then(() => void written.push(health))
+        },
+        writesFlushed: () => landing,
+      }),
+    })
+    await manager.start()
+    await manager.idle()
+    await manager.close()
+    expect(reasons(written).at(-1)).toBe("stopped")
+  })
 })
 
 describe("measurements", () => {
@@ -581,19 +763,9 @@ describe("measurements", () => {
     async mode => {
       const measurements = keptMeasurements()
       const manager = createMachineManager({
-        sensor: steady,
-        sink: { write: async () => {} },
-        settings: SETTINGS,
+        ...managedDeps(steady),
         mode,
-        capabilities: { grow: false, repairDisk: false },
-        index: memoryIndex(),
-        store: fakeStore(EMPTY_LISTING).store,
-        records: fakeRecords(),
-        laneFacts: fakeLaneFacts(),
         measurements,
-        readRepair: null,
-        repair: null,
-        tell: () => {},
       })
       await manager.start()
       for (let i = 0; i < TRIM_MEASUREMENTS_EVERY_SAMPLES; i++)
@@ -631,19 +803,10 @@ describe("measurements", () => {
     let at = 0
     const measurements = keptMeasurements()
     const manager = createMachineManager({
-      sensor: { sample: async () => samples[Math.min(at++, 2)] ?? calm },
-      sink: { write: async () => {} },
-      settings: SETTINGS,
-      mode: "manage",
-      capabilities: { grow: false, repairDisk: false },
-      index: memoryIndex(),
-      store: fakeStore(EMPTY_LISTING).store,
-      records: fakeRecords(),
-      laneFacts: fakeLaneFacts(),
+      ...managedDeps({
+        sample: async () => samples[Math.min(at++, 2)] ?? calm,
+      }),
       measurements,
-      readRepair: null,
-      repair: null,
-      tell: () => {},
     })
     await manager.start()
     await manager.sample()
@@ -660,23 +823,14 @@ describe("measurements", () => {
     const told: ManagerNews[] = []
     const written: MachineHealth[] = []
     const manager = createMachineManager({
-      sensor: steady,
-      sink: { write: async health => void written.push(health) },
-      settings: SETTINGS,
-      mode: "manage",
-      capabilities: { grow: false, repairDisk: false },
-      index: memoryIndex(),
-      store: fakeStore(EMPTY_LISTING).store,
-      records: fakeRecords(),
-      laneFacts: fakeLaneFacts(),
+      ...managedDeps(steady),
+      makeSink: recordingSink(written),
       measurements: {
         ...keptMeasurements(),
         recordSample: () => {
           throw new Error("disk full")
         },
       },
-      readRepair: null,
-      repair: null,
       tell: news => told.push(news),
     })
     await manager.start()
@@ -747,19 +901,13 @@ describe("the lane VM's repair", () => {
     const written: MachineHealth[] = []
     const measurements = keptMeasurements()
     const manager = createMachineManager({
-      sensor: { sample: async () => sensed },
-      sink: { write: async health => void written.push(health) },
-      settings: SETTINGS,
+      ...managedDeps({ sample: async () => sensed }),
+      makeSink: recordingSink(written),
       mode,
       capabilities: { grow: true, repairDisk: true },
-      index: memoryIndex(),
-      store: fakeStore(EMPTY_LISTING).store,
-      records: fakeRecords(),
-      laneFacts: fakeLaneFacts(),
       measurements,
       readRepair: async () => ({ ...shared }),
       repair: controls,
-      tell: () => {},
     })
     return { manager, written, measurements }
   }

@@ -11,6 +11,7 @@ export {
   type LanehostChannel,
   lanehostClient,
 } from "./client.ts"
+export { ClientClosed } from "./closed.ts"
 export { lanehostDisks } from "./disks-client.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {

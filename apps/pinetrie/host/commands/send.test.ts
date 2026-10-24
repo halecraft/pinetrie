@@ -63,7 +63,13 @@ import {
   writeDirectory,
 } from "../fakes.ts"
 import type { PlacesChange } from "../provenance.ts"
-import { executeSend, type SendDeps, sendMessage, spendsCard } from "./send.ts"
+import {
+  executeSend,
+  type SendDeps,
+  sendMessage,
+  spendsCard,
+  wireOutcome,
+} from "./send.ts"
 
 /** A new canvas: in no store yet. */
 const NEW_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
@@ -721,6 +727,19 @@ describe("sendMessage", () => {
       )
       expect(out).toEqual({ kind: "started", runId: "r-2" })
       expect(prompts).toEqual([land])
+    })
+
+    test("a lane whose start the machine holds is not caught up nor written: start-held, which its sender is told as busy", async () => {
+      const { started, deps, b } = setUp(null, async () => ({
+        kind: "start-held",
+      }))
+      behindLane(b, "none")
+      const out = await sendCleared(deps, ALICE, "s-1", ask())
+      expect([out, wireOutcome(out), started]).toEqual([
+        { kind: "start-held" },
+        { kind: "busy" },
+        [],
+      ])
     })
 
     test("a lane with work of its own is not caught up: it is told, at its run", async () => {
