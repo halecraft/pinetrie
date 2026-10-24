@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
 import { stopMessage } from "../apps/pinetrie/e2e/checks.ts"
+import { planUnitRequirements } from "../apps/pinetrie/e2e/requirements.ts"
 import {
   choose,
   failingChecks,
@@ -10,9 +11,11 @@ import {
   mutantEnv,
   mutationCommand,
   narrowedCommand,
+  notHerePlace,
   planMutant,
   run as runGroup,
   SUITES,
+  skippedRequirements,
   testsToList,
 } from "./mutate.ts"
 import type { ListedTest } from "./proofs.ts"
@@ -220,14 +223,63 @@ describe("testsToList: what one vitest list collects for a batch", () => {
 describe("planMutant: a command must pass before its mutant runs", () => {
   const command = ["pnpm", "exec", "vitest", "run", "a.test.ts"]
   test("a command that passed with nothing mutated runs the mutant", () => {
-    expect(planMutant(command, null)).toEqual({ kind: "run", command })
+    expect(planMutant(command, { kind: "passed" })).toEqual({
+      kind: "run",
+      command,
+    })
   })
   test("a command that failed with nothing mutated runs no mutant: BASELINE", () => {
-    expect(planMutant(command, ["× a > b"])).toEqual({
-      kind: "baseline",
-      failing: ["× a > b"],
+    expect(
+      planMutant(command, { kind: "failed", failing: ["× a > b"] }),
+    ).toEqual({ kind: "baseline", failing: ["× a > b"] })
+  })
+  test("a command whose tests all skipped here runs no mutant here: NOT-HERE", () => {
+    expect(
+      planMutant(command, {
+        kind: "skipped",
+        requirements: ["btrfs-checkout"],
+      }),
+    ).toEqual({ kind: "not-here", requirements: ["btrfs-checkout"] })
+  })
+})
+
+describe("a mutant whose tests skip here", () => {
+  const report = (status: string) => ({
+    testResults: [
+      {
+        name: "/r/packages/x/x.test.ts",
+        assertionResults: [
+          { fullName: "on btrfs a take", status, tags: ["btrfs-checkout"] },
+          { fullName: "plain other", status: "passed", tags: [] },
+        ],
+      },
+    ],
+  })
+  test("is told from the report: its expected tests all skipped, with their tags", () => {
+    expect(skippedRequirements(report("skipped"), "/r", "a take")).toEqual([
+      "btrfs-checkout",
+    ])
+    expect(skippedRequirements(report("passed"), "/r", "a take")).toBeNull()
+    expect(skippedRequirements(report("skipped"), "/r", "nothing")).toBeNull()
+  })
+  test("runs in a lane where the place plans one, else reads why it runs nowhere", () => {
+    const mac = planUnitRequirements({
+      platform: "darwin",
+      checkoutOnBtrfs: false,
+      hasFlock: false,
+      laneRuntime: null,
     })
-    expect(planMutant(command, [])).toEqual({ kind: "baseline", failing: [] })
+    expect(notHerePlace(["btrfs-checkout"], mac)).toEqual({ kind: "lane" })
+    const noLane = planUnitRequirements({
+      platform: "darwin",
+      checkoutOnBtrfs: false,
+      hasFlock: false,
+      laneRuntime: "Docker does not answer",
+    })
+    expect(notHerePlace(["btrfs-checkout"], noLane)).toEqual({
+      kind: "nowhere",
+      why: "needs the checkout on btrfs, and no lane can be made here: Docker does not answer",
+    })
   })
 })
 

@@ -23,6 +23,11 @@
 //   - A unit mutation's command must pass with nothing mutated, run once per
 //     batch however many mutants share it, or its mutants read BASELINE and
 //     run nothing: a kill there would prove no bug.
+//   - A unit mutation whose tests all skip here, for what they require of the
+//     place (`apps/pinetrie/e2e/requirements.ts`), runs in a throwaway lane
+//     when this place can make one (`apps/pinetrie/scripts/test-lane.ts`, one
+//     lane per call, each mutant's file sent in and put back), or reads
+//     NOT-HERE: a skipped test passes, and would read SURVIVED.
 //
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
@@ -33,11 +38,27 @@
 // is already caught by a faster command, as a unit test.
 
 import { execFileSync, spawn } from "node:child_process"
-import { readdirSync, readFileSync, writeFileSync } from "node:fs"
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
+import {
+  type RequirementPlace,
+  requirementWords,
+  testPlace,
+  testRequirements,
+  type UnitRequirement,
+} from "../apps/pinetrie/e2e/requirements.ts"
+import type { TestLane } from "../apps/pinetrie/scripts/test-lane.ts"
 import type { ListedTest } from "./proofs.ts"
+import { reportedTests } from "./requirements-report.ts"
 
 interface MutationBase {
   /** What the mutant breaks, in words. */
@@ -170,23 +191,86 @@ export function testsToList(
   return [...new Set(each.flat())].sort()
 }
 
+/** How a unit mutation's command ran with nothing mutated. */
+export type Baseline =
+  | { readonly kind: "passed" }
+  | { readonly kind: "failed"; readonly failing: readonly string[] }
+  /** Every test it ran skipped: what they require of the place, by their tags. */
+  | {
+      readonly kind: "skipped"
+      readonly requirements: readonly UnitRequirement[]
+    }
+
 export type MutantStep =
   | { readonly kind: "run"; readonly command: readonly string[] }
   | { readonly kind: "baseline"; readonly failing: readonly string[] }
+  | {
+      readonly kind: "not-here"
+      readonly requirements: readonly UnitRequirement[]
+    }
 
 /**
- * What a mutant does, given whether its command passed with nothing
- * mutated (`failedWithout`: its failing lines, or null for a pass). A
+ * What a mutant does, given how its command ran with nothing mutated. A
  * command that fails unmutated would read KILLED with no bug, as a test
- * that passes only after another in its file does once narrowed to it.
+ * that passes only after another in its file does once narrowed to it; one
+ * whose tests all skipped would read SURVIVED, its tests never run.
  */
 export const planMutant = (
   command: readonly string[],
-  failedWithout: readonly string[] | null,
-): MutantStep =>
-  failedWithout === null
-    ? { kind: "run", command }
-    : { kind: "baseline", failing: failedWithout }
+  baseline: Baseline,
+): MutantStep => {
+  switch (baseline.kind) {
+    case "passed":
+      return { kind: "run", command }
+    case "failed":
+      return { kind: "baseline", failing: baseline.failing }
+    case "skipped":
+      return { kind: "not-here", requirements: baseline.requirements }
+  }
+}
+
+/**
+ * Whether a baseline's narrowed tests all skipped, from Vitest's JSON
+ * report: those whose name holds `expect`. Their requirements are the
+ * union of their tags'; null when one ran, or none was reported.
+ */
+export function skippedRequirements(
+  report: unknown,
+  root: string,
+  expect: string,
+): readonly UnitRequirement[] | null {
+  const tests = reportedTests(report, root).filter(t => t.name.includes(expect))
+  if (tests.length === 0 || tests.some(t => t.status !== "skipped")) return null
+  return [...new Set(tests.flatMap(t => testRequirements(t.tags)))]
+}
+
+/**
+ * Where a mutant whose tests skip here runs: in a lane, when the place
+ * plans its requirements there; else nowhere, with why.
+ */
+export function notHerePlace(
+  requirements: readonly UnitRequirement[],
+  plan: Readonly<Record<UnitRequirement, RequirementPlace>>,
+):
+  | { readonly kind: "lane" }
+  | { readonly kind: "nowhere"; readonly why: string } {
+  const place = testPlace(requirements, plan)
+  if (place.kind === "lane") return { kind: "lane" }
+  if (place.kind === "unmet") {
+    const p = plan[place.requirement]
+    return {
+      kind: "nowhere",
+      why:
+        p.kind === "unmet"
+          ? p.why
+          : `needs ${requirementWords(place.requirement)}`,
+    }
+  }
+  return {
+    kind: "nowhere",
+    why: "its tests skip here, though this place meets what they require",
+  }
+}
 
 export type MutantResult =
   | "killed"
@@ -195,6 +279,7 @@ export type MutantResult =
   | "elsewhere"
   | "anchor"
   | "baseline"
+  | "not-here"
 
 /** A result as the run prints it: in capitals, so it stands out in a log. */
 export const resultWord = (result: MutantResult): string => result.toUpperCase()
@@ -374,7 +459,7 @@ const failingOnce = (output: string): readonly string[] => [
 
 /**
  * Every test that `vitest list` collects under `paths` (none: every file),
- * by file from `root` and full name. `--staticParse=false` runs each file to
+ * by file from `root` and full name, those this place cannot run among them. `--staticParse=false` runs each file to
  * collect it: a static parse, Vitest's default from 5, lists a `test.each`
  * by its template ("%s"), not its cases.
  */
@@ -391,6 +476,9 @@ export function listTests(
         encoding: "utf8",
         stdio: ["ignore", "pipe", "inherit"],
         maxBuffer: 64 * 1024 * 1024,
+        // Every test, whatever this place meets: a mutation names its test
+        // wherever it runs (`vitest.config.mjs`).
+        env: { ...process.env, PINETRIE_EVERY_TAG: "1" },
       },
     ),
   ) as readonly { readonly file: string; readonly name: string }[]
@@ -398,39 +486,88 @@ export function listTests(
 }
 
 /**
- * `command`'s failing lines with nothing mutated, or null when it passes:
- * run once per batch, however many mutants share it (`known`).
+ * How `command` runs with nothing mutated: run once per batch, however many
+ * mutants share it (`known`). A Vitest run narrowed to `expect` also writes
+ * its JSON report, which says whether its tests ran or all skipped here.
  */
-const failedWithout = (
+const baselineWithout = (
   root: string,
   command: readonly string[],
+  expect: string | undefined,
   timeoutMs: number,
-  known: Map<string, Promise<readonly string[] | null>>,
-): Promise<readonly string[] | null> => {
+  known: Map<string, Promise<Baseline>>,
+): Promise<Baseline> => {
   const key = JSON.stringify(command)
   const seen = known.get(key)
   if (seen !== undefined) return seen
-  const [cmd, ...args] = command
-  const result =
+  const reportDir =
+    expect !== undefined && VITEST_RUN.every((w, i) => command[i] === w)
+      ? mkdtempSync(path.join(tmpdir(), "pinetrie-mutate-"))
+      : null
+  const report = reportDir === null ? null : path.join(reportDir, "report.json")
+  const [cmd, ...args] =
+    report === null
+      ? command
+      : [
+          ...command,
+          "--reporter=default",
+          "--reporter=json",
+          `--outputFile.json=${report}`,
+        ]
+  const result: Promise<Baseline> =
     cmd === undefined
-      ? Promise.resolve([])
-      : run(cmd, args, root, timeoutMs).then(r =>
-          r.status === 0 && !r.timedOut ? null : failingOnce(r.output),
-        )
+      ? Promise.resolve({ kind: "failed", failing: [] })
+      : run(cmd, args, root, timeoutMs).then(r => {
+          let json: unknown = null
+          if (report !== null)
+            try {
+              json = JSON.parse(readFileSync(report, "utf8"))
+            } catch {
+              // No report to read: the run's status is all there is.
+            }
+          if (reportDir !== null)
+            rmSync(reportDir, { recursive: true, force: true })
+          if (r.status !== 0 || r.timedOut)
+            return { kind: "failed", failing: failingOnce(r.output) }
+          if (expect === undefined) return { kind: "passed" }
+          const skipped = skippedRequirements(json, root, expect)
+          return skipped === null
+            ? { kind: "passed" }
+            : { kind: "skipped", requirements: skipped }
+        })
   known.set(key, result)
   return result
+}
+
+/**
+ * Where a mutant whose tests skip here can run, asked once per call: the
+ * place's plan, read only when a mutant needs it, and the lane, made only
+ * when one runs there.
+ */
+export interface Elsewhere {
+  place(
+    requirements: readonly UnitRequirement[],
+  ): Promise<
+    | { readonly kind: "lane" }
+    | { readonly kind: "nowhere"; readonly why: string }
+  >
+  lane(): Promise<TestLane>
+  /** Remove the lane, when one was made. */
+  close(): Promise<void>
 }
 
 /**
  * A mutant's result, the command it ran, and the checks that failed: with
  * it in place, or, for BASELINE, without it. A unit mutant's command runs
  * once unmutated first, and a suite's does not: a scenario's run is minutes.
+ * One whose tests all skip here runs in the lane, baseline and mutant alike.
  */
 async function apply(
   root: string,
   m: Mutation,
   tests: readonly ListedTest[],
-  known: Map<string, Promise<readonly string[] | null>>,
+  known: Map<string, Promise<Baseline>>,
+  elsewhere: Elsewhere,
 ): Promise<{
   readonly result: MutantResult
   readonly command: readonly string[]
@@ -446,10 +583,18 @@ async function apply(
     return { result: "anchor", command, failing: [] }
   const step = planMutant(
     command,
-    "suite" in m ? null : await failedWithout(root, command, timeoutMs, known),
+    "suite" in m
+      ? { kind: "passed" }
+      : await baselineWithout(root, command, m.expect, timeoutMs, known),
   )
   if (step.kind === "baseline")
     return { result: "baseline", command, failing: step.failing }
+  if (step.kind === "not-here") {
+    const place = await elsewhere.place(step.requirements)
+    if (place.kind === "nowhere")
+      return { result: "not-here", command, failing: [place.why] }
+    return inLane(root, m, command, await elsewhere.lane(), timeoutMs)
+  }
   const ran = await withMutant(root, m, async () => {
     const [cmd, ...args] = step.command
     if (cmd === undefined) return { result: "broken" as const, failing: [] }
@@ -459,6 +604,45 @@ async function apply(
   return ran === "anchor"
     ? { result: ran, command, failing: [] }
     : { ...ran, command }
+}
+
+/**
+ * A unit mutant run in the lane: its command once unmutated there, then
+ * with the mutant's file sent in, and the original sent back however it
+ * ends.
+ */
+async function inLane(
+  root: string,
+  m: Mutation,
+  command: readonly string[],
+  lane: TestLane,
+  timeoutMs: number,
+): Promise<{
+  readonly result: MutantResult
+  readonly command: readonly string[]
+  readonly failing: readonly string[]
+}> {
+  const base = await lane.run(command, { timeoutMs })
+  if (base.status !== 0)
+    return { result: "baseline", command, failing: failingOnce(base.output) }
+  try {
+    const ran = await withMutant(root, m, async () => {
+      await lane.put([m.file])
+      const r = await lane.run(command, { timeoutMs })
+      return {
+        result: judge(
+          { status: r.status, timedOut: r.status === null, output: r.output },
+          m.expect,
+        ),
+        failing: failingOnce(r.output),
+      }
+    })
+    return ran === "anchor"
+      ? { result: ran, command, failing: [] }
+      : { ...ran, command }
+  } finally {
+    await lane.put([m.file])
+  }
 }
 
 /** The checks `against` fails with the mutant in place, each once, trimmed. */
@@ -509,20 +693,64 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   }
   const listing = testsToList(chosen)
   const tests = listing === null ? [] : listTests(root, listing)
-  const known = new Map<string, Promise<readonly string[] | null>>()
+  const known = new Map<string, Promise<Baseline>>()
+  let plan: Promise<
+    Readonly<Record<UnitRequirement, RequirementPlace>>
+  > | null = null
+  let lane: Promise<TestLane> | null = null
+  const elsewhere: Elsewhere = {
+    async place(requirements) {
+      plan ??= (async () => {
+        const { gatherUnitFacts } = await import(
+          "../apps/pinetrie/e2e/place.ts"
+        )
+        const { planUnitRequirements } = await import(
+          "../apps/pinetrie/e2e/requirements.ts"
+        )
+        const { runtimeProblem } = await import(
+          "../apps/pinetrie/e2e/lane-hosts.ts"
+        )
+        return planUnitRequirements({
+          ...gatherUnitFacts(root),
+          laneRuntime: await runtimeProblem(),
+        })
+      })()
+      return notHerePlace(requirements, await plan)
+    },
+    lane() {
+      lane ??= import("../apps/pinetrie/scripts/test-lane.ts").then(m =>
+        m.openTestLane({ root, log: l => console.log(`      ${l}`) }),
+      )
+      return lane
+    },
+    async close() {
+      if (lane !== null) await (await lane).close()
+    },
+  }
   let bad = 0
   for (const m of chosen) {
-    const { result, command, failing } = await apply(root, m, tests, known)
+    const { result, command, failing } = await apply(
+      root,
+      m,
+      tests,
+      known,
+      elsewhere,
+    )
     console.log(`  ${resultWord(result).padEnd(9)} ${m.name}`)
     if (result !== "killed" && result !== "anchor")
       console.log(`      ran: ${command.join(" ")}`)
     // ELSEWHERE: caught by another check, so the expect has drifted from the
     // test that catches it, which is one of these. BASELINE: what fails with
-    // nothing mutated.
-    if (result === "elsewhere" || result === "baseline")
+    // nothing mutated. NOT-HERE: why no place can run its tests.
+    if (
+      result === "elsewhere" ||
+      result === "baseline" ||
+      result === "not-here"
+    )
       for (const line of failing.slice(0, 5)) console.log(`      ${line}`)
     if (result !== "killed") bad += 1
   }
+  await elsewhere.close()
   console.log(`\n=== mutations: ${chosen.length - bad} killed, ${bad} not ===`)
   process.exit(bad)
 }

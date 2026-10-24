@@ -73,6 +73,23 @@ export interface ProviderAuth {
 }
 
 /**
+ * Where `provider`'s credential is, by pi's word (`stored`, an environment
+ * variable's name), or null with none. Never the credential: no key is
+ * resolved and no key command runs.
+ */
+export async function providerCredential(
+  places: Pick<ModelPlaces, "credentials" | "models">,
+  provider: string,
+): Promise<string | null> {
+  const runtime = await openRuntime({
+    authPath: places.credentials,
+    modelsPath: places.models,
+  })
+  const status = runtime.getProviderAuthStatus(provider)
+  return status.configured ? (status.source ?? "configured") : null
+}
+
+/**
  * Sign-in over pine·trie's `auth.json`, with the providers `packages`
  * register beside pi's own. Its directory is made private first: pi writes
  * the file itself, readable by its owner alone.

@@ -17,6 +17,8 @@ const pureConfig = [
   "-p",
   "tsconfig.pure.json",
 ]
+const rootTools = ["pnpm", "exec", "vitest", "run", "scripts"]
+const e2eTools = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e"]
 const checks = [
   "pnpm",
   "exec",
@@ -384,8 +386,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command that fails unmutated still runs its mutant",
     file: "scripts/mutate.ts",
-    from: "  failedWithout === null\n",
-    to: "  true\n",
+    from: '    case "failed":\n      return { kind: "baseline", failing: baseline.failing }\n',
+    to: '    case "failed":\n      return { kind: "run", command }\n',
     command: unit,
     expect:
       "a command that failed with nothing mutated runs no mutant: BASELINE",
@@ -431,13 +433,20 @@ export const mutations: readonly Mutation[] = [
     expect: "planSuite runs a scenario with no problem",
   },
   {
-    name: "a scenario that runs lanes is never asked the runtime",
+    name: "a scenario that runs lanes does not require a runtime for them",
     file: "apps/pinetrie/e2e/scenario.ts",
-    from: "  return (input.lanes ? input.runtime : null) ?? input.needs",
-    to: "  return input.needs",
+    from: '    ...(scenario.lanes === true ? (["lane-runtime"] as const) : []),\n',
+    to: "",
     command: scenarios,
-    expect:
-      "scenarioProblem: one that runs lanes is skipped with the runtime's words",
+    expect: "scenarioRequirements: one that runs lanes requires a runtime",
+  },
+  {
+    name: "a requirement this place does not meet runs the scenario",
+    file: "apps/pinetrie/e2e/scenario.ts",
+    from: "    if (why !== null) return { requirement, why }",
+    to: "",
+    command: scenarios,
+    expect: "scenarioProblem: the first requirement not met",
   },
   {
     name: "a stop at a check is split into processes",
@@ -466,10 +475,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a scenario's failed checks are dropped from the suite's tally",
     file: "apps/pinetrie/e2e/checks.ts",
-    from: "    : { pass: Number(m[1]), fail: Number(m[2]), skip: Number(m[3]) }\n",
-    to: "    : { pass: Number(m[1]), fail: 0, skip: Number(m[3]) }\n",
+    from: "  return { passed: Number(m[2]), failed: Number(m[1] ?? 0), skipsBy }\n",
+    to: "  return { passed: Number(m[2]), failed: 0, skipsBy }\n",
     command: checks,
-    expect: "readTally reads the last tally a run of the suite printed",
+    expect: "a scenario's process's counts are read back from its marked line",
   },
   {
     name: "proofGaps reports no unproven label",
@@ -927,5 +936,82 @@ export const mutations: readonly Mutation[] = [
     to: "export const probeTimer = () => setTimeout(() => {}, 0)\nexport const NO_INTENTS",
     // As above.
     command: pureConfig,
+  },
+  {
+    name: "a lane is planned for the Mac's own tests",
+    file: "apps/pinetrie/e2e/requirements.ts",
+    from: "    if (!LANE_MEETS.has(r))\n",
+    to: "    if (false)\n",
+    command: e2eTools,
+    expect: "Linux with the checkout on btrfs meets all but the Mac's here",
+  },
+  {
+    name: "a requirement no lane can be made for is planned in a lane",
+    file: "apps/pinetrie/e2e/requirements.ts",
+    from: "    if (facts.laneRuntime !== null)\n",
+    to: "    if (false)\n",
+    command: e2eTools,
+    expect: "a Mac that can make no lane meets them nowhere, saying why",
+  },
+  {
+    name: "a test needing the Mac and a lane's requirement is sent to the lane",
+    file: "apps/pinetrie/e2e/requirements.ts",
+    from: "    requirements.find(r => !LANE_MEETS.has(r))",
+    to: "    undefined",
+    command: e2eTools,
+    expect:
+      "a test runs here, in the lane, or nowhere, by its requirements' places",
+  },
+  {
+    name: "btrfs is met here on any Linux",
+    file: "apps/pinetrie/e2e/requirements.ts",
+    from: '      return facts.platform === "linux" && facts.checkoutOnBtrfs',
+    to: '      return facts.platform === "linux"',
+    command: e2eTools,
+    expect:
+      "Linux whose checkout is not on btrfs sends only btrfs's tests to a lane",
+  },
+  {
+    name: "a test planned for the lane that it did not run counts there",
+    file: "scripts/requirements-report.ts",
+    from: '    if (place.kind === "lane" && !ranInLane.has(`${t.file}\\n${t.name}`)) {',
+    to: "    if (false) {",
+    command: rootTools,
+    expect: "a test planned for the lane that the lane did not run is lost",
+  },
+  {
+    name: "a parser reads the last line, not its marked one",
+    file: "scripts/verify-parsers.ts",
+    from: "    .filter(l => l.startsWith(mark))\n    .at(-1)",
+    to: '    .filter(l => l !== "")\n    .at(-1)',
+    command: rootTools,
+    expect:
+      "a parser reads its marked line among other output, wherever it came",
+  },
+  {
+    name: "a suite run as processes drops its scenarios' skips from its marked line",
+    file: "apps/pinetrie/e2e/checks.ts",
+    from: "  for (const [k, n] of b.skipsBy) skipsBy.set(k, (skipsBy.get(k) ?? 0) + n)\n",
+    to: "",
+    command: checks,
+    expect: "two runs' counts add, their skips by requirement",
+  },
+  {
+    name: "a suite's marked line counts its skips but names no requirement",
+    file: "apps/pinetrie/e2e/checks.ts",
+    from: '    ...(skipped > 0 ? [`${skipped} skipped (${groups.join(", ")})`] : []),',
+    to: "    ...(skipped > 0 ? [`${skipped} skipped`] : []),",
+    command: checks,
+    expect:
+      "a suite's marked line counts its checks and names each skip's requirement",
+  },
+  {
+    name: "a mutant whose tests all skipped here runs here, and reads SURVIVED",
+    file: "scripts/mutate.ts",
+    from: '    case "skipped":\n      return { kind: "not-here", requirements: baseline.requirements }\n',
+    to: '    case "skipped":\n      return { kind: "run", command }\n',
+    command: unit,
+    expect:
+      "a command whose tests all skipped here runs no mutant here: NOT-HERE",
   },
 ]

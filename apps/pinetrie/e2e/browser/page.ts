@@ -320,6 +320,16 @@ export async function launchBrowser(): Promise<Browser> {
   }
 }
 
+/** Why Chromium's headless shell cannot launch here, or null: it is launched once, and closed. */
+export async function chromiumProblem(): Promise<string | null> {
+  try {
+    await (await launchBrowser()).close()
+    return null
+  } catch (error: unknown) {
+    return errorText(error)
+  }
+}
+
 /**
  * Make `p` a person before it loads: what the identity form would have
  * stored. A page from `browser.newPage()` has a context, and so a device, of

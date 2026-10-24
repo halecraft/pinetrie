@@ -306,10 +306,10 @@ async function dockerContract(
       ])
     ).trim()
     if (privileged === "")
-      skip(
-        "lanehost's privileged role cannot write the lanes directory",
-        "nothing here needs the privileged role: no grant of the host's ports, and no diff by send under rootless Docker",
-      )
+      skip("lanehost's privileged role cannot write the lanes directory", {
+        requirement: "rootful-docker",
+        why: "nothing here needs the privileged role: no grant of the host's ports, and no diff by send under rootless Docker",
+      })
     else {
       const wrote = await quietCli([
         "exec",
@@ -342,14 +342,17 @@ async function dockerContract(
         sampleDetail(s => JSON.stringify(s.read.pressure)),
       )
     else
-      skip(
-        "the lane VM's kernel reports memory pressure",
-        "the lane VM is the Mac's: on Linux the kernel is the machine's, and pine·trie sets none of it",
-      )
+      skip("the lane VM's kernel reports memory pressure", {
+        requirement: "lane-vm",
+        why: "on Linux the kernel is the machine's, and pine·trie sets none of it",
+      })
     if (existsSync(NESTED_MOUNT))
       skip(
         "lanehost's disks role reads each running lane's memory from its cgroup",
-        "under rootless Docker no role is given the cgroup tree",
+        {
+          requirement: "rootful-docker",
+          why: "under rootless Docker no role is given the cgroup tree",
+        },
       )
     else
       check(
@@ -528,7 +531,10 @@ async function dockerContract(
     } else
       skip(
         "a lane cannot reach the Mac's loopback, nor gvproxy's API that opens ports on the Mac",
-        "gvproxy is the Mac's lane VM's network",
+        {
+          requirement: "lane-vm",
+          why: "gvproxy is the Mac's lane VM's network",
+        },
       )
 
     // ── two hosts' slots ──
@@ -567,7 +573,10 @@ async function dockerContract(
       } else
         skip(
           "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
-          "gvproxy is the Mac's lane VM's network",
+          {
+            requirement: "lane-vm",
+            why: "gvproxy is the Mac's lane VM's network",
+          },
         )
       if (onMac) {
         // ── a host closed with its lane running, and the next one on its
@@ -643,7 +652,10 @@ async function dockerContract(
       } else {
         skip(
           "a host's start stops the last host's lanes and starts them again",
-          "only the Mac's lane VM has slots a host's leftovers bind into",
+          {
+            requirement: "lane-vm",
+            why: "only the Mac's lane VM has slots a host's leftovers bind into",
+          },
         )
         await b.close()
       }
@@ -770,17 +782,16 @@ async function dockerContract(
     } else
       skip(
         "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
-        "the Mac's lane VM only",
+        { requirement: "lane-vm" },
       )
 
     // ── a service killed for memory, heard from Docker's events ──
     // Last: the kill may take the disks role's server, which the next call
     // starts again.
     if (existsSync(NESTED_MOUNT))
-      skip(
-        "Docker's events name lanehost's disks role killed for memory",
-        "no spike has measured rootless Docker's oom events",
-      )
+      skip("Docker's events name lanehost's disks role killed for memory", {
+        unmeasured: "no spike has measured rootless Docker's oom events",
+      })
     else {
       const kills = a.machine.watchServiceKills()
       try {

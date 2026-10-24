@@ -21,7 +21,10 @@ suites' runtime cannot run here, `runtimeProblem`; hosts with tools,
 lane's shell, `inLane`; `cleanUp`) and `lane-runtime.ts` (the suites'
 runtime's CLI, and a lane's container and disks read and removed through
 lanehost's one-shot command in the project's `disks` role container, as
-the host does: ADR-0129). A suite's own helpers are beside its scenarios:
+the host does: ADR-0129), `requirements.ts` and `place.ts` (what a test or
+a scenario needs of the place it runs in, and what this place has: §
+Requirements), and `suite-facts.ts` (each suite requirement's probe). A
+suite's own helpers are beside its scenarios:
 `host/support.ts` (among them `clockedStore`), `lanes/support.ts`,
 `browser/page.ts`.
 
@@ -117,9 +120,9 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   (`ownForInnerLanes`), never a repository, which git then refuses to the
   host. A lane's writes there are uid 1000's (`lanesWriteAs`).
 - **Every agent with tools works in real lanes** (ADR-0102). A scenario
-  whose agent has tools declares `lanes: true` (`Scenario`, `scenario.ts`):
-  the runner asks `runtimeProblem` once per suite, skips the scenario with
-  its words where the runtime cannot run, and otherwise gives it
+  whose agent has tools declares `lanes: true` (`Scenario`, `scenario.ts`),
+  which requires `lane-runtime`: the runner skips it where the runtime
+  cannot run, with `runtimeProblem`'s words, and otherwise gives it
   `LaneHosts`, the only way to a host with tools. `startSuiteHost` takes
   no project with tools, so a scenario cannot start lanes without saying
   so. A host with lanes starts its root threads at accepted work
@@ -139,8 +142,11 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   mutant runs one scenario, and stops at its check (`PINETRIE_STOP_AT`).
 - **A suite runs its scenarios as processes, several at once** (`planJobs`,
   `runSuite`): each its runner again with `PINETRIE_SCENARIO` naming it,
-  its output printed whole once it ends, in name order, and one tally of
-  all (`readTally`). Each suite's limits are beside its runner (`JOBS`):
+  its output printed whole once it ends, in name order, and one tally and
+  one marked line of all: each process's counts are read back from its
+  marked line (`readSuiteCounts`), so the skips keep their requirements, and
+  each process's marked line is left out of what is printed, since `verify`
+  reads the last one. Each suite's limits are beside its runner (`JOBS`):
   `e2e` 8 at once, of which four with lanes, since a lane's lanes share its
   4 GiB and four at once took about 3 GiB of it; `e2e:lanes` and
   `e2e:browser` one at a time. One scenario to run, or `PINETRIE_STOP_AT`
@@ -150,12 +156,79 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   lanes: each would otherwise build a missing image at once. A fresh lane's
   first run shows its build there, as its own step.
 - **A scenario that cannot run here says why, and is skipped**
-  (`scenarioProblem`): for one with `lanes: true`, `runtimeProblem()` gives
-  the host's own reason the suites' runtime cannot give lanes their own
-  here (`findProject` on a throwaway project); then its own `needs`, as
-  `live`'s `PINETRIE_LIVE`. A skip is neither a pass nor a fail.
+  (`scenarioProblem`): its requirements (`scenarioRequirements`:
+  `lane-runtime` for one with `lanes: true`, its suite's, its own
+  `requires`) are asked in order, each once per suite (`suiteFact`), and
+  the first not met is its reason: `runtimeProblem()`'s words for
+  `lane-runtime` (`findProject` on a throwaway project), and so on. A skip
+  is neither a pass nor a fail.
 - **A scenario that throws fails under its name** (`ERROR name · message`),
   and the next one runs.
+
+### Requirements
+
+What a test needs of the place it runs in is a value
+(`requirements.ts`), never a condition its own file computes (ADR-0213).
+
+- **A unit test names its requirements as Vitest tags** (`{ tags:
+  ["btrfs-checkout"] }`, on a test or a `describe`): `mac-host` (the Mac's
+  own host), `linux`, `flock` (util-linux's, on the `PATH`) and
+  `btrfs-checkout` (the checkout's `node_modules` on btrfs, where the tests
+  make subvolumes). `vitest.config.mjs` defines each tag, skipping it where
+  `isMetHere` says this place lacks it, from facts read with no probe
+  (`gatherUnitFacts`, `place.ts`: synchronous, as the config is loaded,
+  so `flock` is looked for on the `PATH` rather than run). An undefined tag
+  fails its file.
+- **A list sees every test:** collecting by running each file
+  (`--staticParse=false`, as `listTests` in `scripts/mutate.ts` does, so a
+  `test.each` lists its cases) leaves a skipped test out, so a list sets
+  `PINETRIE_EVERY_TAG=1`, and the config then skips no tag.
+- **Where each is met is one plan** (`planUnitRequirements`): here; else in
+  a throwaway lane when this place can make one (`runtimeProblem` null)
+  and a lane meets it (`linux`, `flock`, `btrfs-checkout`: S332); else
+  nowhere, with why. A test goes to the lane only when a lane meets every
+  one of its requirements (`testPlace`): one needing `mac-host` and
+  `linux` runs nowhere.
+- **The lane** (`apps/pinetrie/scripts/test-lane.ts`) is a throwaway git
+  project's, never this checkout's: a host may serve this checkout, and a
+  second host on a served project is refused. Its copy is `jj file list`'s
+  files, uncommitted changes included, streamed through `tar` (no Mac
+  metadata, no extended attributes) into `/workspace/src`, then installed
+  from the frozen lockfile. `lane-tests.ts` runs there the tests tagged with
+  a requirement planned there (`laneTagsFilter`) and writes Vitest's JSON
+  report beside the plan (`LaneReport`); `scripts/requirements-report.ts`
+  reads it with the report of the tests here, and fails when a test
+  planned for the lane did not run there (`planVerifyReport`).
+- **A scenario names its requirements** in `requires`, and a suite those
+  of every scenario (`runSuite`'s `requires`: the browser suite's
+  `chromium`): `lane-runtime`, `lane-vm`, `rootful-docker`, `live-model`
+  (`PINETRIE_LIVE=1` and a credential for the live model's provider, by pi's
+  status: `providerCredential`), `chromium`, `qemu`, `arm64-docker`. None is
+  met in a lane this run makes: S333 asks whether the suites could run in
+  one.
+- **A check skipped for where it runs names its requirement**
+  (`skip(label, { requirement, why })`, worded by `skipWords`); one skipped
+  for what no spike has measured says so (`{ unmeasured }`), as no place
+  meets it. A suite ends with the marked line `suite: …`
+  (`suiteSummaryLine`): its counts and its skips by requirement, which
+  `verify`'s `suite` parser shows (`scripts/verify-parsers.ts`).
+- **The gates are `@halecraft/verify`'s** (`verify.config.ts`): every task
+  runs whatever another's result, and only `types` waits on `format` for
+  its failures, since a dependency's failure ends its dependents early.
+  `checks` runs one task at a time, and only the short `format` and
+  `types` beside it: a unit test that runs jj or a host outlasts its timeout under
+  another task's load, and the lane and the suites share the lane VM or the
+  suites' Docker. In turn: `proofs`, `conformance`, the unit tests here, in
+  the lane, the report, then the suites. verify's command line takes one task or all, so the suites that
+  need a real model, a browser or `qemu` are in the tree only under
+  `PINETRIE_VERIFY_ALL=1`, which `pnpm run verify:all` sets. A tool's
+  marked line (`requirements: …`, `suite: …`) is read by the config's own
+  parsers, as a task's output is stdout and stderr as they came.
+- **`pnpm mutate`** runs a unit mutant's narrowed baseline with Vitest's
+  JSON report: when every test it narrowed to skipped here
+  (`skippedRequirements`), the mutant runs in one throwaway lane per call,
+  baseline and mutant, its file sent in and the original sent back; or,
+  where no lane meets them (`notHerePlace`), it reads NOT-HERE with why.
 
 ### The decisions each scenario checks
 

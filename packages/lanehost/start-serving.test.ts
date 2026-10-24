@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -92,42 +91,36 @@ describe("startServing", () => {
   })
 })
 
-const has = (program: string) =>
-  spawnSync("sh", ["-c", `command -v ${program}`]).status === 0
-
-test.skipIf(!has("flock"))(
-  "two servers on one project: the second refuses, and drops nothing of the first's",
-  async () => {
-    const disks = projectDisks(dir, KEY)
-    await mkdir(disks.snapshots, { recursive: true })
-    const holds: LockAttempt[] = []
-    const started = () => {
-      const r = recorded(HELD)
-      const until = new PassThrough()
-      r.ports.hold = async file => {
-        const hold = await tryLock(file, {
-          platform: "linux",
-          heldWhile: until,
-        })
-        holds.push(hold)
-        return hold
-      }
-      r.ports.drop = dropUnfinishedSnapshots
-      return r
+test("two servers on one project: the second refuses, and drops nothing of the first's", {
+  tags: ["flock"],
+}, async () => {
+  const disks = projectDisks(dir, KEY)
+  await mkdir(disks.snapshots, { recursive: true })
+  const holds: LockAttempt[] = []
+  const started = () => {
+    const r = recorded(HELD)
+    const until = new PassThrough()
+    r.ports.hold = async file => {
+      const hold = await tryLock(file, {
+        platform: "linux",
+        heldWhile: until,
+      })
+      holds.push(hold)
+      return hold
     }
-    try {
-      const first = started()
-      await startServing(serving(KEY), first.ports)
-      expect(first.refusedWith()).toBe(null)
-      await writeFile(path.join(disks.snapshots, "x.tmp"), "in the making")
-      const second = started()
-      await startServing(serving(KEY), second.ports)
-      expect(second.refusedWith()).toBe(
-        lockRefusal({ kind: "held-by-another" }),
-      )
-      expect(await readdir(disks.snapshots)).toEqual(["x.tmp"])
-    } finally {
-      for (const h of holds) if (h.kind === "held") await h.release()
-    }
-  },
-)
+    r.ports.drop = dropUnfinishedSnapshots
+    return r
+  }
+  try {
+    const first = started()
+    await startServing(serving(KEY), first.ports)
+    expect(first.refusedWith()).toBe(null)
+    await writeFile(path.join(disks.snapshots, "x.tmp"), "in the making")
+    const second = started()
+    await startServing(serving(KEY), second.ports)
+    expect(second.refusedWith()).toBe(lockRefusal({ kind: "held-by-another" }))
+    expect(await readdir(disks.snapshots)).toEqual(["x.tmp"])
+  } finally {
+    for (const h of holds) if (h.kind === "held") await h.release()
+  }
+})

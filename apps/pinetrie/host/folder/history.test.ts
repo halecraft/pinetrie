@@ -3,10 +3,10 @@
 // the project's folder a directory beside it, and a lane's commands run on the
 // host in its disk. The rig's test-only hooks read the graph and a diff of
 // their own (`git diff --no-index` of two snapshots); an accept is the host's
-// own (`writes.ts`), of the proposed changes the host would show. Where there
-// is no btrfs, it skips, saying why.
+// own (`writes.ts`), of the proposed changes the host would show. Tagged
+// `btrfs-checkout`, as `disks.test.ts` is.
 
-import { mkdir, readFile, rm, statfs, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import {
   type BaseMerge,
@@ -79,12 +79,8 @@ import { recordWrites } from "./record-writes.ts"
 import { readFolderFile, readFolderReview } from "./review.ts"
 import { createFolderWrites } from "./writes.ts"
 
-const BTRFS_MAGIC = 0x9123683e
 const HERE = path.join(import.meta.dirname, "node_modules", ".folder-suite")
-const onBtrfs = await mkdir(HERE, { recursive: true })
-  .then(() => statfs(HERE))
-  .then(s => s.type === BTRFS_MAGIC)
-  .catch(() => false)
+await mkdir(HERE, { recursive: true })
 
 afterAll(async () => {
   await rm(HERE, { recursive: true, force: true })
@@ -428,415 +424,403 @@ async function makeRig(): Promise<FolderRig> {
   }
 }
 
-describe.skipIf(!onBtrfs)(
-  "the port suite against the folder adapter, on btrfs (skipped: not on btrfs here)",
-  () => {
-    historySuite({ test, expect }, makeRig)
-  },
-)
+describe("the port suite against the folder adapter, on btrfs", {
+  tags: ["btrfs-checkout"],
+}, () => {
+  historySuite({ test, expect }, makeRig)
+})
 
-describe.skipIf(!onBtrfs)(
-  "a folder lane's conflicts, on btrfs (skipped: not on btrfs here)",
-  () => {
-    const TURN = { title: "a turn", entry: entryId("e-1") }
-    test("a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it", async () => {
-      const rig = await makeRig()
-      try {
-        await rig.repoOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
-        const lane = await rig.lane()
-        await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
-        await lane.withHistory(h => h.recordTurn(TURN))
-        const point = await rig.repoOnAccepted({
-          "a.txt": "one\ntwo (yours)\nthree\n",
-        })
-        const merged = await lane.withHistory(async h =>
-          h.merge(
-            folderCopyReady(),
-            { kind: "accepted", point, mark: false },
-            null,
-          ),
-        )
-        expect(merged.kind).toBe("conflicted")
-        expect(await lane.read("a.txt")).toBe("one\ntwo (lane)\nthree\n")
-        const versions = await rig.statesDir(lane.lane)
-        expect(
-          await readFile(path.join(versions, "conflicts/a.txt/theirs"), "utf8"),
-        ).toBe("one\ntwo (yours)\nthree\n")
-        expect(
-          await lane.withHistory(h =>
-            h.resolve("a.txt", "theirs", { kind: "agent" }),
-          ),
-        ).toEqual({ kind: "resolved" })
-        expect(await lane.read("a.txt")).toBe("one\ntwo (yours)\nthree\n")
-        const resolved = rig.states(lane.lane).tip
-        if (resolved === null) throw new Error("the lane has no state")
-        expect(rig.graph().states.get(resolved)?.made).toEqual({
-          kind: "resolve",
-          lane: lane.lane,
-          path: "a.txt",
-        })
-        expect(await rig.snapshotExists(resolved)).toBe(true)
-        // Nothing left for the next turn: the resolution is a state already.
-        expect(
-          (await lane.withHistory(h => h.recordTurn(TURN))).committed,
-        ).toBeNull()
-        expect(await lane.withHistory(h => h.conflicts())).toEqual([])
-        expect(
-          await lane.withHistory(h =>
-            h.resolve("a.txt", "ours", { kind: "agent" }),
-          ),
-        ).toEqual({ kind: "refused", why: "no-conflict" })
-      } finally {
-        await rig.close()
-      }
-    })
-  },
-)
-
-describe.skipIf(!onBtrfs)(
-  "a folder lane's catch-ups after a sweep, and its virtual bases, on btrfs (skipped: not on btrfs here)",
-  () => {
-    const turn = (n: number) => ({
-      title: `turn ${n}`,
-      entry: entryId(`e-${n}`),
-    })
-    const recorded = async (lane: RigLane, n: number) => {
-      const made = await lane.withHistory(h => h.recordTurn(turn(n)))
-      if (made.committed === null) throw new Error("the turn changed nothing")
-      return made.committed
-    }
-    const merge = (lane: RigLane, from: BaseMerge) =>
-      lane.withHistory(h => h.merge(folderCopyReady(), from, null))
-    const withAccepted = (point: PointId): BaseMerge => ({
-      kind: "accepted",
-      point,
-      mark: false,
-    })
-    const withParent = (
-      parent: RigLane,
-      point: PointId,
-      upToDateWith: PointId,
-    ): BaseMerge => ({
-      kind: "parent",
-      lane: parent.lane,
-      name: "amber-fox" as ThreadName,
-      point,
-      upToDateWith,
-    })
-    const lines = (...ls: string[]) => `${ls.join("\n")}\n`
-
-    test("a branch catches up with its parent after a sweep, the parent's turn it began on kept", async () => {
-      const rig = await makeRig()
-      try {
-        await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
-        const parent = await rig.lane()
-        await parent.write("a.txt", lines("P", "2", "3", "4"))
-        const p1 = await recorded(parent, 1)
-        const branch = await rig.branch(p1)
-        await branch.write("a.txt", lines("P", "2", "3", "B"))
-        await recorded(branch, 2)
-        await parent.write("a.txt", lines("P", "PP", "3", "4"))
-        const p2 = await recorded(parent, 3)
-        await rig.sweep()
-        expect(await rig.snapshotExists(p1)).toBe(true)
-        const merged = await merge(branch, withParent(parent, p2, p1))
-        expect(merged.kind).toBe("clean")
-        expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))
-      } finally {
-        await rig.close()
-      }
-    })
-
-    test("a branch whose fork began on accepted work catches up cleanly with its parent after a sweep", async () => {
-      const rig = await makeRig()
-      try {
-        await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
-        const parent = await rig.lane()
-        await parent.write("a.txt", lines("P", "2", "3", "4"))
-        const p1 = await recorded(parent, 1)
-        // Its source snapshot lost, the fork began on accepted work's newest.
-        const branch = await rig.lane()
-        await branch.write("a.txt", lines("1", "2", "3", "B"))
-        await recorded(branch, 2)
-        await parent.write("a.txt", lines("P", "PP", "3", "4"))
-        const p2 = await recorded(parent, 3)
-        expect((await rig.sweep()).toDelete).toContain(p1)
-        const merged = await merge(branch, withParent(parent, p2, p1))
-        expect(merged.kind).toBe("clean")
-        expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))
-      } finally {
-        await rig.close()
-      }
-    })
-
-    test("a catch-up whose base's snapshot is gone is refused with words, and makes nothing", async () => {
-      const rig = await makeRig()
-      try {
-        await rig.repoOnAccepted({ "a.txt": lines("1", "2") })
-        const parent = await rig.lane()
-        await parent.write("a.txt", lines("P", "2"))
-        const p1 = await recorded(parent, 1)
-        const branch = await rig.branch(p1)
-        await branch.write("a.txt", lines("P", "B"))
-        const b1 = await recorded(branch, 2)
-        await parent.write("a.txt", lines("PP", "2"))
-        const p2 = await recorded(parent, 3)
-        await rig.deleteSnapshot(p1)
-        const states = rig.graph().states.size
-        expect(await merge(branch, withParent(parent, p2, p1))).toEqual({
-          kind: "refused",
-          reason:
-            "the state this thread shares with amber-fox is no longer kept",
-          follow: null,
-        })
-        expect(rig.graph().states.size).toBe(states)
-        expect(rig.states(branch.lane).tip).toBe(b1)
-        expect(await branch.read("a.txt")).toBe(lines("P", "B"))
-      } finally {
-        await rig.close()
-      }
-    })
-
-    /**
-     * A criss-cross, as the graph's flows E2 and F (`graph.test.ts`): the
-     * lane's turn; a read with a change of yours; the turn accepted over
-     * that read, and the lane caught up with the read alone. Accepted
-     * work's newest (`theirs`) and the lane then have two merge bases, the
-     * turn and the read.
-     */
-    async function crissCross(
-      rig: FolderRig,
-      files: {
-        readonly start: string
-        readonly lane: string
-        readonly repo: string
-        /** The lane's file once its first catch-up conflicted, resolved as its own. */
-        readonly accepted: string
-      },
-    ) {
-      await rig.repoOnAccepted({ "a.txt": files.start })
+describe("a folder lane's conflicts, on btrfs", {
+  tags: ["btrfs-checkout"],
+}, () => {
+  const TURN = { title: "a turn", entry: entryId("e-1") }
+  test("a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it", async () => {
+    const rig = await makeRig()
+    try {
+      await rig.repoOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
       const lane = await rig.lane()
-      await lane.write("a.txt", files.lane)
-      await recorded(lane, 1)
-      const repo = await rig.repoOnAccepted({ "a.txt": files.repo })
-      await rig.accept(lane)
-      // Accepted work then takes its own file.
-      const theirs = await rig.repoOnAccepted({ "a.txt": files.accepted })
-      const first = await merge(lane, withAccepted(repo))
-      if (first.kind === "conflicted")
+      await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+      await lane.withHistory(h => h.recordTurn(TURN))
+      const point = await rig.repoOnAccepted({
+        "a.txt": "one\ntwo (yours)\nthree\n",
+      })
+      const merged = await lane.withHistory(async h =>
+        h.merge(
+          folderCopyReady(),
+          { kind: "accepted", point, mark: false },
+          null,
+        ),
+      )
+      expect(merged.kind).toBe("conflicted")
+      expect(await lane.read("a.txt")).toBe("one\ntwo (lane)\nthree\n")
+      const versions = await rig.statesDir(lane.lane)
+      expect(
+        await readFile(path.join(versions, "conflicts/a.txt/theirs"), "utf8"),
+      ).toBe("one\ntwo (yours)\nthree\n")
+      expect(
+        await lane.withHistory(h =>
+          h.resolve("a.txt", "theirs", { kind: "agent" }),
+        ),
+      ).toEqual({ kind: "resolved" })
+      expect(await lane.read("a.txt")).toBe("one\ntwo (yours)\nthree\n")
+      const resolved = rig.states(lane.lane).tip
+      if (resolved === null) throw new Error("the lane has no state")
+      expect(rig.graph().states.get(resolved)?.made).toEqual({
+        kind: "resolve",
+        lane: lane.lane,
+        path: "a.txt",
+      })
+      expect(await rig.snapshotExists(resolved)).toBe(true)
+      // Nothing left for the next turn: the resolution is a state already.
+      expect(
+        (await lane.withHistory(h => h.recordTurn(TURN))).committed,
+      ).toBeNull()
+      expect(await lane.withHistory(h => h.conflicts())).toEqual([])
+      expect(
         await lane.withHistory(h =>
           h.resolve("a.txt", "ours", { kind: "agent" }),
-        )
-      const upToDate = rig.states(lane.lane).tip
-      if (upToDate === null) throw new Error("the lane has no state")
-      const plan = planMergeBase(
-        [...rig.graph().states.values()],
-        upToDate,
-        theirs,
-      )
-      if (plan?.kind !== "virtual") throw new Error("no criss-cross")
-      return { lane, theirs, upToDate, base: plan.name }
+        ),
+      ).toEqual({ kind: "refused", why: "no-conflict" })
+    } finally {
+      await rig.close()
     }
+  })
+})
 
-    const E2 = {
-      start: lines("x", "1", "2", "y", "3", "4", "z"),
-      lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
-      repo: lines("X", "1", "2", "y", "3", "4", "z"),
-      accepted: lines("X", "1", "2", "Y1", "3", "4", "z"),
+describe("a folder lane's catch-ups after a sweep, and its virtual bases, on btrfs", {
+  tags: ["btrfs-checkout"],
+}, () => {
+  const turn = (n: number) => ({
+    title: `turn ${n}`,
+    entry: entryId(`e-${n}`),
+  })
+  const recorded = async (lane: RigLane, n: number) => {
+    const made = await lane.withHistory(h => h.recordTurn(turn(n)))
+    if (made.committed === null) throw new Error("the turn changed nothing")
+    return made.committed
+  }
+  const merge = (lane: RigLane, from: BaseMerge) =>
+    lane.withHistory(h => h.merge(folderCopyReady(), from, null))
+  const withAccepted = (point: PointId): BaseMerge => ({
+    kind: "accepted",
+    point,
+    mark: false,
+  })
+  const withParent = (
+    parent: RigLane,
+    point: PointId,
+    upToDateWith: PointId,
+  ): BaseMerge => ({
+    kind: "parent",
+    lane: parent.lane,
+    name: "amber-fox" as ThreadName,
+    point,
+    upToDateWith,
+  })
+  const lines = (...ls: string[]) => `${ls.join("\n")}\n`
+
+  test("a branch catches up with its parent after a sweep, the parent's turn it began on kept", async () => {
+    const rig = await makeRig()
+    try {
+      await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
+      const parent = await rig.lane()
+      await parent.write("a.txt", lines("P", "2", "3", "4"))
+      const p1 = await recorded(parent, 1)
+      const branch = await rig.branch(p1)
+      await branch.write("a.txt", lines("P", "2", "3", "B"))
+      await recorded(branch, 2)
+      await parent.write("a.txt", lines("P", "PP", "3", "4"))
+      const p2 = await recorded(parent, 3)
+      await rig.sweep()
+      expect(await rig.snapshotExists(p1)).toBe(true)
+      const merged = await merge(branch, withParent(parent, p2, p1))
+      expect(merged.kind).toBe("clean")
+      expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))
+    } finally {
+      await rig.close()
     }
-    // Your change and the lane's are on lines of their own, so the accept
-    // is clean; the conflict comes after, at the last line, which the lane
-    // and accepted work then change apart.
-    const F = {
-      start: lines("x", "1", "2", "y", "3", "4", "z"),
-      lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
-      repo: lines("X", "1", "2", "y", "3", "4", "z"),
-      accepted: lines("X", "1", "2", "Y1", "3", "4", "Zyours"),
+  })
+
+  test("a branch whose fork began on accepted work catches up cleanly with its parent after a sweep", async () => {
+    const rig = await makeRig()
+    try {
+      await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
+      const parent = await rig.lane()
+      await parent.write("a.txt", lines("P", "2", "3", "4"))
+      const p1 = await recorded(parent, 1)
+      // Its source snapshot lost, the fork began on accepted work's newest.
+      const branch = await rig.lane()
+      await branch.write("a.txt", lines("1", "2", "3", "B"))
+      await recorded(branch, 2)
+      await parent.write("a.txt", lines("P", "PP", "3", "4"))
+      const p2 = await recorded(parent, 3)
+      expect((await rig.sweep()).toDelete).toContain(p1)
+      const merged = await merge(branch, withParent(parent, p2, p1))
+      expect(merged.kind).toBe("clean")
+      expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))
+    } finally {
+      await rig.close()
     }
+  })
 
-    test("a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it", async () => {
-      const rig = await makeRig()
-      try {
-        const { lane, theirs, upToDate, base } = await crissCross(rig, E2)
-        const branch = await rig.branch(upToDate)
-        expect((await merge(lane, withAccepted(theirs))).kind).toBe("clean")
-        expect(await rig.snapshotExists(base)).toBe(false)
-        expect(rig.graph().states.has(base)).toBe(false)
-        expect((await merge(branch, withAccepted(theirs))).kind).toBe("clean")
-        expect(await rig.snapshotExists(base)).toBe(false)
-      } finally {
-        await rig.close()
-      }
-    })
+  test("a catch-up whose base's snapshot is gone is refused with words, and makes nothing", async () => {
+    const rig = await makeRig()
+    try {
+      await rig.repoOnAccepted({ "a.txt": lines("1", "2") })
+      const parent = await rig.lane()
+      await parent.write("a.txt", lines("P", "2"))
+      const p1 = await recorded(parent, 1)
+      const branch = await rig.branch(p1)
+      await branch.write("a.txt", lines("P", "B"))
+      const b1 = await recorded(branch, 2)
+      await parent.write("a.txt", lines("PP", "2"))
+      const p2 = await recorded(parent, 3)
+      await rig.deleteSnapshot(p1)
+      const states = rig.graph().states.size
+      expect(await merge(branch, withParent(parent, p2, p1))).toEqual({
+        kind: "refused",
+        reason: "the state this thread shares with amber-fox is no longer kept",
+        follow: null,
+      })
+      expect(rig.graph().states.size).toBe(states)
+      expect(rig.states(branch.lane).tip).toBe(b1)
+      expect(await branch.read("a.txt")).toBe(lines("P", "B"))
+    } finally {
+      await rig.close()
+    }
+  })
 
-    test("a virtual base a conflict names is recorded and kept, a clean catch-up over it after included", async () => {
-      const rig = await makeRig()
-      try {
-        const { lane, theirs, upToDate, base } = await crissCross(rig, F)
-        // Branched before the conflict, it takes your line: clean over the same bases.
-        const branch = await rig.branch(upToDate)
-        await branch.write("a.txt", F.accepted)
-        await recorded(branch, 2)
-        await lane.write("a.txt", lines("X", "1", "2", "Y1", "3", "4", "Zlane"))
-        await recorded(lane, 3)
-        expect((await merge(lane, withAccepted(theirs))).kind).toBe(
-          "conflicted",
-        )
-        expect(rig.graph().states.get(base)?.made).toEqual({
-          kind: "bases-merged",
-        })
-        expect(await rig.snapshotExists(base)).toBe(true)
-        expect((await merge(branch, withAccepted(theirs))).kind).toBe("clean")
-        expect(await rig.snapshotExists(base)).toBe(true)
-      } finally {
-        await rig.close()
-      }
-    })
-  },
-)
+  /**
+   * A criss-cross, as the graph's flows E2 and F (`graph.test.ts`): the
+   * lane's turn; a read with a change of yours; the turn accepted over
+   * that read, and the lane caught up with the read alone. Accepted
+   * work's newest (`theirs`) and the lane then have two merge bases, the
+   * turn and the read.
+   */
+  async function crissCross(
+    rig: FolderRig,
+    files: {
+      readonly start: string
+      readonly lane: string
+      readonly repo: string
+      /** The lane's file once its first catch-up conflicted, resolved as its own. */
+      readonly accepted: string
+    },
+  ) {
+    await rig.repoOnAccepted({ "a.txt": files.start })
+    const lane = await rig.lane()
+    await lane.write("a.txt", files.lane)
+    await recorded(lane, 1)
+    const repo = await rig.repoOnAccepted({ "a.txt": files.repo })
+    await rig.accept(lane)
+    // Accepted work then takes its own file.
+    const theirs = await rig.repoOnAccepted({ "a.txt": files.accepted })
+    const first = await merge(lane, withAccepted(repo))
+    if (first.kind === "conflicted")
+      await lane.withHistory(h => h.resolve("a.txt", "ours", { kind: "agent" }))
+    const upToDate = rig.states(lane.lane).tip
+    if (upToDate === null) throw new Error("the lane has no state")
+    const plan = planMergeBase(
+      [...rig.graph().states.values()],
+      upToDate,
+      theirs,
+    )
+    if (plan?.kind !== "virtual") throw new Error("no criss-cross")
+    return { lane, theirs, upToDate, base: plan.name }
+  }
 
-describe.skipIf(!onBtrfs)(
-  "a folder review, on btrfs (skipped: not on btrfs here)",
-  () => {
-    const GIF = (n: number) => `GIF89a\0${"x".repeat(n)}`
-    test("a review shows an image as media, a moved unchanged file as one row, and serves a side's bytes typed by them", async () => {
-      const rig = await makeRig()
-      try {
-        const first = await rig.repoOnAccepted({
-          "old.txt": "moved, unchanged\n",
-          "a.gif": GIF(1),
-          "b.txt": "one\n",
-        })
-        await rig.removeOnAccepted("old.txt")
-        const second = await rig.repoOnAccepted({
-          "docs/new.txt": "moved, unchanged\n",
-          "a.gif": GIF(3),
-          "b.txt": "two\n",
-        })
-        const { files } = await rig.review(first, second)
-        expect(files.map(f => [f.shown, f.change, f.content.kind])).toEqual([
-          ["a.gif", "modified", "media"],
-          ["b.txt", "modified", "lines"],
-          ["{old.txt => docs/new.txt}", "renamed", "lines"],
-        ])
-        expect(files[0]?.content).toEqual({
-          kind: "media",
-          before: { content: "image/gif", size: 8 },
-          after: { content: "image/gif", size: 10 },
-        })
-        const served = await rig.fileBytes(first, "a.gif")
-        if (served.kind !== "file") throw new Error(JSON.stringify(served))
-        const chunks: Uint8Array[] = []
-        for await (const c of served.bytes) chunks.push(c)
-        expect([served.content, Buffer.concat(chunks).toString()]).toEqual([
-          "image/gif",
-          GIF(1),
-        ])
-        expect((await rig.fileBytes(first, "none")).kind).toBe("refused")
-      } finally {
-        await rig.close()
-      }
-    })
-  },
-)
+  const E2 = {
+    start: lines("x", "1", "2", "y", "3", "4", "z"),
+    lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
+    repo: lines("X", "1", "2", "y", "3", "4", "z"),
+    accepted: lines("X", "1", "2", "Y1", "3", "4", "z"),
+  }
+  // Your change and the lane's are on lines of their own, so the accept
+  // is clean; the conflict comes after, at the last line, which the lane
+  // and accepted work then change apart.
+  const F = {
+    start: lines("x", "1", "2", "y", "3", "4", "z"),
+    lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
+    repo: lines("X", "1", "2", "y", "3", "4", "z"),
+    accepted: lines("X", "1", "2", "Y1", "3", "4", "Zyours"),
+  }
 
-describe.skipIf(!onBtrfs)(
-  "a restore of accepted work's kept state, on btrfs (skipped: not on btrfs here)",
-  () => {
-    test("a restore makes accepted work's newest hold its state's content, and the next read answers current", async () => {
-      const rig = await makeRig()
-      try {
-        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.repoOnAccepted({
-          "a.txt": "two\n",
-          "b.txt": "new\n",
-        })
-        await rig.sweep(5)
-        expect(await rig.restore(first, second)).toEqual({ kind: "done" })
-        const newest = rig.states(null).newest
-        if (newest === null) throw new Error("no accepted work")
-        expect(rig.graph().states.get(newest)?.made).toEqual({
-          kind: "restore",
-          of: first,
-        })
-        expect(await rig.snapshotExists(newest)).toBe(true)
-        expect(await rig.folderFile("a.txt")).toBe("one\n")
-        expect(await rig.folderFile("b.txt")).toBeNull()
-        expect(await rig.repoOnAccepted({})).toBe(newest)
-      } finally {
-        await rig.close()
-      }
-    })
+  test("a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it", async () => {
+    const rig = await makeRig()
+    try {
+      const { lane, theirs, upToDate, base } = await crissCross(rig, E2)
+      const branch = await rig.branch(upToDate)
+      expect((await merge(lane, withAccepted(theirs))).kind).toBe("clean")
+      expect(await rig.snapshotExists(base)).toBe(false)
+      expect(rig.graph().states.has(base)).toBe(false)
+      expect((await merge(branch, withAccepted(theirs))).kind).toBe("clean")
+      expect(await rig.snapshotExists(base)).toBe(false)
+    } finally {
+      await rig.close()
+    }
+  })
 
-    test("a restore not as shown, of a state not kept, or of what the folder holds is refused, making nothing", async () => {
-      const rig = await makeRig()
-      try {
-        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
-        const states = rig.graph().states.size
-        expect(await rig.restore(first, first)).toEqual({
-          kind: "refused",
-          code: ERR.NOT_AS_SHOWN,
-        })
-        expect(await rig.restore(first, second)).toEqual({
-          kind: "refused",
-          code: ERR.STATE_NOT_KEPT,
-        })
-        await rig.sweep(5)
-        expect(await rig.restore(second, second)).toEqual({
-          kind: "refused",
-          code: ERR.NOTHING_TO_RESTORE,
-        })
-        expect(rig.graph().states.size).toBe(states)
-        expect(rig.journals()).toEqual([])
-      } finally {
-        await rig.close()
-      }
-    })
+  test("a virtual base a conflict names is recorded and kept, a clean catch-up over it after included", async () => {
+    const rig = await makeRig()
+    try {
+      const { lane, theirs, upToDate, base } = await crissCross(rig, F)
+      // Branched before the conflict, it takes your line: clean over the same bases.
+      const branch = await rig.branch(upToDate)
+      await branch.write("a.txt", F.accepted)
+      await recorded(branch, 2)
+      await lane.write("a.txt", lines("X", "1", "2", "Y1", "3", "4", "Zlane"))
+      await recorded(lane, 3)
+      expect((await merge(lane, withAccepted(theirs))).kind).toBe("conflicted")
+      expect(rig.graph().states.get(base)?.made).toEqual({
+        kind: "bases-merged",
+      })
+      expect(await rig.snapshotExists(base)).toBe(true)
+      expect((await merge(branch, withAccepted(theirs))).kind).toBe("clean")
+      expect(await rig.snapshotExists(base)).toBe(true)
+    } finally {
+      await rig.close()
+    }
+  })
+})
 
-    test("a restore stopped after its last link is finished at the next start, its snapshot made then", async () => {
-      const rig = await makeRig()
-      try {
-        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
-        await rig.sweep(5)
-        // The journal's writes: open, then before the move and after the link.
-        rig.stopJournalAfter(2)
-        await expect(rig.restore(first, second)).rejects.toThrow("stopped")
-        rig.stopJournalAfter(null)
-        const [open] = rig.journals()
-        if (open === undefined) throw new Error("no journal kept")
-        expect(await rig.snapshotExists(open.record.id)).toBe(false)
-        await rig.recover()
-        expect(await rig.snapshotExists(open.record.id)).toBe(true)
-        expect(rig.states(null).newest).toBe(open.record.id)
-        expect(await rig.folderFile("a.txt")).toBe("one\n")
-      } finally {
-        await rig.close()
-      }
-    })
+describe("a folder review, on btrfs", { tags: ["btrfs-checkout"] }, () => {
+  const GIF = (n: number) => `GIF89a\0${"x".repeat(n)}`
+  test("a review shows an image as media, a moved unchanged file as one row, and serves a side's bytes typed by them", async () => {
+    const rig = await makeRig()
+    try {
+      const first = await rig.repoOnAccepted({
+        "old.txt": "moved, unchanged\n",
+        "a.gif": GIF(1),
+        "b.txt": "one\n",
+      })
+      await rig.removeOnAccepted("old.txt")
+      const second = await rig.repoOnAccepted({
+        "docs/new.txt": "moved, unchanged\n",
+        "a.gif": GIF(3),
+        "b.txt": "two\n",
+      })
+      const { files } = await rig.review(first, second)
+      expect(files.map(f => [f.shown, f.change, f.content.kind])).toEqual([
+        ["a.gif", "modified", "media"],
+        ["b.txt", "modified", "lines"],
+        ["{old.txt => docs/new.txt}", "renamed", "lines"],
+      ])
+      expect(files[0]?.content).toEqual({
+        kind: "media",
+        before: { content: "image/gif", size: 8 },
+        after: { content: "image/gif", size: 10 },
+      })
+      const served = await rig.fileBytes(first, "a.gif")
+      if (served.kind !== "file") throw new Error(JSON.stringify(served))
+      const chunks: Uint8Array[] = []
+      for await (const c of served.bytes) chunks.push(c)
+      expect([served.content, Buffer.concat(chunks).toString()]).toEqual([
+        "image/gif",
+        GIF(1),
+      ])
+      expect((await rig.fileBytes(first, "none")).kind).toBe("refused")
+    } finally {
+      await rig.close()
+    }
+  })
+})
 
-    test("a restore stopped before its last link is put back, leaving no snapshot its record names", async () => {
-      const rig = await makeRig()
-      try {
-        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
-        await rig.sweep(5)
-        rig.stopJournalAfter(1)
-        await expect(rig.restore(first, second)).rejects.toThrow("stopped")
-        rig.stopJournalAfter(null)
-        const [open] = rig.journals()
-        if (open === undefined) throw new Error("no journal kept")
-        await rig.recover()
-        expect(await rig.snapshotExists(open.record.id)).toBe(false)
-        expect(rig.states(null).newest).toBe(second)
-        expect(await rig.folderFile("a.txt")).toBe("two\n")
-      } finally {
-        await rig.close()
-      }
-    })
-  },
-)
+describe("a restore of accepted work's kept state, on btrfs", {
+  tags: ["btrfs-checkout"],
+}, () => {
+  test("a restore makes accepted work's newest hold its state's content, and the next read answers current", async () => {
+    const rig = await makeRig()
+    try {
+      const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+      const second = await rig.repoOnAccepted({
+        "a.txt": "two\n",
+        "b.txt": "new\n",
+      })
+      await rig.sweep(5)
+      expect(await rig.restore(first, second)).toEqual({ kind: "done" })
+      const newest = rig.states(null).newest
+      if (newest === null) throw new Error("no accepted work")
+      expect(rig.graph().states.get(newest)?.made).toEqual({
+        kind: "restore",
+        of: first,
+      })
+      expect(await rig.snapshotExists(newest)).toBe(true)
+      expect(await rig.folderFile("a.txt")).toBe("one\n")
+      expect(await rig.folderFile("b.txt")).toBeNull()
+      expect(await rig.repoOnAccepted({})).toBe(newest)
+    } finally {
+      await rig.close()
+    }
+  })
+
+  test("a restore not as shown, of a state not kept, or of what the folder holds is refused, making nothing", async () => {
+    const rig = await makeRig()
+    try {
+      const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+      const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
+      const states = rig.graph().states.size
+      expect(await rig.restore(first, first)).toEqual({
+        kind: "refused",
+        code: ERR.NOT_AS_SHOWN,
+      })
+      expect(await rig.restore(first, second)).toEqual({
+        kind: "refused",
+        code: ERR.STATE_NOT_KEPT,
+      })
+      await rig.sweep(5)
+      expect(await rig.restore(second, second)).toEqual({
+        kind: "refused",
+        code: ERR.NOTHING_TO_RESTORE,
+      })
+      expect(rig.graph().states.size).toBe(states)
+      expect(rig.journals()).toEqual([])
+    } finally {
+      await rig.close()
+    }
+  })
+
+  test("a restore stopped after its last link is finished at the next start, its snapshot made then", async () => {
+    const rig = await makeRig()
+    try {
+      const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+      const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
+      await rig.sweep(5)
+      // The journal's writes: open, then before the move and after the link.
+      rig.stopJournalAfter(2)
+      await expect(rig.restore(first, second)).rejects.toThrow("stopped")
+      rig.stopJournalAfter(null)
+      const [open] = rig.journals()
+      if (open === undefined) throw new Error("no journal kept")
+      expect(await rig.snapshotExists(open.record.id)).toBe(false)
+      await rig.recover()
+      expect(await rig.snapshotExists(open.record.id)).toBe(true)
+      expect(rig.states(null).newest).toBe(open.record.id)
+      expect(await rig.folderFile("a.txt")).toBe("one\n")
+    } finally {
+      await rig.close()
+    }
+  })
+
+  test("a restore stopped before its last link is put back, leaving no snapshot its record names", async () => {
+    const rig = await makeRig()
+    try {
+      const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+      const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
+      await rig.sweep(5)
+      rig.stopJournalAfter(1)
+      await expect(rig.restore(first, second)).rejects.toThrow("stopped")
+      rig.stopJournalAfter(null)
+      const [open] = rig.journals()
+      if (open === undefined) throw new Error("no journal kept")
+      await rig.recover()
+      expect(await rig.snapshotExists(open.record.id)).toBe(false)
+      expect(rig.states(null).newest).toBe(second)
+      expect(await rig.folderFile("a.txt")).toBe("two\n")
+    } finally {
+      await rig.close()
+    }
+  })
+})
 
 test("a folder lane's fork restores from accepted work's state, or from its source's snapshot when branched", () => {
   const h = folderHistory({

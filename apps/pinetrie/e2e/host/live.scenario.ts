@@ -27,10 +27,7 @@ import type { Scenario } from "../scenario.ts"
 import { startedRunId } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: async () =>
-    process.env.PINETRIE_LIVE === "1"
-      ? null
-      : "a real model: PINETRIE_LIVE=1 (pnpm run e2e:live)",
+  requires: ["live-model"],
   run: ({ check }) => run(check),
 }
 

@@ -5,6 +5,7 @@ import {
   planSuite,
   type SuiteStep,
   scenarioProblem,
+  scenarioRequirements,
   scenarioSection,
 } from "./scenario.ts"
 
@@ -23,15 +24,18 @@ describe("chooseScenarios", () => {
   })
 })
 
+const docker = {
+  requirement: "lane-runtime",
+  why: "Docker does not answer",
+} as const
+
 test("planSuite runs a scenario with no problem, and skips one with a reason, keeping it", () => {
-  expect(
-    planSuite(all, undefined, new Map([["tools", "Docker does not answer"]])),
-  ).toEqual({
+  expect(planSuite(all, undefined, new Map([["tools", docker]]))).toEqual({
     kind: "run",
     steps: [
       { name: "boot", run: true },
       { name: "strip", run: true },
-      { name: "tools", run: false, why: "Docker does not answer" },
+      { name: "tools", run: false, why: docker },
     ],
   })
   expect(planSuite(all, "nope", new Map())).toEqual({
@@ -40,23 +44,20 @@ test("planSuite runs a scenario with no problem, and skips one with a reason, ke
   })
 })
 
-test("scenarioProblem: one that runs lanes is skipped with the runtime's words, before its own needs; one that runs none never asks the runtime", () => {
-  const docker = "Docker does not answer (`docker version`)"
-  expect(scenarioProblem({ lanes: true, runtime: docker, needs: null })).toBe(
-    docker,
-  )
+test("scenarioRequirements: one that runs lanes requires a runtime for them first, then its suite's and its own", () => {
   expect(
-    scenarioProblem({ lanes: true, runtime: docker, needs: "PINETRIE_LIVE" }),
-  ).toBe(docker)
-  expect(
-    scenarioProblem({ lanes: true, runtime: null, needs: "PINETRIE_LIVE" }),
-  ).toBe("PINETRIE_LIVE")
-  expect(scenarioProblem({ lanes: false, runtime: docker, needs: null })).toBe(
-    null,
-  )
-  expect(scenarioProblem({ lanes: true, runtime: null, needs: null })).toBe(
-    null,
-  )
+    scenarioRequirements({ lanes: true, requires: ["lane-vm"] }, ["chromium"]),
+  ).toEqual(["lane-runtime", "chromium", "lane-vm"])
+  expect(scenarioRequirements({}, [])).toEqual([])
+})
+
+test("scenarioProblem: the first requirement not met, with its probe's words", () => {
+  const facts = new Map([
+    ["lane-runtime", "Docker does not answer"],
+    ["live-model", null],
+  ] as const)
+  expect(scenarioProblem(["live-model", "lane-runtime"], facts)).toEqual(docker)
+  expect(scenarioProblem(["live-model"], facts)).toBeNull()
 })
 
 describe("planJobs", () => {
@@ -97,7 +98,11 @@ describe("planJobs", () => {
   test("one scenario to run, the others skipped, runs here", () => {
     const one: readonly SuiteStep[] = [
       { name: "a", run: true },
-      { name: "b", run: false, why: "no Docker" },
+      {
+        name: "b",
+        run: false,
+        why: { requirement: "lane-runtime", why: "no Docker" },
+      },
     ]
     expect(
       planJobs({ steps: one, jobs: { all: 8, lanes: 1 }, stopAt: undefined }),

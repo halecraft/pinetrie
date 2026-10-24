@@ -31,63 +31,62 @@ describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux"
   })
 })
 
-// Off the Mac only: there, asking Docker takes a lease on the person's VM.
-describe.skipIf(process.platform === "darwin")(
-  "findProject: a host with tools that cannot run lanes is refused, in words",
-  () => {
-    const inRepo = async (
-      init: readonly string[] | null,
-      body: (dir: string) => Promise<void>,
-    ) => {
-      const dir = mkdtempSync(path.join(tmpdir(), "pinetrie-refused-"))
-      if (init !== null)
-        execFileSync(init[0] ?? "", init.slice(1), {
-          cwd: dir,
-          stdio: "ignore",
-        })
-      try {
-        await body(dir)
-      } finally {
-        rmSync(dir, { recursive: true, force: true })
-      }
+// Linux only: on the Mac, asking Docker takes a lease on the person's VM.
+describe("findProject: a host with tools that cannot run lanes is refused, in words", {
+  tags: ["linux"],
+}, () => {
+  const inRepo = async (
+    init: readonly string[] | null,
+    body: (dir: string) => Promise<void>,
+  ) => {
+    const dir = mkdtempSync(path.join(tmpdir(), "pinetrie-refused-"))
+    if (init !== null)
+      execFileSync(init[0] ?? "", init.slice(1), {
+        cwd: dir,
+        stdio: "ignore",
+      })
+    try {
+      await body(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
-    const find = (dir: string) =>
-      findProject({
-        root: dir,
+  }
+  const find = (dir: string) =>
+    findProject({
+      root: dir,
+      install: thisInstall,
+      slots: 16,
+      hostSocket: path.join(dir, ".no-ssh.sock"),
+      log: () => {},
+      working: () => {},
+      manage: "manage",
+    })
+  test("a Docker that does not answer, in the runtime's words", () =>
+    inRepo(["jj", "git", "init", "--colocate"], async dir => {
+      const saved = process.env.DOCKER_HOST
+      process.env.DOCKER_HOST = "unix:///nonexistent.sock"
+      try {
+        const found = await find(dir)
+        expect(found?.kind).toBe("refused")
+        expect(found?.kind === "refused" ? found.words : "").toContain(
+          "Docker does not answer",
+        )
+      } finally {
+        if (saved === undefined) delete process.env.DOCKER_HOST
+        else process.env.DOCKER_HOST = saved
+      }
+    }))
+  test("no tools: nothing to find", async () => {
+    expect(
+      await findProject({
+        root: null,
         install: thisInstall,
         slots: 16,
-        hostSocket: path.join(dir, ".no-ssh.sock"),
+        hostSocket: "/no-ssh.sock",
         log: () => {},
         working: () => {},
         manage: "manage",
-      })
-    test("a Docker that does not answer, in the runtime's words", () =>
-      inRepo(["jj", "git", "init", "--colocate"], async dir => {
-        const saved = process.env.DOCKER_HOST
-        process.env.DOCKER_HOST = "unix:///nonexistent.sock"
-        try {
-          const found = await find(dir)
-          expect(found?.kind).toBe("refused")
-          expect(found?.kind === "refused" ? found.words : "").toContain(
-            "Docker does not answer",
-          )
-        } finally {
-          if (saved === undefined) delete process.env.DOCKER_HOST
-          else process.env.DOCKER_HOST = saved
-        }
-      }))
-    test("no tools: nothing to find", async () => {
-      expect(
-        await findProject({
-          root: null,
-          install: thisInstall,
-          slots: 16,
-          hostSocket: "/no-ssh.sock",
-          log: () => {},
-          working: () => {},
-          manage: "manage",
-        }),
-      ).toBeNull()
-    })
-  },
-)
+      }),
+    ).toBeNull()
+  })
+})

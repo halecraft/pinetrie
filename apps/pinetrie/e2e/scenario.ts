@@ -13,11 +13,13 @@ import {
   type Checks,
   createChecks,
   isStop,
-  readTally,
-  type Tally,
-  tallyLine,
+  NO_COUNTS,
+  readSuiteCounts,
+  SUITE_MARK,
+  sumSuiteCounts,
 } from "./checks.ts"
 import type { LaneHosts } from "./lane-hosts.ts"
+import type { SuiteRequirement } from "./requirements.ts"
 
 /** What a scenario is given beside its checks. */
 export interface Given {
@@ -25,34 +27,54 @@ export interface Given {
 }
 
 /**
- * A scenario. One whose agent has tools declares `lanes: true`: it is skipped
- * where the suites' runtime cannot run (`runtimeProblem`), and only it is
- * given hosts with lanes.
+ * A scenario. One whose agent has tools declares `lanes: true`: it requires
+ * a runtime for lanes, and only it is given hosts with lanes. What else it
+ * needs of the place it runs in is its `requires`; one not met skips it.
  */
 export type Scenario =
   | {
       readonly lanes?: false
-      /** Why it cannot run in this environment, or null: `PINETRIE_LIVE` unset. */
-      readonly needs?: () => Promise<string | null>
+      readonly requires?: readonly SuiteRequirement[]
       run(checks: Checks): Promise<void>
     }
   | {
       readonly lanes: true
-      readonly needs?: () => Promise<string | null>
+      readonly requires?: readonly SuiteRequirement[]
       run(checks: Checks, given: Given): Promise<void>
     }
 
+/** A requirement a scenario named and this place does not meet. */
+export interface Unmet {
+  readonly requirement: SuiteRequirement
+  /** What this place lacks, in its probe's words. */
+  readonly why: string
+}
+
 /**
- * Why a scenario cannot run here, or null: the runtime's reason first, for
- * one that runs lanes, then its own `needs`.
+ * What a scenario requires, in the order it is asked: a runtime for lanes
+ * when it runs them, its suite's (`runSuite`), then its own.
  */
-export function scenarioProblem(input: {
-  readonly lanes: boolean
-  /** `runtimeProblem`'s answer; asked only for a scenario that runs lanes. */
-  readonly runtime: string | null
-  readonly needs: string | null
-}): string | null {
-  return (input.lanes ? input.runtime : null) ?? input.needs
+export const scenarioRequirements = (
+  scenario: Pick<Scenario, "lanes" | "requires">,
+  suite: readonly SuiteRequirement[],
+): readonly SuiteRequirement[] => [
+  ...new Set<SuiteRequirement>([
+    ...(scenario.lanes === true ? (["lane-runtime"] as const) : []),
+    ...suite,
+    ...(scenario.requires ?? []),
+  ]),
+]
+
+/** The first of `requirements` this place does not meet, by `facts`, or null. */
+export function scenarioProblem(
+  requirements: readonly SuiteRequirement[],
+  facts: ReadonlyMap<SuiteRequirement, string | null>,
+): Unmet | null {
+  for (const requirement of requirements) {
+    const why = facts.get(requirement) ?? null
+    if (why !== null) return { requirement, why }
+  }
+  return null
 }
 
 /** The file suffix that makes a file a scenario; its stem is its name. */
@@ -78,7 +100,7 @@ export function chooseScenarios(
 
 export type SuiteStep =
   | { readonly name: string; readonly run: true }
-  | { readonly name: string; readonly run: false; readonly why: string }
+  | { readonly name: string; readonly run: false; readonly why: Unmet }
 
 type SuitePlan =
   | { readonly kind: "unknown"; readonly names: readonly string[] }
@@ -86,12 +108,13 @@ type SuitePlan =
 
 /**
  * What a suite does: the chosen scenarios, each run, or skipped for the
- * reason its `needs` gave (`problems`, by name; absent or null runs it).
+ * requirement it names that this place does not meet (`problems`, by name;
+ * absent or null runs it).
  */
 export function planSuite(
   all: readonly string[],
   named: string | undefined,
-  problems: ReadonlyMap<string, string | null>,
+  problems: ReadonlyMap<string, Unmet | null>,
 ): SuitePlan {
   const chosen = chooseScenarios(all, named)
   if ("unknown" in chosen) return { kind: "unknown", names: chosen.unknown }
@@ -150,13 +173,18 @@ export interface SuiteJobs {
 export const ONE_AT_A_TIME: SuiteJobs = { all: 1, lanes: 1 }
 
 /**
- * What a scenario's own process printed, without the suite's title and
- * tally around it, which the suite prints once for all of them.
+ * What a scenario's own process printed, without the suite's title, tally
+ * and marked line around it, which the suite prints once for all of them.
  */
 export const scenarioSection = (output: string, title: string): string =>
   output
     .split("\n")
-    .filter(l => l !== `=== ${title} ===` && !l.startsWith(`=== ${title}: `))
+    .filter(
+      l =>
+        l !== `=== ${title} ===` &&
+        !l.startsWith(`=== ${title}: `) &&
+        !l.startsWith(SUITE_MARK),
+    )
     .join("\n")
     .replace(/^\n+/, "")
     .replace(/\n+$/, "")
@@ -169,15 +197,17 @@ export const scenarioNames = (dir: string): readonly string[] =>
     .sort()
 
 /**
- * Gather (the scenarios in `dir`, the chosen ones imported, each one's
- * `needs` awaited), plan (`planSuite`), then run the plan and report. A
- * scenario that throws fails under its name and the next one runs; a stop at
+ * Gather (the scenarios in `dir`, the chosen ones imported, each requirement
+ * they name asked once, `suiteFact`), plan (`planSuite`), then run the plan
+ * and report. `requires` is every scenario's in this suite. A scenario that
+ * throws fails under its name and the next one runs; a stop at
  * `PINETRIE_STOP_AT` ends the suite.
  */
 export async function runSuite(
   title: string,
   dir: string,
   jobs: SuiteJobs = ONE_AT_A_TIME,
+  requires: readonly SuiteRequirement[] = [],
 ): Promise<never> {
   const all = scenarioNames(dir)
   const named = process.env.PINETRIE_SCENARIO
@@ -189,30 +219,32 @@ export async function runSuite(
     process.exit(2)
   }
   const scenarios = new Map<string, Scenario>()
-  const problems = new Map<string, string | null>()
-  // Imported, and the runtime asked, once, and only for a suite with a
-  // scenario that runs lanes.
+  const problems = new Map<string, Unmet | null>()
+  // Imported once, and only for a suite with a scenario that runs lanes.
   let hosts: Promise<typeof import("./lane-hosts.ts")> | null = null
-  let runtime: Promise<string | null> | null = null
   const laneHosts = () => {
     hosts ??= import("./lane-hosts.ts")
     return hosts
   }
+  // Each requirement asked once, and only when a chosen scenario names it:
+  // the probes load pi, the VM's and Docker's modules.
+  const facts = new Map<SuiteRequirement, string | null>()
+  let probes: Promise<typeof import("./suite-facts.ts")> | null = null
   for (const name of chosen) {
     const mod = (await import(
       pathToFileURL(path.join(dir, `${name}${SCENARIO_SUFFIX}`)).href
     )) as { scenario: Scenario }
     scenarios.set(name, mod.scenario)
-    const lanes = mod.scenario.lanes === true
-    if (lanes) runtime ??= laneHosts().then(m => m.runtimeProblem())
-    problems.set(
-      name,
-      scenarioProblem({
-        lanes,
-        runtime: lanes ? await runtime : null,
-        needs: (await mod.scenario.needs?.()) ?? null,
-      }),
-    )
+    const requirements = scenarioRequirements(mod.scenario, requires)
+    // Asked in order until one is not met: the first is the reason given.
+    for (const r of requirements) {
+      if (!facts.has(r)) {
+        probes ??= import("./suite-facts.ts")
+        facts.set(r, await (await probes).suiteFact(r))
+      }
+      if (facts.get(r) !== null) break
+    }
+    problems.set(name, scenarioProblem(requirements, facts))
   }
   const plan = planSuite(all, named, problems)
   if (plan.kind === "run") {
@@ -292,12 +324,7 @@ async function runInProcesses(
         return [s.name, holding(held, () => scenarioProcess(s.name))] as const
       }),
   )
-  const total = { pass: 0, fail: 0, skip: 0 }
-  const add = (t: Tally) => {
-    total.pass += t.pass
-    total.fail += t.fail
-    total.skip += t.skip
-  }
+  let children = NO_COUNTS
   for (const step of steps) {
     const run = runs.get(step.name)
     if (run === undefined) {
@@ -307,18 +334,12 @@ async function runInProcesses(
     }
     const { output, status } = await run
     console.log(`\n${scenarioSection(output, title)}`)
-    const tally = readTally(output, title)
-    if (tally === null)
+    const counts = readSuiteCounts(output)
+    if (counts === null)
       checks.error(step.name, `its process exited ${status} with no tally`)
-    else add(tally)
+    else children = sumSuiteCounts(children, counts)
   }
-  add({
-    pass: checks.passed.length,
-    fail: checks.failed.length,
-    skip: checks.skipped.length,
-  })
-  console.log(`\n${tallyLine(title, total)}`)
-  process.exit(total.fail > 0 ? 1 : 0)
+  return checks.report(title, children)
 }
 
 /** A count of slots: `take` waits for one, `give` hands it back. */

@@ -1,6 +1,7 @@
 # S331 — Vitest 5's tags can carry what a test requires: a tag defined with `skip` skips every test it marks, and a filter selects by tag
 
 - **Status:** Answered
+- **Led to:** ADR-0213
 
 **Question.** Unit tests that need a place to run (the checkout on btrfs,
 `flock`, the Mac's own disks) decide it today with `describe.skipIf` on a
@@ -40,8 +41,13 @@ extends `TestOptions` but `tags`, so a tag carries `skip`, `timeout`,
    `skip` holds under a filter that selects it: the place that runs a
    tagged test must define the tag without `skip`, as its own config
    would.
-3. **`vitest list` lists every test, skipped by a tag or not**, and applies
-   `--tags-filter`; its `--json` gives no tags. **The JSON reporter**
+3. **`vitest list` lists every test, skipped by a tag or not, only when it
+   parses statically** (its default in Vitest 5), and applies
+   `--tags-filter`; its `--json` gives no tags. With
+   `--staticParse=false`, which runs each file to collect it (as
+   `scripts/mutate.ts`' `listTests` does, so a `test.each` lists its cases),
+   a tag's `skip` leaves its tests out, and a file holding nothing else
+   reads "No test suite found" (found while landing the plan, 2026-10-23). **The JSON reporter**
    (`--reporter json --outputFile`) gives each test's `status` and `tags`,
    and no reason for a skip: what was not met is read from its tags.
    `vitest --list-tags=json` lists each tag with its `skip`.
@@ -53,5 +59,6 @@ extends `TestOptions` but `tags`, so a tag carries `skip`, `timeout`,
 A requirement can be a tag, defined once with its `skip` from what the
 place it runs in has: no test file computes a condition of its own, and a
 test that cannot run here is listed and reported as skipped by name rather
-than left out. Since `vitest list` ignores the skip, a check of tests by
-name (`pnpm run proofs:unit`) sees every test on every machine.
+than left out. A list that must see every test, as a check of tests by
+name does (`pnpm run proofs:unit`), has the config skip no tag while it
+collects.

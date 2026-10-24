@@ -17,7 +17,7 @@ import { type LoaderLine, planAttribution } from "@pinetrie/lanehost"
 import { commandStatements, FORGED_SIGNALS } from "@pinetrie/shell/fixtures"
 import type { Checks } from "../checks.ts"
 import type { Scenario } from "../scenario.ts"
-import { bootGuest, guestProblem } from "./support.ts"
+import { bootGuest } from "./support.ts"
 
 type Event = Extract<LoaderLine, { kind: "event" }>
 type Call = Extract<RunEvent, { kind: "call" }>
@@ -88,7 +88,7 @@ const taggedLines = (
 }
 
 export const scenario: Scenario = {
-  needs: guestProblem,
+  requires: ["qemu", "arm64-docker"],
   async run({ check }: Checks) {
     const guest = await bootGuest(line => console.log(`  ${line}`))
     const events = eventsOf(guest.events)

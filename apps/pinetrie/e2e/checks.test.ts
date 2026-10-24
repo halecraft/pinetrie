@@ -3,10 +3,12 @@ import {
   createChecks,
   isStop,
   line,
-  readTally,
+  readSuiteCounts,
+  skipCounts,
   stopMessage,
   stopsHere,
-  tallyLine,
+  suiteSummaryLine,
+  sumSuiteCounts,
 } from "./checks.ts"
 
 test("stopsHere: a failing check whose label is stopAt stops; nothing else does", () => {
@@ -37,7 +39,10 @@ test("check prints its label and what it found; a stop matches the label, not th
 test("skip is neither a pass nor a fail, and an error fails under the scenario's name", () => {
   const printed: string[] = []
   const checks = createChecks(undefined, l => printed.push(l))
-  checks.skip("proposed", "Docker does not answer")
+  checks.skip("proposed", {
+    requirement: "lane-runtime",
+    why: "Docker does not answer",
+  })
   checks.error("tools", "boom")
   expect([checks.passed, checks.failed, checks.skipped]).toEqual([
     [],
@@ -45,17 +50,68 @@ test("skip is neither a pass nor a fail, and an error fails under the scenario's
     ["proposed"],
   ])
   expect(printed).toEqual([
-    "  SKIP  proposed · Docker does not answer",
+    "  SKIP  proposed · needs a runtime for lanes: Docker does not answer",
     "  ERROR tools · boom",
   ])
   expect(isStop(new Error(stopMessage("x")))).toBe(true)
   expect(isStop(new Error("x"))).toBe(false)
 })
 
-test("readTally reads the last tally a run of the suite printed, and none from a run that crashed", () => {
-  const tally = { pass: 3, fail: 1, skip: 2 }
-  const output = `── a\n  PASS  x\n\n${tallyLine("e2e", tally)}\n`
-  expect(readTally(output, "e2e")).toEqual(tally)
-  expect(readTally(output, "e2e:lanes")).toBeNull()
-  expect(readTally("── a\nTypeError: boom\n", "e2e")).toBeNull()
+test("a suite's marked line counts its checks and names each skip's requirement", () => {
+  expect(
+    suiteSummaryLine({
+      passed: 16,
+      failed: 1,
+      skipsBy: skipCounts([
+        { requirement: "lane-vm" },
+        { requirement: "lane-vm", why: "gvproxy" },
+        { unmeasured: "rootless oom events" },
+      ]),
+    }),
+  ).toBe("suite: 1 failed · 16 passed · 3 skipped (lane-vm ×2, unmeasured)")
+  expect(suiteSummaryLine({ passed: 2, failed: 0, skipsBy: new Map() })).toBe(
+    "suite: 2 passed",
+  )
+})
+
+test("a scenario's process's counts are read back from its marked line, and none from one that crashed", () => {
+  const counts = {
+    passed: 3,
+    failed: 1,
+    skipsBy: new Map([
+      ["lane-vm", 2],
+      ["unmeasured", 1],
+    ]),
+  }
+  const output = `── a\n  PASS  x\n\n${suiteSummaryLine(counts)}\n`
+  expect(readSuiteCounts(output)).toEqual(counts)
+  expect(readSuiteCounts("suite: 2 passed")).toEqual({
+    passed: 2,
+    failed: 0,
+    skipsBy: new Map(),
+  })
+  expect(readSuiteCounts("── a\nTypeError: boom\n")).toBeNull()
+})
+
+test("two runs' counts add, their skips by requirement", () => {
+  expect(
+    sumSuiteCounts(
+      { passed: 1, failed: 0, skipsBy: new Map([["lane-vm", 1]]) },
+      {
+        passed: 2,
+        failed: 1,
+        skipsBy: new Map([
+          ["lane-vm", 1],
+          ["chromium", 1],
+        ]),
+      },
+    ),
+  ).toEqual({
+    passed: 3,
+    failed: 1,
+    skipsBy: new Map([
+      ["lane-vm", 2],
+      ["chromium", 1],
+    ]),
+  })
 })

@@ -279,16 +279,15 @@ test("a session a live host serves is not renamed", async () => {
   expect(registryNames()).toEqual(["website"])
 })
 
-test.skipIf(process.platform !== "darwin")(
-  "a folder opened in another case is the same session (the Mac's disks ignore case)",
-  async () => {
-    const site = folder("Website")
-    const first = await opened(site)
-    const again = await opened(path.join(dir, "website"))
-    expect(again.path).toBe(site)
-    expect(again.name).toBe(first.name)
-  },
-)
+test("a folder opened in another case is the same session (the Mac's disks ignore case)", {
+  tags: ["mac-host"],
+}, async () => {
+  const site = folder("Website")
+  const first = await opened(site)
+  const again = await opened(path.join(dir, "website"))
+  expect(again.path).toBe(site)
+  expect(again.name).toBe(first.name)
+})
 
 test("sessionOfFolder finds a registered folder, and writes nothing for one never served", async () => {
   const served = await opened(folder("served"))

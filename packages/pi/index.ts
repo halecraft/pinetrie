@@ -10,6 +10,7 @@ export {
   type ProviderAuth,
   planSignIn,
   providerAuth,
+  providerCredential,
   type SignInInteraction,
   type SignInMethod,
   type SignInNotice,

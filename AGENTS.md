@@ -101,7 +101,8 @@ spent spikes: history, which search skips unless you name the folder.
 
 | gate | command |
 |---|---|
-| unit, conformance, e2e, lanes | `pnpm run verify` (its scenarios with lanes need Docker, as `e2e:lanes` does) |
+| unit, conformance, e2e, lanes | `pnpm run verify`: `@halecraft/verify` over `verify.config.ts`, every task run whatever another's result; the unit tests this machine cannot run go to a throwaway lane it makes (on the Mac, on the lane VM), and the report says which ran where and what ran nowhere, and why. `pnpm exec verify <key>` runs one task (`checks:unit:lane`); `pnpm run verify:fix` fixes what Biome can |
+| everything that can run here | `pnpm run verify:all`: `verify`, and the live, browser and observer suites, each skipped with why where it cannot run |
 | with a real model | `pnpm run e2e:live` (the `live` scenario alone; needs a model key) |
 | in a real browser | `pnpm run e2e:browser` (its scenarios with lanes need Docker, as `e2e:lanes` does; on the Mac, `pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell` once) |
 | lanes of their own, in containers | `pnpm run e2e:lanes` under Docker: in a lane whose project grants `lanes.nested` (pine·trie's does), its Docker at `$DOCKER_HOST`; on the Mac the lane VM, whose image the first lease builds with no Docker engine (ADR-0147), on Linux Docker with a btrfs lanes directory. Where Docker cannot run lanes, every scenario with lanes reports SKIP with why |
@@ -119,7 +120,11 @@ and only those tests (one `vitest list` per batch). So a unit mutation's
 command names its package, not a file, and needs no `-t` of its own. Its
 command first runs once with nothing mutated; if it fails there, its
 mutants read BASELINE and run nothing: a test that passes only after
-another in its file fails alone, and would otherwise read KILLED.
+another in its file fails alone, and would otherwise read KILLED. A test
+names what it needs of the place it runs in as a Vitest tag (`linux`,
+`flock`, `btrfs-checkout`, `mac-host`; `apps/pinetrie/e2e/TECHNICAL.md`),
+never a condition of its own; a mutant whose tests all skip here runs in
+a throwaway lane when this machine can make one, or reads NOT-HERE.
 `pnpm mutate <list> <name> --against <command>` runs a mutant against
 another command, whole, and lists the checks that catch it: use it to find
 a unit test that already proves a rule before writing one.

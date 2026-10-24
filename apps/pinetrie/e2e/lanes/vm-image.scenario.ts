@@ -15,9 +15,7 @@ import {
   gatherRunningVm,
   leaseExtra,
   leaseVm,
-  vmHostRefusal,
   vmStateDir,
-  vmWords,
 } from "@pinetrie/vm"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
@@ -26,14 +24,7 @@ import type { Scenario } from "../scenario.ts"
 import { ownVm } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: async () => {
-    const host = vmHostRefusal({
-      platform: process.platform,
-      arch: process.arch,
-      darwin: Number(os.release().split(".")[0]),
-    })
-    return host === null ? null : vmWords(host)
-  },
+  requires: ["lane-vm"],
   run: ({ check }) => run(check),
 }
 

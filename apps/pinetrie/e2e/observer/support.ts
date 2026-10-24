@@ -35,13 +35,18 @@ const LANES_CONTAINERFILE = path.join(
   "../../../../packages/lanes/image/Containerfile",
 )
 
-/** Why the guest cannot boot here, or null. */
-export async function guestProblem(): Promise<string | null> {
+/** Why QEMU cannot boot the guest here, or null. */
+export async function qemuProblem(): Promise<string | null> {
   try {
     await command(QEMU, ["--version"])
+    return null
   } catch {
     return `${QEMU} is not on PATH (apt-get install qemu-system-arm; brew install qemu)`
   }
+}
+
+/** Why the suites' Docker cannot build the guest's arm64 image, or null. */
+export async function arm64DockerProblem(): Promise<string | null> {
   let arch: string
   try {
     arch = (await cli(["info", "--format", "{{.Architecture}}"])).trim()

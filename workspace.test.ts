@@ -46,6 +46,8 @@ const allDeps = (m: Manifest) => [
  */
 const ROOT_TOOLING = [
   "@biomejs/biome",
+  // The gates' runner (`verify.config.ts`), and its parsers' type.
+  "@halecraft/verify",
   "@types/node",
   "esbuild",
   // Property tests' generators, for tests and `fixtures.ts` alone.
