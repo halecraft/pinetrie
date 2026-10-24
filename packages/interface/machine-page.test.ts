@@ -2,6 +2,7 @@ import {
   canvasIdFor,
   type EventMeasured,
   type MachinePageFacts,
+  type MachinePageSampled,
   type ThreadName,
   threadIdFor,
   workflowStateIdFor,
@@ -73,8 +74,11 @@ const facts: MachinePageFacts = {
         },
       },
     ],
+    containment: { kind: "contained" },
   },
   vmMemoryCeilingBytes: 8 * GiB,
+  servicesFloorBytes: 1.5 * GiB,
+  isOomdManagingLanes: false,
   lately: [
     {
       at: 2000,
@@ -166,13 +170,60 @@ describe("the Machine page", () => {
   })
 
   test("a service not read says why", () => {
-    expect(words(facts).sections.host.lines).toEqual([
-      {
-        key: "observer",
-        text: "the file observer: not read: the host outside this lane runs it",
-        unreadable: true,
-      },
+    expect(words(facts).sections.host.lines[0]).toEqual({
+      key: "observer",
+      text: "the file observer: not read: the host outside this lane runs it",
+      unreadable: true,
+    })
+  })
+
+  test("the host says what is contained, the floor it protects, and the OOM priority as set, not read", () => {
+    const host = (f: MachinePageFacts) =>
+      words(f)
+        .sections.host.lines.filter(l => l.key !== "observer")
+        .map(l => l.text)
+    const sampled = (containment: MachinePageSampled["containment"]) => ({
+      ...facts,
+      reading: { ...(facts.reading as MachinePageSampled), containment },
+    })
+    expect(host(facts)).toEqual([
+      "each lane is held to its process limit, the services to theirs and to their CPU share, and the services are protected up to 1.5 GB of memory; the kernel is set to stop a lane before a service when memory runs out (set, not read back)",
     ])
+    expect(host({ ...facts, servicesFloorBytes: null })).toEqual([
+      "each lane is held to its process limit, and the services to theirs and to their CPU share; the services' memory has no floor here, where the cgroups are not pine·trie's; the kernel is set to stop a lane before a service when memory runs out (set, not read back)",
+    ])
+    expect(
+      host(
+        sampled({
+          kind: "not-contained",
+          missing: ["processes", "cpu-weight", "services-floor"],
+          why: "no-cgroup-driver",
+        }),
+      ),
+    ).toEqual([
+      "this lane's Docker has no cgroup controllers: nothing is contained here",
+    ])
+    expect(
+      host(
+        sampled({
+          kind: "not-contained",
+          missing: ["cpu-weight", "services-floor"],
+          why: "not-read-back",
+        }),
+      ),
+    ).toEqual([
+      "not every limit took: a service's CPU share, the services' memory floor did not read back as set",
+    ])
+  })
+
+  test("a host whose lanes systemd-oomd manages says so", () => {
+    expect(
+      words({ ...facts, isOomdManagingLanes: true })
+        .sections.host.lines.map(l => l.text)
+        .at(-1),
+    ).toBe(
+      "systemd-oomd may stop these lanes under memory pressure, outside pine·trie",
+    )
   })
 
   test("lately is newest first, a lane by its thread's name", () => {

@@ -9,6 +9,7 @@ import {
   planHealth,
 } from "./health.ts"
 import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
+import type { CauseLimitEvent } from "./measurements.ts"
 import type { MachineSample } from "./sample.ts"
 import { LEAVE_FREE_DEFAULT } from "./store-settings.ts"
 
@@ -49,6 +50,7 @@ const calm: MachineSample = {
   },
   filesystem: { size: 1000 * GiB, free: 500 * GiB },
   services: [],
+  containment: { kind: "contained" },
   serviceKills: [],
   hostStalledMs: 0,
   snapshotsSkipped: 0,
@@ -79,7 +81,7 @@ function run(
   return samples.map(sample => {
     const planned = planHealth(
       state,
-      { kind: "sampled", sample },
+      { kind: "sampled", sample, atLimit: [] },
       settings,
       NO_GROW,
       NOTHING_BESIDE,
@@ -87,6 +89,35 @@ function run(
     state = planned.state
     return planned
   })
+}
+/** `calm` planned once per entry, each with the cgroups at their limits it names. */
+function runAtLimit(
+  steps: readonly (readonly CauseLimitEvent[])[],
+): readonly Planned[] {
+  let state = FIRST_HEALTH_STATE
+  return steps.map(atLimit => {
+    const planned = planHealth(
+      state,
+      { kind: "sampled", sample: calm, atLimit },
+      settings,
+      NO_GROW,
+      NOTHING_BESIDE,
+    )
+    state = planned.state
+    return planned
+  })
+}
+const observerAtLimit: CauseLimitEvent = {
+  kind: "cgroup-at-limit",
+  subject: { kind: "service", service: "observer" },
+  maxHits: 40,
+  highHits: 0,
+}
+const laneAtLimit: CauseLimitEvent = {
+  kind: "cgroup-at-limit",
+  subject: { kind: "lane", lane },
+  maxHits: 3,
+  highHits: 0,
 }
 const kinds = (p: Planned | undefined) => p?.health.causes.map(c => c.kind)
 const times = <T>(n: number, x: T): readonly T[] =>
@@ -345,7 +376,7 @@ describe("the value", () => {
     ])
     const back = planHealth(
       failed.state,
-      { kind: "sampled", sample: FILESYSTEM_LOW },
+      { kind: "sampled", sample: FILESYSTEM_LOW, atLimit: [] },
       settings,
       NO_GROW,
       NOTHING_BESIDE,
@@ -357,10 +388,16 @@ describe("the value", () => {
 
 describe("memory", () => {
   const plan = (memory: MemoryShort, from = FIRST_HEALTH_STATE) =>
-    planHealth(from, { kind: "sampled", sample: calm }, settings, NO_GROW, {
-      memory,
-      repair: null,
-    })
+    planHealth(
+      from,
+      { kind: "sampled", sample: calm, atLimit: [] },
+      settings,
+      NO_GROW,
+      {
+        memory,
+        repair: null,
+      },
+    )
 
   test("memory short from rung 2 is amber, with the lanes held listed beside it", () => {
     const held = [{ lane, treatment: { kind: "paused" } } as const]
@@ -396,5 +433,46 @@ describe("memory", () => {
       held.state,
     )
     expect(same.changed).toBe(false)
+  })
+})
+
+describe("a cgroup at its limit", () => {
+  test("a cgroup meeting its limit ENTER_AFTER samples running is a cause, gone after LEAVE_AFTER without", () => {
+    const plans = runAtLimit([
+      ...times(ENTER_AFTER, [observerAtLimit]),
+      ...times(LEAVE_AFTER, []),
+    ])
+    expect(plans.slice(0, ENTER_AFTER - 1).map(kinds)).toEqual(
+      times(ENTER_AFTER - 1, []),
+    )
+    expect(plans[ENTER_AFTER - 1]?.health).toEqual({
+      state: "amber",
+      causes: [
+        {
+          kind: "cgroup-at-limit",
+          subject: { kind: "service", service: "observer" },
+        },
+      ],
+      treatments: [],
+    })
+    expect(kinds(plans.at(-2))).toEqual(["cgroup-at-limit"])
+    expect(kinds(plans.at(-1))).toEqual([])
+  })
+
+  test("each cgroup at its limit is a cause of its own", () => {
+    const plans = runAtLimit(times(ENTER_AFTER, [observerAtLimit, laneAtLimit]))
+    expect(plans.at(-1)?.health.causes).toEqual([
+      { kind: "cgroup-at-limit", subject: { kind: "lane", lane } },
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "service", service: "observer" },
+      },
+    ])
+  })
+
+  test("a cgroup over its high mark alone is no cause", () => {
+    const high = { ...observerAtLimit, maxHits: 0, highHits: 9 }
+    const plans = runAtLimit(times(ENTER_AFTER + 1, [high]))
+    expect(kinds(plans.at(-1))).toEqual([])
   })
 })

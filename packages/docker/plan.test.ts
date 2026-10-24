@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { threadIdFor } from "@pinetrie/core"
-import { projectDisks } from "@pinetrie/lanehost"
+import {
+  observerHeapBytes,
+  observerMemoryBytes,
+  projectDisks,
+} from "@pinetrie/lanehost"
 import {
   type ContainerShape,
   type LaneSpec,
@@ -13,8 +17,10 @@ import { describe, expect, test } from "vitest"
 import { createBody } from "./api.ts"
 import { buildError } from "./cli.ts"
 import {
+  CONTAINER_LIMITS,
   cgroupMount,
   containerService,
+  cpuWeightOfShares,
   type DockerHostFacts,
   dockerWords,
   eventsSince,
@@ -38,11 +44,15 @@ import {
   planSlotSweep,
   projectKey,
   renderHelper,
+  renderObserver,
   renderRun,
   runningLanes,
   runningServices,
+  SERVICE_MEMORY,
+  servicesFloorBytes,
   systemTimeNanos,
   unneededImageTags,
+  wantedControls,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
@@ -77,6 +87,7 @@ const mac: DockerTarget = {
   hostSocket: "/run/pinetrie/ssh-3.sock",
   hostAddress: "192.168.127.254",
   remoteHostPaths: true,
+  hasServicesParent: true,
 }
 const render = (shape: ContainerShape, target = mac) =>
   renderRun(shape, {
@@ -106,10 +117,8 @@ const shapes: readonly ContainerShape[] = [
 describe("renderRun: a lane's shape as a container", () => {
   test("every shape keeps a PID namespace of its own: the observer's lane is it", () => {
     for (const shape of shapes) {
-      const host = createBody(render(shape), () => "").HostConfig as Record<
-        string,
-        unknown
-      >
+      const host = createBody(render(shape), () => "", mac)
+        .HostConfig as Record<string, unknown>
       expect(host.PidMode).toBeUndefined()
     }
   })
@@ -224,6 +233,7 @@ describe("renderRun: a lane's shape as a container", () => {
       hostSocket: null,
       hostAddress: null,
       remoteHostPaths: false,
+      hasServicesParent: false,
     }
     const made = render(shapes[1] as ContainerShape, linux)
     expect(made.mounts).toContainEqual({
@@ -693,5 +703,73 @@ describe("the events a service's kill is heard from", () => {
     )
     expect(systemTimeNanos("2026-10-22T16:29:00Z")).toBe(1792686540000000000n)
     expect(systemTimeNanos("yesterday")).toBeNull()
+  })
+})
+
+describe("each container's kind and the limits it reads back", () => {
+  const shape = {
+    project: key,
+    image: "pinetrie-lanehost:abc",
+    lanesDir: "/var/lib/lanehost",
+    root: "/Users/ada/p",
+    install: "/opt/pinetrie",
+    runtime: "/Users/ada/p/.pinetrie/runtime/abc",
+    rootless: false,
+  }
+  test("cpuWeightOfShares is runc's conversion, as each share read back", () => {
+    expect([2, 256, 512, 1024, 4096, 262_144].map(cpuWeightOfShares)).toEqual([
+      1, 35, 59, 100, 303, 10_000,
+    ])
+  })
+
+  test("each renderer makes its own kind", () => {
+    expect(render(shapes[0] as ContainerShape).kind).toBe("lane")
+    expect(renderHelper({ ...shape, role: "disks" }, mac).kind).toBe("disks")
+    expect(renderHelper({ ...shape, role: "privileged" }, mac).kind).toBe(
+      "privileged",
+    )
+    expect(renderObserver("abc", { form: "built" }).kind).toBe("observer")
+  })
+
+  test("a lane's default share is not judged, a service's is", () => {
+    expect(wantedControls("lane")).toEqual({
+      processesMax: CONTAINER_LIMITS.lane.processesMax,
+      expectedCpuWeight: null,
+    })
+    expect(wantedControls("observer")).toEqual({
+      processesMax: CONTAINER_LIMITS.observer.processesMax,
+      expectedCpuWeight: 303,
+    })
+  })
+
+  test("the observer's memory is its budget's sum, and its server's heap its budget's", () => {
+    const made = renderObserver("abc", { form: "built" })
+    expect(made.memory).toBe(String(observerMemoryBytes()))
+    expect(made.cmd).toContain(
+      `--max-old-space-size=${Math.ceil(observerHeapBytes() / 1024 ** 2)}`,
+    )
+  })
+
+  test("the services' floor is whole pages, as the kernel holds it", () => {
+    expect(servicesFloorBytes() % 4096).toBe(0)
+  })
+
+  test("servicesFloorBytes is the sum of every service's memory limit", () => {
+    const sum = Object.values(SERVICE_MEMORY)
+      .map(m => {
+        const bytes = createBody(
+          { ...renderObserver("abc", { form: "built" }), memory: m },
+          () => "",
+          mac,
+        ).HostConfig as Record<string, unknown>
+        return bytes.Memory as number
+      })
+      .reduce((a, b) => a + b, 0)
+    expect(servicesFloorBytes()).toBe(sum)
+    expect(Object.keys(SERVICE_MEMORY).sort()).toEqual([
+      "disks",
+      "observer",
+      "privileged",
+    ])
   })
 })

@@ -12,6 +12,7 @@ import { rmSync } from "node:fs"
 import { truncate, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { servicesFloorBytes } from "@pinetrie/docker"
 import {
   LEAVE_FREE_DEFAULT,
   planStoreCapabilities,
@@ -68,6 +69,7 @@ async function run(check: Checks["check"]): Promise<void> {
       slots: 1,
       agent: null,
       log,
+      servicesFloorBytes: servicesFloorBytes(),
       onStartWaiting: () => log("[vm] waiting for the repair lock"),
     })
   // Made before the first start, so the launcher makes no 256 GiB one and

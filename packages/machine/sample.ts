@@ -5,6 +5,7 @@
 import type {
   CgroupLimitHits,
   CgroupMemory,
+  Containment,
   HeldLane,
   MachineHealth,
   MachineReclaim,
@@ -59,6 +60,11 @@ export interface MachineSample {
    * a host in a lane reads no observer, which is the host outside's.
    */
   readonly services: readonly ServiceReading[]
+  /**
+   * What took effect of each running container's controls and the
+   * services' floor, read from this sample's cgroups (`planContainment`).
+   */
+  readonly containment: Containment
   /**
    * Each service killed for memory since the last sample, once per kill.
    * Heard, not counted: the observer's container goes with its kill.

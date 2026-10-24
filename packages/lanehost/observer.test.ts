@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs"
 import net from "node:net"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import readline from "node:readline"
 import { serve } from "@pinetrie/channel"
 import { encodeRunEvent, type RunEvent, stamp } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -18,13 +19,17 @@ import {
   isStrictDescendant,
   type LaneNamespace,
   loaderRefusal,
+  OBSERVER_BUDGET,
   type ObserverCall,
   type ObserverHello,
   type ObserverNotice,
   type ObserverUpdate,
+  observerHeapBytes,
+  observerMemoryBytes,
   observerNotice,
   observerVersion,
   planAttribution,
+  planConnection,
   planHeld,
   planIdle,
   planLookup,
@@ -186,15 +191,54 @@ describe("routing", () => {
   })
   test("a lane holds up to its bound, then counts each loss; an end is always kept", () => {
     const open = notice("21", release("1:1", null))
-    expect(planHeld(HELD_PER_LANE - 1, HELD_PER_LANE, open)).toBe("keep")
-    expect(planHeld(HELD_PER_LANE, HELD_PER_LANE, open)).toBe("lose")
+    const lane = (inLane: number) => ({ inLane, inAll: inLane })
+    expect(planHeld(lane(HELD_PER_LANE - 1), open)).toBe("keep")
+    expect(planHeld(lane(HELD_PER_LANE), open)).toBe("lose")
+    expect(
+      planHeld(lane(HELD_PER_LANE), notice("21", { kind: "end", at: 1 })),
+    ).toBe("keep")
+  })
+  test("a notice past the bound across every lane is lost however few its lane holds; an end is kept", () => {
+    const all = { inLane: 3, inAll: OBSERVER_BUDGET.heldNoticesMax }
+    expect(planHeld(all, notice("21", release("1:1", null)))).toBe("lose")
+    expect(planHeld(all, notice("21", { kind: "end", at: 1 }))).toBe("keep")
     expect(
       planHeld(
-        HELD_PER_LANE,
-        HELD_PER_LANE,
-        notice("21", { kind: "end", at: 1 }),
+        { ...all, inAll: OBSERVER_BUDGET.heldNoticesMax - 1 },
+        notice("21", release("1:1", null)),
       ),
     ).toBe("keep")
+  })
+  test("the observer's limit is its budget's sum in whole MiB, and its heap holds every held notice", () => {
+    const b = OBSERVER_BUDGET
+    expect(observerHeapBytes()).toBe(
+      b.serverHeapBytes + b.perHeldNoticeBytes * b.heldNoticesMax,
+    )
+    const sum =
+      b.fixedBytes +
+      b.perConnectionBytes * b.connectionsMax +
+      b.serverHeapBytes +
+      b.perHeldNoticeBytes * b.heldNoticesMax
+    expect(observerMemoryBytes()).toBeGreaterThanOrEqual(sum)
+    expect(observerMemoryBytes() - sum).toBeLessThan(1024 ** 2)
+    expect(observerMemoryBytes() % 1024 ** 2).toBe(0)
+  })
+  test("a connection past the budget's is refused, saying how many it serves", () => {
+    expect(planConnection(OBSERVER_BUDGET.connectionsMax - 1)).toBe("serve")
+    const full = planConnection(OBSERVER_BUDGET.connectionsMax)
+    expect(full).toEqual({
+      kind: "full",
+      connectionsMax: OBSERVER_BUDGET.connectionsMax,
+    })
+    expect(
+      loaderRefusal({
+        version: "v1",
+        loader: { kind: "full", connectionsMax: 12 },
+        attribution: { on: true },
+      }),
+    ).toBe(
+      "the machine's observer serves 12 hosts' connections already, as many as its memory holds",
+    )
   })
   test("a lane's new host gets what was held, then each run's losses, then the ends", () => {
     const end = notice("21", { kind: "end", at: 2 })
@@ -556,6 +600,38 @@ describe("the machine role's server, with a stand-in loader", () => {
       channel.close()
       await channel.closed
     } finally {
+      role.close()
+    }
+  })
+
+  test("a connection past the budget's is told so in its hello, and the ones before it are served", async () => {
+    const role = await standInRole()
+    const sockets: net.Socket[] = []
+    /** A raw connection's hello: the first line the role writes. */
+    const hello = () =>
+      new Promise<ObserverHello>((resolve, reject) => {
+        const socket = net.connect(role.socket)
+        sockets.push(socket)
+        socket.on("error", reject)
+        readline
+          .createInterface({ input: socket })
+          .once("line", line =>
+            resolve((JSON.parse(line) as { hello: ObserverHello }).hello),
+          )
+      })
+    try {
+      const served = await Promise.all(
+        Array.from({ length: OBSERVER_BUDGET.connectionsMax }, hello),
+      )
+      expect(served.map(h => h.loader.kind)).toEqual(
+        Array.from({ length: OBSERVER_BUDGET.connectionsMax }, () => "ready"),
+      )
+      expect((await hello()).loader).toEqual({
+        kind: "full",
+        connectionsMax: OBSERVER_BUDGET.connectionsMax,
+      })
+    } finally {
+      for (const s of sockets) s.destroy()
       role.close()
     }
   })

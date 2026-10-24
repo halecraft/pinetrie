@@ -31,10 +31,17 @@ const read: MachineRead = {
   },
   store: null,
   containers: [
-    { id: "id-a", memory },
-    { id: "id-b", memory: null },
+    { id: "id-a", memory, controls: { processesMax: 16_384, cpuWeight: 100 } },
+    {
+      id: "id-b",
+      memory: null,
+      controls: { processesMax: null, cpuWeight: null },
+    },
   ],
+  servicesFloor: null,
 }
+/** A Linux host's asks: no floor, Docker's cgroupfs driver. */
+const asked = { servicesFloor: null, cgroupDriver: "cgroupfs" }
 
 test("each running lane's cgroup is its sample, and a lane whose cgroup was not found is left out of it but still running", () => {
   const sample = planSample({
@@ -44,6 +51,7 @@ test("each running lane's cgroup is its sample, and a lane whose cgroup was not 
     ],
     services: [],
     read,
+    asked,
     own: null,
     filesystem: { size: 10, free: 5 },
     serviceKills: [],
@@ -66,6 +74,47 @@ test("each running lane's cgroup is its sample, and a lane whose cgroup was not 
   ])
 })
 
+describe("what took effect of the containers' controls", () => {
+  const observer = "id-o"
+  const lanehost = (controls: MachineRead["containers"][number]["controls"]) =>
+    planSample({
+      running: [{ lane: a, id: "id-a" }],
+      services: [{ service: "observer", id: observer }],
+      read: {
+        ...read,
+        containers: [
+          read.containers[0] ?? { id: "", memory: null, controls },
+          { id: observer, memory, controls },
+        ],
+        servicesFloor: 1000,
+      },
+      asked: { servicesFloor: 1000, cgroupDriver: "cgroupfs" },
+      own: null,
+      filesystem: null,
+      serviceKills: [],
+      hostStalledMs: 0,
+    }).containment
+
+  test("a lane is judged by its kind's process limit, a service by its own and its share's weight", () => {
+    expect(lanehost({ processesMax: 1024, cpuWeight: 303 })).toEqual({
+      kind: "contained",
+    })
+    expect(lanehost({ processesMax: 1024, cpuWeight: 100 })).toEqual({
+      kind: "not-contained",
+      missing: ["cpu-weight"],
+      why: "not-read-back",
+    })
+  })
+
+  test("a container whose cgroup was not read is missing its controls", () => {
+    expect(lanehost({ processesMax: null, cpuWeight: null })).toEqual({
+      kind: "not-contained",
+      missing: ["processes", "cpu-weight"],
+      why: "not-read-back",
+    })
+  })
+})
+
 test("a sample whose read fails leaves the kills heard for the next", async () => {
   let reads = 0
   const reach: Parameters<typeof createSensor>[0] = {
@@ -78,6 +127,7 @@ test("a sample whose read fails leaves the kills heard for the next", async () =
       return { ...read, containers: [] }
     },
     storeVolume: "/",
+    containmentAsked: asked,
   }
   let heard: ("disks" | "observer")[] = ["observer"]
   const kills: Pick<ServiceKillWatch, "take"> = {
@@ -180,6 +230,7 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
       running: [],
       services: [],
       read,
+      asked,
       own,
       filesystem: null,
       serviceKills: [],
@@ -194,6 +245,7 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
       running: [],
       services: [],
       read,
+      asked,
       own,
       filesystem: null,
       serviceKills: [],

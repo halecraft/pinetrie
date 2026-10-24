@@ -93,7 +93,7 @@ const VM_LOGS: readonly VmLog[] = ["console.log", "launcher.log"]
 export async function gatherDiagnostics(deps: {
   readonly facts: () => MachinePageFacts | null
   readonly measurements: Pick<HostMeasurements, "exportRows">
-  readonly measuredOn: MeasuredOn
+  readonly measuredOn: () => MeasuredOn
   /** The lane VM's state directory, where its logs are; null where lanes run on no VM. */
   readonly vmStateDir: string | null
 }): Promise<string> {
@@ -110,7 +110,7 @@ export async function gatherDiagnostics(deps: {
   return diagnosticsText(
     machinePageView(deps.facts(), () => null),
     {
-      heading: measurementsHeading(deps.measuredOn, 1),
+      heading: measurementsHeading(deps.measuredOn(), 1),
       rows: deps.measurements.exportRows(1),
     },
     logTails,

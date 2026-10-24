@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { thisInstall } from "@pinetrie/install"
 import { describe, expect, test } from "vitest"
-import { findProject, planRuntime } from "./runtime.ts"
+import { findProject, isOomdManagingLanes, planRuntime } from "./runtime.ts"
 
 describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux", () => {
   const facts = {
@@ -29,6 +29,19 @@ describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux"
       planRuntime({ ...facts, platform: "linux", nestedMount: true }),
     ).toEqual({ kind: "docker-host", lanesDir: "/var/lib/pinetrie-lanes" })
   })
+})
+
+test("systemd-oomd manages the lanes only when it runs and Docker is rootless", () => {
+  expect(
+    [
+      [true, true],
+      [true, false],
+      [false, true],
+      [false, false],
+    ].map(([oomdActive = false, rootless = false]) =>
+      isOomdManagingLanes({ oomdActive, rootless }),
+    ),
+  ).toEqual([true, false, false, false])
 })
 
 // Linux only: on the Mac, asking Docker takes a lease on the person's VM.

@@ -12,13 +12,12 @@ import { mkdirSync, rmSync } from "node:fs"
 import net from "node:net"
 import path from "node:path"
 import readline from "node:readline"
-import { serve } from "@pinetrie/channel"
+import { encode, serve } from "@pinetrie/channel"
 import {
   type Candidate,
   type ConnectionId,
   decodeLoaderLine,
   encodeLoaderCommand,
-  HELD_PER_LANE,
   heldNotices,
   type LaneNamespace,
   type LoaderCommand,
@@ -29,6 +28,7 @@ import {
   type ObserverUpdate,
   observerNotice,
   planAttribution,
+  planConnection,
   planHeld,
   planIdle,
   planLookup,
@@ -86,6 +86,13 @@ const held = new Map<
   LaneNamespace,
   { notices: ObserverNotice[]; lost: Map<string, number> }
 >()
+/** Every lane's held notices together: what the budget bounds. */
+let heldInAll = 0
+/** A lane's held notices let go of, sent or dropped. */
+function dropHeld(lane: LaneNamespace) {
+  heldInAll -= held.get(lane)?.notices.length ?? 0
+  held.delete(lane)
+}
 interface Lookup {
   readonly candidates: Candidate[]
   readonly done: (cut: boolean) => void
@@ -117,9 +124,12 @@ function route(notice: ObserverNotice) {
     lost: new Map<string, number>(),
   }
   held.set(notice.lane, h)
-  if (planHeld(h.notices.length, HELD_PER_LANE, notice) === "keep")
+  if (
+    planHeld({ inLane: h.notices.length, inAll: heldInAll }, notice) === "keep"
+  ) {
     h.notices.push(notice)
-  else h.lost.set(notice.run, (h.lost.get(notice.run) ?? 0) + 1)
+    heldInAll++
+  } else h.lost.set(notice.run, (h.lost.get(notice.run) ?? 0) + 1)
 }
 
 /**
@@ -137,7 +147,7 @@ function release(lane: LaneNamespace) {
   const to = registrations.get(lane)?.owner
   const update = to == null ? null : connections.get(to)?.update
   if (h === undefined || update == null) return
-  held.delete(lane)
+  dropHeld(lane)
   for (const n of heldNotices({
     lane,
     held: h.notices,
@@ -272,7 +282,7 @@ async function answer(
       })
       // Its owner gets its notices until the loader has let it go.
       registrations.delete(call.lane)
-      held.delete(call.lane)
+      dropHeld(call.lane)
       return null
     }
     case "subscribe": {
@@ -323,13 +333,25 @@ rmSync(socketPath, { force: true })
 let nextConnection = 0
 net
   .createServer(socket => {
+    socket.on("error", () => {})
+    // Past the budget's connections, refused in its hello and closed: each
+    // is a process in this cgroup, and the limit holds only so many.
+    const planned = planConnection(connections.size)
+    if (planned !== "serve") {
+      const hello: ObserverHello = {
+        version,
+        loader: planned,
+        attribution: planAttribution(hooks),
+      }
+      socket.end(`${encode({ ready: true, hello })}\n`)
+      return
+    }
     const id = nextConnection++
     connections.set(id, { update: null, output: null })
     // At the end of its input, before the host sees its side close: a host
     // that opens a new connection once the old one closed reclaims its lanes.
     socket.on("end", () => disconnect(id))
     socket.on("close", () => disconnect(id))
-    socket.on("error", () => {})
     void started.then(loaded =>
       serve<ObserverHello, ObserverCall, ObserverUpdate, unknown>(
         { version, loader: loaded, attribution: planAttribution(hooks) },

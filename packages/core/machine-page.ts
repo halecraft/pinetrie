@@ -6,7 +6,9 @@
 import type { ThreadId } from "./ids.ts"
 import type {
   CgroupLimitHits,
+  Containment,
   LaneTreatment,
+  LimitSubject,
   MachineHealth,
   MachineService,
   MemorySource,
@@ -28,12 +30,6 @@ export type Measured<T> =
 
 /** The programs whose slow commands the host times. */
 export const TIMED_PROGRAMS = ["jj", "git"] as const
-
-/** A cgroup the host reads: a lane's, a service's, or a host in a lane's own. */
-export type LimitSubject =
-  | { readonly kind: "lane"; readonly lane: ThreadId }
-  | { readonly kind: "service"; readonly service: MachineService }
-  | { readonly kind: "own" }
 
 /**
  * Something the host saw happen that no decision row holds: each kept in
@@ -157,6 +153,8 @@ export interface MachinePageSampled {
   }>
   readonly lanes: readonly MachinePageLane[]
   readonly services: readonly ServiceReading[]
+  /** What took effect of the containers' controls, read back from their cgroups this sample. */
+  readonly containment: Containment
 }
 
 /** What this host can do from the page; each carried only where it can. */
@@ -171,6 +169,10 @@ export interface MachinePageFacts {
   readonly reading: { readonly kind: "unsampled" } | MachinePageSampled
   /** The lane VM's memory ceiling on the Mac; null where lanes run on no VM. */
   readonly vmMemoryCeilingBytes: number | null
+  /** The services' guaranteed floor this host asks for; null where it keeps none (a Linux host's cgroups are the person's). */
+  readonly servicesFloorBytes: number | null
+  /** systemd-oomd may stop this host's lanes, outside pine·trie: it manages rootless Docker's containers here. */
+  readonly isOomdManagingLanes: boolean
   /** Newest first. */
   readonly lately: readonly MachineLately[]
   /** Each named thread a lane of Lately names: a lane is never worded by its id. */

@@ -41,10 +41,12 @@ import {
   counterRise,
   type DecisionMeasured,
   type LaneMeasured,
+  type LimitEvents,
   type LimitsRead,
   lanesChanged,
   lanesMeasured,
   limitEvents,
+  limitEventsMeasured,
   reclaimRise,
   treatmentChanges,
 } from "./measurements.ts"
@@ -56,6 +58,7 @@ import type {
   MachineSensor,
   RepairControls,
 } from "./ports.ts"
+import { type PressureScope, pressureScope } from "./pressure-scope.ts"
 import {
   isRepairCalledFor,
   isRepairRunning,
@@ -279,7 +282,11 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
    * order. Nothing is changed: a sample judged stale plans nothing.
    */
   const gatherMemory = async (sample: MachineSample) => {
-    const planned = planRung(rungState, sample.machine)
+    const scope = pressureScope({
+      machine: sample.machine,
+      reclaimBefore: reclaim,
+    })
+    const planned = planRung(rungState, sample.machine, scope)
     const lanesWaitingToStart = [...waiters]
       .filter(w => w.activity === "container-start")
       .map(w => w.lane)
@@ -288,7 +295,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
           ...new Set([...sample.lanesRunning, ...lanesWaitingToStart]),
         ])
       : []
-    return { planned, lanesWaitingToStart, lanesByImportance }
+    return { planned, scope, lanesWaitingToStart, lanesByImportance }
   }
 
   /**
@@ -303,11 +310,12 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
         readonly rung: Rung
         readonly state: RungPlanState
       }
+      readonly scope: PressureScope
       readonly lanesWaitingToStart: readonly ThreadId[]
       readonly lanesByImportance: readonly ThreadId[]
     },
   ): void => {
-    const { planned, lanesWaitingToStart, lanesByImportance } = gathered
+    const { planned, scope, lanesWaitingToStart, lanesByImportance } = gathered
     rungState = planned.state
     const { rung } = planned
     const isHolding = deps.mode === "manage"
@@ -339,6 +347,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
         source: sample.machine.source,
         since: counterRise(counters, sample.machine.counters),
         reclaim: reclaimRise(reclaim, sample.machine.reclaim),
+        scope: scope.kind,
         lanesRunning: sample.lanesRunning.length,
         mode: deps.mode,
       },
@@ -479,12 +488,13 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     const startedAt = freshness.ticks
     // gather
     let result: SampleResult
+    // Read from the last sample's limit hits, which only a later plan moves.
+    let limits: LimitEvents | null = null
     try {
       const sensed = await sensor.sample()
-      result = {
-        kind: "sampled",
-        sample: { ...sensed, snapshotsSkipped: skipped, upkeep },
-      }
+      const sample = { ...sensed, snapshotsSkipped: skipped, upkeep }
+      limits = limitEvents(limitsBefore, sample)
+      result = { kind: "sampled", sample, atLimit: limits.causes }
     } catch (error) {
       result = { kind: "failed", error: errorText(error) }
     }
@@ -526,9 +536,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     })
     const events = [
       ...causeEvents(planned.seen),
-      ...(result.kind === "sampled"
-        ? limitEvents(limitsBefore, result.sample)
-        : []),
+      ...(limits === null ? [] : limitEventsMeasured(limits)),
     ]
     if (result.kind === "sampled") limitsBefore = result.sample
     if (events.length > 0) record(() => deps.measurements.recordEvents(events))

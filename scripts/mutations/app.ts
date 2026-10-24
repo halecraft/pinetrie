@@ -3770,4 +3770,41 @@ export const mutations: readonly Mutation[] = [
     expect:
       "once there is room, the waiting get-the-latest is popped and its update is in its thread",
   },
+  // ── the machine's boundary ──
+  {
+    name: "systemd-oomd manages the lanes of a rootful Docker",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "}): boolean => f.oomdActive && f.rootless\n",
+    to: "}): boolean => f.oomdActive\n",
+    command: HOST,
+    expect:
+      "systemd-oomd manages the lanes only when it runs and Docker is rootless",
+  },
+  {
+    name: "a sample's scope is not kept",
+    file: "apps/pinetrie/host/machine/measurements.ts",
+    from: "      insertScope.run(at, row.scope)\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/machine"],
+    expect:
+      "a sample with no reclaim to compare keeps no reclaim row, and its scope",
+  },
+  {
+    name: "a sample's containment is judged by its lanes' CPU weight",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: '    ...input.running.map(r => ({ id: r.id, kind: "lane" as const })),\n',
+    to: '    ...input.running.map(r => ({ id: r.id, kind: "disks" as const })),\n',
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/machine"],
+    expect:
+      "a lane is judged by its kind's process limit, a service by its own and its share's weight",
+  },
+  {
+    name: "the scope never reaches the rung",
+    file: "packages/machine/manager.ts",
+    from: "    const planned = planRung(rungState, sample.machine, scope)\n",
+    to: '    const planned = planRung(rungState, sample.machine, sample.machine.pressure === null ? scope : { kind: "machine", pressure: sample.machine.pressure })\n',
+    suite: "lanes",
+    scenario: "machine-boundary",
+    expect: "a lane stuck at its limit is a cause, and holds nothing",
+  },
 ]

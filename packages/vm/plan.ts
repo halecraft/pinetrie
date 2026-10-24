@@ -139,6 +139,8 @@ export interface LauncherFacts {
   readonly cpus: number
   /** gvproxy's binary, where `ensureGvproxy` puts it. */
   readonly gvproxy: string
+  /** The services' guaranteed floor, in bytes: `init` writes it to their parent's `memory.low`. */
+  readonly servicesFloorBytes: number
 }
 
 /** The launcher's argv after its binary, in the order `launcher.swift` reads it. */
@@ -151,6 +153,7 @@ export const launcherArgs = (f: LauncherFacts): readonly string[] => [
   f.gvproxy,
   LAUNCHER_DISKS.synchronization,
   LAUNCHER_DISKS.caching,
+  String(f.servicesFloorBytes),
 ]
 
 /** A launcher's command line in `ps`: its binary's name, its state directory, and its image's key. */

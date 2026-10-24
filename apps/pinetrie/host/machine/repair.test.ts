@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
+import { SERVICES_CGROUP } from "@pinetrie/lanehost"
 import { ROOM_SPENT } from "@pinetrie/machine"
 import { DATA_DISK_FULL_LINE } from "@pinetrie/vm"
 import { expect, test } from "vitest"
@@ -29,6 +30,15 @@ test("the lane VM's init calls its disk full where the host calls the room spent
   const [, a, b, c, words] = full
   expect(Number(a) * Number(b) * Number(c)).toBe(ROOM_SPENT)
   expect(words).toBe(DATA_DISK_FULL_LINE)
+})
+
+test("the lane VM's init makes the services' parent where lanehost reads it, with the launcher's floor", () => {
+  const made = [
+    ...INIT.matchAll(/\/sys\/fs\/cgroup\/([\w-]+)\/memory\.low/g),
+  ].map(m => m[1])
+  expect(made).toEqual([SERVICES_CGROUP])
+  expect(INIT).toContain("services_floor=$(arg lane.services_floor)")
+  expect(INIT).toContain("-o memory_recursiveprot")
 })
 
 test("a repair boot's report keeps what it left, and why it failed", () => {

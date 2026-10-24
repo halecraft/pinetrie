@@ -82,7 +82,8 @@ export async function startHttp(input: {
   /** The machine's measurements, and what they were measured on: their export's first line. */
   readonly measurements: {
     readonly store: Pick<HostMeasurements, "exportRows">
-    readonly measuredOn: MeasuredOn
+    /** Read at each export: the containment it names is the latest sample's. */
+    readonly measuredOn: () => MeasuredOn
   }
   /** The Machine page's reads: its facts, null where the host reads no machine; and its diagnostics' text. */
   readonly machine: {
@@ -154,7 +155,7 @@ export async function startHttp(input: {
       case "measurements": {
         const { store, measuredOn } = input.measurements
         const lines = [
-          measurementsHeading(measuredOn, to.days),
+          measurementsHeading(measuredOn(), to.days),
           ...store.exportRows(to.days),
         ]
         send(res, machineResponse("measurements", `${lines.join("\n")}\n`))

@@ -7,7 +7,8 @@
 # port. Every stage logs a `T+` line, the guest's uptime, to the console.
 #
 # The kernel's command line: lane.slots=<n>, the share devices `slot0` …
-# `slot<n-1>` the launcher made.
+# `slot<n-1>` the launcher made, and lane.services_floor=<bytes>, the
+# services' guaranteed floor (below).
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 mountpoint -q /proc || mount -t proc proc /proc
 mountpoint -q /sys || mount -t sysfs sys /sys
@@ -23,7 +24,23 @@ mount -t tmpfs tmpfs /dev/shm
 mount -t tmpfs tmpfs /run
 mkdir -p /run/pinetrie
 mount -t tmpfs tmpfs /tmp
-mount -t cgroup2 cgroup2 /sys/fs/cgroup
+# memory_recursiveprot: a parent's memory.low protects the cgroups under it
+# by itself, so a service needs no floor of its own.
+mount -t cgroup2 -o memory_recursiveprot cgroup2 /sys/fs/cgroup
+# The services' parent (lanehost's roles and the observer, which Docker puts
+# under it), with their floor: the kernel reclaims the lanes' pages before
+# theirs while it has any to take. A floor protects only under parents that
+# have one, and Docker's own has none, so the services are apart from it.
+# The host reads the floor back; one not written is said there.
+services_floor=$(arg lane.services_floor)
+if mkdir -p /sys/fs/cgroup/pinetrie-services &&
+  echo "+memory +pids +cpu" > /sys/fs/cgroup/cgroup.subtree_control &&
+  echo "+memory +pids +cpu" > /sys/fs/cgroup/pinetrie-services/cgroup.subtree_control &&
+  echo "${services_floor:-0}" > /sys/fs/cgroup/pinetrie-services/memory.low; then
+  t "services' floor: ${services_floor:-0} bytes"
+else
+  t "services' floor not set"
+fi
 
 # Every device's driver, then the manifest's modules (`build.sh` writes them
 # to /etc/pinetrie/modules). Alpine's own module index: no udev here.

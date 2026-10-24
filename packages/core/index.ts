@@ -197,11 +197,17 @@ export {
   type RunnableLane,
 } from "./lanes.ts"
 export {
+  type CauseLimitSubject,
   type CgroupLimitHits,
   type CgroupMemory,
+  CONTAINMENT_CONTROLS,
+  type Containment,
+  type ContainmentControl,
+  type ControlsReadBack,
   type HeldLane,
   LANE_TREATMENTS,
   type LaneTreatment,
+  type LimitSubject,
   MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,
@@ -218,7 +224,6 @@ export {
 } from "./machine.ts"
 export {
   type EventMeasured,
-  type LimitSubject,
   MACHINE_SAMPLE_MS,
   type MachineAction,
   type MachineLately,

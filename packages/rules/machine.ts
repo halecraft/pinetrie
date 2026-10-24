@@ -53,6 +53,16 @@ const CauseSchema = Type.Union([
     kind: Type.Literal("service-oom-killed"),
     service: choiceSchema(MACHINE_SERVICES),
   }),
+  Type.Object({
+    kind: Type.Literal("cgroup-at-limit"),
+    subject: Type.Union([
+      Type.Object({ kind: Type.Literal("lane"), lane: ThreadIdSchema }),
+      Type.Object({
+        kind: Type.Literal("service"),
+        service: choiceSchema(MACHINE_SERVICES),
+      }),
+    ]),
+  }),
   Type.Object({ kind: Type.Literal("host-stalls"), stalledMs: Bytes }),
   Type.Object({
     kind: Type.Literal("snapshot-skipped"),

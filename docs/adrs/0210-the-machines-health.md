@@ -6,7 +6,7 @@
   `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
   `packages/core/TECHNICAL.md`, `packages/lock/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
-  S317, S318, S319, S320, S321, S322, S323, S324, S326
+  S317, S318, S319, S320, S321, S322, S323, S324, S326, S340
 - **Revised:**
   - 2026-10-22 (S324): a lanehost role or the observer killed for memory is an
     amber cause, heard from Docker's `oom` events on one held stream, not read
@@ -91,6 +91,14 @@
     reducer takes only from `failed`, whatever the disk could grow to.
     **Restart the lane VM**, and a red cause in the inbox's **Needs you**, are
     not built yet.
+  - 2026-10-24 (S340): each container is held to its kind's process count, CPU
+    share and OOM priority (`CONTAINER_LIMITS`), besides its memory. What took
+    effect is read from the cgroups, never from Docker's answer, and the
+    Machine page and the measurements' export say which control is missing and
+    why: a nested lane's Docker has no cgroup driver, accepts every limit and
+    applies none, so its inner lanes are held only by the nested lane's own
+    limits. On a Linux host where systemd-oomd manages rootless Docker's
+    containers, the page says it may stop lanes outside pine·trie.
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.

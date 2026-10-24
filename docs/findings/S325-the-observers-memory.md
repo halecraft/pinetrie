@@ -1,6 +1,7 @@
 # S325 — The observer starts at 225 MB of its 512 MiB, 177 MB of it the loader's maps; each connection adds 28 MB, and lanes whose host is gone hold 39 MB each at their bound, so 11 connections, or 7 or 8 such lanes, fill it
 
 - **Status:** Answered
+- **Led to:** ADR-0212
 
 **Question.** The observer's container (`OBSERVER_GRANT`, 512 MiB) was
 killed for memory on 2026-10-21 in the person's lane VM, and in the lanes
@@ -136,7 +137,7 @@ open, no output was attributed); the inner host's own side of a relay
 (each relayed connection here is a direct one from the Mac, which is what
 the observer sees); growth over hours.
 
-**Kept** in `docs/findings/archive/S325-the-observers-memory/`:
+**Kept** in `docs/findings/S325-the-observers-memory/`:
 - `start.sh`: the container as the runtime renders it; `env.sh` and
   `read.sh`: its cgroup and processes, read from the VM's root;
 - `probe.ts`: connections opened as a host's, subscribed, the first

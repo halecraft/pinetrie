@@ -1,6 +1,13 @@
 import fc from "fast-check"
 import { describe, expect, test } from "vitest"
 import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
+import { pressureScope } from "./pressure-scope.ts"
+import {
+  CGROUP_AT_ITS_LIMIT,
+  MACHINE_SHORT,
+  RECORDED_MEMORY_TOTAL,
+  type RecordedSample,
+} from "./recorded-loads.ts"
 import { FIRST_RUNG_STATE, planRung, RUNG_BOUNDS, type Rung } from "./rung.ts"
 import type { MachineSample } from "./sample.ts"
 
@@ -21,13 +28,41 @@ const machine = (full: number | null, available = 8, some = full): Machine => ({
   source: "whole-machine",
 })
 
-/** Each machine planned in turn from the first state; the rung after each. */
+/**
+ * Each machine planned in turn from the first state, its pressure's scope
+ * read against the reclaim of the one before; the rung after each.
+ */
 function rungs(machines: readonly Machine[]): Rung[] {
   let state = FIRST_RUNG_STATE
+  let reclaimBefore: Machine["reclaim"] = null
   return machines.map(m => {
-    const planned = planRung(state, m)
+    const planned = planRung(
+      state,
+      m,
+      pressureScope({ machine: m, reclaimBefore }),
+    )
     state = planned.state
+    reclaimBefore = m.reclaim
     return planned.rung
+  })
+}
+
+/** A recorded load's samples as the machine reads them, its reclaim counted from 0 at its first. */
+function recorded(samples: readonly RecordedSample[]): Machine[] {
+  const reclaim = { allocStalls: 0, scannedDirect: 0, scannedByKswapd: 0 }
+  return samples.map(([, full, some, share, stalls, direct, kswapd]) => {
+    reclaim.allocStalls += stalls
+    reclaim.scannedDirect += direct
+    reclaim.scannedByKswapd += kswapd
+    return {
+      memoryTotal: RECORDED_MEMORY_TOTAL,
+      memoryAvailable: Math.round(share * RECORDED_MEMORY_TOTAL),
+      pressure: { someAvg10: some, fullAvg10: full },
+      counters: null,
+      reclaim: { ...reclaim },
+      limitHits: null,
+      source: "whole-machine",
+    }
   })
 }
 const times = <T>(n: number, x: T): T[] => Array.from({ length: n }, () => x)
@@ -80,7 +115,8 @@ describe("planRung", () => {
     const short = times(ENTER_AFTER + 2, machine(null, 0.4))
     expect(rungs(short).at(-1)).toBe(3)
     let state = FIRST_RUNG_STATE
-    for (const m of short) state = planRung(state, m).state
+    for (const m of short)
+      state = planRung(state, m, { kind: "unmeasured" }).state
     expect(state.levels.has(1)).toBe(false)
   })
 
@@ -100,5 +136,30 @@ describe("planRung", () => {
         },
       ),
     )
+  })
+
+  test("a stall in a cgroup at its own limit holds nothing", () => {
+    const got = rungs(recorded(CGROUP_AT_ITS_LIMIT))
+    expect(got.every(r => r === 0)).toBe(true)
+  })
+
+  test("the machine's own shortage holds starts", () => {
+    const got = rungs(recorded(MACHINE_SHORT))
+    expect(Math.max(...got)).toBe(2)
+  })
+
+  test("a contained stall reads its pressure bounds as unmeasured, and its available share as read", () => {
+    const contained = {
+      kind: "contained",
+      pressure: { someAvg10: 30, fullAvg10: 30 },
+    } as const
+    let state = FIRST_RUNG_STATE
+    for (const _ of times(ENTER_AFTER + 1, null))
+      state = planRung(state, machine(30, 0.4), contained).state
+    expect(state.rung).toBe(2)
+    let calm = FIRST_RUNG_STATE
+    for (const _ of times(ENTER_AFTER + 1, null))
+      calm = planRung(calm, machine(30), contained).state
+    expect(calm.rung).toBe(0)
   })
 })

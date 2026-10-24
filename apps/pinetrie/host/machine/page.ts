@@ -40,6 +40,9 @@ export interface MachinePageGathered {
   readonly settings: Pick<StoreSettings, "max" | "leaveFree">
   /** The lane VM's memory ceiling; null where lanes run on no VM. */
   readonly vmMemoryCeilingBytes: number | null
+  /** The services' floor this host asks for; null where it keeps none. */
+  readonly servicesFloorBytes: number | null
+  readonly isOomdManagingLanes: boolean
   /** Whether this host holds the lane VM's repair's controls. */
   readonly repairs: boolean
 }
@@ -93,6 +96,8 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
   const mentioned = new Set(g.lately.flatMap(latelyLanes))
   const common = {
     vmMemoryCeilingBytes: g.vmMemoryCeilingBytes,
+    servicesFloorBytes: g.servicesFloorBytes,
+    isOomdManagingLanes: g.isOomdManagingLanes,
     lately: g.lately,
     names: [...mentioned].flatMap(lane => {
       const name = g.names.get(lane)
@@ -167,6 +172,7 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
             },
       lanes,
       services: sample.services,
+      containment: sample.containment,
     },
     ...common,
   }
@@ -181,6 +187,8 @@ export function machinePageFacts(deps: {
   readonly session: SessionDocHandle
   readonly settings: Pick<StoreSettings, "max" | "leaveFree">
   readonly target: StoreTarget
+  readonly servicesFloorBytes: number | null
+  readonly isOomdManagingLanes: boolean
 }): MachinePageFacts {
   return planMachinePage({
     reading: deps.reading(),
@@ -190,6 +198,8 @@ export function machinePageFacts(deps: {
     settings: deps.settings,
     vmMemoryCeilingBytes:
       deps.target === "lane-vm" ? vmMemoryCeiling(os.totalmem()) : null,
+    servicesFloorBytes: deps.servicesFloorBytes,
+    isOomdManagingLanes: deps.isOomdManagingLanes,
     repairs: deps.repairs,
   })
 }

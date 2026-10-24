@@ -11,10 +11,11 @@ import {
   type MachineService,
   type ServiceReading,
 } from "@pinetrie/core"
-import type {
-  RunningLane,
-  RunningService,
-  ServiceKillWatch,
+import {
+  type RunningLane,
+  type RunningService,
+  type ServiceKillWatch,
+  wantedControls,
 } from "@pinetrie/docker"
 import {
   type MachineRead,
@@ -24,7 +25,12 @@ import {
   parseMemoryMax,
   parsePressure,
 } from "@pinetrie/lanehost"
-import type { LaneSample, MachineSensor, SensedSample } from "@pinetrie/machine"
+import {
+  type LaneSample,
+  type MachineSensor,
+  planContainment,
+  type SensedSample,
+} from "@pinetrie/machine"
 import type { Stall } from "../stalls.ts"
 import type { MachineReach } from "../work/runtime.ts"
 
@@ -114,17 +120,55 @@ export function serviceReadings(
   })
 }
 
+/** What this host asks of its containers' cgroups beyond each kind's limits: gathered once, at its start. */
+export interface ContainmentAsked {
+  /** The services' floor this host boots the lane VM with; null where it keeps none. */
+  readonly servicesFloor: number | null
+  /** Docker's cgroup driver; null where it did not say. */
+  readonly cgroupDriver: string | null
+}
+
+/**
+ * What took effect of each running container's controls, from what its
+ * kind asks (`wantedControls`) and what its cgroup read back this sample.
+ */
+export function sampleContainment(input: {
+  readonly running: readonly RunningLane[]
+  readonly services: readonly RunningService[]
+  readonly read: Pick<MachineRead, "containers" | "servicesFloor">
+  readonly asked: ContainmentAsked
+}): SensedSample["containment"] {
+  const readBack = new Map(input.read.containers.map(c => [c.id, c.controls]))
+  const kinds = [
+    ...input.running.map(r => ({ id: r.id, kind: "lane" as const })),
+    ...input.services.map(s => ({ id: s.id, kind: s.service })),
+  ]
+  return planContainment({
+    wanted: {
+      containers: kinds.map(c => ({
+        ...wantedControls(c.kind),
+        readBack: readBack.get(c.id) ?? { processesMax: null, cpuWeight: null },
+      })),
+      servicesFloor: input.asked.servicesFloor,
+    },
+    servicesFloorReadBack: input.read.servicesFloor,
+    cgroupDriver: input.asked.cgroupDriver,
+  })
+}
+
 /**
  * One sample from what was read: each running lane's cgroup by its id, a
  * lane whose cgroup was not found left out of `lanes` but in `lanesRunning`,
- * each service's (`serviceReadings`), the filesystem as found, and the
- * machine's memory the whole machine's, with its reclaim, or, given `own`,
- * the host's own cgroup's, with none.
+ * each service's (`serviceReadings`), what took effect of their controls
+ * (`sampleContainment`), the filesystem as found, and the machine's memory
+ * the whole machine's, with its reclaim, or, given `own`, the host's own
+ * cgroup's, with none.
  */
 export function planSample(input: {
   readonly running: readonly RunningLane[]
   readonly services: readonly RunningService[]
   readonly read: MachineRead
+  readonly asked: ContainmentAsked
   readonly own: OwnCgroupFiles | null
   readonly filesystem: SensedSample["filesystem"]
   readonly serviceKills: readonly MachineService[]
@@ -154,6 +198,7 @@ export function planSample(input: {
     store: read.store,
     filesystem: input.filesystem,
     services: serviceReadings(input.services, memoryById, input.own !== null),
+    containment: sampleContainment(input),
     serviceKills: input.serviceKills,
     hostStalledMs: input.hostStalledMs,
   }
@@ -204,6 +249,7 @@ export function createSensor(
     | "machineSample"
     | "storeVolume"
     | "memorySource"
+    | "containmentAsked"
   >,
   kills: Pick<ServiceKillWatch, "take">,
 ): MachineSensor & {
@@ -232,6 +278,7 @@ export function createSensor(
         running,
         services,
         read,
+        asked: reach.containmentAsked,
         own,
         filesystem,
         serviceKills,

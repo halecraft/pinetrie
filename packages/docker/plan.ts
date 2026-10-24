@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto"
 import {
   type MachineService,
+  parseSize,
   type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -23,6 +24,8 @@ import {
   MACHINE_SOCKET,
   type NestedDisk,
   OBSERVER_LOADER,
+  observerHeapBytes,
+  observerMemoryBytes,
   type ProjectDisks,
   ROLE_NAMES,
   ROLES,
@@ -106,6 +109,89 @@ export interface BindMount {
   readonly readonly: boolean
 }
 
+/** Who a container is, for the limits the kernel holds it to. */
+export type ContainerKind = "lane" | MachineService
+
+/** What the kernel holds a container to, besides its memory. */
+export interface ContainerLimits {
+  /** `pids.max`: threads count, so a service's Node and its connections are counted. */
+  readonly processesMax: number
+  /** `CpuShares`, which Docker writes as `cpu.weight` (`cpuWeightOfShares`). */
+  readonly cpuShares: number
+  /** `OomScoreAdj`: lower is killed later. */
+  readonly oomScoreAdj: number
+  /** Under the services' parent, which holds their floor; a lane under Docker's own. */
+  readonly parent: "services" | "lanes"
+}
+
+/**
+ * Each kind's limits, read by a spec's kind and never given per spec. A
+ * lane's process count holds its whole tree, a nested lane's inner Docker
+ * and inner lanes among it; the services' CPU share and OOM priority put
+ * them before the lanes when the machine is short. Each is to be tuned
+ * from the measurements of real use.
+ */
+export const CONTAINER_LIMITS = {
+  lane: {
+    processesMax: 16_384,
+    cpuShares: 1024,
+    oomScoreAdj: 500,
+    parent: "lanes",
+  },
+  disks: {
+    processesMax: 1024,
+    cpuShares: 4096,
+    oomScoreAdj: -500,
+    parent: "services",
+  },
+  privileged: {
+    processesMax: 1024,
+    cpuShares: 4096,
+    oomScoreAdj: -500,
+    parent: "services",
+  },
+  observer: {
+    processesMax: 1024,
+    cpuShares: 4096,
+    oomScoreAdj: -500,
+    parent: "services",
+  },
+} as const satisfies Record<ContainerKind, ContainerLimits>
+
+/** The share Docker gives a container that asks for none: its weight is every cgroup's default. */
+const DEFAULT_CPU_SHARES = 1024
+
+/**
+ * The `cpu.weight` runc writes for a CPU share: the quadratic through
+ * (2, 1), (1024, 100) and (262144, 10000), rounded up, that runc and
+ * opencontainers/cgroups use. What a share is read back as.
+ */
+export function cpuWeightOfShares(shares: number): number {
+  if (shares <= 2) return 1
+  if (shares >= 262_144) return 10_000
+  const l = Math.log2(shares)
+  return Math.ceil(10 ** ((l * l + 125 * l) / 612 - 7 / 34))
+}
+
+/**
+ * What a running container of `kind` should read back from its cgroup: its
+ * process limit, and its CPU weight, null for the default share, whose
+ * weight every cgroup reads applied or not, so it proves nothing.
+ */
+export function wantedControls(kind: ContainerKind): {
+  readonly processesMax: number
+  readonly expectedCpuWeight: number | null
+} {
+  const limits: ContainerLimits = CONTAINER_LIMITS[kind]
+  return {
+    processesMax: limits.processesMax,
+    expectedCpuWeight:
+      limits.cpuShares === DEFAULT_CPU_SHARES
+        ? null
+        : cpuWeightOfShares(limits.cpuShares),
+  }
+}
+
 /**
  * A container as a value: everything it is made with. Docker's API takes it
  * (`createBody`), and its hash is its spec label (`SPEC_LABEL`), so a
@@ -114,6 +200,8 @@ export interface BindMount {
  */
 export interface ContainerSpec {
   readonly name: string
+  /** What the kernel holds it to, besides its memory: its kind's `CONTAINER_LIMITS`. */
+  readonly kind: ContainerKind
   readonly hostname: string | null
   readonly image: string
   readonly cmd: readonly string[]
@@ -130,12 +218,6 @@ export interface ContainerSpec {
   /** `seccomp=<path>` names a profile on the host, read when the container is made. */
   readonly securityOpt: readonly string[]
   readonly devices: readonly string[]
-  /**
-   * The machine's own pid namespace, a read-only root with a
-   * tmpfs at each of `tmpfs`, and removal when it stops: the machine role's
-   * alone (`renderObserver`). Null for every other container.
-   */
-  readonly machine: { readonly tmpfs: readonly string[] } | null
 }
 
 /** A host mount as Docker's machine sees it. */
@@ -192,6 +274,7 @@ export function renderRun(
   const hostPorts = target.hostAddress !== null && shape.hostPorts.length > 0
   return {
     name: shape.name,
+    kind: "lane",
     // A lane's hostname is its container's name; Docker's own would be the
     // container's id.
     hostname: shape.name,
@@ -231,7 +314,6 @@ export function renderRun(
       ? [`seccomp=${input.seccomp}`, "systempaths=unconfined"]
       : ["no-new-privileges"],
     devices: nested ? ["/dev/net/tun"] : [],
-    machine: null,
   }
 }
 
@@ -299,6 +381,7 @@ export function renderHelper(
   const cgroup = cgroupMount(shape.role, shape.rootless)
   return {
     name: lanehostContainer(shape.role, shape.project, target),
+    kind: shape.role,
     hostname: null,
     image: shape.image,
     cmd: ["sleep", "infinity"],
@@ -339,7 +422,6 @@ export function renderHelper(
     capAdd: spec.caps.keep === "default" ? [] : spec.caps.add,
     securityOpt: ["no-new-privileges"],
     devices: [],
-    machine: null,
   }
 }
 
@@ -395,15 +477,18 @@ const tagRepository = (tag: string): string => {
  * and reading BPF programs (`BPF`, `PERFMON`) and an lstat through a lane's
  * first process's root (`SYS_PTRACE`), under Docker's own seccomp
  * profile; the machine's pids, which the loader reads; no
- * network, no lanes directory, a read-only root.
+ * network, no lanes directory, a read-only root. Its memory is its
+ * budget's sum, in bytes as Docker reads a bare number.
  */
-const OBSERVER_GRANT = {
+export const OBSERVER_GRANT = {
   capAdd: ["BPF", "PERFMON", "SYS_PTRACE"],
   network: "none",
-  // The kernel's ring of 64 MiB is charged to it.
-  memory: "512m",
+  memory: String(observerMemoryBytes()),
   tmpfs: ["/run"],
 } as const
+
+/** Node's heap ceiling for the observer's server, in MiB: its budget's, not Node's guess from the cgroup's limit. */
+const OBSERVER_HEAP_FLAG = `--max-old-space-size=${Math.ceil(observerHeapBytes() / 1024 ** 2)}`
 
 /** Each service's memory limit, as its container is made with. */
 export const SERVICE_MEMORY: Readonly<Record<MachineService, string>> = {
@@ -411,6 +496,18 @@ export const SERVICE_MEMORY: Readonly<Record<MachineService, string>> = {
   privileged: ROLES.privileged.memory,
   observer: OBSERVER_GRANT.memory,
 }
+
+/**
+ * The services' guaranteed floor (`memory.low` on their parent), in bytes:
+ * the sum of their memory limits, so they are protected up to their own
+ * limits and no further.
+ */
+export const servicesFloorBytes = (): number =>
+  Object.values(SERVICE_MEMORY).reduce((sum, memory) => {
+    const bytes = parseSize(memory)
+    if (bytes === null) throw new Error(`not an amount of memory: ${memory}`)
+    return sum + bytes
+  }, 0)
 
 /**
  * The machine role's container: the observer for every project and host on
@@ -425,11 +522,15 @@ export function renderObserver(
 ): ContainerSpec {
   return {
     name: observerContainer(version),
+    kind: "observer",
     hostname: null,
     image: observerImage(version),
     // Its server, on the runtime copied into its image.
     cmd: [
-      ...scriptCommand(inMount(install), "observerServer", RUNTIME_NODE),
+      ...scriptCommand(inMount(install), "observerServer", [
+        ...RUNTIME_NODE,
+        OBSERVER_HEAP_FLAG,
+      ]),
       MACHINE_SOCKET,
       OBSERVER_LOADER,
       version,
@@ -444,7 +545,6 @@ export function renderObserver(
     capAdd: OBSERVER_GRANT.capAdd,
     securityOpt: ["no-new-privileges"],
     devices: [],
-    machine: { tmpfs: OBSERVER_GRANT.tmpfs },
   }
 }
 

@@ -9,6 +9,7 @@ import {
   nextLevelState,
   type Tracked,
 } from "./hysteresis.ts"
+import type { PressureScope } from "./pressure-scope.ts"
 import type { MachineSample } from "./sample.ts"
 
 export type Rung = 0 | 1 | 2 | 3 | 4 | 5
@@ -38,8 +39,10 @@ export interface RungBounds {
 
 /**
  * Every rung's bounds, named once. The PSI numbers were measured on
- * synthetic loads; the available shares keep rungs 2 and 3 entering before
- * 4 and 5. Each is to be tuned from the measurements of real use.
+ * synthetic loads, and apply only to a stall the machine's own reclaim
+ * says is the machine's (`PressureScope`); the available shares keep rungs
+ * 2 and 3 entering before 4 and 5. Each is to be tuned from the
+ * measurements of real use.
  */
 export const RUNG_BOUNDS = {
   1: { enter: { someAvg10: 5 }, clear: { someAvg10: 1 } },
@@ -87,14 +90,19 @@ const boundReading = (
 
 /**
  * A rung's level as this sample reads it: over when any bound it names is
- * over, clear only when every bound it could read is clear.
+ * over, clear only when every bound it could read is clear. Its pressure
+ * bounds read the pressure only when `scope` says it is the machine's: a
+ * stall contained in cgroups at their own limits reads as unmeasured, since
+ * holding lanes cannot relieve it, and the available share still reads.
  */
 function rungReading(
   rung: LevelRung,
   machine: MachineSample["machine"],
+  scope: PressureScope,
 ): LevelReading<LevelRung> {
   const { enter, clear }: RungBounds = RUNG_BOUNDS[rung]
-  const { pressure, memoryTotal, memoryAvailable } = machine
+  const { memoryTotal, memoryAvailable } = machine
+  const pressure = scope.kind === "machine" ? scope.pressure : null
   const share = memoryTotal > 0 ? memoryAvailable / memoryTotal : null
   const readings = [
     boundReading(
@@ -123,18 +131,20 @@ function rungReading(
 }
 
 /**
- * The rung after one sample: the highest active level, moved at most one
- * step from the last, so a release lets go one rung's holds at a time.
+ * The rung after one sample, from its available share and what its
+ * pressure says (`pressureScope`): the highest active level, moved at most
+ * one step from the last, so a release lets go one rung's holds at a time.
  */
 export function planRung(
   state: RungPlanState,
   machine: MachineSample["machine"],
+  scope: PressureScope,
 ): { readonly rung: Rung; readonly state: RungPlanState } {
   const levels = new Map<LevelRung, Tracked<LevelRung>>()
   for (const level of LEVELS) {
     const next = nextLevelState(
       state.levels.get(level),
-      rungReading(level, machine),
+      rungReading(level, machine, scope),
     )
     if (next !== null) levels.set(level, next)
   }

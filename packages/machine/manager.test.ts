@@ -61,6 +61,7 @@ const calm: SensedSample = {
   store: null,
   filesystem: null,
   services: [],
+  containment: { kind: "contained" },
   serviceKills: [],
   hostStalledMs: 0,
 }
@@ -859,6 +860,71 @@ describe("measurements", () => {
     ])
   })
 
+  test("an observer meeting its limit sample after sample is a cause in the health written", async () => {
+    let max = 0
+    const { manager, written } = managed({
+      sample: async () => {
+        max += 10
+        return {
+          ...calm,
+          services: [
+            {
+              service: "observer",
+              memory: {
+                kind: "read",
+                currentBytes: GiB / 2,
+                limitBytes: GiB / 2,
+                limitHits: { max, high: 0 },
+              },
+            },
+          ],
+        }
+      },
+    })
+    await manager.start()
+    for (let i = 0; i < ENTER_AFTER; i++) await manager.sample()
+    await manager.idle()
+    expect(written.at(-1)?.causes).toEqual([
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "service", service: "observer" },
+      },
+    ])
+  })
+
+  test("a host in a lane's own cgroup at its limit is recorded, and is no cause", async () => {
+    let max = 0
+    const measurements = keptMeasurements()
+    const written: MachineHealth[] = []
+    const manager = createMachineManager({
+      ...managedDeps({
+        sample: async () => {
+          max += 10
+          return {
+            ...calm,
+            machine: {
+              ...calm.machine,
+              source: "own-cgroup",
+              limitHits: { max, high: 0 },
+            },
+          }
+        },
+      }),
+      makeSink: recordingSink(written),
+      measurements,
+    })
+    await manager.start()
+    for (let i = 0; i < ENTER_AFTER + 1; i++) await manager.sample()
+    await manager.idle()
+    expect(measurements.events[0]).toEqual({
+      kind: "cgroup-at-limit",
+      subject: { kind: "own" },
+      maxHits: 10,
+      highHits: 0,
+    })
+    expect(written.at(-1)?.causes).toEqual([])
+  })
+
   test("the machine's reclaim is recorded as its rise with each sample, and none for an own-cgroup sample", async () => {
     const reclaim = (allocStalls: number) => ({
       allocStalls,
@@ -891,6 +957,32 @@ describe("measurements", () => {
       null,
       null,
     ])
+  })
+
+  test("each sample's scope is recorded, and a stall with no machine reclaim holds nothing", async () => {
+    const reclaim = { allocStalls: 5, scannedDirect: 50, scannedByKswapd: 500 }
+    const stalled: SensedSample = {
+      ...calm,
+      machine: {
+        ...calm.machine,
+        pressure: { someAvg10: 30, fullAvg10: 25 },
+        reclaim,
+      },
+    }
+    const measurements = keptMeasurements()
+    const manager = createMachineManager({
+      ...managedDeps({ sample: async () => stalled }),
+      measurements,
+    })
+    await manager.start()
+    for (let i = 0; i < ENTER_AFTER + 2; i++) await manager.sample()
+    await manager.idle()
+    expect(measurements.samples.map(s => s.scope)).toEqual([
+      "machine",
+      ...Array.from({ length: ENTER_AFTER + 2 }, () => "contained"),
+    ])
+    expect(measurements.samples.map(s => s.rung)).not.toContain(1)
+    expect(manager.latestReading()).toMatchObject({ kind: "fresh", rung: 0 })
   })
 
   test("a measurement that cannot be written is told, and the sample goes on", async () => {

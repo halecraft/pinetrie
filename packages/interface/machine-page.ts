@@ -6,9 +6,10 @@
 import {
   agentAsk,
   assertNever,
+  type Containment,
+  type ContainmentControl,
   type EventMeasured,
   type LaneTreatment,
-  type LimitSubject,
   type MachineCause,
   type MachineLately,
   type MachinePageFacts,
@@ -27,6 +28,7 @@ import type { Prefill } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import {
   causeWords,
+  limitSubjectWords,
   serviceWords,
   sizeWords,
   treatmentWords,
@@ -56,6 +58,9 @@ export type MachinePageView =
       /** Held first, then by name. */
       readonly threads: readonly MachineThreadRow[]
       readonly vmMemoryCeilingBytes: number | null
+      /** The services' floor this host asks for; null where it keeps none. */
+      readonly servicesFloorBytes: number | null
+      readonly isOomdManagingLanes: boolean
       readonly lately: readonly MachineLately[]
       readonly names: ReadonlyMap<ThreadId, ThreadName>
       /** Offered only where the facts carry it: this host holds the repair's controls, and it failed. */
@@ -100,9 +105,12 @@ export function machinePageView(
             store: sampled.store,
             filesystem: sampled.filesystem,
             services: sampled.services,
+            containment: sampled.containment,
           },
     threads,
     vmMemoryCeilingBytes: facts.vmMemoryCeilingBytes,
+    servicesFloorBytes: facts.servicesFloorBytes,
+    isOomdManagingLanes: facts.isOomdManagingLanes,
     lately: facts.lately,
     names,
     repairAgain: repair === undefined ? null : { why: repair.why },
@@ -222,6 +230,7 @@ function causeDoingWords(cause: MachineCause): string | null {
     case "disk-repair-failed":
     case "lane-oom-killed":
     case "service-oom-killed":
+    case "cgroup-at-limit":
     case "host-stalls":
     case "snapshot-skipped":
       return null
@@ -247,6 +256,10 @@ function causeYouCanWords(cause: MachineCause): string | null {
       return "raise `lanes.store.max`, or free the Mac's disk, then repair it again"
     case "lane-oom-killed":
       return "read what the command was doing in its thread, and run less of it at once"
+    case "cgroup-at-limit":
+      return cause.subject.kind === "lane"
+        ? "read what its thread is running, and run less of it at once"
+        : "copy the diagnostics, or ask an agent about this"
     case "service-oom-killed":
     case "host-stalls":
       return "copy the diagnostics, or ask an agent about this"
@@ -331,6 +344,68 @@ const serviceLine = (s: ServiceReading): MachineLine =>
       : `${sizeWords(m.currentBytes)} of ${sizeWords(m.limitBytes)}`,
   )
 
+/** A control that did not take, as the subject of a clause. */
+const CONTROL_WORDS: Readonly<Record<ContainmentControl, string>> = {
+  processes: "a container's process limit",
+  "cpu-weight": "a service's CPU share",
+  "services-floor": "the services' memory floor",
+}
+
+/** What took effect of the containers' controls; the OOM priority is said as set, never read back. */
+function containmentText(
+  containment: Containment,
+  servicesFloorBytes: number | null,
+): string {
+  const oom =
+    "the kernel is set to stop a lane before a service when memory runs out (set, not read back)"
+  switch (containment.kind) {
+    case "contained":
+      return servicesFloorBytes === null
+        ? `each lane is held to its process limit, and the services to theirs and to their CPU share; the services' memory has no floor here, where the cgroups are not ${PRODUCT_NAME}'s; ${oom}`
+        : `each lane is held to its process limit, the services to theirs and to their CPU share, and the services are protected up to ${sizeWords(servicesFloorBytes)} of memory; ${oom}`
+    case "not-contained":
+      switch (containment.why) {
+        case "no-cgroup-driver":
+          return "this lane's Docker has no cgroup controllers: nothing is contained here"
+        case "not-read-back":
+          return `not every limit took: ${containment.missing.map(c => CONTROL_WORDS[c]).join(", ")} did not read back as set`
+        default:
+          return assertNever(containment.why)
+      }
+    default:
+      return assertNever(containment)
+  }
+}
+
+/** The Host section: each service against its limit, what is contained, and systemd-oomd where it may stop lanes. */
+function hostLines(
+  sampled: NonNullable<
+    Extract<MachinePageView, { kind: "machine" }>["sampled"]
+  >,
+  view: Pick<
+    Extract<MachinePageView, { kind: "machine" }>,
+    "servicesFloorBytes" | "isOomdManagingLanes"
+  >,
+): readonly MachineLine[] {
+  return [
+    ...sampled.services.map(serviceLine),
+    {
+      key: "containment",
+      text: containmentText(sampled.containment, view.servicesFloorBytes),
+      unreadable: false,
+    },
+    ...(view.isOomdManagingLanes
+      ? [
+          {
+            key: "oomd",
+            text: `systemd-oomd may stop these lanes under memory pressure, outside ${PRODUCT_NAME}`,
+            unreadable: false,
+          },
+        ]
+      : []),
+  ]
+}
+
 function threadLine(row: MachineThreadRow): MachineThreadLine {
   const who = threadWords(row.name)
   const snapshots =
@@ -380,23 +455,6 @@ const REPAIR_MOVE_WORDS: Readonly<Record<RepairStep, string>> = {
   "booting-repair": "the lane VM's disk is being repaired",
   done: "the lane VM's disk was repaired",
   failed: "the lane VM's disk repair failed",
-}
-
-/** The cgroup a limit was met in, as the subject of a clause. */
-function limitSubjectWords(
-  subject: LimitSubject,
-  nameOf: (lane: ThreadId) => string,
-): string {
-  switch (subject.kind) {
-    case "lane":
-      return nameOf(subject.lane)
-    case "service":
-      return serviceWords(subject.service)
-    case "own":
-      return "this host's lane"
-    default:
-      return assertNever(subject)
-  }
 }
 
 const timesWords = (n: number) => `${n} time${n === 1 ? "" : "s"}`
@@ -544,7 +602,7 @@ export function machinePageWords(view: MachinePageView): MachinePageText {
         lines:
           view.sampled === null
             ? [waiting("host")]
-            : view.sampled.services.map(serviceLine),
+            : hostLines(view.sampled, view),
       },
       lately: {
         heading: "Lately",

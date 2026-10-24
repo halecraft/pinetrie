@@ -300,6 +300,7 @@ test("a VM's start waits while another holds the repair lock, growing nothing me
       slots: 1,
       agent: null,
       log,
+      servicesFloorBytes: 0,
       onStartWaiting: onWaiting,
       growData: () => {
         grown.push(1)

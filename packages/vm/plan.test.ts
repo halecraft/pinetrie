@@ -110,7 +110,7 @@ test("vmMemoryCeiling: a quarter of the Mac's, between 4 and 16 GiB", () => {
   expect(vmMemoryCeiling(128 * GiB)).toBe(16 * GiB)
 })
 
-test("launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy", () => {
+test("launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy; the services' floor last", () => {
   const GiB = 1024 ** 3
   expect(
     launcherArgs({
@@ -120,6 +120,7 @@ test("launcherArgs: the disks flush with fsync and cache their reads, after the 
       macMemory: 32 * GiB,
       cpus: 12,
       gvproxy: "/state/bin/gvproxy-x",
+      servicesFloorBytes: 1_400_000_000,
     }),
   ).toEqual([
     "/state",
@@ -130,6 +131,7 @@ test("launcherArgs: the disks flush with fsync and cache their reads, after the 
     "/state/bin/gvproxy-x",
     "fsync",
     "cached",
+    "1400000000",
   ])
 })
 

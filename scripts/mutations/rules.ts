@@ -5560,4 +5560,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "planNextQueuedCardPop: a lane whose start is held pops no message, but a fact on top; a held queue says so first",
   },
+  {
+    name: "a cgroup stuck at its limit is not stored",
+    file: "packages/rules/machine.ts",
+    from: '    kind: Type.Literal("cgroup-at-limit"),\n',
+    to: '    kind: Type.Literal("cgroup-at-its-limit"),\n',
+    command: unit,
+    expect:
+      "a cgroup stuck at its limit, a lane's or a service's, is read back as it was written",
+  },
 ]

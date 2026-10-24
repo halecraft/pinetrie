@@ -257,6 +257,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/images` | the default image's browser (ADR-0041) |
 | `lanes/proposal` | an agent's proposal of branches, Start's lanes, order and messages, and its fact (ADR-0157, S218) |
 | `lanes/package` | the npm package, built, packed and installed by npm, its own `pinetrie serve` (loading the `pi-anthropic-auth` it ships, ADR-0192) and a lane run from its files (ADR-0189), its helper bundled (ADR-0190) |
+| `lanes/machine-boundary` | in a lane VM of its own, built from this checkout's launcher and image with only the builder shared: the observer and a lane held to their kinds' process limits and CPU weights and the services' parent to its floor, read back from the cgroups, and a lane thrashing at its own memory limit a cause naming its thread while memory's rung stays calm (ADR-0210, ADR-0212) |
 | `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |

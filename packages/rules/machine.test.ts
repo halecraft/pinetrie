@@ -23,3 +23,22 @@ test("a health value of the old shape, memory's stalls and no treatments, does n
   }
   expect(MACHINE.decode(old, MACHINE_KEY)).toBeUndefined()
 })
+
+test("a cgroup stuck at its limit, a lane's or a service's, is read back as it was written", () => {
+  const atLimit: MachineHealth = {
+    state: "amber",
+    causes: [
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "service", service: "observer" },
+      },
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "lane", lane: threadIdFor("t-1") },
+      },
+    ],
+    treatments: [],
+  }
+  const stored = structuredClone(MACHINE.encode(atLimit))
+  expect(MACHINE.decode(stored, MACHINE_KEY)).toEqual(atLimit)
+})

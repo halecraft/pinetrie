@@ -19,6 +19,9 @@ and the words share one.
 | `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it; `planOverdueHealth`, once the reading is overdue |
 | `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
+| `pressure-scope.ts` | what a sample's pressure says (`PressureScope`, `pressureScope`): the machine's, contained in cgroups at their own limits, or unmeasured |
+| `containment.ts` | what took effect of the containers' controls (`planContainment`, from each running container's `ContainerWanted`), core's `Containment` its one maker |
+| `recorded-loads.ts` | test support: two loads recorded in a spike VM (S335), a cgroup at its limit and the machine short, sample by sample |
 | `importance.ts` | which lanes matter most (`rankLanes`) |
 | `treatments.ts` | each lane's treatment (`planTreatments`, `Treatments`), what each allows (`ACTIVITIES_ALLOWED`), the shadow decisions of the rungs not built |
 | `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`, `limitEvents`), the counters' rises (`counterRise`, `reclaimRise`), a command's program (`commandProgram`), and the numbers in force the export names (`numbersInForce`) |
@@ -44,6 +47,22 @@ and the words share one.
   read, so rungs 2 and 3 hold on such a kernel, and rung 1, whose bounds
   are all PSI, is unmeasured. The PSI numbers are S309's and the available
   shares are set to enter before 4 and 5's; S328 tunes them.
+- **The rung reads only a `PressureScope`, never the raw pressure**
+  (ADR-0212, S335). The kernel counts a task's stall in every ancestor's
+  cgroup, the root's included, so one container thrashing at its own limit
+  on an idle machine reads as high at the root as in itself (S334's hour).
+  `pressureScope` decides it once per sample: on a whole machine the
+  pressure is the machine's only when its own reclaim rose since the last
+  sample (`reclaimRise`'s `allocStalls` or `scannedDirect` above 0;
+  `scannedByKswapd` alone is not), and otherwise `contained`, whose
+  pressure bounds `planRung` reads as unmeasured while the available-share
+  bounds read as ever; with no reclaim to compare (a kernel without the
+  counters, the first sample) it is the machine's, as before the reclaim
+  was read; a host in a lane's own cgroup always counts its own, which is
+  its shortage. Available memory cannot be the rule's second half: it
+  counts the page cache a short machine thrashes (S335). Not measured: a
+  long-running VM whose own reclaim runs in normal use, where a cgroup's
+  own stall could coincide with it.
 - **A hold is a treatment, planned afresh each sample** (`planTreatments`):
   nothing is released by hand, so no release can be forgotten. Every lane
   has one, a started one or not (`laneTreatment`): one not running is
@@ -91,8 +110,9 @@ and the words share one.
   treatments are planned for their shadow decisions only, every lane is
   `normal`, and memory short is said without a hold (`isHolding`).
 - **The measurements are kept in both modes** (`MachineMeasurements`): each
-  sample's rung, pressure, memory, its source, the kernel's counters'
-  rise since the last (`counterRise`, none across a reset) and the
+  sample's rung, pressure, memory, its source, its pressure's scope
+  (`SampleMeasured`'s `scope`, which S328's week reads beside the rung),
+  the kernel's counters' rise since the last (`counterRise`, none across a reset) and the
   machine's own reclaim's (`reclaimRise`: `allocstall_*`, `pgscan_direct`,
   `pgscan_kswapd`; none on an own-cgroup sample, whose machine's counters
   are other threads' too); each running
@@ -107,7 +127,7 @@ and the words share one.
   whose `memory.events` `max` or `high` rose since the last sample, from
   the two samples (`limitEvents`, kept with the OOM kills; a cgroup new in
   the sample, or made again, has no rise yet), since a cgroup thrashing
-  at its own limit is killed by nothing and named by nothing else; the
+  at its own limit is killed by nothing; the
   upkeep's deletion, with its snapshots' cost from their
   rows, once the deletion returned; a person's retry of the repair. The
   host records the slow step and the slow `jj` or `git` command. A kind
@@ -124,8 +144,11 @@ and the words share one.
   `minimumUnallocated`'s share and floor, each read from its constant,
   never copied, so a tuned one shows in the next export; and the bound and
   interval a host runs with, which a suite may shorten. The containers'
-  memory limits are the host's to pass in (from `@pinetrie/docker` and
-  its lanes' setup), so this package declares no dependency for them.
+  memory limits, each kind's other limits (`ContainerLimitsInForce`, the
+  docker package's `CONTAINER_LIMITS`) and the services' floor the host
+  asks for are the host's to pass in (from `@pinetrie/docker` and its
+  lanes' setup), so this package declares no dependency for them; S328
+  tunes them from the week.
 
 - **No I/O lives here.** It declares only `@pinetrie/core` and
   `@pinetrie/keeper` (`workspace.test.ts`), and `boundary.test.ts` refuses
@@ -158,6 +181,29 @@ and the words share one.
   lane's OOM kill, a service's, a host stall) is never seen twice running:
   it enters on the sample it is seen in and leaves after `LEAVE_AFTER`
   without it. A level not measured in a sample keeps its count.
+- **A cgroup stuck at its limit is a cause** (`cgroup-at-limit`, amber,
+  ADR-0212). `limitEvents` splits by construction: its `causes` name a
+  lane's or a service's cgroup only (`CauseLimitEvent`, core's
+  `CauseLimitSubject`), and a host in a lane's own cgroup comes back apart
+  (`own`), recorded and never a cause, since on such a host that limit is
+  the shortage memory's rung names already. The manager computes them once
+  per sample and hands the causes to `planHealth` in the sample's result
+  (`atLimit`): `health.ts` cannot import `measurements.ts`, which imports
+  it. Each subject is a level (`nextLevelState`, `causeKey` by its
+  subject): over in a sample whose events name it with its `max` risen,
+  clear in one that does not, so it is a cause after `ENTER_AFTER` samples
+  running and gone after `LEAVE_AFTER` without. A `high` alone is no cause.
+- **What took effect is planned from what was read back** (`planContainment`,
+  ADR-0210, S340): each running container's process limit, and its CPU
+  weight where its share is not the default's (a default weight reads the
+  same applied or not, so it proves nothing: lanes are judged by their
+  process limit, the services by both), and the services' floor where the
+  host asks for one. A Docker whose `CgroupDriver` is `none` (a nested
+  lane's) contains nothing, whatever `docker inspect` says. The sample
+  carries it (`containment`), planned by the host's sensor from that
+  sample's read-back, so the page never lags a container made since. The
+  OOM priority is not read back: the disks role reads cgroups, not
+  processes.
 - **A lane's kill is counted; a service's is heard.** A lane's is a rise in
   its cgroup's `oom_kill` between two samples: its container outlives the
   kill. A service's (a lanehost role's, the observer's) is in the sample's
@@ -376,7 +422,10 @@ and the words share one.
 
 ## Tests
 
-`health.test.ts`, `hysteresis.test.ts`, `rung.test.ts`,
+`health.test.ts`, `hysteresis.test.ts`, `rung.test.ts` (S335's recorded
+loads, `recorded-loads.ts`: a cgroup at its own limit holds nothing, the
+machine short holds starts), `pressure-scope.test.ts`,
+`containment.test.ts`,
 `treatments.test.ts` and `importance.test.ts` (properties over random
 lanes, rungs and rankings), `repair.test.ts` (properties over random
 states and events: every move the table allows and no other, what leaves

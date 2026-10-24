@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { describe, expect, test } from "vitest"
 import {
   cgroupCandidates,
@@ -14,6 +17,9 @@ import {
   parsePressureTotals,
   parseReclaim,
   planBtrfsRoom,
+  readContainers,
+  readServicesFloor,
+  SERVICES_CGROUP,
 } from "./machine.ts"
 
 // As the lane VM's kernel writes them.
@@ -146,9 +152,10 @@ test("a full 2 GiB disk's room is its 1 MiB unallocated", () => {
   })
 })
 
-test("a container's cgroup is looked for where cgroupfs and systemd put it", () => {
+test("a container's cgroup is looked for where cgroupfs puts a lane and a service, and systemd any", () => {
   expect(cgroupCandidates(ID)).toEqual([
     `docker/${ID}`,
+    `pinetrie-services/${ID}`,
     `system.slice/docker-${ID}.scope`,
   ])
 })
@@ -190,5 +197,84 @@ describe("the kernel's memory counters", () => {
     expect(parseInactiveFile("anon 4096\ninactive_file 528379904\n")).toBe(
       528379904,
     )
+  })
+})
+
+describe("a container's cgroup under the tree", () => {
+  /** A cgroup tree in a directory of its own, each file as given; removed after `use`. */
+  async function withTree(
+    files: Readonly<Record<string, string>>,
+    use: (tree: string) => Promise<void>,
+  ) {
+    const tree = await mkdtemp(path.join(tmpdir(), "cgroup-"))
+    try {
+      for (const [file, text] of Object.entries(files)) {
+        await mkdir(path.dirname(path.join(tree, file)), { recursive: true })
+        await writeFile(path.join(tree, file), text)
+      }
+      await use(tree)
+    } finally {
+      await rm(tree, { recursive: true, force: true })
+    }
+  }
+  // Each test's ids its own: a container's cgroup, once found, is kept
+  // for as long as it is asked for.
+  const lane = "a".repeat(64)
+  const service = "b".repeat(64)
+  const capped = "c".repeat(64)
+  const gone = "d".repeat(64)
+  const cgroup = (dir: string, pids: string, weight: string) => ({
+    [`${dir}/memory.current`]: "1048576\n",
+    [`${dir}/memory.stat`]: MEMORY_STAT,
+    [`${dir}/memory.events`]: "max 0\nhigh 0\noom_kill 0\n",
+    [`${dir}/pids.max`]: pids,
+    [`${dir}/cpu.weight`]: weight,
+  })
+
+  test("a service under the services' parent is found and read, as a lane under Docker's own", async () => {
+    await withTree(
+      {
+        ...cgroup(`docker/${lane}`, "16384\n", "100\n"),
+        ...cgroup(`${SERVICES_CGROUP}/${service}`, "1024\n", "303\n"),
+      },
+      async tree => {
+        const [l, s] = await readContainers(tree, [lane, service])
+        expect(l?.controls).toEqual({ processesMax: 16_384, cpuWeight: 100 })
+        expect(s?.controls).toEqual({ processesMax: 1024, cpuWeight: 303 })
+        expect(s?.memory?.current).toBe(1_048_576)
+      },
+    )
+  })
+
+  test("the controls read from pids.max and cpu.weight, and max reads null", async () => {
+    await withTree(cgroup(`docker/${capped}`, "max\n", "100\n"), async tree => {
+      const [l] = await readContainers(tree, [capped])
+      expect(l?.controls).toEqual({ processesMax: null, cpuWeight: 100 })
+    })
+  })
+
+  test("a container whose cgroup is not found reads no memory and no controls", async () => {
+    await withTree({}, async tree => {
+      expect(await readContainers(tree, [gone])).toEqual([
+        {
+          id: gone,
+          memory: null,
+          controls: { processesMax: null, cpuWeight: null },
+        },
+      ])
+    })
+  })
+
+  test("the services' floor is their parent's memory.low, and none where it is not there", async () => {
+    await withTree(
+      { [`${SERVICES_CGROUP}/memory.low`]: "1468006400\n" },
+      async tree => {
+        expect(await readServicesFloor(tree)).toBe(1_468_006_400)
+      },
+    )
+    await withTree({}, async tree => {
+      expect(await readServicesFloor(tree)).toBeNull()
+    })
+    expect(await readServicesFloor(null)).toBeNull()
   })
 })

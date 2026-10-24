@@ -6,12 +6,16 @@
 import { readFile } from "node:fs/promises"
 import http from "node:http"
 import { parseSize } from "@pinetrie/core"
+import { SERVICES_CGROUP } from "@pinetrie/lanehost"
 import type { ContainerFacts } from "@pinetrie/lanes"
 import { SPEC_LABEL } from "@pinetrie/lanes"
 import {
+  CONTAINER_LIMITS,
+  type ContainerLimits,
   type ContainerSpec,
   type Listed,
   type ListedImage,
+  OBSERVER_GRANT,
   systemTimeNanos,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
@@ -207,11 +211,14 @@ export function memoryBytes(memory: string): number {
  * `POST /containers/create`'s body for `spec`. `seccomp=<path>` becomes the
  * profile's content, which the CLI would read from the file, and
  * `systempaths=unconfined` empties the masked and read-only paths, which is
- * what the CLI turns it into.
+ * what the CLI turns it into. Its process count, CPU share and OOM priority
+ * are its kind's (`CONTAINER_LIMITS`); a service goes under the services'
+ * parent only where the target has one.
  */
 export function createBody(
   spec: ContainerSpec,
   profileOf: (path: string) => string,
+  target: Pick<DockerTarget, "hasServicesParent">,
 ): Record<string, unknown> {
   const unconfined = spec.securityOpt.includes("systempaths=unconfined")
   const securityOpt = spec.securityOpt
@@ -221,6 +228,7 @@ export function createBody(
         ? `seccomp=${profileOf(o.slice("seccomp=".length))}`
         : o,
     )
+  const limits: ContainerLimits = CONTAINER_LIMITS[spec.kind]
   return {
     Image: spec.image,
     Cmd: spec.cmd,
@@ -232,6 +240,15 @@ export function createBody(
       Init: true,
       NetworkMode: spec.network,
       Memory: memoryBytes(spec.memory),
+      // `memory.high` has no field, `MemoryReservation` protects nothing
+      // under Docker's own parent, and `io.weight` does nothing under the
+      // lane VM's disk's scheduler: none is set.
+      PidsLimit: limits.processesMax,
+      CpuShares: limits.cpuShares,
+      OomScoreAdj: limits.oomScoreAdj,
+      ...(limits.parent === "services" && target.hasServicesParent
+        ? { CgroupParent: `/${SERVICES_CGROUP}` }
+        : {}),
       Mounts: spec.mounts.map(m => ({
         Type: "bind",
         Source: m.source,
@@ -247,14 +264,15 @@ export function createBody(
         CgroupPermissions: "rwm",
       })),
       ...(unconfined ? { MaskedPaths: [], ReadonlyPaths: [] } : {}),
-      ...(spec.machine === null
-        ? {}
-        : {
+      // The observer's alone: the loader reads the machine's pids.
+      ...(spec.kind === "observer"
+        ? {
             PidMode: "host",
             ReadonlyRootfs: true,
             AutoRemove: true,
-            Tmpfs: Object.fromEntries(spec.machine.tmpfs.map(t => [t, ""])),
-          }),
+            Tmpfs: Object.fromEntries(OBSERVER_GRANT.tmpfs.map(t => [t, ""])),
+          }
+        : {}),
     },
   }
 }
@@ -273,7 +291,7 @@ function imageRef(image: string): { from: string; tag: string } {
  * by `buildMissing` when it knows how (it answers true), else pulled.
  */
 export async function runContainer(
-  target: Pick<DockerTarget, "socket">,
+  target: Pick<DockerTarget, "socket" | "hasServicesParent">,
   spec: ContainerSpec,
   buildMissing: (image: string) => Promise<boolean> = async () => false,
 ): Promise<Answered> {
@@ -283,7 +301,7 @@ export async function runContainer(
       const file = o.slice("seccomp=".length)
       profiles.set(file, await readFile(file, "utf8"))
     }
-  const body = createBody(spec, file => profiles.get(file) ?? "")
+  const body = createBody(spec, file => profiles.get(file) ?? "", target)
   const path = `/containers/create?name=${at(spec.name)}`
   let made = await request(target, "POST", path, body)
   if (isCreateRefusedForMissingImage(made)) {
@@ -577,6 +595,20 @@ export const removeNetwork = (
   target: Pick<DockerTarget, "socket">,
   name: string,
 ): Promise<Answered> => request(target, "DELETE", `/networks/${at(name)}`)
+
+/** `docker info`'s cgroup driver (`cgroupfs`, `systemd`, `none`); null when it does not say. */
+export async function cgroupDriver(
+  target: Pick<DockerTarget, "socket">,
+): Promise<string | null> {
+  const answered = await request(target, "GET", "/info")
+  if (!ok(answered)) return null
+  try {
+    const found = JSON.parse(answered.body) as { CgroupDriver?: unknown }
+    return typeof found.CgroupDriver === "string" ? found.CgroupDriver : null
+  } catch {
+    return null
+  }
+}
 
 /** `docker info`'s security options. */
 export async function securityOptions(

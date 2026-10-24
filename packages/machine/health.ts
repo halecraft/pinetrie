@@ -17,6 +17,7 @@ import {
   nextLevelState,
   type Tracked,
 } from "./hysteresis.ts"
+import type { CauseLimitEvent } from "./measurements.ts"
 import type { Rung } from "./rung.ts"
 import type { MachineSample } from "./sample.ts"
 import {
@@ -52,6 +53,7 @@ const SEVERITY: Readonly<Record<MachineCauseKind, MachineState>> = {
   "memory-short": "amber",
   "lane-oom-killed": "amber",
   "service-oom-killed": "amber",
+  "cgroup-at-limit": "amber",
   "host-stalls": "amber",
   "snapshot-skipped": "amber",
   "freeing-room": "amber",
@@ -72,6 +74,7 @@ const ORDER: readonly MachineCauseKind[] = [
   "memory-short",
   "lane-oom-killed",
   "service-oom-killed",
+  "cgroup-at-limit",
   "host-stalls",
   "snapshot-skipped",
 ]
@@ -122,6 +125,10 @@ const causeKey = (cause: MachineCause): string => {
       return `${cause.kind}:${cause.lane}`
     case "service-oom-killed":
       return `${cause.kind}:${cause.service}`
+    case "cgroup-at-limit":
+      return cause.subject.kind === "lane"
+        ? `${cause.kind}:lane:${cause.subject.lane}`
+        : `${cause.kind}:service:${cause.subject.service}`
     default:
       return cause.kind
   }
@@ -232,6 +239,37 @@ function upkeepReadings(
   ]
 }
 
+/**
+ * Each cgroup at its limit, as a level per subject: over in a sample whose
+ * events name it with its `max` risen, clear in one that does not. So one
+ * that meets its limit `ENTER_AFTER` samples running is a cause, and one
+ * that stops for `LEAVE_AFTER` is not. A subject tracked already is read
+ * too, so its count goes on when it stops meeting it.
+ */
+function atLimitReadings(
+  causes: ReadonlyMap<string, Tracked<MachineCause>>,
+  atLimit: readonly CauseLimitEvent[],
+): readonly [string, CauseReading][] {
+  const over = new Map(
+    atLimit
+      .filter(e => e.maxHits > 0)
+      .map(e => {
+        const cause = { kind: "cgroup-at-limit", subject: e.subject } as const
+        return [causeKey(cause), cause]
+      }),
+  )
+  const tracked = [...causes]
+    .filter(([, t]) => t.value.kind === "cgroup-at-limit")
+    .map(([key]) => key)
+  return [...new Set([...over.keys(), ...tracked])].map(key => {
+    const cause = over.get(key)
+    return [
+      key,
+      cause === undefined ? { kind: "clear" } : { kind: "over", value: cause },
+    ]
+  })
+}
+
 /** The health value of `causes`: sorted worst first, and the worst one's state. */
 function rankedHealth(
   causes: readonly MachineCause[],
@@ -303,7 +341,12 @@ const isSameHealth = (a: MachineHealth, b: MachineHealth): boolean =>
 
 /** What a sample, or its failure, gave. */
 export type SampleResult =
-  | { readonly kind: "sampled"; readonly sample: MachineSample }
+  | {
+      readonly kind: "sampled"
+      readonly sample: MachineSample
+      /** Each lane's and service's cgroup that met its limit since the last sample (`limitEvents`). */
+      readonly atLimit: readonly CauseLimitEvent[]
+    }
   | { readonly kind: "failed"; readonly error: string }
 
 /** What memory's rung and the lanes held add to the health value. */
@@ -361,6 +404,7 @@ export function planHealth(
     ...roomReadings(sample, settings, capabilities),
     ["filesystem-low", filesystemReading(sample, settings)],
     ...upkeepReadings(sample, capabilities),
+    ...atLimitReadings(state.causes, result.atLimit),
   ]
   for (const [key, r] of levels) {
     const stepped = nextLevelState(state.causes.get(key), r)

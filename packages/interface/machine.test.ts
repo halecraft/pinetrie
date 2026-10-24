@@ -69,6 +69,11 @@ describe("machineWords", () => {
         amber({ kind: "service-oom-killed", service: "disks" }),
         amber({ kind: "service-oom-killed", service: "privileged" }),
         amber({ kind: "service-oom-killed", service: "observer" }),
+        amber({
+          kind: "cgroup-at-limit",
+          subject: { kind: "service", service: "observer" },
+        }),
+        amber({ kind: "cgroup-at-limit", subject: { kind: "lane", lane } }),
         amber({ kind: "host-stalls", stalledMs: 1500 }),
         amber({ kind: "freeing-room" }),
         amber({
@@ -118,6 +123,8 @@ describe("machineWords", () => {
       "work is slowed: lanehost's disk service was killed for using too much memory",
       "work is slowed: lanehost's privileged service was killed for using too much memory",
       "work is slowed: the file observer was killed for using too much memory",
+      "work is slowed: the file observer is stuck at its memory limit",
+      "work is slowed: Quiet Otter is stuck at its memory limit",
       "work is slowed: the host stalled for 1.5 seconds",
       "work is slowed: the lanes' disk is low: old turns' snapshots are being deleted to free room",
       "work is slowed: the lanes' disk is low, and nothing is left that may be deleted: 6 GB left, 20 GB at least",

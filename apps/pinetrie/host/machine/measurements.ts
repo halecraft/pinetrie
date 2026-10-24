@@ -1,4 +1,4 @@
-// host/machine/measurements — the machine's measurements in six tables
+// host/machine/measurements — the machine's measurements in seven tables
 // beside the documents' in the session's file, on the store's connection, as
 // the snapshot index's are: each row stamped with the host's clock, kept for
 // `MEASUREMENTS_KEPT_DAYS`, and exported as JSON lines under a first line
@@ -9,6 +9,7 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite"
 import {
   assertNever,
+  type Containment,
   type EventMeasured,
   isThreadId,
   LANE_TREATMENTS,
@@ -43,6 +44,7 @@ const TABLES = {
   decisions: "pinetrie_machine_decisions",
   events: "pinetrie_machine_events",
   reclaim: "pinetrie_machine_reclaim",
+  scopes: "pinetrie_machine_scopes",
 } as const
 
 /** How many of what happened the Machine page shows, newest first. */
@@ -231,6 +233,10 @@ export interface MeasuredOn {
   readonly backend: StoreTarget | null
   readonly source: MemorySource | null
   readonly numbers: NumbersInForce
+  /** What took effect of the containers' controls, as the latest sample read it; null before one, or with no machine. */
+  readonly containment: Containment | null
+  /** systemd-oomd may stop this host's lanes, outside pine·trie. */
+  readonly isOomdManagingLanes: boolean
 }
 
 /** The export's first line: what its rows were measured on, the numbers in force among it, and its days. */
@@ -310,6 +316,12 @@ export function sqliteMachineMeasurements(
     scanned_direct INTEGER NOT NULL,
     scanned_by_kswapd INTEGER NOT NULL
   )`)
+  // Its own table, not a column of the samples': a person's store already
+  // holds the samples' table, and no stored table changes shape.
+  db.exec(`CREATE TABLE IF NOT EXISTS ${TABLES.scopes} (
+    at INTEGER NOT NULL,
+    scope TEXT NOT NULL
+  )`)
   for (const table of Object.values(TABLES))
     db.exec(`CREATE INDEX IF NOT EXISTS ${table}_at ON ${table} (at)`)
 
@@ -331,6 +343,7 @@ export function sqliteMachineMeasurements(
   const insertReclaim = db.prepare(
     `INSERT INTO ${TABLES.reclaim} VALUES (?, ?, ?, ?)`,
   )
+  const insertScope = db.prepare(`INSERT INTO ${TABLES.scopes} VALUES (?, ?)`)
   const recentDecisions = db.prepare(
     `SELECT * FROM ${TABLES.decisions} WHERE kind IN ('treatment', 'repair') ORDER BY at DESC LIMIT ?`,
   )
@@ -398,6 +411,7 @@ export function sqliteMachineMeasurements(
           reclaim.scannedDirect,
           reclaim.scannedByKswapd,
         )
+      insertScope.run(at, row.scope)
     },
     recordLaneSamples(rows: readonly LaneMeasured[]) {
       const at = now()

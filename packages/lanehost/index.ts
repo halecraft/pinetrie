@@ -28,6 +28,7 @@ export {
   parseLimitHits,
   parseMemoryMax,
   parsePressure,
+  SERVICES_CGROUP,
 } from "./machine.ts"
 export { holdingMount, type Mount } from "./mountinfo.ts"
 export {
@@ -39,11 +40,14 @@ export {
   type LoaderCommand,
   type LoaderLine,
   MACHINE_SOCKET,
+  OBSERVER_BUDGET,
   type ObserverCall,
   type ObserverFacts,
   type ObserverHello,
   type ObserverNotice,
   type ObserverPlan,
+  observerHeapBytes,
+  observerMemoryBytes,
   observerVersion,
   planAttribution,
   planObserver,

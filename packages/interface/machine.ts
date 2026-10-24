@@ -5,6 +5,7 @@
 import {
   assertNever,
   type LaneTreatment,
+  type LimitSubject,
   type MachineCause,
   type MachineHealth,
   type MachineService,
@@ -47,6 +48,23 @@ export function serviceWords(service: MachineService): string {
       return "the file observer"
     default:
       return assertNever(service)
+  }
+}
+
+/** The cgroup a limit was met in, as the subject of a clause. */
+export function limitSubjectWords(
+  subject: LimitSubject,
+  nameOf: (lane: ThreadId) => string,
+): string {
+  switch (subject.kind) {
+    case "lane":
+      return nameOf(subject.lane)
+    case "service":
+      return serviceWords(subject.service)
+    case "own":
+      return "this host's lane"
+    default:
+      return assertNever(subject)
   }
 }
 
@@ -119,6 +137,8 @@ export function causeWords(
       return `a command in ${nameOf(cause.lane)} was killed for using too much memory`
     case "service-oom-killed":
       return `${serviceWords(cause.service)} was killed for using too much memory`
+    case "cgroup-at-limit":
+      return `${limitSubjectWords(cause.subject, nameOf)} is stuck at its memory limit`
     case "host-stalls":
       return `the host stalled for ${(cause.stalledMs / 1000).toFixed(1)} seconds`
     case "freeing-room":

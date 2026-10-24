@@ -31,6 +31,7 @@ const sample: SampleMeasured = {
     stallFullUs: 4,
   },
   reclaim: { allocStalls: 5, scannedDirect: 6, scannedByKswapd: 7 },
+  scope: "contained",
   lanesRunning: 1,
   mode: "observe",
 }
@@ -113,13 +114,17 @@ test("each kind of row is kept in its table, stamped with the host's clock, and 
       scanned_direct: 6,
       scanned_by_kswapd: 7,
     },
+    { table: "scopes", at: now, scope: "contained" },
   ])
 })
 
-test("a sample with no reclaim to compare keeps no reclaim row", () => {
+test("a sample with no reclaim to compare keeps no reclaim row, and its scope", () => {
   const m = memoryMachineMeasurements(() => DAY)
-  m.recordSample({ ...sample, reclaim: null })
-  expect(rows(m.exportRows(1)).map(r => r.table)).toEqual(["samples"])
+  m.recordSample({ ...sample, reclaim: null, scope: "machine" })
+  expect(rows(m.exportRows(1)).map(r => [r.table, r.scope])).toEqual([
+    ["samples", undefined],
+    ["scopes", "machine"],
+  ])
 })
 
 test("a trim deletes the rows older than what is kept, and an export reads only its days", () => {
@@ -129,23 +134,25 @@ test("a trim deletes the rows older than what is kept, and an export reads only 
   now = 3 * DAY
   m.recordSample({ ...sample, rung: 3 })
   now = (MEASUREMENTS_KEPT_DAYS + 1) * DAY
+  const kept = [
+    ["samples", 3],
+    ["reclaim", 5],
+    ["scopes", "contained"],
+  ]
   expect(
     rows(m.exportRows(MEASUREMENTS_KEPT_DAYS)).map(r => [
       r.table,
-      r.rung ?? r.alloc_stalls,
+      r.rung ?? r.alloc_stalls ?? r.scope,
     ]),
-  ).toEqual([
-    ["samples", 3],
-    ["reclaim", 5],
-  ])
+  ).toEqual(kept)
   m.trim()
   now = 0
   expect(
-    rows(m.exportRows(1000)).map(r => [r.table, r.rung ?? r.alloc_stalls]),
-  ).toEqual([
-    ["samples", 3],
-    ["reclaim", 5],
-  ])
+    rows(m.exportRows(1000)).map(r => [
+      r.table,
+      r.rung ?? r.alloc_stalls ?? r.scope,
+    ]),
+  ).toEqual(kept)
 })
 
 test("each event is kept in its own table, exported, read back as it was, and trimmed", () => {
@@ -292,6 +299,33 @@ test("the export's first line names the numbers in force, as their modules have 
     sampleEveryMs: 5000,
     readingOverdueAfterTicks: 6,
     memoryLimits: null,
+    containerLimits: {
+      lane: {
+        processesMax: 16_384,
+        cpuShares: 1024,
+        oomScoreAdj: 500,
+        parent: "lanes",
+      },
+      disks: {
+        processesMax: 1024,
+        cpuShares: 4096,
+        oomScoreAdj: -500,
+        parent: "services",
+      },
+      privileged: {
+        processesMax: 1024,
+        cpuShares: 4096,
+        oomScoreAdj: -500,
+        parent: "services",
+      },
+      observer: {
+        processesMax: 1024,
+        cpuShares: 4096,
+        oomScoreAdj: -500,
+        parent: "services",
+      },
+    },
+    servicesFloorBytes: 1_400_000_000,
   })
   const heading = JSON.parse(
     measurementsHeading(
@@ -300,6 +334,12 @@ test("the export's first line names the numbers in force, as their modules have 
         backend: "lane-vm",
         source: "whole-machine",
         numbers,
+        containment: {
+          kind: "not-contained",
+          missing: ["services-floor"],
+          why: "not-read-back",
+        },
+        isOomdManagingLanes: false,
       },
       7,
     ),
@@ -309,9 +349,18 @@ test("the export's first line names the numbers in force, as their modules have 
     backend: "lane-vm",
     source: "whole-machine",
     numbers: JSON.parse(JSON.stringify(numbers)),
+    containment: {
+      kind: "not-contained",
+      missing: ["services-floor"],
+      why: "not-read-back",
+    },
+    isOomdManagingLanes: false,
     days: 7,
   })
   expect((heading.numbers as Record<string, unknown>).RUNG_BOUNDS).toEqual(
     RUNG_BOUNDS,
+  )
+  expect((heading.numbers as Record<string, unknown>).servicesFloorBytes).toBe(
+    1_400_000_000,
   )
 })

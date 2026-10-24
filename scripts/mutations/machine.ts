@@ -8,16 +8,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a cgroup at its limit keeps no high",
     file: "packages/machine/measurements.ts",
-    from: "    const highHits = hits.high - then.high\n",
-    to: "    const highHits = 0\n",
+    from: "  const high = now.high - then.high\n",
+    to: "  const high = 0\n",
     command: unit,
     expect: "each cgroup whose max or high rose is one event, with each rise",
   },
   {
     name: "the cgroups at their limits are not recorded",
     file: "packages/machine/manager.ts",
-    from: "        ? limitEvents(limitsBefore, result.sample)\n",
-    to: "        ? []\n",
+    from: "      ...(limits === null ? [] : limitEventsMeasured(limits)),\n",
+    to: "",
     command: unit,
     expect:
       "a sample after one whose observer's max was lower records it at its limit",
@@ -482,5 +482,102 @@ export const mutations: readonly Mutation[] = [
     to: "    isOverdue(freshness)\n",
     command: unit,
     expect: "isLaneActivityAllowed answers as waitUntilAllowed settles",
+  },
+  // ── the machine's own shortage, and a cgroup at its limit ──
+  {
+    name: "a stall with no machine reclaim reads as the machine's",
+    file: "packages/machine/pressure-scope.ts",
+    from: '    : { kind: "contained", pressure }\n',
+    to: '    : { kind: "machine", pressure }\n',
+    command: unit,
+    expect: "a stall in a cgroup at its own limit holds nothing",
+  },
+  {
+    name: "a host's own cgroup's pressure waits for the machine's reclaim",
+    file: "packages/machine/pressure-scope.ts",
+    from: '  if (machine.source === "own-cgroup") return { kind: "machine", pressure }\n',
+    to: "",
+    command: unit,
+    expect:
+      "a host's own cgroup's pressure is the machine's, whatever reclaim it is given",
+  },
+  {
+    name: "a cgroup at its limit is never a cause",
+    file: "packages/machine/health.ts",
+    from: "    ...atLimitReadings(state.causes, result.atLimit),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a cgroup meeting its limit ENTER_AFTER samples running is a cause, gone after LEAVE_AFTER without",
+  },
+  {
+    name: "the manager plans no cgroup at its limit",
+    file: "packages/machine/manager.ts",
+    from: '      result = { kind: "sampled", sample, atLimit: limits.causes }\n',
+    to: '      result = { kind: "sampled", sample, atLimit: [] }\n',
+    command: unit,
+    expect:
+      "an observer meeting its limit sample after sample is a cause in the health written",
+  },
+  {
+    name: "a host's own cgroup at its limit is planned as a cause",
+    file: "packages/machine/manager.ts",
+    from: '      result = { kind: "sampled", sample, atLimit: limits.causes }\n',
+    to: '      result = { kind: "sampled", sample, atLimit: limitEventsMeasured(limits) as never }\n',
+    command: unit,
+    expect:
+      "a host in a lane's own cgroup at its limit is recorded, and is no cause",
+  },
+  {
+    name: "a host's own cgroup's limit hits are dropped",
+    file: "packages/machine/measurements.ts",
+    from: "        : hitsRise(before.machine.limitHits, now.machine.limitHits),\n",
+    to: "        : null,\n",
+    command: unit,
+    expect:
+      "an own cgroup's limit hits come back as own, never among the causes",
+  },
+  {
+    name: "the sample's scope is not measured",
+    file: "packages/machine/manager.ts",
+    from: "        scope: scope.kind,\n",
+    to: '        scope: "machine",\n',
+    command: unit,
+    expect:
+      "each sample's scope is recorded, and a stall with no machine reclaim holds nothing",
+  },
+  // ── what took effect ──
+  {
+    name: "the containment trusts the processes wanted",
+    file: "packages/machine/containment.ts",
+    from: "      c => c.readBack.processesMax !== c.processesMax,\n",
+    to: "      c => c.processesMax !== c.processesMax,\n",
+    command: unit,
+    expect: "a container whose pids.max reads max is missing its process limit",
+  },
+  {
+    name: "the containment judges a default share",
+    file: "packages/machine/containment.ts",
+    from: "        c.expectedCpuWeight !== null &&\n",
+    to: "",
+    command: unit,
+    expect: "a lane's default share is not judged",
+  },
+  {
+    name: "the containment trusts the floor wanted",
+    file: "packages/machine/containment.ts",
+    from: "      input.servicesFloorReadBack !== wanted.servicesFloor,\n",
+    to: "      wanted.servicesFloor !== wanted.servicesFloor,\n",
+    command: unit,
+    expect: "a floor wanted and not there is missing",
+  },
+  {
+    name: "a Docker with no cgroup driver is believed",
+    file: "packages/machine/containment.ts",
+    from: '  if (input.cgroupDriver === "none")\n',
+    to: '  if (input.cgroupDriver === "no driver")\n',
+    command: unit,
+    expect:
+      "a Docker with no cgroup driver contains nothing, whatever its containers read",
   },
 ]

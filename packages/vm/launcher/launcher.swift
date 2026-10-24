@@ -3,6 +3,7 @@
 // slot of its own, and bridges Docker with half-closes.
 //
 //   launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy>
+//            <synchronization> <caching> <services floor bytes>
 //
 // In <state dir>: launcher.lock (an exclusive flock: a second launcher exits
 // at once; a host repairing the data disk holds it while the VM is stopped), data.img (the data disk, 256 GiB sparse, formatted by the guest
@@ -49,11 +50,11 @@ setvbuf(stdout, nil, _IOLBF, 0)
 func log(_ s: String) { print("launcher: \(s)") }
 
 let args = CommandLine.arguments
-guard args.count == 9, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
-  let cpus = Int(args[5])
+guard args.count == 10, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
+  let cpus = Int(args[5]), let servicesFloor = UInt64(args[9])
 else {
   FileHandle.standardError.write(
-    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy> <synchronization> <caching>\n"
+    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy> <synchronization> <caching> <services floor bytes>\n"
       .data(using: .utf8)!)
   exit(2)
 }
@@ -127,7 +128,12 @@ let boot = VZLinuxBootLoader(kernelURL: url("\(image)/Image"))
 boot.initialRamdiskURL = url("\(image)/stage1.cpio")
 // psi=1: the kernel is built with pressure stall information off by
 // default, and the host reads the machine's and each lane's.
-boot.commandLine = "console=hvc0 quiet psi=1 lane.slots=\(slotCount)"
+// lane.services_floor: the services' guaranteed floor, which `init` writes
+// to their parent's memory.low. The booting launcher's holds for the VM's
+// life: a host with another floor joins it, and its floor applies from the
+// VM's next start.
+boot.commandLine =
+  "console=hvc0 quiet psi=1 lane.slots=\(slotCount) lane.services_floor=\(servicesFloor)"
 config.bootLoader = boot
 
 do {

@@ -8,11 +8,11 @@
 
 import {
   assertNever,
+  type CauseLimitSubject,
   type CgroupLimitHits,
   type EventMeasured,
   type HeldLane,
   type LaneTreatment,
-  type LimitSubject,
   MACHINE_SAMPLE_MS,
   type MachineCause,
   type MachineReclaim,
@@ -30,6 +30,7 @@ import {
 } from "./health.ts"
 import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import type { ManageMode } from "./manager.ts"
+import type { PressureScope } from "./pressure-scope.ts"
 import type { RepairState } from "./repair.ts"
 import { RUNG_BOUNDS, type Rung } from "./rung.ts"
 import type { LaneSample, MachineSample } from "./sample.ts"
@@ -103,6 +104,8 @@ export interface SampleMeasured {
   readonly since: MemoryCounters | null
   /** The machine's reclaim's rise since the last sample read it; null for none to compare, as on an own-cgroup read. */
   readonly reclaim: MachineReclaim | null
+  /** What its pressure was read as: the machine's, contained in cgroups at their limits, or unmeasured. */
+  readonly scope: PressureScope["kind"]
   readonly lanesRunning: number
   readonly mode: ManageMode
 }
@@ -184,9 +187,22 @@ export type LimitsRead = Pick<MachineSample, "lanes" | "services"> & {
   readonly machine: Pick<MachineSample["machine"], "limitHits">
 }
 
-/** Each cgroup a sample read the limit hits of, by its subject. */
-function limitHitsRead(read: LimitsRead): readonly {
-  readonly subject: LimitSubject
+/** A lane's or a service's cgroup that met its limit since the last sample: what a cause may name. */
+export type CauseLimitEvent = Extract<
+  EventMeasured,
+  { readonly kind: "cgroup-at-limit" }
+> & { readonly subject: CauseLimitSubject }
+
+/** The cgroups at their limits since the last sample: the lanes' and services', and a host in a lane's own apart. */
+export interface LimitEvents {
+  readonly causes: readonly CauseLimitEvent[]
+  /** The own cgroup's rise, when one rose: recorded, and never a cause's subject. */
+  readonly own: CgroupLimitHits | null
+}
+
+/** Each lane's and service's cgroup a sample read the limit hits of, by its subject. */
+function causeLimitHitsRead(read: LimitsRead): readonly {
+  readonly subject: CauseLimitSubject
   readonly hits: CgroupLimitHits
 }[] {
   return [
@@ -204,48 +220,85 @@ function limitHitsRead(read: LimitsRead): readonly {
           ]
         : [],
     ),
-    ...(read.machine.limitHits === null
-      ? []
-      : [{ subject: { kind: "own" } as const, hits: read.machine.limitHits }]),
   ]
 }
 
-const subjectKey = (subject: LimitSubject): string => {
+const subjectKey = (subject: CauseLimitSubject): string => {
   switch (subject.kind) {
     case "lane":
       return `lane:${subject.lane}`
     case "service":
       return `service:${subject.service}`
-    case "own":
-      return "own"
     default:
       return assertNever(subject)
   }
 }
 
+/** How far `now`'s `max` and `high` rose over `then`; null when neither rose, or one fell (a cgroup made again). */
+function hitsRise(
+  then: CgroupLimitHits | null | undefined,
+  now: CgroupLimitHits,
+): CgroupLimitHits | null {
+  if (then == null) return null
+  const max = now.max - then.max
+  const high = now.high - then.high
+  return max < 0 || high < 0 || max + high === 0 ? null : { max, high }
+}
+
 /**
- * One event per cgroup whose `max` or `high` count rose from `before` to
- * `now`. A cgroup new in `now`, or whose counts fell (a container made
- * again), has no rise yet.
+ * One event per lane's or service's cgroup whose `max` or `high` count
+ * rose from `before` to `now`, and a host in a lane's own cgroup's rise
+ * apart: on such a host its limit is the shortage memory's rung names, so
+ * it is no cause's subject. A cgroup new in `now`, or whose counts fell (a
+ * container made again), has no rise yet.
  */
 export function limitEvents(
   before: LimitsRead | null,
   now: LimitsRead,
-): readonly EventMeasured[] {
-  if (before === null) return []
+): LimitEvents {
+  if (before === null) return { causes: [], own: null }
   const was = new Map(
-    limitHitsRead(before).map(r => [subjectKey(r.subject), r.hits]),
+    causeLimitHitsRead(before).map(r => [subjectKey(r.subject), r.hits]),
   )
-  return limitHitsRead(now).flatMap(({ subject, hits }): EventMeasured[] => {
-    const then = was.get(subjectKey(subject))
-    if (then === undefined) return []
-    const maxHits = hits.max - then.max
-    const highHits = hits.high - then.high
-    return maxHits < 0 || highHits < 0 || maxHits + highHits === 0
-      ? []
-      : [{ kind: "cgroup-at-limit", subject, maxHits, highHits }]
-  })
+  return {
+    causes: causeLimitHitsRead(now).flatMap(
+      ({ subject, hits }): CauseLimitEvent[] => {
+        const rise = hitsRise(was.get(subjectKey(subject)), hits)
+        return rise === null
+          ? []
+          : [
+              {
+                kind: "cgroup-at-limit",
+                subject,
+                maxHits: rise.max,
+                highHits: rise.high,
+              },
+            ]
+      },
+    ),
+    own:
+      now.machine.limitHits === null
+        ? null
+        : hitsRise(before.machine.limitHits, now.machine.limitHits),
+  }
 }
+
+/** Every event of `limitEvents`, as the measurements keep them: the own cgroup's among them. */
+export const limitEventsMeasured = (
+  events: LimitEvents,
+): readonly EventMeasured[] => [
+  ...events.causes,
+  ...(events.own === null
+    ? []
+    : [
+        {
+          kind: "cgroup-at-limit",
+          subject: { kind: "own" },
+          maxHits: events.own.max,
+          highHits: events.own.high,
+        } as const,
+      ]),
+]
 
 /** The memory limits a host's containers are made with, as Docker's `--memory` takes them (`512m`). */
 export interface MemoryLimits {
@@ -253,17 +306,29 @@ export interface MemoryLimits {
   readonly lane: string
 }
 
+/** What the kernel holds a container of one kind to besides its memory, as the host makes it. */
+export interface ContainerLimitsInForce {
+  readonly processesMax: number
+  readonly cpuShares: number
+  readonly oomScoreAdj: number
+  readonly parent: string
+}
+
 /**
  * Every number the host decides memory and room by, read from the
  * constants themselves so a tuned one shows in the next export, with the
- * sample's interval, the overdue bound and the containers' memory limits
- * this host runs with. `memoryLimits` is null on a host that runs no
- * containers.
+ * sample's interval, the overdue bound, the containers' memory limits and
+ * each kind's other limits this host runs with, and the services' floor it
+ * asks for. Each is null on a host that has none.
  */
 export function numbersInForce(inForce: {
   readonly sampleEveryMs: number
   readonly readingOverdueAfterTicks: number
   readonly memoryLimits: MemoryLimits | null
+  readonly containerLimits: Readonly<
+    Record<"lane" | MachineService, ContainerLimitsInForce>
+  > | null
+  readonly servicesFloorBytes: number | null
 }) {
   return {
     RUNG_BOUNDS,
@@ -280,6 +345,8 @@ export function numbersInForce(inForce: {
     MINIMUM_UNALLOCATED_PERCENT,
     MINIMUM_UNALLOCATED_FLOOR,
     memoryLimits: inForce.memoryLimits,
+    containerLimits: inForce.containerLimits,
+    servicesFloorBytes: inForce.servicesFloorBytes,
   }
 }
 

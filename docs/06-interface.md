@@ -329,7 +329,13 @@ nothing; Ctrl+Shift+L still folds the sidebar.
   - **Now**: each cause the glyph would name, worst first, with what
     pine·trie is doing about it ("it holds new runs' starts until there is
     room") and what you can do ("archive the canvases you are done with:
-    their snapshots are deleted; or raise `lanes.store.max`").
+    their snapshots are deleted; or raise `lanes.store.max`"). A service's
+    or a thread's lane stuck at its own memory limit for samples running is
+    a cause of its own, amber, named by its service or its thread ("the
+    file observer is stuck at its memory limit", "foggy-garnet is stuck at
+    its memory limit", ADR-0212): it holds nothing, since holding lanes
+    cannot relieve a stall inside one cgroup's limit, and only a stall the
+    machine's own reclaim says is the machine's moves memory's rung.
   - **Threads**: each running lane by its thread's name, held lanes
     first: its memory against its limit, its own and its cache, its
     snapshots and their estimated size, and how it is held. A row opens
@@ -342,7 +348,18 @@ nothing; Ctrl+Shift+L still folds the sidebar.
     least"); your disk against what pine·trie leaves free of it; on the
     Mac, "the lane VM may use up to 8 GB of your Mac's memory".
   - **Host**: lanehost's disk and privileged services and the file
-    observer, each against its limit.
+    observer, each against its limit; what the kernel holds the
+    containers to, read back from their cgroups, never from Docker's
+    answer ("each lane is held to its process limit, the services to
+    theirs and to their CPU share, and the services are protected up to
+    1.4 GB of memory; the kernel is set to stop a lane before a service
+    when memory runs out (set, not read back)"), on Linux the services'
+    memory having no floor, or which control did not take ("not every
+    limit took: the services' memory floor did not read back as set";
+    in a nested lane, "this lane's Docker has no cgroup controllers:
+    nothing is contained here", ADR-0210); and on a Linux host where
+    systemd-oomd manages rootless Docker's containers, "systemd-oomd may
+    stop these lanes under memory pressure, outside pine·trie".
   - **Lately**: newest first, what happened: a lane held or let go,
     memory's rung moving, the disk's repair moving, a command or a service
     killed for memory, old snapshots deleted, the host stalling, a slow

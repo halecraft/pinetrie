@@ -2,7 +2,12 @@ import { mkdtemp, rm } from "node:fs/promises"
 import http from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { MACHINE_SOCKET, OBSERVER_LOADER } from "@pinetrie/lanehost"
+import {
+  MACHINE_SOCKET,
+  OBSERVER_LOADER,
+  observerHeapBytes,
+  observerMemoryBytes,
+} from "@pinetrie/lanehost"
 import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import {
@@ -19,6 +24,7 @@ import { type ContainerSpec, renderObserver } from "./plan.ts"
 
 const spec: ContainerSpec = {
   name: "pinetrie-t-1",
+  kind: "lane",
   hostname: "pinetrie-t-1",
   image: "pinetrie-lane:abc",
   cmd: ["sleep", "infinity"],
@@ -35,12 +41,16 @@ const spec: ContainerSpec = {
   capAdd: [],
   securityOpt: ["no-new-privileges"],
   devices: [],
-  machine: null,
 }
+
+/** A target with no services' parent: a Linux host's. */
+const LINUX = { hasServicesParent: false }
+/** The lane VM's, whose `init` made the services' parent. */
+const LANE_VM = { hasServicesParent: true }
 
 describe("createBody: a spec as the API's create", () => {
   test("every container runs --init, with its mounts as binds, read-only where they say", () => {
-    const body = createBody(spec, () => "")
+    const body = createBody(spec, () => "", LINUX)
     const host = body.HostConfig as Record<string, unknown>
     expect(host.Init).toBe(true)
     expect(host.Memory).toBe(4 * 1024 ** 3)
@@ -64,6 +74,7 @@ describe("createBody: a spec as the API's create", () => {
         devices: ["/dev/net/tun"],
       },
       file => (file === "/opt/p/seccomp.json" ? '{"defaultAction":"x"}' : ""),
+      LINUX,
     )
     const host = body.HostConfig as Record<string, unknown>
     expect(host.SecurityOpt).toEqual(['seccomp={"defaultAction":"x"}'])
@@ -76,6 +87,47 @@ describe("createBody: a spec as the API's create", () => {
       },
     ])
   })
+
+  test("each kind carries its process limit, CPU share and OOM priority", () => {
+    const limits = (kind: ContainerSpec["kind"]) => {
+      const host = createBody({ ...spec, kind }, () => "", LANE_VM)
+        .HostConfig as Record<string, unknown>
+      return [host.PidsLimit, host.CpuShares, host.OomScoreAdj]
+    }
+    expect(limits("lane")).toEqual([16_384, 1024, 500])
+    expect(limits("disks")).toEqual([1024, 4096, -500])
+    expect(limits("privileged")).toEqual([1024, 4096, -500])
+    expect(limits("observer")).toEqual([1024, 4096, -500])
+  })
+
+  test("a service goes under the services' parent only on a target that has one, and a lane never", () => {
+    const parent = (kind: ContainerSpec["kind"], target: typeof LINUX) =>
+      (
+        createBody({ ...spec, kind }, () => "", target).HostConfig as Record<
+          string,
+          unknown
+        >
+      ).CgroupParent
+    expect(parent("disks", LANE_VM)).toBe("/pinetrie-services")
+    expect(parent("observer", LANE_VM)).toBe("/pinetrie-services")
+    expect(parent("lane", LANE_VM)).toBeUndefined()
+    expect(parent("disks", LINUX)).toBeUndefined()
+  })
+
+  test("only the observer's kind gets the machine's pid namespace", () => {
+    const host = (kind: ContainerSpec["kind"]) =>
+      createBody({ ...spec, kind }, () => "", LANE_VM).HostConfig as Record<
+        string,
+        unknown
+      >
+    expect(host("observer").PidMode).toBe("host")
+    for (const kind of ["lane", "disks", "privileged"] as const)
+      expect(
+        ["PidMode", "ReadonlyRootfs", "AutoRemove", "Tmpfs"].filter(
+          k => k in host(kind),
+        ),
+      ).toEqual([])
+  })
 })
 
 test("memoryBytes reads -m as the CLI does: units of 1024", () => {
@@ -86,11 +138,16 @@ test("memoryBytes reads -m as the CLI does: units of 1024", () => {
 })
 
 test("the machine role's container is made with its grant and nothing more", () => {
-  const body = createBody(renderObserver("abc", { form: "built" }), () => "")
+  const body = createBody(
+    renderObserver("abc", { form: "built" }),
+    () => "",
+    LANE_VM,
+  )
   expect(body).toEqual({
     Image: "pinetrie-observer:abc",
     Cmd: [
       ...RUNTIME_NODE,
+      `--max-old-space-size=${Math.ceil(observerHeapBytes() / 1024 ** 2)}`,
       "/pinetrie/packages/lanehost/observer-server.js",
       MACHINE_SOCKET,
       OBSERVER_LOADER,
@@ -101,7 +158,11 @@ test("the machine role's container is made with its grant and nothing more", () 
     HostConfig: {
       Init: true,
       NetworkMode: "none",
-      Memory: 512 * 1024 ** 2,
+      Memory: observerMemoryBytes(),
+      PidsLimit: 1024,
+      CpuShares: 4096,
+      OomScoreAdj: -500,
+      CgroupParent: "/pinetrie-services",
       Mounts: [],
       CapAdd: ["BPF", "PERFMON", "SYS_PTRACE"],
       CapDrop: ["ALL"],
@@ -235,7 +296,7 @@ test("a create whose connection drops is not tried again", async () => {
   const docker = await droppingDocker()
   try {
     await expect(
-      runContainer({ socket: docker.socket }, spec),
+      runContainer({ socket: docker.socket, ...LINUX }, spec),
     ).rejects.toThrow()
     expect(docker.requests).toEqual([
       "POST /containers/create?name=pinetrie-t-1",

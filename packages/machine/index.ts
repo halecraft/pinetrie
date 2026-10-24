@@ -6,6 +6,7 @@ export {
   type StoreCapabilities,
   type StoreTarget,
 } from "./capabilities.ts"
+export { type ContainerWanted, planContainment } from "./containment.ts"
 export { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
 export { ROOM_SPENT, WAITING } from "./health.ts"
 export { type LaneImportance, rankLanes } from "./importance.ts"

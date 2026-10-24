@@ -164,8 +164,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane shares the machine's PID namespace",
     file: "packages/docker/plan.ts",
-    from: '    devices: nested ? ["/dev/net/tun"] : [],\n    machine: null,\n',
-    to: '    devices: nested ? ["/dev/net/tun"] : [],\n    machine: { tmpfs: [] },\n',
+    from: '    name: shape.name,\n    kind: "lane",\n',
+    to: '    name: shape.name,\n    kind: "observer",\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/docker/plan.test.ts"],
     expect:
       "every shape keeps a PID namespace of its own: the observer's lane is it",
@@ -529,8 +529,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host whose Docker does not answer is given lanes",
     file: "apps/pinetrie/host/work/runtime.ts",
-    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const observed = planObserver({",
-    to: "  const observed = planObserver({",
+    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const [rootless, cgroupDriver, oomdActive] =",
+    to: "  const [rootless, cgroupDriver, oomdActive] =",
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
     expect: "a Docker that does not answer, in the runtime's words",
   },
@@ -672,5 +672,65 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "contract",
     expect: "a host's close closes its observer connection",
+  },
+  // ── each container's kind and its limits ──
+  {
+    name: "a container is made with no process limit",
+    file: "packages/docker/api.ts",
+    from: "      PidsLimit: limits.processesMax,\n",
+    to: "",
+    command: unit("packages/docker"),
+    expect: "each kind carries its process limit, CPU share and OOM priority",
+  },
+  {
+    name: "a share's weight is read back one short",
+    file: plan,
+    from: "  return Math.ceil(10 ** ((l * l + 125 * l) / 612 - 7 / 34))\n",
+    to: "  return Math.floor(10 ** ((l * l + 125 * l) / 612 - 7 / 34))\n",
+    command: unit("packages/docker"),
+    expect: "cpuWeightOfShares is runc's conversion, as each share read back",
+  },
+  {
+    name: "a lane's create claims the machine's pid namespace",
+    file: "packages/docker/api.ts",
+    from: '      ...(spec.kind === "observer"\n',
+    to: '      ...(spec.kind === "observer" || spec.kind === "lane"\n',
+    command: unit("packages/docker"),
+    expect: "only the observer's kind gets the machine's pid namespace",
+  },
+  {
+    name: "a lane goes under the services' parent",
+    file: "packages/docker/api.ts",
+    from: '      ...(limits.parent === "services" && target.hasServicesParent\n',
+    to: "      ...(target.hasServicesParent\n",
+    command: unit("packages/docker"),
+    expect:
+      "a service goes under the services' parent only on a target that has one, and a lane never",
+  },
+  {
+    name: "the services' floor leaves out the observer",
+    file: plan,
+    from: "  Object.values(SERVICE_MEMORY).reduce((sum, memory) => {\n",
+    to: '  Object.values({ ...SERVICE_MEMORY, observer: "0" }).reduce((sum, memory) => {\n',
+    command: unit("packages/docker"),
+    expect: "servicesFloorBytes is the sum of every service's memory limit",
+  },
+  {
+    name: "the observer's memory is a literal again",
+    file: plan,
+    from: "  memory: String(observerMemoryBytes()),\n",
+    to: '  memory: "512m",\n',
+    command: unit("packages/docker"),
+    expect:
+      "the observer's memory is its budget's sum, and its server's heap its budget's",
+  },
+  {
+    name: "the observer's server guesses its heap from the cgroup",
+    file: plan,
+    from: "        OBSERVER_HEAP_FLAG,\n",
+    to: "",
+    command: unit("packages/docker"),
+    expect:
+      "the observer's memory is its budget's sum, and its server's heap its budget's",
   },
 ]

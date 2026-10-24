@@ -3,8 +3,8 @@
 - **Status:** Accepted (Duane, 2026-10-22)
 - **Area:** `packages/machine/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `docs/06-interface.md`
-- **Evidence:** S309, S316, S317, S318, S319, S323, S329, S334, S336, S337,
-  S338
+- **Evidence:** S309, S316, S317, S318, S319, S323, S325, S329, S334, S335,
+  S336, S337, S338, S340
 - **Amends:**
   - ADR-0210: of its memory ladder, holding starts and pausing at the gate are
     built now, on every backend; squeezing, freezing into zram and killing are
@@ -32,6 +32,27 @@
     host runs. Bounds on each await a sample makes wait on S336's
     measurements; - a host's close closes its lanehost and observer channels
     (S337), and the host's log tells the time.
+  - 2026-10-24 (S335, S325, S340): the gate acts on a stall only when the
+    machine itself is short. On a whole machine a rung's pressure bounds count
+    only in a sample whose machine-wide reclaim rose (`allocstall_*` or
+    `pgscan_direct`); a stall without it is contained in cgroups at their own
+    limits, which holding lanes cannot relieve, and its bounds read as
+    unmeasured. A host inside a lane, whose machine is its own cgroup, counts
+    its own pressure as before. The available-share bounds read as before:
+    available memory counts the page cache a short machine thrashes, so it
+    cannot be the rule's second half. Each sample records which it read. A
+    lane's or a service's cgroup meeting its `memory.max` for `ENTER_AFTER`
+    samples running is an amber cause, `cgroup-at-limit`; a host in a lane's
+    own cgroup at its limit is recorded and is no cause, since memory's rung
+    names that shortage. On the lane VM the services sit under a parent whose
+    guaranteed floor (`memory.low`) is the sum of their limits, and the OOM
+    killer takes a lane before a service. The observer's memory limit is the
+    sum of its budget: its loader's maps, a capped number of connections, a
+    bound on held notices across every lane, and its server's heap, which Node
+    is told. Left out: `memory.high`, which Docker cannot set, a restart
+    resets, and over anonymous memory stalls a container without end, S334's
+    hour again; and `io.weight`, which does nothing under the lane VM's disk's
+    scheduler.
 
 **Context.** ADR-0210 decided a ladder of six rungs (calm, squeeze, hold
 starts, pause at the gate, freeze into zram, kill one command), all to be

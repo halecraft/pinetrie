@@ -266,8 +266,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no host holds without bound",
     file: policy,
-    from: '  held < bound || notice.event.kind === "end" ? "keep" : "lose"\n',
-    to: '  "keep"\n',
+    from: "  (held.inLane < HELD_PER_LANE &&\n    held.inAll < OBSERVER_BUDGET.heldNoticesMax) ||\n",
+    to: "  true ||\n",
     command: unit,
     expect:
       "a lane holds up to its bound, then counts each loss; an end is always kept",
@@ -513,8 +513,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the machine role's container keeps the network",
     file: "packages/docker/plan.ts",
-    from: '  network: "none",\n  // The kernel',
-    to: '  network: "bridge",\n  // The kernel',
+    from: '  network: "none",\n  memory: String(observerMemoryBytes()),',
+    to: '  network: "bridge",\n  memory: String(observerMemoryBytes()),',
     command: ["pnpm", "exec", "vitest", "run", "packages/docker/api.test.ts"],
     expect:
       "the machine role's container is made with its grant and nothing more",
@@ -680,5 +680,50 @@ export const mutations: readonly Mutation[] = [
     to: "  Number.isSafeInteger(n) && n >= 0 ? (n as StatementIndex) : null\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/core/output.test.ts"],
     expect: "the kernel's statement 0 decodes as no statement",
+  },
+  // ── the observer's budget ──
+  {
+    name: "a lane's held notices ignore every other lane's",
+    file: policy,
+    from: "    held.inAll < OBSERVER_BUDGET.heldNoticesMax) ||\n",
+    to: "    true) ||\n",
+    command: unit,
+    expect:
+      "a notice past the bound across every lane is lost however few its lane holds; an end is kept",
+  },
+  {
+    name: "the observer's server serves every connection",
+    file: "packages/lanehost/observer-server.ts",
+    from: '    if (planned !== "serve") {\n',
+    to: '    if (planned !== "serve" && connections.size < 0) {\n',
+    command: unit,
+    expect:
+      "a connection past the budget's is told so in its hello, and the ones before it are served",
+  },
+  {
+    name: "a full observer's refusal reads as a failed loader",
+    file: policy,
+    from: '    : { kind: "full", connectionsMax: OBSERVER_BUDGET.connectionsMax }\n',
+    to: '    : ({ kind: "failed", why: "full" } as never)\n',
+    command: unit,
+    expect:
+      "a connection past the budget's is refused, saying how many it serves",
+  },
+  {
+    name: "the observer's limit leaves out its connections",
+    file: policy,
+    from: "  OBSERVER_BUDGET.perConnectionBytes * OBSERVER_BUDGET.connectionsMax +\n",
+    to: "",
+    command: unit,
+    expect:
+      "the observer's limit is its budget's sum in whole MiB, and its heap holds every held notice",
+  },
+  {
+    name: "the observer's limit is not whole MiB, so the floor is not whole pages",
+    file: policy,
+    from: "  Math.ceil(\n    (OBSERVER_BUDGET.fixedBytes +",
+    to: "  (x => x)(\n    (OBSERVER_BUDGET.fixedBytes +",
+    command: ["pnpm", "exec", "vitest", "run", "packages/docker"],
+    expect: "the services' floor is whole pages, as the kernel holds it",
   },
 ]

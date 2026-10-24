@@ -132,6 +132,8 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "PerformanceObserver",
   "sanitizeUri",
   "useEffectEvent",
+  // Docker's API, a field pine·trie leaves unset
+  "MemoryReservation",
   // Node, Linux and macOS
   "ERR_MODULE_NOT_FOUND",
   "F_FULLFSYNC",

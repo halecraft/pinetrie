@@ -256,6 +256,12 @@ export interface LeaseInput {
   /** How large the data disk should be at a start this host makes; absent, it is left as it is. */
   readonly growData?: DataDiskPlan
   /**
+   * The services' guaranteed floor a VM this host starts boots with, in
+   * bytes: the caller's, which knows the services. A VM already running
+   * keeps the floor it booted with.
+   */
+  readonly servicesFloorBytes: number
+  /**
    * Told once when a start must wait for the repair lock: another host is
    * starting the VM, or repairing its disk, which the caller words.
    */
@@ -289,6 +295,7 @@ async function leaseOnce(input: LeaseInput): Promise<{
       macMemory: os.totalmem(),
       cpus: os.availableParallelism(),
       gvproxy: gvproxyPath(stateDir, pin),
+      servicesFloorBytes: input.servicesFloorBytes,
     })
     // execute
     if (planned.buildImage) await buildImage(input)

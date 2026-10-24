@@ -1,6 +1,7 @@
 # S335 — Global reclaim tells the lane VM short of memory apart from one cgroup stalled at its own limit: it rose in every sample of a shortage and in none of a cgroup's own stall
 
 - **Status:** Answered
+- **Led to:** ADR-0212
 
 **Why.** The gate's rung reads the VM's `/proc/pressure/memory` and the
 share of memory available, and enters a rung when any bound it names is
@@ -147,7 +148,7 @@ stall: so a cgroup is named by its `max` rising with its own pressure,
 never by `max` alone. Only this kernel (6.18.58) and one shape of each
 load.
 
-**Kept** in `docs/findings/archive/S335-the-machine-short-or-one-cgroup-at-its-limit/`:
+**Kept** in `docs/findings/S335-the-machine-short-or-one-cgroup-at-its-limit/`:
 - `sample.sh`: the 5 s reader, run in the VM's root by a privileged
   container (`nsenter -t 1 -m`): a `root` line and a `cg` line per
   container;

@@ -41,7 +41,15 @@ event, every lane, service or host in a lane's own cgroup whose
 rung's pressure bounds count only in a sample in which the machine's own
 reclaim rose) holds on a long-running machine whose page cache fills its
 memory, where reclaim is routine: whether a cgroup's own stall coincides
-with reclaim from a lane's build there. The services' memory budgets: how
+with reclaim from a lane's build there. Each sample keeps what its
+pressure was read as (`pinetrie_machine_scopes`: the machine's, contained,
+or unmeasured), so the week shows how often a stall was contained and
+whether the rung would have moved without the rule. Each kind's process
+count, CPU share and OOM priority (`CONTAINER_LIMITS`, named in the
+export's heading with the services' floor) are tuned from the week: a
+lane's 16,384 processes holds a nested lane's whole tree, its inner
+Docker and lanes among it, which `verify:all` with Chromium ran under a
+few thousand threads. The services' memory budgets: how
 often, and when, the observer, which fills by connections (S325), and
 lanehost's roles meet their limits, and each lane meets its own. How those
 numbers are changed from then on: an edit of the constants, one set of

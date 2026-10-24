@@ -9,6 +9,7 @@ import {
   lanesChanged,
   lanesMeasured,
   limitEvents,
+  limitEventsMeasured,
   numbersInForce,
   reclaimRise,
   treatmentChanges,
@@ -190,7 +191,7 @@ describe("a cgroup at its limit", () => {
       limitEvents(
         read([laneAt(lane, 2), laneAt(other, 5)], [observerAt(100)]),
         read([laneAt(lane, 2, 3), laneAt(other, 5)], [observerAt(141)]),
-      ),
+      ).causes,
     ).toEqual([
       {
         kind: "cgroup-at-limit",
@@ -213,21 +214,27 @@ describe("a cgroup at its limit", () => {
         read([laneAt(lane, 9)], []),
         read([laneAt(lane, 1), laneAt(other, 7)], [observerAt(4)]),
       ),
-    ).toEqual([])
-    expect(limitEvents(null, read([laneAt(lane, 9)], []))).toEqual([])
+    ).toEqual({ causes: [], own: null })
+    expect(limitEvents(null, read([laneAt(lane, 9)], [], hits(3)))).toEqual({
+      causes: [],
+      own: null,
+    })
   })
 
-  test("a host in a lane's own cgroup is own", () => {
-    expect(limitEvents(read([], [], hits(10)), read([], [], hits(12)))).toEqual(
-      [
-        {
-          kind: "cgroup-at-limit",
-          subject: { kind: "own" },
-          maxHits: 2,
-          highHits: 0,
-        },
-      ],
+  test("an own cgroup's limit hits come back as own, never among the causes", () => {
+    const events = limitEvents(
+      read([], [], hits(10)),
+      read([], [], hits(12, 1)),
     )
+    expect(events).toEqual({ causes: [], own: { max: 2, high: 1 } })
+    expect(limitEventsMeasured(events)).toEqual([
+      {
+        kind: "cgroup-at-limit",
+        subject: { kind: "own" },
+        maxHits: 2,
+        highHits: 1,
+      },
+    ])
   })
 })
 
@@ -236,6 +243,8 @@ test("the numbers in force name the overdue bound's constant and the bound a hos
     sampleEveryMs: 100,
     readingOverdueAfterTicks: 40,
     memoryLimits: null,
+    containerLimits: null,
+    servicesFloorBytes: null,
   })
   expect([
     numbers.READING_OVERDUE_AFTER_TICKS,

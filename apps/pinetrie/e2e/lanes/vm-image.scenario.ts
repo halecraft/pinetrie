@@ -8,6 +8,7 @@
 import { rmSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { servicesFloorBytes } from "@pinetrie/docker"
 import {
   buildVmImageInVm,
   checkImageDir,
@@ -67,6 +68,7 @@ async function run(check: Checks["check"]): Promise<void> {
       slots: 2,
       agent: null,
       log: l => lines.push(l),
+      servicesFloorBytes: servicesFloorBytes(),
       onStartWaiting: () => lines.push("[vm] waiting to start the lane VM"),
     }).then(
       async lease => {

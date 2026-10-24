@@ -8,6 +8,7 @@ import path from "node:path"
 import type {
   CgroupLimitHits,
   CgroupMemory,
+  ControlsReadBack,
   MachineReclaim,
   MemoryCounters,
   Pressure,
@@ -27,11 +28,19 @@ export interface MachineRead {
   /** null where the lanes directory is not on btrfs, or its counters cannot be found. */
   readonly store: StoreRoom | null
   /** Each container asked for, in order; `memory` null when its cgroup was not found. */
-  readonly containers: readonly {
-    readonly id: string
-    readonly memory: CgroupMemory | null
-  }[]
+  readonly containers: readonly ContainerRead[]
+  /** The services' parent's `memory.low`; null where it does not exist, or the tree was not given. */
+  readonly servicesFloor: number | null
 }
+
+/** One container's cgroup as read: its memory, and what it is held to. */
+export interface ContainerRead {
+  readonly id: string
+  readonly memory: CgroupMemory | null
+  readonly controls: ControlsReadBack
+}
+
+const NO_CONTROLS: ControlsReadBack = { processesMax: null, cpuWeight: null }
 
 /** A container's full id, as Docker names its cgroup: never a path of the caller's. */
 export const isContainerId = (id: string): boolean => /^[0-9a-f]{64}$/.test(id)
@@ -158,6 +167,14 @@ export function parseReclaim(vmstat: string): MachineReclaim | null {
 
 /** `memory.max`: bytes, or null for `max`, no ceiling. */
 export function parseMemoryMax(text: string): number | null {
+  return parseCgroupNumber(text)
+}
+
+/**
+ * A cgroup file of one number (`memory.max`, `memory.low`, `pids.max`,
+ * `cpu.weight`): its number, or null for `max` or anything else.
+ */
+export function parseCgroupNumber(text: string): number | null {
   const value = text.trim()
   return value === "max" || !/^\d+$/.test(value) ? null : Number(value)
 }
@@ -190,9 +207,20 @@ export function planBtrfsRoom(input: {
   }
 }
 
-/** Where a container's cgroup may be under the tree, in the order tried: cgroupfs's, then systemd's. */
+/**
+ * The services' parent cgroup at the tree's root, holding their floor
+ * (`memory.low`): the lane VM's `init` makes it at boot, and Docker puts a
+ * service's container under it (`CgroupParent`).
+ */
+export const SERVICES_CGROUP = "pinetrie-services"
+
+/**
+ * Where a container's cgroup may be under the tree, in the order tried:
+ * cgroupfs's, under Docker's own parent or the services', then systemd's.
+ */
 export const cgroupCandidates = (id: string): readonly string[] => [
   `docker/${id}`,
+  `${SERVICES_CGROUP}/${id}`,
   `system.slice/docker-${id}.scope`,
 ]
 
@@ -247,6 +275,50 @@ async function readCgroup(dir: string): Promise<CgroupMemory | null> {
     limitHits: parseLimitHits(events),
     pressure: pressure == null ? null : parsePressure(pressure),
   }
+}
+
+async function readControls(dir: string): Promise<ControlsReadBack> {
+  const [processesMax, cpuWeight] = await Promise.all(
+    ["pids.max", "cpu.weight"].map(f => readOrNull(path.join(dir, f))),
+  )
+  return {
+    processesMax: processesMax == null ? null : parseCgroupNumber(processesMax),
+    cpuWeight: cpuWeight == null ? null : parseCgroupNumber(cpuWeight),
+  }
+}
+
+/**
+ * Each container's cgroup under `tree`, by its full id: its memory and its
+ * controls, each null or empty where its cgroup was not found. A container
+ * not asked for has stopped, and its cgroup is forgotten.
+ */
+export async function readContainers(
+  tree: string | null,
+  ids: readonly string[],
+): Promise<readonly ContainerRead[]> {
+  for (const id of cgroupDirs.keys())
+    if (!ids.includes(id)) cgroupDirs.delete(id)
+  return Promise.all(
+    ids.map(async id => {
+      const dir = tree === null ? null : await findCgroupDir(tree, id)
+      return dir === null
+        ? { id, memory: null, controls: NO_CONTROLS }
+        : {
+            id,
+            memory: await readCgroup(dir),
+            controls: await readControls(dir),
+          }
+    }),
+  )
+}
+
+/** The services' parent's floor under `tree`: its `memory.low`, null where it is not there. */
+export async function readServicesFloor(
+  tree: string | null,
+): Promise<number | null> {
+  if (tree === null) return null
+  const low = await readOrNull(path.join(tree, SERVICES_CGROUP, "memory.low"))
+  return low === null ? null : parseCgroupNumber(low)
 }
 
 async function readCounters(dir: string): Promise<ChunkCounters | null> {
@@ -325,18 +397,11 @@ export async function readMachine(input: {
   ])
   const memory = meminfo === null ? null : parseMeminfo(meminfo)
   if (memory === null) throw new Error("/proc/meminfo could not be read")
-  // A container not asked for has stopped: its cgroup is gone with it.
-  for (const id of cgroupDirs.keys())
-    if (!input.containers.includes(id)) cgroupDirs.delete(id)
-  const containers = await Promise.all(
-    input.containers.map(async id => {
-      const dir =
-        tree && input.cgroup !== null
-          ? await findCgroupDir(input.cgroup, id)
-          : null
-      return { id, memory: dir === null ? null : await readCgroup(dir) }
-    }),
-  )
+  const given = tree ? input.cgroup : null
+  const [containers, servicesFloor] = await Promise.all([
+    readContainers(given, input.containers),
+    readServicesFloor(given),
+  ])
   return {
     memory,
     pressure: pressure === null ? null : parsePressure(pressure),
@@ -344,5 +409,6 @@ export async function readMachine(input: {
     reclaim: vmstat === null ? null : parseReclaim(vmstat),
     store,
     containers,
+    servicesFloor,
   }
 }

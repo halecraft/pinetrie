@@ -43,6 +43,7 @@ const sample: MachineSample = {
   },
   filesystem: null,
   services: [],
+  containment: { kind: "contained" },
   serviceKills: [],
   hostStalledMs: 0,
   snapshotsSkipped: 0,
@@ -65,6 +66,8 @@ const gathered = {
   names: new Map([[a, named]]),
   settings: { max: 200 * GiB, leaveFree: LEAVE_FREE_DEFAULT },
   vmMemoryCeilingBytes: 8 * GiB,
+  servicesFloorBytes: GiB,
+  isOomdManagingLanes: false,
   repairs: false,
 }
 
@@ -128,6 +131,15 @@ describe("the Machine page's facts", () => {
       { lane: a, name: named },
       { lane: b, name: "still-pond" },
     ])
+  })
+
+  test("the page carries the sample's containment, the floor asked and whether systemd-oomd manages the lanes", () => {
+    const facts = planMachinePage(gathered)
+    expect([
+      facts.reading.kind === "sampled" && facts.reading.containment,
+      facts.servicesFloorBytes,
+      facts.isOomdManagingLanes,
+    ]).toEqual([{ kind: "contained" }, GiB, false])
   })
 
   test("the store is against its floor and its setting, and what was not read says why", () => {

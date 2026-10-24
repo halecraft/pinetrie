@@ -495,4 +495,13 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/vm"],
     expect: "a plan for no larger leaves the disk as it is",
   },
+  {
+    name: "the lane VM's init writes no services' floor",
+    file: "packages/vm/image/init",
+    from: '  echo "${services_floor:-0}" > /sys/fs/cgroup/pinetrie-services/memory.low; then\n',
+    to: "  true; then\n",
+    suite: "lanes",
+    scenario: "machine-boundary",
+    expect: "the kernel holds each container to its kind's limits",
+  },
 ]

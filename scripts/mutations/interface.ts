@@ -5073,4 +5073,29 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a branch whose fork lost a turn's files to its base says so",
   },
+  {
+    name: "a Docker with no cgroup driver is worded as a control missed",
+    file: "packages/interface/machine-page.ts",
+    from: '          return "this lane\'s Docker has no cgroup controllers: nothing is contained here"\n',
+    to: '          return "not every limit took"\n',
+    command: unit,
+    expect:
+      "the host says what is contained, the floor it protects, and the OOM priority as set, not read",
+  },
+  {
+    name: "systemd-oomd is never named",
+    file: "packages/interface/machine-page.ts",
+    from: "    ...(view.isOomdManagingLanes\n",
+    to: "    ...(false\n",
+    command: unit,
+    expect: "a host whose lanes systemd-oomd manages says so",
+  },
+  {
+    name: "a cgroup stuck at its limit is worded as killed",
+    file: "packages/interface/machine.ts",
+    from: "      return `${limitSubjectWords(cause.subject, nameOf)} is stuck at its memory limit`\n",
+    to: "      return `${limitSubjectWords(cause.subject, nameOf)} was killed for using too much memory`\n",
+    command: unit,
+    expect: "each cause has its words",
+  },
 ]

@@ -3,13 +3,16 @@
 // own get. On the Mac, Docker's is the lane VM's, through a lease on a slot of
 // it; on Linux, the host's own. Everything after it takes the runtime as given.
 
+import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import { errorText, type MemorySource, OBSERVER_SOCKET } from "@pinetrie/core"
 import {
+  CONTAINER_LIMITS,
   type DockerRuntime,
   type DockerTarget,
+  dockerCgroupDriver,
   dockerRootless,
   dockerRuntime,
   dockerWords,
@@ -18,6 +21,7 @@ import {
   planDockerHost,
   SERVICE_MEMORY,
   SLOT_LABEL,
+  servicesFloorBytes,
   stopSlot,
 } from "@pinetrie/docker"
 import type { Install } from "@pinetrie/install"
@@ -61,6 +65,7 @@ import {
   laneVmRepairControls,
   laneVmRepairRead,
 } from "../machine/repair.ts"
+import type { ContainmentAsked } from "../machine/sensor.ts"
 import type { Build, StartWork } from "../start-checklist.ts"
 import { LANE_MEMORY } from "./setup.ts"
 import {
@@ -123,8 +128,14 @@ export interface MachineReach
   readonly target: StoreTarget
   /** Whose memory is the machine's: a host in a lane reads its own cgroup's. */
   readonly memorySource: MemorySource
+  /** What this host asks of its containers' cgroups beyond each kind's limits, and Docker's driver. */
+  readonly containmentAsked: ContainmentAsked
+  /** systemd-oomd may stop this host's lanes, outside pine·trie (`isOomdManagingLanes`). */
+  readonly isOomdManagingLanes: boolean
   /** The memory limits its services' and lanes' containers are made with. */
   memoryLimits(): MemoryLimits
+  /** What the kernel holds each kind of container to besides its memory. */
+  readonly containerLimits: typeof CONTAINER_LIMITS
   /** The lane VM's repair: its shared state, and what repairs it; null where nothing is repaired. */
   readonly repair: {
     readonly read: () => Promise<RepairRead>
@@ -138,16 +149,19 @@ const machineReach = (
   storeVolume: string,
   target: StoreTarget,
   memorySource: MemorySource,
+  host: Pick<MachineReach, "containmentAsked" | "isOomdManagingLanes">,
   repair: MachineReach["repair"],
 ): MachineReach => ({
   target,
   memorySource,
+  ...host,
   repair,
   runningLanes: () => runtime.runningLanes(),
   runningServices: () => runtime.runningServices(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
   memoryLimits: () => ({ services: SERVICE_MEMORY, lane: LANE_MEMORY }),
+  containerLimits: CONTAINER_LIMITS,
   storeVolume,
   store: {
     listing: () => runtime.storeListing(),
@@ -271,6 +285,31 @@ const imageBuilding =
   (image: ImageBuild): void =>
     input.working({ kind: "build", build: { kind: "image", image } })
 
+/**
+ * Whether systemd-oomd may stop this host's lanes: it runs, and Docker is
+ * rootless, whose containers are leaves under the user's `user@.service`,
+ * which Ubuntu's desktop install has it manage. Rootful Docker's are under
+ * `system.slice`, which its defaults leave alone.
+ */
+export const isOomdManagingLanes = (f: {
+  readonly oomdActive: boolean
+  readonly rootless: boolean
+}): boolean => f.oomdActive && f.rootless
+
+/** Whether `systemd-oomd` is active, asked once of systemd on Linux; its absence or any failure reads false. */
+const isOomdActive = (): Promise<boolean> =>
+  process.platform !== "linux"
+    ? Promise.resolve(false)
+    : new Promise(resolve =>
+        execFile(
+          "systemctl",
+          ["is-active", "systemd-oomd"],
+          { timeout: 5_000 },
+          (error, stdout) =>
+            resolve(error === null && stdout.trim() === "active"),
+        ),
+      )
+
 /** Docker on this machine (Linux): its socket, paths as they are. */
 async function hostDockerFound(
   project: Found["project"],
@@ -289,11 +328,19 @@ async function hostDockerFound(
     hostSocket,
     hostAddress: null,
     remoteHostPaths: false,
+    // A Linux host's cgroups are the person's: its services get their
+    // own limits only.
+    hasServicesParent: false,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
   if (refusal !== null) return refusedWith(dockerWords(refusal))
+  const [rootless, cgroupDriver, oomdActive] = await Promise.all([
+    dockerRootless(target),
+    dockerCgroupDriver(target),
+    isOomdActive(),
+  ])
   const observed = planObserver({
-    rootless: await dockerRootless(target),
+    rootless,
     forwarded: existsSync(OBSERVER_SOCKET),
   })
   if (observed.kind === "refused") return refusedWith(observed.why)
@@ -336,6 +383,10 @@ async function hostDockerFound(
       lanesDir,
       "docker-host",
       observed.kind === "forwarded" ? "own-cgroup" : "whole-machine",
+      {
+        containmentAsked: { servicesFloor: null, cgroupDriver },
+        isOomdManagingLanes: isOomdManagingLanes({ oomdActive, rootless }),
+      },
       null,
     ),
   }
@@ -372,6 +423,7 @@ async function vmFound(
       log,
       building: building(input),
       ...(input.growData === undefined ? {} : { growData: input.growData }),
+      servicesFloorBytes: servicesFloorBytes(),
       onStartWaiting: () =>
         void readRepair().then(read =>
           log(`[vm] ${vmStartWaitWords(isRepairRunning(repairFacts(read)))}`),
@@ -418,6 +470,8 @@ async function vmFound(
     },
     hostAddress: GVPROXY_HOST_ADDRESS,
     remoteHostPaths: true,
+    // The lane VM's `init` makes it at boot, with its floor.
+    hasServicesParent: true,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, null))
   if (refusal !== null) {
@@ -432,6 +486,7 @@ async function vmFound(
     log,
     building: imageBuilding(input),
   })
+  const cgroupDriver = await dockerCgroupDriver(target)
   const held = createShares({
     lease: first,
     ownPort,
@@ -484,10 +539,18 @@ async function vmFound(
       await kept.close()
       await repairBootMade
     },
-    machine: machineReach(runtime, stateDir, "lane-vm", "whole-machine", {
-      read: laneVmRepairRead(stateDir),
-      controls: repairControls,
-    }),
+    machine: machineReach(
+      runtime,
+      stateDir,
+      "lane-vm",
+      "whole-machine",
+      {
+        containmentAsked: { servicesFloor: servicesFloorBytes(), cgroupDriver },
+        // The lane VM's init runs no systemd.
+        isOomdManagingLanes: false,
+      },
+      { read: laneVmRepairRead(stateDir), controls: repairControls },
+    ),
   }
 }
 

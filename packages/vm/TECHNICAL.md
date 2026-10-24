@@ -54,6 +54,17 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
   `sync` on vsock 2377 for the launcher's stop; the clock (below). No
   shell listens on any port. `socat -t 3600`: without it, socat cuts a
   stream 0.5 s after its input ends (S128, S129).
+- **The services' parent and its floor** (`init`, ADR-0212, S340): cgroup2
+  is mounted with `memory_recursiveprot`, so a parent's `memory.low`
+  protects every cgroup under it by itself; `init` makes
+  `/sys/fs/cgroup/pinetrie-services` (lanehost's `SERVICES_CGROUP`, which a
+  host test holds it to), enables `memory`, `pids` and `cpu` in the root's
+  and its `cgroup.subtree_control`, and writes the kernel command line's
+  `lane.services_floor` to its `memory.low`, logging `services' floor: …`
+  or `services' floor not set`. Docker puts lanehost's roles and the
+  observer under it (`CgroupParent`), apart from its own `docker/`, whose
+  floor is none, under which a floor protects nothing. The boot clears it
+  with every other cgroup.
 - **The clock is kept to the RTC** (`clock`, installed as
   `/usr/local/sbin/pinetrie-clock`, started by `init`). The kernel reads
   the RTC, Virtualization's PL031 on the Mac's time, only at boot, and the
@@ -150,13 +161,23 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   `bin/launcher-<hash of the source and entitlements>`. Without Xcode's
   command line tools the lease is refused, naming `xcode-select --install`.
 - **The machine:** `VZLinuxBootLoader` with `Image`, `stage1.cpio` and
-  `psi=1 lane.slots=<n>` (the kernel is built with pressure stall
-  information off by default, and the host reads the machine's and each
-  lane's for its health, S308); `system.erofs` read-only and `data.img`
+  `psi=1 lane.slots=<n> lane.services_floor=<bytes>` (the kernel is built
+  with pressure stall information off by default, and the host reads the
+  machine's and each lane's for its health, S308; the floor is the
+  services', which `init` writes); `system.erofs` read-only and `data.img`
   (256 GiB sparse) as disks; NAT; a console to `console.log`; entropy; vsock; and
   `<n>` share devices `slot0` … `slot<n-1>`, each an empty directory at
   boot. Its memory is a quarter of the Mac's, between 4 and 16 GiB
   (`vmMemoryCeiling`), and it has every CPU.
+- **The services' floor is the booting launcher's argument**
+  (`LauncherFacts.servicesFloorBytes`, the last of `launcherArgs`): the
+  host passes the docker package's `servicesFloorBytes` to `leaseVm`, which
+  holds no dependency for it. It is not in the launcher's hash or the
+  image's key, so a host whose floor differs (another version's budget)
+  joins the running VM, and every host on it shares the floor of whichever
+  started it; a changed floor applies from the VM's next start (an idle
+  stop, or a changed launcher or image), as the data disk's growth does.
+  The Machine page says so when the floor read back is not this host's.
 - **Disks are attached with synchronization `fsync`, caching `cached`.**
   Apple's defaults, `full` and `automatic`, made every `docker run` about
   500 ms (S129). The host decides them (`LAUNCHER_DISKS`, `plan.ts`) and

@@ -1236,17 +1236,31 @@ async function openHost(
 
   progress.begin("listening")
   // What the measurements' export and the diagnostics say they were measured on.
-  const measuredOn: MeasuredOn = {
+  const reach = found?.kind === "found" ? found.machine : null
+  const measuredFixed = {
     version: await hostVersion(install.root),
-    backend: found?.kind === "found" ? found.machine.target : null,
-    source: found?.kind === "found" ? found.machine.memorySource : null,
+    backend: reach?.target ?? null,
+    source: reach?.memorySource ?? null,
     numbers: numbersInForce({
       sampleEveryMs: machineOptions.sampleEveryMs ?? MACHINE_SAMPLE_MS,
       readingOverdueAfterTicks:
         machineOptions.readingOverdueAfterTicks ?? READING_OVERDUE_AFTER_TICKS,
-      memoryLimits:
-        found?.kind === "found" ? found.machine.memoryLimits() : null,
+      memoryLimits: reach?.memoryLimits() ?? null,
+      containerLimits: reach?.containerLimits ?? null,
+      servicesFloorBytes: reach?.containmentAsked.servicesFloor ?? null,
     }),
+    isOomdManagingLanes: reach?.isOomdManagingLanes ?? false,
+  }
+  /** Read at each export: its containment is the latest sample's. */
+  const measuredOn = (): MeasuredOn => {
+    const reading = machine?.latestReading() ?? null
+    const sampled =
+      reading === null
+        ? null
+        : reading.kind === "fresh"
+          ? reading.sample
+          : (reading.last?.sample ?? null)
+    return { ...measuredFixed, containment: sampled?.containment ?? null }
   }
   const machinePage = () =>
     machine === null
@@ -1259,6 +1273,8 @@ async function openHost(
           session,
           settings: storeSettings(settled),
           target: machine.target,
+          servicesFloorBytes: reach?.containmentAsked.servicesFloor ?? null,
+          isOomdManagingLanes: reach?.isOomdManagingLanes ?? false,
         })
   const server = await startHttp({
     port,

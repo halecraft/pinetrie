@@ -160,6 +160,27 @@ host, whatever their projects.
   refused, whatever the origins. Only its owner unregisters it
   (`planUnregister`). Registrations are planned one at a time, so two
   cannot both install one namespace.
+- **The observer has a budget** (`OBSERVER_BUDGET`, ADR-0212, S325): its
+  loader's maps (allocated whole at load) and server, a capped number of
+  connections each a Node process of up to 48 MiB, held notices of about
+  400 bytes each up to a bound across every lane, and its server's heap.
+  Its memory limit is their sum (`observerMemoryBytes`), in whole MiB, so
+  nothing it is allowed to do can fill it and the services' floor, the sum
+  of their limits, is whole pages, as the kernel holds it; and its server's Node is told its heap's
+  ceiling (`observerHeapBytes`, the server's own heap and every held
+  notice), which Node would otherwise size from the cgroup's limit and run
+  out of first.
+  - **A connection past `connectionsMax` is refused** (`planConnection`):
+    its hello's loader is `{ kind: "full", connectionsMax }`, the socket
+    then closed, and the connection never counted. The client words it
+    (`loaderRefusal`) as the observer serving as many hosts' connections as
+    its memory holds, never as a kernel's failure; a relay passes the hello
+    on as it is, so a host inside a lane refused this way says so.
+  - **Held notices are bounded per lane and across every lane**
+    (`planHeld`): a notice is kept only while its lane holds fewer than
+    `HELD_PER_LANE` and every lane together fewer than
+    `OBSERVER_BUDGET.heldNoticesMax`; past either it is a loss, counted. A
+    run's `end` is always kept.
 - **A host gone keeps its lanes' runs:** a connection's end leaves its
   lanes registered and pinned, their notices held until a connection
   reclaims them, as a host does after it restarts, one unregisters them,
@@ -305,8 +326,16 @@ host, whatever their projects.
   free while every write failed (S314).
 - **A container is named by its full id,** refused otherwise, since the id
   builds a path. Its cgroup is looked for under the tree where cgroupfs
-  puts it, then systemd (`cgroupCandidates`), and the one found is kept
-  in the role's memory while the container is still asked for.
+  puts it, under Docker's own parent or the services' (`SERVICES_CGROUP`,
+  where the lane VM's services run), then systemd (`cgroupCandidates`), and
+  the one found is kept in the role's memory while the container is still
+  asked for (`readContainers`).
+- **What each container is held to is read back** (`ControlsReadBack`,
+  ADR-0210, S340): its `pids.max` and `cpu.weight`, each null where the
+  file is missing or reads `max`, and the services' parent's `memory.low`
+  (`MachineRead.servicesFloor`, `readServicesFloor`), null where it does not
+  exist. Two small files per container, read with its memory each sample.
+  What they mean is the machine package's (`planContainment`).
 
 ## One host per project (`start-serving.ts`, S326, ADR-0210)
 

@@ -49,6 +49,11 @@ export type MachineCause =
   | { readonly kind: "lane-oom-killed"; readonly lane: ThreadId }
   /** A process in a service's container was killed at its memory limit. */
   | { readonly kind: "service-oom-killed"; readonly service: MachineService }
+  /**
+   * A service's or a lane's cgroup keeps meeting its memory limit: it
+   * stalls there, and nothing kills it.
+   */
+  | { readonly kind: "cgroup-at-limit"; readonly subject: CauseLimitSubject }
   /** The host's event loop stalled, the longest in ms. */
   | { readonly kind: "host-stalls"; readonly stalledMs: number }
   /** Turns whose snapshot was skipped since the last sample: its index row could not be written. */
@@ -82,6 +87,18 @@ export type MachineCause =
       readonly reason: UnsampledReason
       readonly error: string | null
     }
+
+/** A cgroup the host reads: a lane's, a service's, or a host in a lane's own. */
+export type LimitSubject =
+  | { readonly kind: "lane"; readonly lane: ThreadId }
+  | { readonly kind: "service"; readonly service: MachineService }
+  | { readonly kind: "own" }
+
+/**
+ * A cgroup a cause may name at its limit: never a host in a lane's own,
+ * whose limit is the machine's shortage, which memory's rung names already.
+ */
+export type CauseLimitSubject = Exclude<LimitSubject, { readonly kind: "own" }>
 
 export const MACHINE_SERVICES = ["disks", "privileged", "observer"] as const
 
@@ -171,6 +188,38 @@ export interface CgroupLimitHits {
   readonly max: number
   readonly high: number
 }
+
+/** What a container's cgroup says it is held to; null where a file is missing or reads `max`. */
+export interface ControlsReadBack {
+  /** `pids.max`. */
+  readonly processesMax: number | null
+  /** `cpu.weight`. */
+  readonly cpuWeight: number | null
+}
+
+/** A control the kernel was asked to hold a container to, and can be read back. */
+export const CONTAINMENT_CONTROLS = [
+  "processes",
+  "cpu-weight",
+  "services-floor",
+] as const
+export type ContainmentControl = (typeof CONTAINMENT_CONTROLS)[number]
+
+/**
+ * What took effect of the controls each container was made with, read
+ * from the cgroups and never from Docker's answer: every one, or which are
+ * missing and why, when the host knows. A Docker with no cgroup driver (a
+ * nested lane's) accepts every control and applies none.
+ */
+export type Containment =
+  | { readonly kind: "contained" }
+  | {
+      readonly kind: "not-contained"
+      /** In `CONTAINMENT_CONTROLS`' order. */
+      readonly missing: readonly ContainmentControl[]
+      /** Docker reports no cgroup driver, or a control does not read back as asked. */
+      readonly why: "no-cgroup-driver" | "not-read-back"
+    }
 
 /**
  * What a host reads as the machine's memory: the whole machine's, or, for a

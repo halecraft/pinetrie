@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto"
 import {
   type Attribution,
+  assertNever,
   decodeOutputEvent,
   decodeRunEvent,
   OBSERVER_SOCKET,
@@ -263,10 +264,15 @@ export type ObserverCall =
 export interface ObserverHello {
   /** The role's version (`observerVersion`), its image's tag and its container's name alike. */
   readonly version: string
-  /** The loader as it started: ready, or what it said when it failed. */
+  /**
+   * The loader as it started: ready, or what it said when it failed; or
+   * this connection refused, the role serving as many as its budget holds
+   * (`planConnection`).
+   */
   readonly loader:
     | { readonly kind: "ready" }
     | { readonly kind: "failed"; readonly why: string }
+    | { readonly kind: "full"; readonly connectionsMax: number }
   /**
    * Whether the loader's attribution hooks all attached (`planAttribution`).
    * Required, so whatever serves a hello, a relay included, says it. A
@@ -409,17 +415,74 @@ export const routeEvent = (
 /** How many notices a lane with no host may hold: past it, each is a loss. */
 export const HELD_PER_LANE = 100_000
 
+const MiB = 1024 ** 2
+
+/**
+ * The observer's memory, by what it holds: the limit is the sum of what
+ * it is allowed to hold, so nothing it is allowed to do can fill it. Each
+ * is measured, with room: a connection's process is 28 MB idle and 42 MB
+ * after it carried traffic, a held notice about 390 bytes.
+ */
+export const OBSERVER_BUDGET = {
+  /** The loader's maps, allocated whole at load (177 MB), and the server's own (44 MB). */
+  fixedBytes: 256 * MiB,
+  /** One connection's process, after it has carried traffic. */
+  perConnectionBytes: 48 * MiB,
+  connectionsMax: 12,
+  /** One held notice. */
+  perHeldNoticeBytes: 400,
+  /** Held notices across every lane with no host. */
+  heldNoticesMax: 200_000,
+  /** The server's own heap, besides what it holds: about 6 MB after a collection. */
+  serverHeapBytes: 32 * MiB,
+} as const
+
+/** The server's heap ceiling (`--max-old-space-size`): its own heap and every held notice. */
+export const observerHeapBytes = (): number =>
+  OBSERVER_BUDGET.serverHeapBytes +
+  OBSERVER_BUDGET.perHeldNoticeBytes * OBSERVER_BUDGET.heldNoticesMax
+
+/**
+ * The observer's memory limit, computed from its budget: the fixed share,
+ * every connection, and the heap's ceiling, in whole MiB. The kernel holds
+ * a floor in whole pages, so the services' floor, the sum of their limits,
+ * reads back as written only when each limit is.
+ */
+export const observerMemoryBytes = (): number =>
+  Math.ceil(
+    (OBSERVER_BUDGET.fixedBytes +
+      OBSERVER_BUDGET.perConnectionBytes * OBSERVER_BUDGET.connectionsMax +
+      observerHeapBytes()) /
+      MiB,
+  ) * MiB
+
+/**
+ * A connection served, or refused once `open` connections are as many as
+ * the budget holds: each is a process in the observer's cgroup, and nothing
+ * else bounds their number. A refused one is told why in its hello.
+ */
+export const planConnection = (
+  open: number,
+): "serve" | Extract<ObserverHello["loader"], { readonly kind: "full" }> =>
+  open < OBSERVER_BUDGET.connectionsMax
+    ? "serve"
+    : { kind: "full", connectionsMax: OBSERVER_BUDGET.connectionsMax }
+
 /**
  * A held notice kept, or counted lost against its run once its lane holds
- * `bound` already: a host that never comes back cannot hold the machine's
- * memory.
+ * `HELD_PER_LANE` or every lane together `OBSERVER_BUDGET.heldNoticesMax`:
+ * a host that never comes back cannot hold the machine's memory, however
+ * many lanes it left. An end is always kept, so a run's end is never lost.
  */
 export const planHeld = (
-  held: number,
-  bound: number,
+  held: { readonly inLane: number; readonly inAll: number },
   notice: ObserverNotice,
 ): "keep" | "lose" =>
-  held < bound || notice.event.kind === "end" ? "keep" : "lose"
+  (held.inLane < HELD_PER_LANE &&
+    held.inAll < OBSERVER_BUDGET.heldNoticesMax) ||
+  notice.event.kind === "end"
+    ? "keep"
+    : "lose"
 
 /**
  * The notices a lane's new host is sent first: what was held, each run's
@@ -743,10 +806,19 @@ export const planObserver = (facts: ObserverFacts): ObserverPlan =>
         }
 
 /** Why lanes are refused, from the machine role's hello; null when its loader is ready. */
-export const loaderRefusal = (hello: ObserverHello): string | null =>
-  hello.loader.kind === "ready"
-    ? null
-    : `the observer that attributes a lane's file calls cannot load on this machine's kernel (it needs Linux 5.17 or later with BTF and kprobes): ${hello.loader.why}`
+export function loaderRefusal(hello: ObserverHello): string | null {
+  const { loader } = hello
+  switch (loader.kind) {
+    case "ready":
+      return null
+    case "failed":
+      return `the observer that attributes a lane's file calls cannot load on this machine's kernel (it needs Linux 5.17 or later with BTF and kprobes): ${loader.why}`
+    case "full":
+      return `the machine's observer serves ${loader.connectionsMax} hosts' connections already, as many as its memory holds`
+    default:
+      return assertNever(loader)
+  }
+}
 
 /** The machine role's socket, in its container: each host's channel is one connection. */
 export const MACHINE_SOCKET = "/run/observer/observer.sock"

@@ -1,7 +1,7 @@
 // docker/facts — what Docker and the lanes directory say, gathered.
 
 import { readFile, stat } from "node:fs/promises"
-import { securityOptions } from "./api.ts"
+import { cgroupDriver, securityOptions } from "./api.ts"
 import { docker } from "./cli.ts"
 import { type DockerHostFacts, isRootless, parseMountinfo } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
@@ -54,3 +54,12 @@ export const hostPathExists = (p: string): Promise<boolean> =>
 export const dockerRootless = async (
   target: Pick<DockerTarget, "socket">,
 ): Promise<boolean> => isRootless(await securityOptions(target))
+
+/**
+ * Docker's cgroup driver, read once at the host's start, beside whether it
+ * is rootless: `none` (a nested lane's rootless Docker without systemd)
+ * accepts every limit and applies none, though `docker inspect` shows them.
+ */
+export const dockerCgroupDriver = (
+  target: Pick<DockerTarget, "socket">,
+): Promise<string | null> => cgroupDriver(target)

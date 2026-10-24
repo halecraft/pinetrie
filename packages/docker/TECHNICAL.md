@@ -46,6 +46,34 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   from a `ContainerSpec`, a value: `createBody` turns it into the API's
   create, and its hash is its spec label, so it no longer depends on the
   order of flags. Every container runs `--init`.
+- **Each container is held to its kind's limits** (ADR-0210, ADR-0212,
+  S340). `ContainerSpec.kind` (`ContainerKind`: a lane, or a lanehost role
+  or the observer) is set by each renderer, and its limits are read from
+  one table by it (`CONTAINER_LIMITS`), never given per spec: `createBody`
+  writes its `PidsLimit`, `CpuShares` (Docker writes `cpu.weight`, read back
+  as `cpuWeightOfShares`) and `OomScoreAdj`. A service goes under the
+  services' parent (`CgroupParent`, lanehost's `SERVICES_CGROUP`) only on a
+  target that has one (`DockerTarget.hasServicesParent`): the lane VM's,
+  whose `init` makes it with the services' floor (`servicesFloorBytes`, the
+  sum of `SERVICE_MEMORY`, so they are protected up to their own limits
+  and no further; `packages/vm/TECHNICAL.md`). On Linux the cgroups are the
+  person's, and a service gets its own limits only. A lane's process count
+  holds its whole tree, a nested lane's inner Docker and inner lanes among
+  it. The machine's pid namespace, read-only root and tmpfs are the
+  observer's kind's alone, so no spec can claim them for another kind.
+  What each kind should read back is `wantedControls`, which the host's
+  sensor hands to the machine package's containment.
+- **What `createBody` does not set, and why** (S340): `memory.high` has no
+  field, a restart resets one written by hand, and over anonymous memory it
+  stalls a container without ever killing it; a reservation
+  (`MemoryReservation`, `memory.low`) protects nothing under Docker's own
+  parent, which has no floor, so the floor is the services' parent's;
+  `io.weight` does nothing under the lane VM's disk's scheduler.
+- **Gotcha: `docker inspect` shows limits that took no effect.** A Docker
+  whose `CgroupDriver` is `none` (a nested lane's rootless one) accepts
+  every limit and applies none, while `docker inspect` shows each as
+  asked; only its cgroups say what holds (`dockerCgroupDriver`, read once
+  at the host's start, and lanehost's `machine-sample`).
 - **What the CLI did for a flag, `createBody` does:** `seccomp=<path>`
   becomes the profile's content, read when the container is made, and
   `systempaths=unconfined` empties the masked and read-only paths. A
@@ -365,8 +393,11 @@ directory, so the person's hosts are untouched. Its checks:
   `CAP_PERFMON` and `CAP_SYS_PTRACE`, Docker's own seccomp profile, the
   host's pid namespace (its own cgroup namespace: nothing it does reads
   cgroups), a read-only root with a tmpfs at
-  `/run`, no network, removed when it exits (`ContainerSpec.machine`). A
-  test checks its body exactly (`api.test.ts`).
+  `/run`, no network, removed when it exits (its kind's, in `createBody`).
+  Its memory is lanehost's `observerMemoryBytes`, its budget's sum, and its
+  server's Node is given `--max-old-space-size` from `observerHeapBytes`,
+  so its heap's ceiling is the budget's, not Node's guess from the
+  cgroup's limit. A test checks its body exactly (`api.test.ts`).
 - **Made or joined by name, as a lane's container is** (`openObserver`,
   through `ensureContainer`, `runtime.ts`): every host of a version
   renders the same spec, so each joins the one running, and a failed

@@ -16,6 +16,7 @@ const linux: DockerTarget = {
   hostSocket: null,
   hostAddress: null,
   remoteHostPaths: false,
+  hasServicesParent: false,
 }
 
 test("a runtime builds its base in its own project's scratch lane", () => {

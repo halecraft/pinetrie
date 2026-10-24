@@ -26,4 +26,10 @@ export interface DockerTarget {
    * observer reads a shared directory's that way.
    */
   readonly remoteHostPaths: boolean
+  /**
+   * The services' parent cgroup (`SERVICES_CGROUP`) exists, with its
+   * floor: the lane VM's, which its `init` makes at boot. Elsewhere the
+   * cgroups are the person's, and a service gets its own limits only.
+   */
+  readonly hasServicesParent: boolean
 }

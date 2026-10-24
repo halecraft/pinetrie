@@ -130,4 +130,31 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "close ends the channel, and a call after it is refused",
   },
+  {
+    name: "a service's cgroup is not looked for under the services' parent",
+    file: "packages/lanehost/machine.ts",
+    from: "  `${SERVICES_CGROUP}/${id}`,\n",
+    to: "",
+    command: unit,
+    expect:
+      "a service under the services' parent is found and read, as a lane under Docker's own",
+  },
+  {
+    name: "a container's controls are not read",
+    file: "packages/lanehost/machine.ts",
+    from: "            controls: await readControls(dir),\n",
+    to: "            controls: NO_CONTROLS,\n",
+    command: unit,
+    expect:
+      "the controls read from pids.max and cpu.weight, and max reads null",
+  },
+  {
+    name: "the services' floor is read from Docker's parent",
+    file: "packages/lanehost/machine.ts",
+    from: '  const low = await readOrNull(path.join(tree, SERVICES_CGROUP, "memory.low"))\n',
+    to: '  const low = await readOrNull(path.join(tree, "docker", "memory.low"))\n',
+    command: unit,
+    expect:
+      "the services' floor is their parent's memory.low, and none where it is not there",
+  },
 ]

@@ -1,6 +1,7 @@
 # S340 — On the lane VM, Docker sets `memory.low`, `pids.max`, `cpu.weight`, `io.max` and `oom_score_adj`, and each acts (`memory.low` only under a parent with its own); `memory.high` has no field; a nested lane's rootless Docker drops them all without a word
 
 - **Status:** Answered
+- **Led to:** ADR-0210, ADR-0212
 
 **Why.** pine·trie keeps the machine healthy with code of its own: a gate
 that holds lanes on memory pressure (ADR-0212), and a hard memory limit
@@ -310,7 +311,7 @@ reads. The real observer and lanehost as the services (stand-ins of the
 same size here). A long-running VM whose page cache is full. Only this
 kernel and Docker 29.5.2 outside, 29.8.2 inside.
 
-**Kept** in `docs/findings/archive/S340-cgroup-controls-through-docker/`, run
+**Kept** in `docs/findings/S340-cgroup-controls-through-docker/`, run
 from `sandbox/machine-spikes/s-cgroups/` beside S308's `vm.sh`:
 - `env.sh`: the spike VM's Docker, a shell in the VM's root and a
   read-back of one container's cgroup; `sample.sh`: the 5 s reader
