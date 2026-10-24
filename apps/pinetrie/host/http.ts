@@ -13,7 +13,12 @@ import {
   type WebsocketServerTransport,
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
-import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
+import {
+  type BlobStore,
+  errorText,
+  type MachinePageFacts,
+  type Sha256,
+} from "@pinetrie/core"
 import type { ReviewAsk } from "@pinetrie/rules"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
@@ -23,6 +28,7 @@ import type { PageSource } from "./page.ts"
 import {
   blobResponse,
   type HttpAnswer,
+  machineResponse,
   reviewResponse,
   uploaded,
   uploadRefusal,
@@ -73,6 +79,11 @@ export async function startHttp(input: {
   readonly measurements: {
     readonly store: Pick<HostMeasurements, "exportRows">
     readonly heading: Readonly<Record<string, string | number | null>>
+  }
+  /** The Machine page's reads: its facts, null where the host reads no machine; and its diagnostics' text. */
+  readonly machine: {
+    readonly facts: () => MachinePageFacts | null
+    readonly diagnostics: () => Promise<string>
   }
   readonly log: (message: string) => void
 }): Promise<RunningHttp> {
@@ -142,14 +153,21 @@ export async function startHttp(input: {
           JSON.stringify({ ...heading, days: to.days }),
           ...store.exportRows(to.days),
         ]
-        res
-          .writeHead(200, {
-            "content-type": "application/x-ndjson; charset=utf-8",
-            "cache-control": "no-store",
-          })
-          .end(`${lines.join("\n")}\n`)
+        send(res, machineResponse("measurements", `${lines.join("\n")}\n`))
         return
       }
+      case "machine":
+        send(
+          res,
+          machineResponse("facts", JSON.stringify(input.machine.facts())),
+        )
+        return
+      case "machine-diagnostics":
+        void input.machine.diagnostics().then(
+          text => send(res, machineResponse("diagnostics", text)),
+          () => res.writeHead(500).end(),
+        )
+        return
       case "bad":
         res.writeHead(400).end()
         return

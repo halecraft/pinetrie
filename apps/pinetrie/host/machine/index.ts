@@ -3,6 +3,7 @@
 // services' kills on, and the timer that asks it for a sample. The timer is
 // the host's: the manager reads no clock.
 
+import { MACHINE_SAMPLE_MS } from "@pinetrie/core"
 import { machineWords } from "@pinetrie/interface"
 import {
   createMachineManager,
@@ -12,10 +13,11 @@ import {
   type MachineSensor,
   type ManageMode,
   type ManagerNews,
-  planCapabilities,
+  planStoreCapabilities,
   type SnapshotIndex,
   type StoreRecords,
   type StoreSettings,
+  type StoreTarget,
 } from "@pinetrie/machine"
 import { readThreadName } from "@pinetrie/reads"
 import type { SessionDocHandle } from "@pinetrie/schema"
@@ -26,8 +28,6 @@ import type { MachineReach } from "../work/runtime.ts"
 import { createSensor } from "./sensor.ts"
 import { createHealthSink } from "./sink.ts"
 
-/** How often the machine is sampled. */
-export const MACHINE_SAMPLE_MS = 5_000
 /** How often the disk upkeep runs with nothing to trigger it: a backstop, never what decides. */
 export const DISK_UPKEEP_EVERY_MS = 15 * 60_000
 
@@ -45,7 +45,7 @@ export function newsLine(news: ManagerNews, session: SessionDocHandle): string {
     case "unmeasured":
       return `[host] the machine: its measurements were not written: ${news.error}`
     case "repair":
-      return `[host] the lane VM's disk repair: ${news.from.kind} to ${news.to.kind}${news.to.kind === "failed" ? `: ${news.to.why}` : ""}`
+      return `[host] the lane VM's disk repair: ${news.from.kind} to ${news.to.kind}${news.to.kind === "failed" ? `: ${news.to.why}` : news.to.kind === "detected" && news.to.trigger === "asked-again" ? ", asked for again" : ""}`
     case "repair-not-run":
       return `[host] the lane VM's disk was not repaired: ${news.why}`
   }
@@ -62,6 +62,14 @@ export interface MachineWatchOptions {
 export interface MachineWatch {
   /** What a lane's gate and its start wait on: its treatment allowing it. */
   readonly waitUntilAllowed: MachineManager["waitUntilAllowed"]
+  /** What the Machine page shows: the manager's last reading. */
+  readonly latestReading: MachineManager["latestReading"]
+  /** Whether this host holds the lane VM's repair's controls: it manages, and the disk can be repaired. */
+  readonly repairs: boolean
+  /** A person asked for the failed repair again: the next sample takes it. */
+  readonly askRepairAgain: () => void
+  /** Where the store is: what the page's Machine section says of the lane VM. */
+  readonly target: StoreTarget
   /** Takes each of the host's stalls, for the next sample. */
   hearStall(stall: Stall): void
   /** A turn's snapshot skipped, its index row unwritten: counted in the next sample. */
@@ -95,7 +103,13 @@ export async function startMachineWatch(deps: {
 }): Promise<MachineWatch> {
   const kills = deps.reach.watchServiceKills()
   const sensor = createSensor(deps.reach, kills)
-  const capabilities = planCapabilities(deps.reach.target)
+  const capabilities = planStoreCapabilities(deps.reach.target)
+  // Made only where the disk can be repaired and this host manages:
+  // observing, or on Linux, no path reaches a VM's stop.
+  const repair =
+    deps.mode === "manage" && capabilities.repairDisk
+      ? (deps.reach.repair?.controls ?? null)
+      : null
   const manager = createMachineManager({
     sensor: deps.options.wrapSensor?.(sensor) ?? sensor,
     sink: createHealthSink(deps),
@@ -108,12 +122,7 @@ export async function startMachineWatch(deps: {
     laneFacts: deps.laneFacts,
     measurements: deps.measurements,
     readRepair: deps.reach.repair?.read ?? null,
-    // Made only where the disk can be repaired and this host manages:
-    // observing, or on Linux, no path reaches a VM's stop.
-    repair:
-      deps.mode === "manage" && capabilities.repairDisk
-        ? (deps.reach.repair?.controls ?? null)
-        : null,
+    repair,
     tell: news => deps.log(newsLine(news, deps.session)),
   })
   await manager.start()
@@ -132,6 +141,10 @@ export async function startMachineWatch(deps: {
   return {
     waitUntilAllowed: (lane, activity, signal) =>
       manager.waitUntilAllowed(lane, activity, signal),
+    latestReading: () => manager.latestReading(),
+    repairs: repair !== null,
+    askRepairAgain: () => manager.askRepairAgain(),
+    target: deps.reach.target,
     hearStall: stall => sensor.hearStall(stall),
     noteSnapshotSkipped: () => manager.noteSnapshotSkipped(),
     upkeep: manager,

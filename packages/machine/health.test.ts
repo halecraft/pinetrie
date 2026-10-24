@@ -45,6 +45,7 @@ const calm: MachineSample = {
     metadata: { total: 4 * GiB, used: GiB },
   },
   filesystem: { size: 1000 * GiB, free: 500 * GiB },
+  services: [],
   serviceKills: [],
   hostStalledMs: 0,
   snapshotsSkipped: 0,

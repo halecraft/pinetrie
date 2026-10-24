@@ -4,13 +4,18 @@
 
 import type {
   CgroupMemory,
+  HeldLane,
+  MachineHealth,
   MachineService,
   MemoryCounters,
   MemorySource,
   Pressure,
+  ServiceReading,
   StoreRoom,
   ThreadId,
 } from "@pinetrie/core"
+import type { RepairFacts } from "./repair.ts"
+import type { Rung } from "./rung.ts"
 
 /** One lane's cgroup. */
 export interface LaneSample extends CgroupMemory {
@@ -40,6 +45,11 @@ export interface MachineSample {
   /** The filesystem holding the store, in bytes. */
   readonly filesystem: { readonly size: number; readonly free: number } | null
   /**
+   * Each lanehost role's and the observer's memory, or why it was not read:
+   * a host in a lane reads no observer, which is the host outside's.
+   */
+  readonly services: readonly ServiceReading[]
+  /**
    * Each service killed for memory since the last sample, once per kill.
    * Heard, not counted: the observer's container goes with its kill.
    */
@@ -50,6 +60,16 @@ export interface MachineSample {
   readonly snapshotsSkipped: number
   /** What the last upkeep step found: the manager's, not the sensor's. */
   readonly upkeep: UpkeepHeard
+}
+
+/** The last sample that read, and what the step that took it, or a later one, planned. */
+export interface MachineReading {
+  readonly sample: MachineSample
+  readonly health: MachineHealth
+  readonly rung: Rung
+  /** The lanes held as last applied: memory's, or every lane while a repair runs. */
+  readonly held: readonly HeldLane[]
+  readonly repair: RepairFacts
 }
 
 /** What the disk upkeep's last step found, with the store's room under its floor. */

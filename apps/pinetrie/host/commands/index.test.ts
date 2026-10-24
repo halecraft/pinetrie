@@ -61,7 +61,13 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
 
 function setUp(
   work: Partial<CommandDeps["work"]> = {},
-  { writes = true }: { readonly writes?: boolean } = {},
+  {
+    writes = true,
+    repairAgain = null,
+  }: {
+    readonly writes?: boolean
+    readonly repairAgain?: CommandDeps["repairAgain"]
+  } = {},
 ) {
   const b = basics()
   const cards = record<CommandDeps["cards"]>({
@@ -127,6 +133,7 @@ function setUp(
     titles: titles.port,
     keeper,
     later: { step: async () => {} },
+    repairAgain,
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }
@@ -196,6 +203,32 @@ test("a publish to a folder project and a restore to a jj project are each refus
   ).toEqual([
     ["p-1", "refused", ERR.REFUSED],
     ["r-1", "refused", ERR.REFUSED],
+  ])
+})
+
+test("repair again is asked of a host holding the repair's controls, and refused as no command of its own by one without", async () => {
+  let asked = 0
+  const holds = setUp({}, { repairAgain: () => void asked++ })
+  const lacks = setUp()
+  await holds.commands.handle(holds.sender, ALICE, {
+    id: "a-1",
+    kind: "repair-again",
+  })
+  await lacks.commands.handle(lacks.sender, ALICE, {
+    id: "a-2",
+    kind: "repair-again",
+  })
+  expect([
+    asked,
+    ...[...holds.replies, ...lacks.replies].map(r => [
+      r.id,
+      r.outcome,
+      r.errorCode,
+    ]),
+  ]).toEqual([
+    1,
+    ["a-1", "repair-asked", ""],
+    ["a-2", "refused", ERR.UNKNOWN_KIND],
   ])
 })
 

@@ -3,6 +3,7 @@
 
 import {
   type ErrCode,
+  type EventMeasured,
   errorText,
   type RootId,
   type ThreadId,
@@ -31,6 +32,8 @@ export interface Basics {
    */
   readonly places: PlacesDocHandle
   readonly log: (message: string) => void
+  /** Kept in the machine's measurements, for the Machine page's Lately; one that cannot be written is logged. */
+  readonly recordEvent: (event: EventMeasured) => void
   readonly newId: () => string
   readonly now: () => number
 }
@@ -151,10 +154,17 @@ export const compactionLine = (c: {
 }): string =>
   `[host] compacted ${c.docId} (${c.records} record${c.records === 1 ? "" : "s"}, ${Math.round(c.bytes / 1000)} KB) in ${Math.round(c.ms)} ms`
 
-/** An `onSlow` handler that logs `slowStepLine`. */
+/** An `onSlow` handler that logs `slowStepLine`, and records it. */
 export function slow(
-  basics: Pick<Basics, "log">,
+  basics: Pick<Basics, "log" | "recordEvent">,
   where?: string,
 ): (step: SlowStep & { readonly split?: StepSplit }) => void {
-  return s => basics.log(slowStepLine(where, s))
+  return s => {
+    basics.log(slowStepLine(where, s))
+    basics.recordEvent({
+      kind: "slow-step",
+      where: where ?? null,
+      ms: Math.round(s.ran),
+    })
+  }
 }

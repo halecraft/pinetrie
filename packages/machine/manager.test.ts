@@ -28,7 +28,11 @@ import {
   type RepairOutcome,
 } from "./repair.ts"
 import type { SensedSample } from "./sample.ts"
-import type { SnapshotIndex, SnapshotRow } from "./snapshot-index.ts"
+import {
+  type SnapshotIndex,
+  type SnapshotRow,
+  snapshotCost,
+} from "./snapshot-index.ts"
 import type { StoreListed, StoreRecords } from "./store.ts"
 import { LEAVE_FREE_DEFAULT, type StoreSettings } from "./store-settings.ts"
 
@@ -52,6 +56,7 @@ const calm: SensedSample = {
   lanesRunning: [],
   store: null,
   filesystem: null,
+  services: [],
   serviceKills: [],
   hostStalledMs: 0,
 }
@@ -216,6 +221,7 @@ describe("the disk upkeep", () => {
     const { store, did } = fakeStore(
       input.listing ?? { snapshots: [A, B], lanes: [], nested: [] },
     )
+    const measurements = keptMeasurements()
     const manager = createMachineManager({
       sensor: steady,
       sink: { write: async () => {} },
@@ -226,12 +232,12 @@ describe("the disk upkeep", () => {
       store,
       records: input.records ?? fakeRecords(),
       laneFacts: fakeLaneFacts(),
-      measurements: keptMeasurements(),
+      measurements,
       readRepair: null,
       repair: null,
       tell: () => {},
     })
-    return { manager, did }
+    return { manager, did, measurements }
   }
   const settle = async (m: MachineManager) => {
     await m.idle()
@@ -261,6 +267,21 @@ describe("the disk upkeep", () => {
     await settle(manager)
     expect(did).toEqual([`snapshot ${A}`])
     expect(index.rows().find(r => r.snapshot === A)?.state).toBe("deleted")
+  })
+
+  test("a deletion is recorded once, with its snapshots' estimated cost", async () => {
+    const index = memoryIndex([kept(A, { changed: 10 }), kept(B, { used: 2 })])
+    index.markComplete()
+    const { manager, measurements } = upkept({ index })
+    await manager.markArchivedForDeletion([A])
+    await settle(manager)
+    expect(measurements.events).toEqual([
+      {
+        kind: "snapshots-deleted",
+        count: 1,
+        bytes: snapshotCost({ changed: 10 }),
+      },
+    ])
   })
 
   test("observing, nothing is deleted: rows are marked, and no upkeep runs", async () => {
@@ -453,6 +474,31 @@ describe("memory", () => {
     expect(written.at(-1)?.treatments).toEqual([])
   })
 
+  test("the latest reading is none before a sample, then the last sample with what was planned from it", async () => {
+    const { now, sensor } = pressured()
+    const { manager } = managed(sensor)
+    expect(manager.latestReading()).toBeNull()
+    await manager.start()
+    now.full = 6
+    await toRung2(manager)
+    const start = manager.waitUntilAllowed(LANE, "container-start")
+    await manager.sample()
+    const reading = manager.latestReading()
+    expect([
+      reading?.sample.machine.pressure?.fullAvg10,
+      reading?.rung,
+      reading?.held,
+      reading?.health.treatments,
+    ]).toEqual([
+      6,
+      2,
+      [{ lane: LANE, treatment: { kind: "waiting-to-start" } }],
+      [{ lane: LANE, treatment: { kind: "waiting-to-start" } }],
+    ])
+    await manager.close()
+    await start.catch(() => {})
+  })
+
   test("a running lane whose cgroup was not read may still call from rung 2", async () => {
     const { now, sensor } = pressured()
     const { manager } = managed(sensor)
@@ -560,6 +606,56 @@ describe("measurements", () => {
     },
   )
 
+  test("a lane's OOM kill, a service's and the host's stall are each recorded once, as the sample that saw them", async () => {
+    const lane = threadIdFor("t-1")
+    const cgroup = (oomKills: number) => ({
+      lane,
+      current: GiB,
+      anon: GiB,
+      file: 0,
+      limit: 2 * GiB,
+      oomKills,
+      pressure: null,
+    })
+    const samples: SensedSample[] = [
+      { ...calm, lanes: [cgroup(0)], lanesRunning: [lane] },
+      {
+        ...calm,
+        lanes: [cgroup(1)],
+        lanesRunning: [lane],
+        serviceKills: ["disks"],
+        hostStalledMs: 1500,
+      },
+      { ...calm, lanes: [cgroup(1)], lanesRunning: [lane] },
+    ]
+    let at = 0
+    const measurements = keptMeasurements()
+    const manager = createMachineManager({
+      sensor: { sample: async () => samples[Math.min(at++, 2)] ?? calm },
+      sink: { write: async () => {} },
+      settings: SETTINGS,
+      mode: "manage",
+      capabilities: { grow: false, repairDisk: false },
+      index: memoryIndex(),
+      store: fakeStore(EMPTY_LISTING).store,
+      records: fakeRecords(),
+      laneFacts: fakeLaneFacts(),
+      measurements,
+      readRepair: null,
+      repair: null,
+      tell: () => {},
+    })
+    await manager.start()
+    await manager.sample()
+    await manager.sample()
+    await manager.idle()
+    expect(measurements.events).toEqual([
+      { kind: "lane-oom-killed", lane },
+      { kind: "service-oom-killed", service: "disks" },
+      { kind: "host-stalled", ms: 1500 },
+    ])
+  })
+
   test("a measurement that cannot be written is told, and the sample goes on", async () => {
     const told: ManagerNews[] = []
     const written: MachineHealth[] = []
@@ -649,6 +745,7 @@ describe("the lane VM's repair", () => {
     mode: ManageMode = "manage",
   ) {
     const written: MachineHealth[] = []
+    const measurements = keptMeasurements()
     const manager = createMachineManager({
       sensor: { sample: async () => sensed },
       sink: { write: async health => void written.push(health) },
@@ -659,12 +756,12 @@ describe("the lane VM's repair", () => {
       store: fakeStore(EMPTY_LISTING).store,
       records: fakeRecords(),
       laneFacts: fakeLaneFacts(),
-      measurements: keptMeasurements(),
+      measurements,
       readRepair: async () => ({ ...shared }),
       repair: controls,
       tell: () => {},
     })
-    return { manager, written }
+    return { manager, written, measurements }
   }
 
   /** A sample, then the upkeep, which finds nothing to delete, the room spent. */
@@ -745,6 +842,43 @@ describe("the lane VM's repair", () => {
       kind: "disk-repair-failed",
       why: "no room",
     })
+  })
+
+  test("a failed repair asked for again runs as a person asked, whatever the disk could grow to, and is recorded once", async () => {
+    const shared = {
+      text: encodeRepairState({
+        kind: "failed",
+        why: "no room",
+        sizeAtFailure: 1024 * GiB,
+      }),
+      lockHeld: false,
+    }
+    const { controls, steps, boot } = fakeControls(shared)
+    const { manager, measurements } = repairing(shared, controls, calm)
+    await manager.start()
+    await manager.sample()
+    manager.askRepairAgain()
+    await manager.idle()
+    await new Promise(r => setTimeout(r, 0))
+    expect(steps).toEqual(["take", "stop", "launcher", "grow", "boot"])
+    expect(measurements.decisions.find(d => d.kind === "repair")).toMatchObject(
+      { from: "failed", to: "detected" },
+    )
+    expect(measurements.events).toEqual([{ kind: "repair-asked-again" }])
+    boot.resolve({ leftUnallocated: null, leftMetadata: null, failed: "x" })
+    await manager.close()
+  })
+
+  test("a repair asked for again with none failed changes nothing", async () => {
+    const shared = { text: null, lockHeld: false }
+    const { controls, steps } = fakeControls(shared)
+    const { manager, measurements } = repairing(shared, controls, calm)
+    await manager.start()
+    manager.askRepairAgain()
+    await manager.sample()
+    await manager.idle()
+    expect([steps, shared.text, measurements.events]).toEqual([[], null, []])
+    await manager.close()
   })
 
   test("another host's repair holds this host's lanes, and its VM start does not", async () => {

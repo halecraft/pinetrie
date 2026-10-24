@@ -215,6 +215,7 @@ import { Footer } from "./footer.tsx"
 import { HistoryPage } from "./history-page.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
+import { MachinePage } from "./machine-page.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -1973,6 +1974,34 @@ export function App({
               {page === "setup" && (
                 <SetupPage
                   view={setupView(workFacts.setup, workFacts.commands)}
+                />
+              )}
+              {page === "machine" && (
+                <MachinePage
+                  archiveMove={lane => {
+                    const canvas = canvasOfThread.get(lane)
+                    const head =
+                      canvas === undefined ? undefined : heads.get(canvas)
+                    return head?.moves.find(m => m.closes) ?? null
+                  }}
+                  onIntent={onIntent}
+                  openThread={lane => {
+                    const canvas = canvasOfThread.get(lane)
+                    if (canvas !== undefined)
+                      onIntent({
+                        kind: "show",
+                        here: { kind: "canvas", canvas },
+                      })
+                  }}
+                  repairAgain={async () => {
+                    const outcome = await session.request({
+                      kind: "repair-again",
+                    })
+                    return outcome.kind === "refused" ||
+                      outcome.kind === "failed"
+                      ? outcome.message
+                      : null
+                  }}
                 />
               )}
               {page === "history" && (

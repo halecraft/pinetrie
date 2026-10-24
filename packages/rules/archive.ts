@@ -299,6 +299,8 @@ export function writesIn(
     case "set-command":
     // Traces are the session's, in no canvas.
     case "traces-seen":
+    // The lane VM is the machine's, in no canvas.
+    case "repair-again":
     // An answer to a lane's ssh writes its access record, in no canvas: the
     // owner can take back what an archived canvas's lane holds.
     case "ssh-access":

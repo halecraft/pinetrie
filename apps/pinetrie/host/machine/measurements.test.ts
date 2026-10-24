@@ -1,9 +1,13 @@
+import { DatabaseSync } from "node:sqlite"
 import { threadIdFor } from "@pinetrie/core"
 import type { SampleMeasured } from "@pinetrie/machine"
 import { expect, test } from "vitest"
 import {
+  eventFromRow,
   MEASUREMENTS_KEPT_DAYS,
   memoryMachineMeasurements,
+  rungChanges,
+  sqliteMachineMeasurements,
 } from "./measurements.ts"
 
 const DAY = 24 * 60 * 60 * 1000
@@ -112,4 +116,125 @@ test("a trim deletes the rows older than what is kept, and an export reads only 
   m.trim()
   now = 0
   expect(rows(m.exportRows(1000)).map(r => r.rung)).toEqual([3])
+})
+
+test("each event is kept in its own table, exported, read back as it was, and trimmed", () => {
+  let now = DAY
+  const m = memoryMachineMeasurements(() => now)
+  const events = [
+    { kind: "lane-oom-killed", lane },
+    { kind: "service-oom-killed", service: "observer" },
+    { kind: "snapshots-deleted", count: 3, bytes: 200_000 },
+    { kind: "host-stalled", ms: 1500 },
+    { kind: "repair-asked-again" },
+    { kind: "slow-step", where: "your repo", ms: 900 },
+    { kind: "slow-step", where: null, ms: 800 },
+    { kind: "slow-command", program: "jj", subcommand: "log", ms: 700 },
+    { kind: "slow-command", program: "git", subcommand: null, ms: 600 },
+  ] as const
+  m.recordEvents(events)
+  const exported = rows(m.exportRows(1)).filter(r => r.table === "events")
+  expect(exported.map(eventFromRow)).toEqual(events)
+  now = (MEASUREMENTS_KEPT_DAYS + 2) * DAY
+  m.trim()
+  now = DAY
+  expect(rows(m.exportRows(1000)).filter(r => r.table === "events")).toEqual([])
+})
+
+test("what happened lately is newest first across decisions, events and the rung's changes, without shadow decisions", () => {
+  let now = 1000
+  const m = memoryMachineMeasurements(() => now)
+  m.recordSample({ ...sample, rung: 0 })
+  now = 2000
+  m.recordDecisions([
+    {
+      kind: "treatment",
+      lane,
+      from: "normal",
+      to: "paused",
+      fullAvg10: 12,
+      memoryAvailable: 1,
+    },
+    {
+      kind: "shadow",
+      decision: { kind: "kill", lane, program: "tsc" },
+      fullAvg10: 12,
+      memoryAvailable: 1,
+    },
+  ])
+  now = 3000
+  m.recordSample({ ...sample, rung: 3 })
+  now = 4000
+  m.recordEvents([{ kind: "host-stalled", ms: 1200 }])
+  now = 5000
+  m.recordDecisions([
+    {
+      kind: "repair",
+      from: "failed",
+      to: "detected",
+      fullAvg10: null,
+      memoryAvailable: 1,
+    },
+  ])
+  expect(m.recentRows(10)).toEqual([
+    { at: 5000, kind: "repair", from: "failed", to: "detected" },
+    { at: 4000, kind: "event", event: { kind: "host-stalled", ms: 1200 } },
+    { at: 3000, kind: "rung", from: 0, to: 3 },
+    { at: 2000, kind: "treatment", lane, from: "normal", to: "paused" },
+  ])
+  expect(m.recentRows(2).map(r => r.at)).toEqual([5000, 4000])
+})
+
+test("the rung's changes are read from the samples a store already keeps", () => {
+  const db = new DatabaseSync(":memory:")
+  let now = 1000
+  sqliteMachineMeasurements(db, () => now).recordSample({ ...sample, rung: 1 })
+  now = 2000
+  const again = sqliteMachineMeasurements(db, () => now)
+  again.recordSample({ ...sample, rung: 2 })
+  expect(again.recentRows(5)).toEqual([
+    { at: 2000, kind: "rung", from: 1, to: 2 },
+  ])
+})
+
+test("the rung changes only between consecutive samples that differ", () => {
+  expect(
+    rungChanges([
+      { at: 1, rung: 0 },
+      { at: 2, rung: 0 },
+      { at: 3, rung: 2 },
+      { at: 4, rung: 2 },
+      { at: 5, rung: 1 },
+    ]),
+  ).toEqual([
+    { at: 3, kind: "rung", from: 0, to: 2 },
+    { at: 5, kind: "rung", from: 2, to: 1 },
+  ])
+})
+
+test("shadow decisions newer than what happened crowd none of it out of Lately", () => {
+  let now = 1000
+  const m = memoryMachineMeasurements(() => now)
+  m.recordDecisions([
+    {
+      kind: "treatment",
+      lane,
+      from: "normal",
+      to: "paused",
+      fullAvg10: 12,
+      memoryAvailable: 1,
+    },
+  ])
+  now = 2000
+  m.recordDecisions(
+    Array.from({ length: 5 }, () => ({
+      kind: "shadow" as const,
+      decision: { kind: "kill" as const, lane, program: "tsc" },
+      fullAvg10: 12,
+      memoryAvailable: 1,
+    })),
+  )
+  expect(m.recentRows(2)).toEqual([
+    { at: 1000, kind: "treatment", lane, from: "normal", to: "paused" },
+  ])
 })

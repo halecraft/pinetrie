@@ -102,8 +102,12 @@ export function imageRefusal(
 
 const GiB = 1024 ** 3
 
-/** The VM's memory: a quarter of the Mac's, between 4 and 16 GiB. */
-export const vmMemory = (macMemory: number): number =>
+/**
+ * The most of the Mac's memory the VM may use: a quarter of it, between 4
+ * and 16 GiB. Not what it uses: a guest keeps every page it has touched
+ * until it stops.
+ */
+export const vmMemoryCeiling = (macMemory: number): number =>
   Math.min(16 * GiB, Math.max(4 * GiB, Math.floor(macMemory / 4)))
 
 /**
@@ -130,7 +134,7 @@ export interface LauncherFacts {
   /** The image's directory (`imageDir`). */
   readonly image: string
   readonly slots: number
-  /** The Mac's memory in bytes; the VM takes `vmMemory` of it. */
+  /** The Mac's memory in bytes; the VM takes `vmMemoryCeiling` of it. */
   readonly macMemory: number
   readonly cpus: number
   /** gvproxy's binary, where `ensureGvproxy` puts it. */
@@ -142,7 +146,7 @@ export const launcherArgs = (f: LauncherFacts): readonly string[] => [
   f.stateDir,
   f.image,
   String(f.slots),
-  String(vmMemory(f.macMemory)),
+  String(vmMemoryCeiling(f.macMemory)),
   String(f.cpus),
   f.gvproxy,
   LAUNCHER_DISKS.synchronization,

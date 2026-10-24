@@ -4,6 +4,41 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
+  // ── what the Machine page reads ──
+  {
+    name: "a lane's snapshots count every row, not only those kept",
+    file: "packages/machine/snapshot-index.ts",
+    from: '    if (r.state !== "kept") continue\n',
+    to: "",
+    command: unit,
+    expect: "a lane's snapshots are its kept rows alone",
+  },
+  {
+    name: "the events a sample saw are not recorded",
+    file: "packages/machine/manager.ts",
+    from: "    if (events.length > 0) record(() => deps.measurements.recordEvents(events))\n",
+    to: "",
+    command: unit,
+    expect:
+      "a lane's OOM kill, a service's and the host's stall are each recorded once",
+  },
+  {
+    name: "the latest reading keeps the first sample, not the last",
+    file: "packages/machine/manager.ts",
+    from: 'const sampled = result.kind === "sampled" ? result.sample : reading?.sample',
+    to: 'const sampled = reading?.sample ?? (result.kind === "sampled" ? result.sample : undefined)',
+    command: unit,
+    expect:
+      "the latest reading is none before a sample, then the last sample with what was planned from it",
+  },
+  {
+    name: "a retry is taken from any state",
+    file: "packages/machine/repair.ts",
+    from: 'return state.kind === "failed"\n        ? { kind: "detected", trigger: "asked-again" }',
+    to: 'return state.kind !== "booting-repair"\n        ? { kind: "detected", trigger: "asked-again" }',
+    command: unit,
+    expect: "a retry asked moves only a failure",
+  },
   {
     name: "any trigger leaves a failure",
     file: "packages/machine/repair.ts",
@@ -43,8 +78,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a repair is asked from this host's memory, not the shared state",
     file: "packages/machine/manager.ts",
-    from: "    const state = repairStateNow(facts)\n",
-    to: '    const state: RepairState = { kind: "idle" }\n',
+    from: "nextRepairState(repairStateNow(facts), asked)",
+    to: 'nextRepairState({ kind: "idle" }, asked)',
     command: unit,
     expect:
       "another host's recorded failure stops this host's repair, until the disk could grow",
@@ -52,8 +87,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a repair is awaited inside a sample",
     file: "packages/machine/manager.ts",
-    from: "void askRepair(result.sample, facts, text)",
-    to: "await askRepair(result.sample, facts, text)",
+    from: "    void askRepair(\n",
+    to: "    await askRepair(\n",
     command: unit,
     expect:
       "a sample with the room spent and nothing to delete repairs, beside the loop, once",

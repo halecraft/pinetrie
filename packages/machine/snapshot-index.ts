@@ -38,6 +38,19 @@ export const SNAPSHOT_BYTES_PER_PATH = Math.round(3.2 * KiB)
 export const snapshotCost = (row: Pick<SnapshotRow, "changed">): number =>
   SNAPSHOT_BYTES_BASE + row.changed * SNAPSHOT_BYTES_PER_PATH
 
+/** Each lane's kept snapshots, how many and their metadata's estimated cost. */
+export function snapshotsByLane(
+  rows: readonly SnapshotRow[],
+): ReadonlyMap<ThreadId, { readonly count: number; readonly bytes: number }> {
+  const by = new Map<ThreadId, { count: number; bytes: number }>()
+  for (const r of rows) {
+    if (r.state !== "kept") continue
+    const was = by.get(r.lane) ?? { count: 0, bytes: 0 }
+    by.set(r.lane, { count: was.count + 1, bytes: was.bytes + snapshotCost(r) })
+  }
+  return by
+}
+
 declare const reservationBrand: unique symbol
 /** A name the index holds `reserved`: what a snapshot is taken under. No record may name it. */
 export type Reservation = SnapshotId & { readonly [reservationBrand]: true }

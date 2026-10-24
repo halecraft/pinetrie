@@ -568,6 +568,24 @@ export const runningLanes = (
       : []
   })
 
+/** A service's container that runs, by its full id. */
+export interface RunningService {
+  readonly service: MachineService
+  readonly id: string
+}
+
+/** This project's services whose containers run, from Docker's list: the observer's only where it is a container. */
+export const runningServices = (
+  containers: readonly Listed[],
+  ours: { readonly project: string; readonly observer: string | null },
+): readonly RunningService[] =>
+  containers.flatMap(c => {
+    const service = containerService(c, ours)
+    return service !== null && c.state === "running" && c.id !== ""
+      ? [{ service, id: c.id }]
+      : []
+  })
+
 /** One `oom` from Docker's events: the container's name and labels, and when. */
 export interface OomEvent {
   /** Nanoseconds since the epoch, the daemon's clock. */
@@ -607,13 +625,12 @@ export function parseOomEvent(line: string): OomEvent | null {
 }
 
 /**
- * The service a container's kill was in: a lanehost role of `project`, by
- * its labels, or the observer, by its name (null where this host's observer
- * is not a container); null for anything else, another project's roles
- * among it.
+ * The service a container is: a lanehost role of `project`, by its labels,
+ * or the observer, by its name (null where this host's observer is not a
+ * container); null for anything else, another project's roles among it.
  */
-export function killedService(
-  event: OomEvent,
+export function containerService(
+  event: Pick<OomEvent, "name" | "labels">,
   ours: { readonly project: string; readonly observer: string | null },
 ): MachineService | null {
   if (ours.observer !== null && event.name === ours.observer) return "observer"

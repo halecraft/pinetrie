@@ -16,12 +16,17 @@ import {
   configPlaces,
   readStartLayers,
 } from "@pinetrie/config"
-import type { RootId, SnapshotId, ThreadId } from "@pinetrie/core"
+import {
+  errorText,
+  type RootId,
+  type SnapshotId,
+  type ThreadId,
+} from "@pinetrie/core"
 import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
-import { planCapabilities, planStoreSize } from "@pinetrie/machine"
+import { planStoreCapabilities, planStoreSize } from "@pinetrie/machine"
 import {
   type AgentDirBinding,
   createAgent,
@@ -113,6 +118,7 @@ import { HostRefused } from "./host-refused.ts"
 import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
+import { gatherDiagnostics, hostVersion } from "./machine/diagnostics.ts"
 import { createRunStarts, gatherLaneImportance } from "./machine/importance.ts"
 import {
   type MachineWatch,
@@ -120,6 +126,7 @@ import {
   startMachineWatch,
 } from "./machine/index.ts"
 import { memoryMachineMeasurements } from "./machine/measurements.ts"
+import { machinePageFacts } from "./machine/page.ts"
 import { createStoreRecords } from "./machine/records.ts"
 import { createShellCalls } from "./machine/shell-calls.ts"
 import {
@@ -427,7 +434,7 @@ async function openHost(
       planStoreSize(
         facts,
         storeSettings(hostOnly),
-        planCapabilities("lane-vm"),
+        planStoreCapabilities("lane-vm"),
       ),
   })
   if (found?.kind === "refused") throw new HostRefused(found.words)
@@ -572,6 +579,15 @@ async function openHost(
     docs,
     places,
     log,
+    recordEvent: event => {
+      try {
+        opened.measurements.recordEvents([event])
+      } catch (error) {
+        log(
+          `[host] the machine: its measurements were not written: ${errorText(error)}`,
+        )
+      }
+    },
     newId,
     now,
   }
@@ -1013,6 +1029,7 @@ async function openHost(
     keeper,
     later,
     relays,
+    repairAgain: machine?.repairs ? machine.askRepairAgain : null,
   })
   putImage.bind(
     createPutImage({
@@ -1187,6 +1204,24 @@ async function openHost(
   })
 
   progress.begin("listening")
+  // What the measurements' export and the diagnostics say they were measured on.
+  const measuredOn = {
+    version: await hostVersion(install.root),
+    backend: found?.kind === "found" ? found.machine.target : null,
+    source: found?.kind === "found" ? found.machine.memorySource : null,
+  }
+  const machinePage = () =>
+    machine === null
+      ? null
+      : machinePageFacts({
+          reading: machine.latestReading,
+          repairs: machine.repairs,
+          measurements: opened.measurements,
+          snapshots: opened.snapshots,
+          session,
+          settings: storeSettings(settled),
+          target: machine.target,
+        })
   const server = await startHttp({
     port,
     bind,
@@ -1196,12 +1231,19 @@ async function openHost(
     blobs,
     destination: work.destination,
     page,
-    measurements: {
-      store: opened.measurements,
-      heading: {
-        backend: found?.kind === "found" ? found.machine.target : null,
-        source: found?.kind === "found" ? found.machine.memorySource : null,
-      },
+    measurements: { store: opened.measurements, heading: measuredOn },
+    machine: {
+      facts: machinePage,
+      diagnostics: () =>
+        gatherDiagnostics({
+          facts: machinePage,
+          measurements: opened.measurements,
+          heading: measuredOn,
+          vmStateDir:
+            found?.kind === "found" && found.machine.target === "lane-vm"
+              ? found.machine.storeVolume
+              : null,
+        }),
     },
     log,
   })

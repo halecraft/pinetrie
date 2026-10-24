@@ -5,8 +5,17 @@
 
 import { readFile, statfs } from "node:fs/promises"
 import path from "node:path"
-import type { MachineService } from "@pinetrie/core"
-import type { RunningLane, ServiceKillWatch } from "@pinetrie/docker"
+import {
+  type CgroupMemory,
+  MACHINE_SERVICES,
+  type MachineService,
+  type ServiceReading,
+} from "@pinetrie/core"
+import type {
+  RunningLane,
+  RunningService,
+  ServiceKillWatch,
+} from "@pinetrie/docker"
 import {
   type MachineRead,
   memoryCounters,
@@ -58,13 +67,57 @@ export function ownCgroupMachine(
 }
 
 /**
+ * Each service's memory from its container's cgroup, or why it was not
+ * read. A host that reads its own cgroup runs in a lane, and its observer
+ * is the host outside's.
+ */
+export function serviceReadings(
+  services: readonly RunningService[],
+  memoryById: ReadonlyMap<string, CgroupMemory | null>,
+  inLane: boolean,
+): readonly ServiceReading[] {
+  return MACHINE_SERVICES.map((service): ServiceReading => {
+    if (service === "observer" && inLane)
+      return {
+        service,
+        memory: {
+          kind: "unreadable",
+          why: "the host outside this lane runs it",
+        },
+      }
+    const running = services.find(s => s.service === service)
+    if (running === undefined)
+      return {
+        service,
+        memory: { kind: "unreadable", why: "it is not running" },
+      }
+    const memory = memoryById.get(running.id) ?? null
+    return memory === null
+      ? {
+          service,
+          memory: { kind: "unreadable", why: "its cgroup could not be read" },
+        }
+      : {
+          service,
+          memory: {
+            kind: "read",
+            currentBytes: memory.current,
+            limitBytes: memory.limit,
+          },
+        }
+  })
+}
+
+/**
  * One sample from what was read: each running lane's cgroup by its id, a
  * lane whose cgroup was not found left out of `lanes` but in `lanesRunning`,
- * the filesystem as found, and the machine's memory the whole machine's or,
- * given `own`, the host's own cgroup's.
+ * each service's (`serviceReadings`), the filesystem as found, and the
+ * machine's memory the whole machine's or, given `own`, the host's own
+ * cgroup's.
  */
 export function planSample(input: {
   readonly running: readonly RunningLane[]
+  readonly services: readonly RunningService[]
   readonly read: MachineRead
   readonly own: OwnCgroupFiles | null
   readonly filesystem: SensedSample["filesystem"]
@@ -92,6 +145,7 @@ export function planSample(input: {
     lanesRunning: running.map(r => r.lane),
     store: read.store,
     filesystem: input.filesystem,
+    services: serviceReadings(input.services, memoryById, input.own !== null),
     serviceKills: input.serviceKills,
     hostStalledMs: input.hostStalledMs,
   }
@@ -132,7 +186,11 @@ async function readOwnCgroup(): Promise<OwnCgroupFiles> {
 export function createSensor(
   reach: Pick<
     MachineReach,
-    "runningLanes" | "machineSample" | "storeVolume" | "memorySource"
+    | "runningLanes"
+    | "runningServices"
+    | "machineSample"
+    | "storeVolume"
+    | "memorySource"
   >,
   kills: Pick<ServiceKillWatch, "take">,
 ): MachineSensor & {
@@ -145,9 +203,12 @@ export function createSensor(
       longest = Math.max(longest, stall.ms)
     },
     async sample() {
-      const running = await reach.runningLanes()
+      const [running, services] = await Promise.all([
+        reach.runningLanes(),
+        reach.runningServices(),
+      ])
       const [read, filesystem, own] = await Promise.all([
-        reach.machineSample(running.map(r => r.id)),
+        reach.machineSample([...running, ...services].map(r => r.id)),
         readFilesystem(reach.storeVolume),
         reach.memorySource === "own-cgroup" ? readOwnCgroup() : null,
       ])
@@ -156,6 +217,7 @@ export function createSensor(
       longest = 0
       return planSample({
         running,
+        services,
         read,
         own,
         filesystem,

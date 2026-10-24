@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest"
-import { planCapabilities } from "./capabilities.ts"
+import { planStoreCapabilities } from "./capabilities.ts"
 import { planStoreSize, type StoreSizeFacts } from "./store-size.ts"
 
 const GiB = 1024 ** 3
-const GROWS = planCapabilities("lane-vm")
+const GROWS = planStoreCapabilities("lane-vm")
 const SETTINGS = { max: null, leaveFree: [{ bytes: 50 * GiB }] }
 /** A 256 GiB disk with 10 GiB unallocated, on a roomy volume. */
 const LOW: StoreSizeFacts = {
@@ -48,7 +48,7 @@ describe("planStoreSize", () => {
 
   test("a backend that cannot grow plans nothing", () => {
     expect(
-      planStoreSize(LOW, SETTINGS, planCapabilities("docker-host")),
+      planStoreSize(LOW, SETTINGS, planStoreCapabilities("docker-host")),
     ).toBeNull()
   })
 })

@@ -156,7 +156,7 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   (256 GiB sparse) as disks; NAT; a console to `console.log`; entropy; vsock; and
   `<n>` share devices `slot0` … `slot<n-1>`, each an empty directory at
   boot. Its memory is a quarter of the Mac's, between 4 and 16 GiB
-  (`vmMemory`), and it has every CPU.
+  (`vmMemoryCeiling`), and it has every CPU.
 - **Disks are attached with synchronization `fsync`, caching `cached`.**
   Apple's defaults, `full` and `automatic`, made every `docker run` about
   500 ms (S129). The host decides them (`LAUNCHER_DISKS`, `plan.ts`) and
@@ -299,6 +299,10 @@ When a host repairs is `@pinetrie/machine`'s; this is the boot and its locks.
   not: Docker may answer on a full disk and fail every write after (S322).
   `data disk full` there fails the lease as `DiskFullAtBoot`, its lease
   closed, for the host's repair.
+- **The VM's logs grow for as long as its state directory lives**
+  (`console.log`, `launcher.log`): the Machine page's diagnostics read
+  their tails (`readVmLogTail`) from the last 64 KiB only, the line the
+  read cut into dropped. The start's read of the console stays whole.
 - **A repair with no room to grow still repacks**, which may itself fail
   for want of room: the repair then fails, saying so.
 

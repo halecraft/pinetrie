@@ -32,8 +32,10 @@ export {
   launcherWords,
   leaseExtra,
   leaseVm,
+  readVmLogTail,
   stopVmForRepair,
   type VmBuild,
+  type VmLog,
   VmRefused,
   vmProblem,
 } from "./lease.ts"
@@ -75,6 +77,7 @@ export {
   type VmVersion,
   vmBuildWords,
   vmHostRefusal,
+  vmMemoryCeiling,
   vmNoneRunningWords,
   vmStateDir,
   vmVersionWords,

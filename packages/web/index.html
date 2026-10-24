@@ -1698,6 +1698,23 @@
       .setup-page dd span { color: var(--text-faint); font-size: var(--font-sm); }
       .setup-model[data-none="true"], .setup-refusals li { color: var(--attention); }
       .setup-hint { color: var(--text-faint); }
+      /* The Machine page: the machine lanes run on, and what can be done. */
+      .machine-page h2 { margin: var(--space-10) 0 var(--space-5); font-size: var(--font-md); color: var(--text-faint);
+        text-transform: uppercase; letter-spacing: .04em; }
+      .machine-page p, .machine-page li { color: var(--text-dim); font-size: var(--font-lg); }
+      .machine-lines { margin: 0; padding-left: var(--space-9); }
+      .machine-lines li { padding: var(--space-2) 0; overflow-wrap: anywhere; }
+      .machine-lines li[data-unreadable="true"] { color: var(--text-faint); font-style: italic; }
+      .machine-page .machine-doing, .machine-page .machine-you-can { margin: var(--space-1) 0 0; font-size: var(--font-md); }
+      .machine-page .machine-you-can { color: var(--text-muted); }
+      .machine-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+      .machine-page .machine-thread { text-align: left; white-space: normal; }
+      .machine-thread:hover { text-decoration: underline; }
+      .machine-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+        margin: var(--space-2) 0 0; padding: 0; border: 0; }
+      .machine-confirm legend { float: left; padding: 0; color: var(--attention); }
+      .machine-lately time { color: var(--text-faint); font-size: var(--font-sm); }
+      .machine-diagnostics pre { max-height: 20rem; overflow: auto; font-size: var(--font-sm); }
       .composer-setup { color: var(--attention); font-size: var(--font-md); }
 
       /* The sidebar folded (ADR-0088), after the rules these refine: your pip

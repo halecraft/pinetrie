@@ -30,7 +30,11 @@ const outcome = (left: number | null): RepairOutcome => ({
 const stateArb: fc.Arbitrary<RepairState> = fc.oneof(
   fc.constant<RepairState>({ kind: "idle" }),
   fc
-    .constantFrom("room-spent-and-nothing-to-delete", "disk-full-at-boot")
+    .constantFrom(
+      "room-spent-and-nothing-to-delete",
+      "disk-full-at-boot",
+      "asked-again",
+    )
     .map((trigger): RepairState => ({ kind: "detected", trigger })),
   fc.constant<RepairState>({ kind: "stopping-vm" }),
   fc
@@ -56,6 +60,7 @@ const eventArb: fc.Arbitrary<RepairEvent> = fc.oneof(
       plannedSize,
     }),
   ),
+  fc.constant<RepairEvent>({ kind: "retry-asked" }),
   fc.constant<RepairEvent>({ kind: "stopping" }),
   fc.constant<RepairEvent>({ kind: "stopped" }),
   fc.string().map((line): RepairEvent => ({ kind: "progress", line })),
@@ -92,6 +97,18 @@ describe("nextRepairState", () => {
         })
         expect(next.kind).toBe(
           plannedSize > sizeAtFailure ? "detected" : "failed",
+        )
+      }),
+    )
+  })
+  test("a retry asked moves only a failure, to detected as a person asked, whatever the disk could grow to", () => {
+    fc.assert(
+      fc.property(stateArb, state => {
+        const next = nextRepairState(state, { kind: "retry-asked" })
+        expect(next).toEqual(
+          state.kind === "failed"
+            ? { kind: "detected", trigger: "asked-again" }
+            : state,
         )
       }),
     )
@@ -158,6 +175,11 @@ describe("the shared state", () => {
         expect(decodeRepairState(encodeRepairState(state))).toEqual(state)
       }),
     )
+  })
+  test("a repair a person asked for again, stored, reads back as it was", () => {
+    expect(
+      decodeRepairState('{"kind":"detected","trigger":"asked-again"}\n'),
+    ).toEqual({ kind: "detected", trigger: "asked-again" })
   })
   test("none written is idle; text that is no state is unreadable", () => {
     expect(decodeRepairState(null)).toEqual(REPAIR_IDLE)

@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process"
 import { openSync } from "node:fs"
-import { mkdir, readFile } from "node:fs/promises"
+import { mkdir, open, readFile } from "node:fs/promises"
 import http from "node:http"
 import net from "node:net"
 import os from "node:os"
@@ -359,6 +359,38 @@ export async function leaseStartedVm(
     throw new DiskFullAtBoot()
   }
   return lease
+}
+
+/** The VM's own logs in its state directory: its console, and the launcher's output. */
+export type VmLog = "console.log" | "launcher.log"
+
+/** How much of a log's end `readVmLogTail` reads: both grow for as long as the state directory lives. */
+const TAIL_BYTES = 64 * 1024
+
+/**
+ * The last `lines` lines of one of the VM's logs, read from its last 64 KiB
+ * only; null where it is not there.
+ */
+export async function readVmLogTail(
+  stateDir: string,
+  file: VmLog,
+  lines: number,
+): Promise<readonly string[] | null> {
+  const handle = await open(path.join(stateDir, file), "r").catch(() => null)
+  if (handle === null) return null
+  try {
+    const { size } = await handle.stat()
+    const length = Math.min(size, TAIL_BYTES)
+    const buffer = Buffer.alloc(length)
+    await handle.read(buffer, 0, length, size - length)
+    const read = buffer.toString("utf8").split("\n")
+    // Read from inside a line: its start is cut, so it is dropped.
+    if (length < size) read.shift()
+    if (read.at(-1) === "") read.pop()
+    return read.slice(-lines)
+  } finally {
+    await handle.close()
+  }
 }
 
 /** Whether the console's last boot says the data disk is full; a console not there says nothing. */

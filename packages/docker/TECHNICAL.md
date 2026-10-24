@@ -25,8 +25,10 @@ hosts lanehost's roles; its disks are lanehost's client, spread
   `ContainerSpec`), `renderHelper` (a lanehost role's), the labels both
   carry (`projectLabels`), `planDockerHost` and `dockerWords` (startup
   refusals), the sweeps (`planSlotSweep`, `planProjectSweep`), the
-  project's running lanes from Docker's list (`runningLanes`), what an
-  `oom` event names (`parseOomEvent`, `killedService`, `eventsSince`,
+  project's running lanes and services from Docker's list (`runningLanes`,
+  `runningServices`), which service a container is, by its labels or the
+  observer's name (`containerService`), what an
+  `oom` event names (`parseOomEvent`, `eventsSince`,
   `isNewEvent`, `systemTimeNanos`), and the
   readers of `docker info`'s options and of the lanes directory's mount
   (`parseMountinfo`, over lanehost's `holdingMount`).

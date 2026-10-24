@@ -35,6 +35,15 @@ test("the machine's measurements are a GET of the days kept, or fewer; any other
   expect(at("POST", "/machine/measurements")).toEqual({ kind: "bad" })
 })
 
+test("the Machine page's facts and its diagnostics are each a GET; any other ask of them is bad", () => {
+  expect(at("GET", "/machine")).toEqual({ kind: "machine" })
+  expect(at("GET", "/machine/diagnostics")).toEqual({
+    kind: "machine-diagnostics",
+  })
+  expect(at("POST", "/machine")).toEqual({ kind: "bad" })
+  expect(at("DELETE", "/machine/diagnostics")).toEqual({ kind: "bad" })
+})
+
 test("a review's read is a GET the wire accepts; anything else under /review/ is bad", () => {
   const c = commitId("0123abcd")
   const revision = { kind: "revision", commit: c } as const
@@ -71,7 +80,7 @@ describe("planRequest and planUpgrade: admission first", () => {
   const withCookie = (url: string) =>
     facts(url, { cookie: `${KEY_COOKIE}=${KEY}` })
 
-  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, proposed changes' read, the measurements", () => {
+  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, proposed changes' read, the machine's reads", () => {
     const c = commitId("0123abcd")
     for (const [method, url] of [
       ["GET", "/"],
@@ -79,6 +88,8 @@ describe("planRequest and planUpgrade: admission first", () => {
       ["POST", "/blob"],
       ["GET", reviewUrl({ kind: "revision", commit: c })],
       ["GET", "/machine/measurements"],
+      ["GET", "/machine"],
+      ["GET", "/machine/diagnostics"],
     ] as const)
       expect(planRequest(facts(url), KEY, method)).toEqual({ kind: "refuse" })
     expect(planRequest(withCookie(`/blob/${SHA}`), KEY, "GET")).toEqual({

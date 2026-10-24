@@ -1,6 +1,11 @@
 import type { FileContent } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { blobResponse, reviewResponse, uploadRefusal } from "./responses.ts"
+import {
+  blobResponse,
+  machineResponse,
+  reviewResponse,
+  uploadRefusal,
+} from "./responses.ts"
 
 test("a review and a diff are immutable; a refusal is never stored", () => {
   const review = { description: "feat: x\n", files: [], widenings: [] }
@@ -86,4 +91,17 @@ async function* chunks(): AsyncIterable<Uint8Array> {
 test("an upload refused unread closes its connection", () => {
   expect(uploadRefusal(413, "too large", true).headers.connection).toBe("close")
   expect(uploadRefusal(415, "not-image").headers.connection).toBeUndefined()
+})
+
+test("the machine's reads are typed by what they are, and never stored", () => {
+  expect(
+    (["measurements", "facts", "diagnostics"] as const).map(k => {
+      const { headers } = machineResponse(k, "")
+      return [headers["content-type"], headers["cache-control"]]
+    }),
+  ).toEqual([
+    ["application/x-ndjson; charset=utf-8", "no-store"],
+    ["application/json; charset=utf-8", "no-store"],
+    ["text/plain; charset=utf-8", "no-store"],
+  ])
 })

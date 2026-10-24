@@ -102,7 +102,7 @@ export interface Found {
 export interface MachineReach
   extends Pick<
     DockerRuntime,
-    "runningLanes" | "machineSample" | "watchServiceKills"
+    "runningLanes" | "runningServices" | "machineSample" | "watchServiceKills"
   > {
   /**
    * A path on the filesystem holding the store, on this host: the lane VM's
@@ -112,7 +112,7 @@ export interface MachineReach
   readonly storeVolume: string
   /** What the disk upkeep does to the store. */
   readonly store: StoreControls
-  /** Where the store is, which says what can be done to it (`planCapabilities`). */
+  /** Where the store is, which says what can be done to it (`planStoreCapabilities`). */
   readonly target: StoreTarget
   /** Whose memory is the machine's: a host in a lane reads its own cgroup's. */
   readonly memorySource: MemorySource
@@ -135,6 +135,7 @@ const machineReach = (
   memorySource,
   repair,
   runningLanes: () => runtime.runningLanes(),
+  runningServices: () => runtime.runningServices(),
   machineSample: containers => runtime.machineSample(containers),
   watchServiceKills: () => runtime.watchServiceKills(),
   storeVolume,
@@ -512,7 +513,10 @@ async function leaseAtStart(f: {
   f.building({ kind: "vm-disk-repair", progress: null })
   const run = await runRepairSteps(
     controls,
-    { trigger: "disk-full-at-boot", plannedSize, seen: read.text },
+    {
+      asked: { kind: "trigger", trigger: "disk-full-at-boot", plannedSize },
+      seen: read.text,
+    },
     (_from, to) => {
       if (to.kind === "booting-repair")
         f.building({

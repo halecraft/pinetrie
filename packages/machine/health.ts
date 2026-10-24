@@ -10,7 +10,7 @@ import type {
   MachineState,
   ThreadId,
 } from "@pinetrie/core"
-import type { Capabilities } from "./capabilities.ts"
+import type { StoreCapabilities } from "./capabilities.ts"
 import {
   type LevelReading,
   nextEventState,
@@ -132,7 +132,7 @@ const UNMEASURED: CauseReading = { kind: "unmeasured" }
 function roomReadings(
   sample: MachineSample,
   settings: Pick<StoreSettings, "leaveFree" | "max">,
-  capabilities: Capabilities,
+  capabilities: StoreCapabilities,
 ): readonly [string, CauseReading][] {
   const { store } = sample
   if (store === null)
@@ -204,7 +204,7 @@ function filesystemReading(
  */
 function upkeepReadings(
   sample: MachineSample,
-  capabilities: Capabilities,
+  capabilities: StoreCapabilities,
 ): readonly [string, CauseReading][] {
   const { store } = sample
   const unrecoverable: CauseReading =
@@ -327,6 +327,8 @@ export interface Planned {
    * the record is not rewritten each sample.
    */
   readonly changed: boolean
+  /** The events this sample saw: an OOM kill, a stall. None for a failed sample. */
+  readonly seen: readonly MachineCause[]
 }
 
 /**
@@ -340,7 +342,7 @@ export function planHealth(
   state: HealthPlanState,
   result: SampleResult,
   settings: Pick<StoreSettings, "leaveFree" | "max">,
-  capabilities: Capabilities,
+  capabilities: StoreCapabilities,
   beside: Beside,
 ): Planned {
   if (result.kind === "failed") {
@@ -351,7 +353,7 @@ export function planHealth(
       ],
       beside,
     )
-    return plannedHealth(state, state, health)
+    return plannedHealth(state, state, health, [])
   }
   const { sample } = result
   const next = new Map<string, Tracked<MachineCause>>()
@@ -395,7 +397,12 @@ export function planHealth(
   }
 
   const health = rankedHealth(activeCauses(next), beside)
-  return plannedHealth(state, { causes: next, oomKills, health }, health)
+  return plannedHealth(
+    state,
+    { causes: next, oomKills, health },
+    health,
+    events,
+  )
 }
 
 const activeCauses = (
@@ -407,11 +414,13 @@ function plannedHealth(
   before: HealthPlanState,
   after: HealthPlanState,
   health: MachineHealth,
+  seen: readonly MachineCause[],
 ): Planned {
   const changed = !isSameHealth(before.health, health)
   return {
     health,
     state: { ...after, health: changed ? health : before.health },
     changed,
+    seen,
   }
 }

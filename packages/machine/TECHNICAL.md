@@ -12,21 +12,21 @@ and the words share one.
 | module | holds |
 |---|---|
 | `ports.ts` | `MachineSensor`, `HealthSink`, `MachineManager`, `HostLaneFacts`, `MachineMeasurements`, `RepairControls` |
-| `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it |
-| `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`) and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
+| `sample.ts` | `MachineSample`: what one sample measured and heard, and only that; `SensedSample`, the sensor's part of it; `MachineReading`, the last sample with what was planned from it |
+| `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`), each lane's kept ones and their cost (`snapshotsByLane`), and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
 | `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it |
 | `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
 | `importance.ts` | which lanes matter most (`rankLanes`) |
 | `treatments.ts` | each lane's treatment (`planTreatments`, `Treatments`), what each allows (`ACTIVITIES_ALLOWED`), the shadow decisions of the rungs not built |
-| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`) and a command's program (`commandProgram`) |
+| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`) and a command's program (`commandProgram`) |
 | `manager.ts` | `createMachineManager`: gather, plan, write, and the disk upkeep's steps, on a keeper of its own; `MANAGE_MODES` |
 | `store.ts` | what the upkeep reads and does: `StoreListed`, `StoreControls`, `StoreRecords` |
 | `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
 | `upkeep.ts` | the next bounded step (`planUpkeepStep`): the index's fill, or deletions of entries, lanes no thread will run (`deletableLanes`) and stopped nested lanes' abandoned inner projects (`abandonedInnerProjects`) |
 | `fixtures.ts` | test support: the index in memory, a store and records to plan over |
-| `capabilities.ts` | what a backend can do to the store (`Capabilities`, `planCapabilities`): the lane VM grows; Linux does not |
+| `capabilities.ts` | what a backend can do to the store (`StoreCapabilities`, `planStoreCapabilities`): the lane VM grows; Linux does not |
 | `store-size.ts` | how large the store's disk should be (`planStoreSize`, the one maker of `StoreSize`), and what it would grow to now (`plannedStoreSize`) |
 | `repair.ts` | the lane VM's repair: its states (`RepairState`), the moves between them (`REPAIR_NEXT`, `nextRepairState`), the shared state's text (`encodeRepairState`, `decodeRepairState`) and how every host reads it (`repairFacts`, `isRepairRunning`), when a sample calls for one (`isRepairCalledFor`), and its cause (`repairCause`) |
 | `repair-steps.ts` | the one executor of a repair's states (`runRepairSteps`), through the host's `RepairControls` |
@@ -85,7 +85,15 @@ and the words share one.
   lane's memory in MiB and its program, kept only when it changed
   (`lanesChanged`), its program past `env`, `time` and their options'
   values, never an argument (`commandProgram`); every treatment changed and every shadow decision, with
-  the pressure and memory at that moment. An action's effect is never
+  the pressure and memory at that moment; and the events no decision
+  holds (core's `EventMeasured`, one row each through `recordEvents`): a
+  lane's or a service's OOM kill and the host's stall, from `planHealth`'s
+  `seen` (the sample's events, `causeEvents`), each once, at the sample
+  that saw it; the upkeep's deletion, with its snapshots' cost from their
+  rows, once the deletion returned; a person's retry of the repair. The
+  host records the slow step and the slow `jj` or `git` command. A kind
+  of event added to core is a type error until the host's store tags and
+  words it. An action's effect is never
   stored: S328 joins the samples that follow. They are trimmed on the
   sample's own step every `TRIM_MEASUREMENTS_EVERY_SAMPLES`, not by the
   upkeep, which runs only in `manage` mode. The manager reads no clock: the
@@ -203,7 +211,7 @@ and the words share one.
   `room-unrecoverable` (red) while its last found nothing left to delete
   and the room still under it, each a level read from the sample's
   `upkeep`, which the manager fills, not the sensor.
-- **The store's disk grows only where the backend can** (`Capabilities`,
+- **The store's disk grows only where the backend can** (`StoreCapabilities`,
   the first action to need one): `planStoreSize` grows a disk whose
   unallocated room is under its floor by the larger of a quarter and
   64 GiB, to at most `lanes.store.max` and at most what the volume gives
@@ -212,7 +220,7 @@ and the words share one.
   `room-low` says so (`grows`), planned from the sample's room and
   filesystem.
 - **The lane VM's disk is repaired offline, and only where it may be**
-  (ADR-0210). `Capabilities.repairDisk` is a fixed fact of the target, the
+  (ADR-0210). `StoreCapabilities.repairDisk` is a fixed fact of the target, the
   lane VM's; whether its repair boot is ready is found when it would run,
   and a boot not ready fails the repair before the VM is stopped. The
   manager takes `RepairControls | null`, generic over the host's proofs
@@ -231,6 +239,18 @@ and the words share one.
   running state with the lock free (its holder died) or text no host can
   read is `interrupted`: unsure, it holds no lane, says nothing, and the
   triggers are read afresh.
+- **What leaves `failed`, besides, is a person asking** (`askRepairAgain`,
+  the Machine page's Repair again): the next sample's repair step asks the
+  reducer with `retry-asked`, which moves `failed` to `detected` with
+  the trigger `asked-again`, whatever the disk could grow to, and from
+  any other state changes nothing; so the command needs no check of its
+  own. A sample that failed still takes it, since a disk full enough to
+  need it may fail the sample. It is recorded as an event
+  (`repair-asked-again`), since the repair's decision row of `failed` to
+  `detected` cannot tell it from a trigger. The stored state's triggers
+  are one table keyed by every `RepairTrigger` (`TRIGGERS`), so a trigger
+  added and not decoded is a type error, never a state read as
+  `interrupted`.
 - **What leaves `failed` is a change that could succeed**: a trigger whose
   planned size (`plannedStoreSize`: `planStoreSize` over the sample's
   room, the size it is when it would not grow) exceeds the failure's
@@ -257,6 +277,16 @@ and the words share one.
   manager's close waits for it: a repair is never left half done by its
   host's close. After it, the upkeep's last word is dropped, being of the
   disk before it.
+- **The latest reading is kept as a sample's step ends**
+  (`latestReading`): the last sample that read, with the health, the rung,
+  the lanes held and the repair's facts planned in that step or a later
+  failed one; null before a sample has read. The Machine page reads it,
+  and never asks for a sample: every threshold counts samples, so a
+  watched host must not sample faster.
+- **Services' memory is read as lanes' is**: each lanehost role's and the
+  observer's container's cgroup, against its limit, in the sample's
+  `services`, or why it was not read (core's `ServiceReading`): a host in
+  a lane reads no observer, which is the host outside's.
 - **While any host repairs, every lane waits** (`heldForRepair`): each
   lane, listed or unseen, is `waiting-for-repair`, which allows nothing,
   though this host's own sample failed with its VM stopped. The next plan

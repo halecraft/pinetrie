@@ -215,6 +215,20 @@ export {
   UNSAMPLED_REASONS,
 } from "./machine.ts"
 export {
+  type EventMeasured,
+  MACHINE_SAMPLE_MS,
+  type MachineAction,
+  type MachineLately,
+  type MachinePageFacts,
+  type MachinePageLane,
+  type MachinePageSampled,
+  type Measured,
+  REPAIR_STEPS,
+  type RepairStep,
+  type ServiceReading,
+  TIMED_PROGRAMS,
+} from "./machine-page.ts"
+export {
   type Attribution,
   decodeOutputEvent,
   encodeOutputEvent,

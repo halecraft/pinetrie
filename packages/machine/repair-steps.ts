@@ -10,7 +10,6 @@ import {
   nextRepairState,
   type RepairEvent,
   type RepairState,
-  type RepairTrigger,
   repairFacts,
   repairStateNow,
 } from "./repair.ts"
@@ -27,8 +26,8 @@ export type RepairRun =
 
 /** What asked for a repair, and what its sample read. */
 export interface RepairRequest {
-  readonly trigger: RepairTrigger
-  readonly plannedSize: number
+  /** The event that opens it: a trigger, or a person's retry of a failed repair. */
+  readonly asked: Extract<RepairEvent, { kind: "trigger" | "retry-asked" }>
   /** The shared state's text the asking sample read: changed since, another host acted. */
   readonly seen: string | null
 }
@@ -73,11 +72,7 @@ export async function runRepairSteps<Held, LauncherHeld>(
       writes = writes.then(() => controls.writeRepairState(held, next))
       return writes
     }
-    await move({
-      kind: "trigger",
-      trigger: request.trigger,
-      plannedSize: request.plannedSize,
-    })
+    await move(request.asked)
     if (state.kind !== "detected") return { kind: "not-needed" }
     const lost = controls.lockLost(held).then(() => {
       throw new LockLost()

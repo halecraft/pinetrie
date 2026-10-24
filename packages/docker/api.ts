@@ -373,6 +373,21 @@ export async function listLabelled(
   return ok(answered) ? parseListed(answered.body) : []
 }
 
+/** The container named `name` exactly, as listed; none when there is none. */
+export async function listNamed(
+  target: Pick<DockerTarget, "socket">,
+  name: string,
+): Promise<readonly Listed[]> {
+  // Docker matches `name` as a regular expression against `/<name>`: anchored, one container.
+  const filters = at(JSON.stringify({ name: [`^/${name}$`] }))
+  const answered = await request(
+    target,
+    "GET",
+    `/containers/json?all=true&filters=${filters}`,
+  )
+  return ok(answered) ? parseListed(answered.body) : []
+}
+
 /** The API's container list as `Listed`; an answer that is not one lists nothing. */
 export function parseListed(body: string): readonly Listed[] {
   try {

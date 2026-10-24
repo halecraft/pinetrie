@@ -24,7 +24,7 @@ import type { AcceptedActing, SessionClient } from "@pinetrie/session"
 import { hashOfPage, type Theme } from "@pinetrie/web-core"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
-import { Button } from "./button.tsx"
+import { Button, IconButton } from "./button.tsx"
 import { MachineIcon } from "./icons.tsx"
 import { InboxMenu, type InboxMenuProps } from "./inbox-menu.tsx"
 import {
@@ -98,7 +98,10 @@ export function Footer({
       {strip}
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
-        <MachineStatus view={machine} />
+        <MachineStatus
+          onOpen={() => onIntent({ kind: "page", to: "machine" })}
+          view={machine}
+        />
         <HistoryLink accepted={line} />
         <PublishButton accepted={line} session={session} />
       </div>
@@ -114,20 +117,26 @@ const HEALTH = {
 } as const
 
 /**
- * The machine's health: a status, not a control, until there is a page it
- * opens. Its words are its accessible name and its title.
+ * The machine's health, a button that opens the Machine page: its words are
+ * its title, and its name says where it goes.
  */
-function MachineStatus({ view }: { view: MachineStatusView }) {
+function MachineStatus({
+  view,
+  onOpen,
+}: {
+  view: MachineStatusView
+  onOpen: () => void
+}) {
   return (
-    <span
-      aria-label={view.text}
+    <IconButton
       className="machine-status"
       data-health={HEALTH[view.state]}
-      role="img"
+      label={view.name}
+      onClick={onOpen}
       title={view.text}
     >
       <MachineIcon state={view.state} />
-    </span>
+    </IconButton>
   )
 }
 

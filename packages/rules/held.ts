@@ -140,6 +140,7 @@ export function runsIn(command: Gated): readonly RunAt[] {
     case "undo-move":
     case "set-command":
     case "traces-seen":
+    case "repair-again":
       return []
   }
 }

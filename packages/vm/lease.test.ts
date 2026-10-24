@@ -17,6 +17,7 @@ import {
   leaseExtra,
   leaseOn,
   leaseStartedVm,
+  readVmLogTail,
   startLaneVm,
 } from "./lease.ts"
 import {
@@ -366,3 +367,19 @@ for (const isDockerSilent of [false, true])
       ),
     ).rejects.toBeInstanceOf(DiskFullAtBoot)
   })
+
+test("a log's tail is its last lines, a cut first line dropped; a log not there is none", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "vm-log-"))
+  try {
+    await writeFile(path.join(dir, "console.log"), "one\ntwo\nthree\n")
+    const long = `${"x".repeat(70 * 1024)}\nlast\n`
+    await writeFile(path.join(dir, "launcher.log"), long)
+    expect([
+      await readVmLogTail(dir, "console.log", 2),
+      await readVmLogTail(dir, "launcher.log", 5),
+      await readVmLogTail(path.join(dir, "gone"), "console.log", 2),
+    ]).toEqual([["two", "three"], ["last"], null])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

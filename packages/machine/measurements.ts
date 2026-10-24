@@ -1,12 +1,15 @@
 // machine/measurements — what the host keeps of the machine to tune the
 // memory rungs by: its samples, each lane's memory and program, each `bash`
-// call's duration, and every treatment changed or shadow decision, each row
-// a value built here from what was planned; the host's store stamps its time.
+// call's duration, every treatment changed or shadow decision, and the
+// events no decision holds (`EventMeasured`), each row a value built here
+// from what was planned; the host's store stamps its time.
 // No command's arguments or output is kept: only its program.
 
 import type {
+  EventMeasured,
   HeldLane,
   LaneTreatment,
+  MachineCause,
   MemoryCounters,
   MemorySource,
   ThreadId,
@@ -112,6 +115,23 @@ export type DecisionMeasured = {
       readonly to: RepairState["kind"]
     }
 )
+
+/** The events a sample's causes saw that the measurements keep: OOM kills, and the host's stall. */
+export const causeEvents = (
+  seen: readonly MachineCause[],
+): readonly EventMeasured[] =>
+  seen.flatMap((c): EventMeasured[] => {
+    switch (c.kind) {
+      case "lane-oom-killed":
+        return [{ kind: "lane-oom-killed", lane: c.lane }]
+      case "service-oom-killed":
+        return [{ kind: "service-oom-killed", service: c.service }]
+      case "host-stalls":
+        return [{ kind: "host-stalled", ms: c.stalledMs }]
+      default:
+        return []
+    }
+  })
 
 /** The rise of each counter from `before` to `now`; null when either is missing or one fell, as at a reboot. */
 export function counterRise(

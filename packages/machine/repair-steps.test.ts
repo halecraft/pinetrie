@@ -36,8 +36,11 @@ function controls(
 }
 
 const request = {
-  trigger: "room-spent-and-nothing-to-delete",
-  plannedSize: 72 * GiB,
+  asked: {
+    kind: "trigger",
+    trigger: "room-spent-and-nothing-to-delete",
+    plannedSize: 72 * GiB,
+  },
   seen: null,
 } as const
 

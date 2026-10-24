@@ -11,11 +11,12 @@ import {
   type HeldLane,
   type MachineHealth,
   type MemoryCounters,
+  type SnapshotId,
   snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
 import { createKeeper, KeeperClosed } from "@pinetrie/keeper"
-import type { Capabilities } from "./capabilities.ts"
+import type { StoreCapabilities } from "./capabilities.ts"
 import {
   FIRST_HEALTH_STATE,
   type HealthPlanState,
@@ -26,6 +27,7 @@ import {
   STOPPED,
 } from "./health.ts"
 import {
+  causeEvents,
   counterRise,
   type DecisionMeasured,
   type LaneMeasured,
@@ -53,10 +55,10 @@ import {
   repairFacts,
   repairStateNow,
 } from "./repair.ts"
-import { runRepairSteps } from "./repair-steps.ts"
+import { type RepairRequest, runRepairSteps } from "./repair-steps.ts"
 import { FIRST_RUNG_STATE, planRung, type RungPlanState } from "./rung.ts"
-import type { MachineSample, UpkeepHeard } from "./sample.ts"
-import type { SnapshotIndex } from "./snapshot-index.ts"
+import type { MachineReading, MachineSample, UpkeepHeard } from "./sample.ts"
+import { type SnapshotIndex, snapshotCost } from "./snapshot-index.ts"
 import type { StoreControls, StoreRecords } from "./store.ts"
 import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
 import { plannedStoreSize } from "./store-size.ts"
@@ -117,7 +119,7 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   readonly settings: StoreSettings
   readonly mode: ManageMode
   /** What this backend can do to the store: on Linux nothing grows. */
-  readonly capabilities: Capabilities
+  readonly capabilities: StoreCapabilities
   readonly index: SnapshotIndex
   readonly store: StoreControls
   readonly records: StoreRecords
@@ -151,6 +153,8 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
    * sample before it has written `detected` must not ask again.
    */
   let repairInFlight: Promise<void> | null = null
+  /** A person asked for the failed repair to run again: taken by the next sample's repair step. */
+  let retryAsked = false
   /** Memory as the last sample read it: what a decision's row is measured at. */
   let lastMemory: {
     readonly fullAvg10: number | null
@@ -177,6 +181,8 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   let settled = false
   /** The roots the index's fill has read since this host started. */
   const read = new Set<string>()
+  /** The last sample that read, and what was planned since: `latestReading`. */
+  let reading: MachineReading | null = null
 
   /** One write; on a refusal the memory forgets it, so the next sample writes again. */
   const writeHealth = async (
@@ -326,43 +332,50 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
   }
 
   /**
-   * A repair started, beside the loop, when this fresh sample calls for
-   * one and the shared state allows it: never awaited in a sample, so the
-   * samples go on and hold this host's lanes while it runs.
+   * A repair started, beside the loop, when a person asked for a failed
+   * one again, or this fresh sample calls for one, and the shared state
+   * allows it: never awaited in a sample, so the samples go on and hold
+   * this host's lanes while it runs. A retry is asked of the reducer,
+   * which takes it only from `failed`, and a sample that failed still
+   * takes it: a disk full enough to need it may fail the sample too.
    */
   const askRepair = (
-    sampled: MachineSample,
+    sampled: MachineSample | null,
     facts: RepairFacts,
     seen: string | null,
   ): Promise<void> | undefined => {
+    const retry = retryAsked
+    retryAsked = false
     const controls = deps.repair
     if (controls === null || deps.mode !== "manage") return
     if (repairInFlight !== null || isRepairRunning(facts)) return
-    if (!isRepairCalledFor(sampled)) return
-    const plannedSize =
-      plannedStoreSize(sampled, settings, deps.capabilities) ??
-      sampled.store?.size ??
-      0
-    const state = repairStateNow(facts)
-    const trigger = "room-spent-and-nothing-to-delete"
-    const asked = nextRepairState(state, {
-      kind: "trigger",
-      trigger,
-      plannedSize,
+    const asked: RepairRequest["asked"] | null = retry
+      ? { kind: "retry-asked" }
+      : sampled !== null && isRepairCalledFor(sampled)
+        ? {
+            kind: "trigger",
+            trigger: "room-spent-and-nothing-to-delete",
+            plannedSize:
+              plannedStoreSize(sampled, settings, deps.capabilities) ??
+              sampled.store?.size ??
+              0,
+          }
+        : null
+    if (asked === null) return
+    if (nextRepairState(repairStateNow(facts), asked).kind !== "detected")
+      return
+    if (retry)
+      record(() =>
+        deps.measurements.recordEvents([{ kind: "repair-asked-again" }]),
+      )
+    repairInFlight = runRepairSteps(controls, { asked, seen }, (from, to) => {
+      tell({ kind: "repair", from, to })
+      record(() =>
+        deps.measurements.recordDecisions([
+          { kind: "repair", from: from.kind, to: to.kind, ...lastMemory },
+        ]),
+      )
     })
-    if (asked.kind !== "detected") return
-    repairInFlight = runRepairSteps(
-      controls,
-      { trigger, plannedSize, seen },
-      (from, to) => {
-        tell({ kind: "repair", from, to })
-        record(() =>
-          deps.measurements.recordDecisions([
-            { kind: "repair", from: from.kind, to: to.kind, ...lastMemory },
-          ]),
-        )
-      },
-    )
       .then(run => {
         if (run.kind === "held-by-another")
           tell({ kind: "repair-not-run", why: "another holds the repair lock" })
@@ -401,12 +414,27 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     const { facts, text } = await readRepairFacts()
     applyTreatments(facts)
     // Never awaited: the samples go on while it runs.
-    if (result.kind === "sampled") void askRepair(result.sample, facts, text)
+    void askRepair(
+      result.kind === "sampled" ? result.sample : null,
+      facts,
+      text,
+    )
     const before = memory.health
     const planned = planHealth(memory, result, settings, deps.capabilities, {
       memory: { ...memoryShort, held: treatments.held },
       repair: repairCause(facts),
     })
+    const events = causeEvents(planned.seen)
+    if (events.length > 0) record(() => deps.measurements.recordEvents(events))
+    const sampled = result.kind === "sampled" ? result.sample : reading?.sample
+    if (sampled !== undefined)
+      reading = {
+        sample: sampled,
+        health: planned.health,
+        rung: memoryShort.rung,
+        held: treatments.held,
+        repair: facts,
+      }
     if (!planned.changed) {
       memory = planned.state
       return
@@ -458,9 +486,19 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     // fork's own check of its source meets.
     const { snapshots } = step
     if (snapshots.length > 0) {
+      const going = new Set<SnapshotId>(snapshots)
+      const bytes = index
+        .rows()
+        .filter(r => going.has(r.snapshot))
+        .reduce((n, r) => n + snapshotCost(r), 0)
       // Marked first, so no fork picks one about to go.
       index.markDeleted(snapshots)
       await store.deleteSnapshots(snapshots)
+      record(() =>
+        deps.measurements.recordEvents([
+          { kind: "snapshots-deleted", count: snapshots.length, bytes },
+        ]),
+      )
     }
     for (const lane of step.lanes) await store.deleteLane(lane)
     for (const p of step.innerProjects)
@@ -493,6 +531,11 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
       void sample()
     },
     sample,
+    latestReading: () => reading,
+    askRepairAgain() {
+      retryAsked = true
+      void sample()
+    },
     noteSnapshotSkipped() {
       skipped++
     },

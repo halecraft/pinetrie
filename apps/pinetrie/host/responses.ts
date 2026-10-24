@@ -1,5 +1,6 @@
 // host/responses — every answer the host gives over HTTP itself, pure: a blob,
-// an upload's outcome, a review's read, stored bytes (`bytesResponse`). `http.ts` writes each one with
+// an upload's outcome, a review's read, stored bytes (`bytesResponse`), and
+// the machine's reads (`machineResponse`). `http.ts` writes each one with
 // `send`.
 
 import {
@@ -107,6 +108,28 @@ export function bytesResponse<
 
 const BLOB_KIND = (mime: BlobMime): BytesKind =>
   mime === TEXT_MIME ? "text" : mime === OPAQUE_MIME ? "attachment" : mime
+
+/**
+ * The machine's reads, each of the moment it is asked, so never stored: the
+ * measurements' export (JSON lines), the Machine page's facts (JSON), its
+ * diagnostics (text).
+ */
+export const machineResponse = (
+  kind: "measurements" | "facts" | "diagnostics",
+  body: string,
+): HttpAnswer<string> => ({
+  status: 200,
+  headers: {
+    "content-type":
+      kind === "measurements"
+        ? "application/x-ndjson; charset=utf-8"
+        : kind === "facts"
+          ? "application/json; charset=utf-8"
+          : "text/plain; charset=utf-8",
+    "cache-control": "no-store",
+  },
+  body,
+})
 
 /** `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks. */
 export function blobResponse(

@@ -14,7 +14,7 @@ import os from "node:os"
 import path from "node:path"
 import {
   LEAVE_FREE_DEFAULT,
-  planCapabilities,
+  planStoreCapabilities,
   planStoreSize,
   type RepairState,
   runRepairSteps,
@@ -100,7 +100,7 @@ async function run(check: Checks["check"]): Promise<void> {
         planStoreSize(
           facts,
           { max: null, leaveFree: LEAVE_FREE_DEFAULT },
-          planCapabilities("lane-vm"),
+          planStoreCapabilities("lane-vm"),
         ),
       log,
     })
@@ -109,8 +109,11 @@ async function run(check: Checks["check"]): Promise<void> {
     const repaired = await runRepairSteps(
       controls,
       {
-        trigger: "room-spent-and-nothing-to-delete",
-        plannedSize: Number.MAX_SAFE_INTEGER,
+        asked: {
+          kind: "trigger",
+          trigger: "room-spent-and-nothing-to-delete",
+          plannedSize: Number.MAX_SAFE_INTEGER,
+        },
         seen: read.text,
       },
       (_from, to) => states.push(to),

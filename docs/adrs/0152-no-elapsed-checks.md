@@ -62,7 +62,7 @@
   often, never for the right reason, and still catches one constant on one
   platform.
 - **Reading `.fsync` out of `launcher.swift` in a TypeScript test.** That
-  tests text. As a planned value the choice sits beside `vmMemory` and the
+  tests text. As a planned value the choice sits beside `vmMemoryCeiling` and the
   slots, and a unit mutation proves it.
 - **A JSON spec as the launcher's one argument.** `prune.ts` and the
   scenario read running launchers' command lines; both would depend on the

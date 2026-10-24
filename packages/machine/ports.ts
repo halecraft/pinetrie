@@ -1,14 +1,19 @@
 // machine/ports — what the manager needs done, said as what is meant, never
 // as a file's name. The host composes each from the adapters' raw calls.
 
-import type { MachineHealth, SnapshotId, ThreadId } from "@pinetrie/core"
+import type {
+  EventMeasured,
+  MachineHealth,
+  SnapshotId,
+  ThreadId,
+} from "@pinetrie/core"
 import type {
   DecisionMeasured,
   LaneMeasured,
   SampleMeasured,
 } from "./measurements.ts"
 import type { RepairOutcome, RepairRead, RepairState } from "./repair.ts"
-import type { SensedSample } from "./sample.ts"
+import type { MachineReading, SensedSample } from "./sample.ts"
 import type { LaneActivity } from "./treatments.ts"
 
 export interface MachineSensor {
@@ -33,6 +38,7 @@ export interface MachineMeasurements {
   /** Only the lanes that changed since each was last kept. */
   recordLaneSamples(rows: readonly LaneMeasured[]): void
   recordDecisions(rows: readonly DecisionMeasured[]): void
+  recordEvents(rows: readonly EventMeasured[]): void
   /** Rows older than `MEASUREMENTS_KEPT_DAYS`, by the store's clock, deleted. */
   trim(): void
 }
@@ -89,6 +95,19 @@ export interface MachineManager {
   start(): Promise<void>
   /** Queues a sample, merged with one already queued; never two at once. */
   sample(): Promise<void>
+  /**
+   * The last sample with what was planned from it, as its step ended: what
+   * the Machine page shows. Null before a sample has read; a failed sample
+   * keeps the last that read, with the health planned since.
+   */
+  latestReading(): MachineReading | null
+  /**
+   * A person asked for the lane VM's failed repair to run again: the next
+   * sample's repair step asks the reducer, which takes it only from
+   * `failed`, so from any other state it changes nothing. A sample is
+   * queued for it.
+   */
+  askRepairAgain(): void
   /** A turn's snapshot was skipped, its index row unwritten: counted in the next sample. */
   noteSnapshotSkipped(): void
   /**

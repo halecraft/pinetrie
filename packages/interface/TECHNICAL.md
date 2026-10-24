@@ -714,8 +714,8 @@ pending.
 - **The machine's health** (`machine.ts`, ADR-0210): the session's facts
   carry the `pinetrie.machine` value (`SessionFacts.machine`), and
   `machineStatus` decides what the footer draws: the state, and its words
-  (`machineWords`), which are its accessible name, its title and the
-  host's log line alike. They name the worst cause and count the rest;
+  (`machineWords`), which are its title and the host's log line alike, and
+  its name, those words and that it opens the Machine page. They name the worst cause and count the rest;
   one `switch` over core's `MachineCause` with `assertNever`, so a cause
   added there fails the type check here until it is worded. Before a host
   wrote it, or on a host with no lanes, it is neutral and says the host
@@ -1743,6 +1743,29 @@ composer*).
   model", its title why, and `setup` asks for the link to the page. A send
   that asks no agent ignores it. A run refused at the host could not reach
   its author, since the host answers `started` before pi admits the run.
+
+## The Machine page (`machine-page.ts`, ADR-0210)
+
+- **`machinePageView` decides the page** from the host's facts (core's
+  `MachinePageFacts`, served at `/machine`; null where the host reads no
+  machine) and the board's archive move for each lane's canvas: Now is
+  the health's causes, worst first; Threads, held lanes first, then by
+  name; an action only where the facts carry it, so a host without the
+  repair's controls is never offered Repair again, and Archive only where
+  the board offers the canvas the archive. A lane is worded by its
+  thread's name, never its id: the facts carry `ThreadName | null`, and a
+  thread not named yet reads so.
+- **`machinePageWords` is the one wording of the page**, for the page and
+  the host's diagnostics (`machinePageLines`, the page as plain text)
+  alike. It reuses `causeWords` for Now, `treatmentWords` for a lane, and
+  `sizeWords` for every size; each cause's what pine·trie does and what you
+  can do, and each event, are a `switch` with `assertNever`, so a cause or
+  an event added to core fails the type check here until it is worded. A
+  reading not taken reads "not read: <why>" and is marked `unreadable`,
+  never a 0.
+- **Ask an agent about this** is a `new-canvas` intent whose prefill is
+  `@agent ` and the diagnostics (`machineAskPrefill`), not blank, so the
+  composer holds them unsent; a new canvas leaves the page as any does.
 
 ## A folder project's history (`history-view.ts`, `conflicts-view.ts`, ADR-0165)
 

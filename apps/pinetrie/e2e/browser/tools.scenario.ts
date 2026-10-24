@@ -207,16 +207,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         const status = await ap
           .waitForSelector(
-            `footer .machine-status[role="img"][aria-label="${keepingUp}"]`,
+            `footer button.machine-status[title="${keepingUp}"]`,
             { timeout: 60_000 },
           )
           .then(
             () => "",
             async () =>
               (await ap
-                .$eval("footer .machine-status", n =>
-                  n.getAttribute("aria-label"),
-                )
+                .$eval("footer .machine-status", n => n.getAttribute("title"))
                 .catch(() => null)) ?? "no status",
           )
         check(

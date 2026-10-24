@@ -9,10 +9,20 @@ import {
 describe("accountView", () => {
   const inventory = { count: 1, open: false }
   test.each([
-    [false, 0, ["profile", "setup", "sign-out"], null],
-    [false, 4, ["profile", "setup", "sign-out"], null],
-    [true, 0, ["inbox", "inventory", "profile", "setup", "sign-out"], null],
-    [true, 4, ["inbox", "inventory", "profile", "setup", "sign-out"], 4],
+    [false, 0, ["profile", "setup", "machine", "sign-out"], null],
+    [false, 4, ["profile", "setup", "machine", "sign-out"], null],
+    [
+      true,
+      0,
+      ["inbox", "inventory", "profile", "setup", "machine", "sign-out"],
+      null,
+    ],
+    [
+      true,
+      4,
+      ["inbox", "inventory", "profile", "setup", "machine", "sign-out"],
+      4,
+    ],
   ])("folded %s, %i needing you", (folded, badge, kinds, onAvatar) => {
     const view = accountView({ folded, badge, inventory })
     expect(view.items.map(i => i.kind)).toEqual(kinds)

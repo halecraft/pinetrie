@@ -2,7 +2,12 @@ import { threadIdFor } from "@pinetrie/core"
 import type { ServiceKillWatch } from "@pinetrie/docker"
 import type { MachineRead } from "@pinetrie/lanehost"
 import { describe, expect, test } from "vitest"
-import { createSensor, ownCgroupMachine, planSample } from "./sensor.ts"
+import {
+  createSensor,
+  ownCgroupMachine,
+  planSample,
+  serviceReadings,
+} from "./sensor.ts"
 
 const a = threadIdFor("0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e6f")
 const b = threadIdFor("0197a3c2-5b1e-7c4d-8e2f-1a2b3c4d5e70")
@@ -31,6 +36,7 @@ test("each running lane's cgroup is its sample, and a lane whose cgroup was not 
       { lane: a, id: "id-a" },
       { lane: b, id: "id-b" },
     ],
+    services: [],
     read,
     own: null,
     filesystem: { size: 10, free: 5 },
@@ -57,6 +63,7 @@ test("a sample whose read fails leaves the kills heard for the next", async () =
   const reach: Parameters<typeof createSensor>[0] = {
     memorySource: "whole-machine",
     runningLanes: async () => [],
+    runningServices: async () => [],
     machineSample: async () => {
       reads += 1
       if (reads === 1) throw new Error("no answer")
@@ -75,6 +82,43 @@ test("a sample whose read fails leaves the kills heard for the next", async () =
   const sensor = createSensor(reach, kills)
   await expect(sensor.sample()).rejects.toThrow("no answer")
   expect((await sensor.sample()).serviceKills).toEqual(["observer"])
+})
+
+test("a service's memory is its container's cgroup, against its limit; one not running or not read says why", () => {
+  const memoryById = new Map([
+    ["id-disks", memory],
+    ["id-observer", null],
+  ])
+  const services = [
+    { service: "disks", id: "id-disks" },
+    { service: "observer", id: "id-observer" },
+  ] as const
+  expect(serviceReadings(services, memoryById, false)).toEqual([
+    {
+      service: "disks",
+      memory: { kind: "read", currentBytes: 100, limitBytes: 400 },
+    },
+    {
+      service: "privileged",
+      memory: { kind: "unreadable", why: "it is not running" },
+    },
+    {
+      service: "observer",
+      memory: { kind: "unreadable", why: "its cgroup could not be read" },
+    },
+  ])
+})
+
+test("a host in a lane reads no observer: the host outside runs it", () => {
+  const observer = serviceReadings(
+    [{ service: "observer", id: "id-a" }],
+    new Map([["id-a", memory]]),
+    true,
+  ).find(s => s.service === "observer")
+  expect(observer?.memory).toEqual({
+    kind: "unreadable",
+    why: "the host outside this lane runs it",
+  })
 })
 
 describe("a host in a lane reads its own cgroup as the machine", () => {
@@ -118,6 +162,7 @@ describe("a host in a lane reads its own cgroup as the machine", () => {
   test("its sample says it read its own cgroup, never the machine's pressure", () => {
     const sample = planSample({
       running: [],
+      services: [],
       read,
       own,
       filesystem: null,

@@ -14,6 +14,7 @@ export type AccountItem =
     }
   | { readonly kind: "profile" }
   | { readonly kind: "setup" }
+  | { readonly kind: "machine" }
   | { readonly kind: "sign-out" }
 
 interface AccountView {
@@ -31,6 +32,7 @@ export function accountView(input: {
   const always: readonly AccountItem[] = [
     { kind: "profile" },
     { kind: "setup" },
+    { kind: "machine" },
     { kind: "sign-out" },
   ]
   if (!input.folded) return { items: always, badge: null }
@@ -65,6 +67,12 @@ export function accountWords(item: AccountItem): AccountItemWords {
       return {
         label: "Setup",
         title: "the host's model, sign-in and config files",
+      }
+    case "machine":
+      return {
+        label: "Machine",
+        title:
+          "the machine lanes run on: what waits, what was done, and what you can do",
       }
     case "sign-out":
       return {

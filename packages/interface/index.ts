@@ -448,6 +448,15 @@ export {
   vmStartWaitWords,
 } from "./machine.ts"
 export {
+  type MachineLine,
+  type MachinePageView,
+  type MachineThreadLine,
+  machineAskPrefill,
+  machinePageLines,
+  machinePageView,
+  machinePageWords,
+} from "./machine-page.ts"
+export {
   addCommentWords,
   COMMENT,
   type MarginBeside,
@@ -689,6 +698,7 @@ export { newColumnButton, type StartButton } from "./start-button.ts"
 export {
   moveTitle,
   type ThreadCardHead,
+  type ThreadMove,
   threadCardHeads,
 } from "./thread-card.ts"
 export {

@@ -37,7 +37,7 @@ import {
   vmChangeWords,
   vmHostRefusal,
   vmKeptWords,
-  vmMemory,
+  vmMemoryCeiling,
   vmNoneRunningWords,
   vmStartRefusal,
   vmStateDir,
@@ -103,11 +103,11 @@ describe("a built image is used only when SHA256SUMS holds", () => {
   })
 })
 
-test("vmMemory: a quarter of the Mac's, between 4 and 16 GiB", () => {
+test("vmMemoryCeiling: a quarter of the Mac's, between 4 and 16 GiB", () => {
   const GiB = 1024 ** 3
-  expect(vmMemory(32 * GiB)).toBe(8 * GiB)
-  expect(vmMemory(8 * GiB)).toBe(4 * GiB)
-  expect(vmMemory(128 * GiB)).toBe(16 * GiB)
+  expect(vmMemoryCeiling(32 * GiB)).toBe(8 * GiB)
+  expect(vmMemoryCeiling(8 * GiB)).toBe(4 * GiB)
+  expect(vmMemoryCeiling(128 * GiB)).toBe(16 * GiB)
 })
 
 test("launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy", () => {

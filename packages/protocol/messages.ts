@@ -150,6 +150,7 @@ export const COMMAND_KINDS = [
   "undo-move",
   "traces-seen",
   "ssh-access",
+  "repair-again",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -263,6 +264,7 @@ export const OUTCOME_KINDS = [
   "proposed",
   "seen",
   "accepted-moved",
+  "repair-asked",
   "moved",
   "held",
   "released",

@@ -69,6 +69,28 @@
     which alone pays for the removal. The fill runs the stop and waits for it;
     no proof value crosses from `@pinetrie/docker` to `@pinetrie/vm`, which
     may not declare each other, and the order is the fill's own.
+  - 2026-10-23: the Machine page reads the host's latest sample, which the
+    manager keeps as each sample's step ends, by `GET /machine` at the
+    sample's own cadence while it is open; it never asks for a sample, nor
+    changes the cadence, since every threshold counts samples and the
+    measurements keep one row per sample. Lately is the measurements: the
+    treatment and repair rows, memory's rung's changes read from the samples
+    kept, and a fifth table, `events`, for what no decision row holds (an OOM
+    kill, a stall, the upkeep's deletion, a slow step or `jj` or `git`
+    command, a repair asked for again), made `IF NOT EXISTS`, so no stored
+    table changes shape. Nothing else is stored; the diagnostics are the page
+    in words, the newest measurement rows and, on the Mac, the lane VM's logs'
+    tails, the host keeping no log of its own. The lane VM's row says its
+    memory ceiling only (`vmMemoryCeiling`): how the host could read its size
+    once touched every few seconds, unprivileged, is unmeasured. CPU, disk per
+    lane, uptime and queue waits are not shown: nothing samples them. A
+    reading that could not be taken says why. The page offers only what its
+    host can do, the facts it is served carrying those actions: **Archive**,
+    the board's own move of the lane's canvas; **Repair again** where the host
+    holds the repair's controls and the repair failed, a `retry-asked` the
+    reducer takes only from `failed`, whatever the disk could grow to.
+    **Restart the lane VM**, and a red cause in the inbox's **Needs you**, are
+    not built yet.
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.

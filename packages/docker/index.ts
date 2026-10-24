@@ -14,6 +14,7 @@ export {
   projectKey,
   ROOTLESS_UID,
   type RunningLane,
+  type RunningService,
   SLOT_LABEL,
 } from "./plan.ts"
 export {

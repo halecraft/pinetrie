@@ -1,8 +1,10 @@
+import type { EventMeasured } from "@pinetrie/core"
 import { threadIdFor } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"
 import { expect, test } from "vitest"
-import { compactionLine, failed, slowStepLine } from "./basics.ts"
+import { compactionLine, failed, slow, slowStepLine } from "./basics.ts"
 import { basics } from "./fakes.ts"
+import { slowCommand } from "./jj/index.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
   const b = basics()
@@ -65,4 +67,26 @@ test("a compaction's line names its document, the records and kilobytes it read,
   expect(
     compactionLine({ docId: "pinetrie:live", records: 1, bytes: 400, ms: 600 }),
   ).toBe("[host] compacted pinetrie:live (1 record, 0 KB) in 600 ms")
+})
+
+test("a slow step and a slow command are logged as before, and each recorded", () => {
+  const lines: string[] = []
+  const recorded: EventMeasured[] = []
+  const b = {
+    log: (l: string) => lines.push(l),
+    recordEvent: (e: EventMeasured) => recorded.push(e),
+  }
+  slow(b, "your repo")({ key: null, waited: 0, ran: 1234.4 })
+  slowCommand(
+    b,
+    "your repo",
+  )({ program: "jj", args: ["log", "-r", "@"], ms: 900.6 })
+  expect(lines).toEqual([
+    slowStepLine("your repo", { key: null, waited: 0, ran: 1234.4 }),
+    "[host] your repo: jj log -r @ ran 901 ms",
+  ])
+  expect(recorded).toEqual([
+    { kind: "slow-step", where: "your repo", ms: 1234 },
+    { kind: "slow-command", program: "jj", subcommand: "log", ms: 901 },
+  ])
 })

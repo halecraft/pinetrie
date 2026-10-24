@@ -37,7 +37,7 @@ export function sizeWords(bytes: number): string {
 const percentWords = (share: number) => `${Math.round(share)}%`
 
 /** A service, as the subject of a clause. */
-function serviceWords(service: MachineService): string {
+export function serviceWords(service: MachineService): string {
   switch (service) {
     case "disks":
       return "lanehost's disk service"
@@ -99,7 +99,7 @@ export const vmStartWaitWords = (isRepairing: boolean): string =>
     : "waiting for the lane VM: another host is starting it"
 
 /** One cause, as a clause; `held` counts the lanes held for memory. */
-function causeWords(
+export function causeWords(
   cause: MachineCause,
   nameOf: (lane: ThreadId) => string,
   held: number,
@@ -198,11 +198,15 @@ export function heldLaneTreatments(
   return new Map((health?.treatments ?? []).map(t => [t.lane, t.treatment]))
 }
 
-/** What the footer's status draws: its state's mark, and its words. */
+/** What the footer's status draws: its state's mark, its words, and its name, which says it opens the Machine page. */
 export interface MachineStatusView {
   readonly state: MachineState
   readonly text: string
+  readonly name: string
 }
+
+/** The footer's status's name: its words, and where pressing it goes. */
+const statusName = (text: string) => `${text}. Open the Machine page`
 
 /**
  * The footer's status. Before a host wrote the machine's health, or where
@@ -212,13 +216,15 @@ export function machineStatus(
   health: MachineHealth | null,
   names: ReadonlyMap<ThreadId, ThreadName>,
 ): MachineStatusView {
-  return health === null
-    ? {
-        state: "neutral",
-        text: "The machine lanes run on: the host has said nothing of it",
-      }
-    : {
-        state: health.state,
-        text: machineWords(health, lane => readableThreadName(names, lane)),
-      }
+  const view =
+    health === null
+      ? {
+          state: "neutral" as const,
+          text: "The machine lanes run on: the host has said nothing of it",
+        }
+      : {
+          state: health.state,
+          text: machineWords(health, lane => readableThreadName(names, lane)),
+        }
+  return { ...view, name: statusName(view.text) }
 }

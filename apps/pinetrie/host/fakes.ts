@@ -409,6 +409,7 @@ export function basics(
     rootsLoaded: () => [...rootDocs.keys()],
     places,
     log: m => lines.push(m),
+    recordEvent: () => {},
     // A uuidv7's shape, as the host's minter gives: a card's id is parsed.
     newId: () =>
       `01a0ffd2-0000-7000-8000-${(++n).toString(16).padStart(12, "0")}`,

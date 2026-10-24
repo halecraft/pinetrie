@@ -7,6 +7,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a log's tail keeps the line its read cut",
+    file: "packages/vm/lease.ts",
+    from: "    if (length < size) read.shift()\n",
+    to: "",
+    command: unit,
+    expect: "a log's tail is its last lines",
+  },
+  {
     name: "the repair boot loads no btrfs",
     file: "packages/vm/builder/pins.json",
     from: '      "fs/btrfs/btrfs.ko.gz",\n',
@@ -183,7 +191,7 @@ export const mutations: readonly Mutation[] = [
     from: "Math.max(4 * GiB, ",
     to: "Math.max(0, ",
     command: unit,
-    expect: "vmMemory: a quarter of the Mac's, between 4 and 16 GiB",
+    expect: "vmMemoryCeiling: a quarter of the Mac's, between 4 and 16 GiB",
   },
   {
     name: "a lease fills its slot twice",

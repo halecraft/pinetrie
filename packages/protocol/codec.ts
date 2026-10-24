@@ -157,6 +157,8 @@ export type Outcome =
   | { readonly kind: "seen" }
   /** Accepted work was set up, or published. */
   | { readonly kind: "accepted-moved" }
+  /** The lane VM's failed repair is asked for again: the next sample takes it. */
+  | { readonly kind: "repair-asked" }
   | Refusal
   /**
    * The host failed carrying the command out, and may have done part of it:
@@ -601,6 +603,7 @@ export function decodeCommand(
       command: name === "" ? null : name,
     }
   }
+  if (kind === "repair-again") return { kind: "repair-again" }
   if (kind === "traces-seen") {
     const traces = tracesFromWire(text(wire?.text))
     return traces === undefined
@@ -1448,6 +1451,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "traces-seen",
         text: JSON.stringify(intent.traces),
       })
+    case "repair-again":
+      return command({ id, kind: "repair-again" })
   }
 }
 
@@ -1495,6 +1500,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "seen" })
     case "accepted-moved":
       return reply({ id, outcome: "accepted-moved" })
+    case "repair-asked":
+      return reply({ id, outcome: "repair-asked" })
     case "queued":
       return reply({ id, outcome: "queued" })
     case "moved":
@@ -1569,6 +1576,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "seen" }
     case "accepted-moved":
       return { kind: "accepted-moved" }
+    case "repair-asked":
+      return { kind: "repair-asked" }
     case "queued":
       return { kind: "queued" }
     case "moved":

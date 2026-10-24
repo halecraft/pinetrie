@@ -58,6 +58,7 @@ import {
   isImageRemovalSettled,
   listImages,
   listLabelled,
+  listNamed,
   networkExists,
   networkSubnet,
   removeContainer,
@@ -78,10 +79,10 @@ import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
   type ContainerSpec,
   cgroupMount,
+  containerService,
   eventsSince,
   imageEnvPath,
   isNewEvent,
-  killedService,
   labelled,
   lanehostContainer,
   NESTED_DISK,
@@ -94,10 +95,12 @@ import {
   projectKey,
   projectNetwork,
   type RunningLane,
+  type RunningService,
   renderHelper,
   renderObserver,
   renderRun,
   runningLanes,
+  runningServices,
   unneededImageTags,
 } from "./plan.ts"
 import { NESTED_PROFILE } from "./seccomp-nested.ts"
@@ -190,6 +193,12 @@ export interface DockerRuntime extends LaneRuntime {
   vmRestarted(): void
   /** The project's lanes whose containers run, by one listing of Docker's. */
   runningLanes(): Promise<readonly RunningLane[]>
+  /**
+   * Lanehost's roles of this project, and the observer where it is a
+   * container, whose containers run: what `machineSample` reads the
+   * services' memory by.
+   */
+  runningServices(): Promise<readonly RunningService[]>
   /**
    * The machine read by lanehost's disks role: its memory and pressure, the
    * lanes directory's room, and each container's cgroup, by full id.
@@ -564,6 +573,18 @@ export function dockerRuntime(input: {
     },
     runningLanes: async () =>
       runningLanes(await listLabelled(target, `${PROJECT_LABEL}=${key}`)),
+    async runningServices() {
+      const observer =
+        input.observer === "forwarded" ? null : observerContainer(await version)
+      const [roles, observed] = await Promise.all([
+        listLabelled(target, `${PROJECT_LABEL}=${key}`),
+        observer === null ? [] : listNamed(target, observer),
+      ])
+      return runningServices([...roles, ...observed], {
+        project: key,
+        observer,
+      })
+    },
     machineSample: containers =>
       lanehost.call({ kind: "machine-sample", containers }),
     storeListing: () => lanehost.call({ kind: "store-listing", project: key }),
@@ -598,7 +619,7 @@ export function dockerRuntime(input: {
           const event = parseOomEvent(line)
           if (event === null || !isNewEvent(event, resume ?? from)) return
           resume = event.timeNano
-          const service = killedService(event, { project: key, observer })
+          const service = containerService(event, { project: key, observer })
           if (service !== null) heard.push(service)
         })
         stream = opened

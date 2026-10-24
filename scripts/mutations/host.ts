@@ -11,6 +11,66 @@ const command = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  // ── the Machine page's reads ──
+  {
+    name: "the rung changes at every sample",
+    file: "apps/pinetrie/host/machine/measurements.ts",
+    from: "before === undefined || before.rung === s.rung",
+    to: "before === undefined",
+    command: unit,
+    expect: "the rung changes only between consecutive samples that differ",
+  },
+  {
+    name: "Lately holds the shadow decisions",
+    file: "apps/pinetrie/host/machine/measurements.ts",
+    from: "WHERE kind IN ('treatment', 'repair') ORDER BY at DESC",
+    to: "ORDER BY at DESC",
+    command: unit,
+    expect: "shadow decisions newer than what happened crowd none of it out",
+  },
+  {
+    name: "a host in a lane reads the observer as its own",
+    file: "apps/pinetrie/host/machine/sensor.ts",
+    from: 'if (service === "observer" && inLane)',
+    to: 'if (service === "observer" && !inLane)',
+    command: unit,
+    expect: "a host in a lane reads no observer",
+  },
+  {
+    name: "a host without the repair's controls asks for it anyway",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "        if (deps.repairAgain === null)\n",
+    to: "        if (deps.repairAgain === undefined)\n",
+    command: unit,
+    expect: "repair again is asked of a host holding the repair's controls",
+  },
+  {
+    name: "the diagnostics keep the export's last rows, not the newest",
+    file: "apps/pinetrie/host/machine/diagnostics.ts",
+    from: "    .sort((a, b) => a.at - b.at)\n",
+    to: "",
+    command: unit,
+    expect: "the newest rows are chosen by their time",
+  },
+  // ── the Machine page's reads, in the browser suite ──
+  {
+    name: "the Machine page is served no facts",
+    file: "apps/pinetrie/host/http.ts",
+    from: 'machineResponse("facts", JSON.stringify(input.machine.facts()))',
+    to: 'machineResponse("facts", JSON.stringify(null))',
+    suite: "browser",
+    scenario: "machine-page",
+    expect: "the Machine page names each lane by its thread",
+  },
+  {
+    name: "the diagnostics' heading leaves out the host's version",
+    file: "apps/pinetrie/host/index.ts",
+    from: "    version: await hostVersion(install.root),\n",
+    to: "    version: null,\n",
+    suite: "browser",
+    scenario: "machine-page",
+    expect: "Copy diagnostics copies the page's words and the host's version",
+  },
   // ── a run the last host left open ──
   {
     name: "an interrupted run clears its mark",
@@ -3010,8 +3070,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the sensor takes the kills heard before its reads",
     file: "apps/pinetrie/host/machine/sensor.ts",
-    from: "      const running = await reach.runningLanes()\n",
-    to: "      const early = await kills.take()\n      const running = await reach.runningLanes()\n      void early\n",
+    from: "      const [running, services] = await Promise.all([\n",
+    to: "      const early = await kills.take()\n      void early\n      const [running, services] = await Promise.all([\n",
     command: unit,
     expect: "a sample whose read fails leaves the kills heard for the next",
   },

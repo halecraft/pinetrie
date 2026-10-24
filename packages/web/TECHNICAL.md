@@ -312,9 +312,10 @@ bar, each column's matches, and the rail's marks.
 
 ## The machine's status (`footer.tsx`, `icons.tsx`, ADR-0210)
 
-- **A status, not a control:** `role="img"`, named and titled by
-  `machineStatus`' words, until the Machine page it will open exists; the
-  footer offers no button that does nothing. Never a badge, never moving.
+- **A button to the Machine page:** an `IconButton` titled by
+  `machineStatus`' words, its name those words and where it goes
+  (`MachineStatusView.name`); pressing it opens `#machine`. Never a badge,
+  never moving.
 - **Shape and colour, never colour alone:** `MachineIcon` is a machine,
   with a triangle at its corner when amber and a barred disc when red. The
   stylesheet names a state by what it does to work (`data-health`:
@@ -1873,7 +1874,9 @@ the email is the only thing pine·trie chooses.
 A page covers the stage: the profile, the setup page
 (`setup-page.tsx`, ADR-0146), which draws `setupView` from the account
 menu's **Setup**, and a folder project's history (`history-page.tsx`,
-ADR-0165), which draws `historyView` from the footer's **history** link.
+ADR-0165), which draws `historyView` from the footer's **history** link,
+and the Machine page (`machine-page.tsx`, ADR-0210), from the account
+menu's **Machine** and the footer's machine status.
 An entry's review opens in place (a `ReviewPane`), fetched only then; a
 restore opens its preview, which says the folder holds the version when
 its review is empty, and offers no restore then. Which pages there are, and
@@ -1881,6 +1884,18 @@ their words, are interface's `page.ts`; a page's hash, and how leaving
 treats the history, web-core's `page-url.ts`. The composer's "See Setup" link is a
 plain `#setup` anchor: `usePage` hears the hash change.
 
+- **The Machine page asks for its facts at the sample's cadence**
+  (`MACHINE_SAMPLE_MS`, core's, the host's sample's), from the moment it
+  mounts until it unmounts, which aborts a fetch in flight: each answer
+  replaces the last, and the page never asks the host to sample. It draws
+  `machinePageWords(machinePageView(facts, archiveMove))` and nothing of
+  its own: an action shows only where the facts carry it, and asks first
+  in place (`Confirmed`), its words the view's. Archive is the board's
+  own move of the lane's canvas (its thread card head's `closes` move),
+  sent as any move is; Repair again is the `repair-again` command, a
+  refusal shown in a `Toast`. Copy diagnostics fetches
+  `/machine/diagnostics` at the press, writes it with `useCopy`, and shows
+  it in a `<details>` for a page with no clipboard to select.
 - **The page is in the URL's hash** (`#profile`). `usePage` reads it with
   `useSyncExternalStore`, hearing `popstate` (Back and Forward) and
   `hashchange` (a typed URL). `showPage` is the `page` port: opening pushes an

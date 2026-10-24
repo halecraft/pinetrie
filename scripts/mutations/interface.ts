@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── the Machine page ──
+  {
+    name: "an archive is offered that the facts do not carry",
+    file: "packages/interface/machine-page.ts",
+    from: 'const archives = facts.actions.some(a => a.kind === "archive")',
+    to: "const archives = true",
+    command: unit,
+    expect: "only the actions the facts carry are offered",
+  },
   // ── a row's detail by statement ──
   {
     name: "a statement's output goes under the line it begins on",

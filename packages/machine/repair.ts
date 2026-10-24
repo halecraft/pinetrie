@@ -11,6 +11,8 @@ import type { MachineSample } from "./sample.ts"
 export type RepairTrigger =
   | "room-spent-and-nothing-to-delete"
   | "disk-full-at-boot"
+  /** A person asked, from the Machine page, for a failed repair to run again. */
+  | "asked-again"
 
 /** What the reducer keeps of a repair boot's report: the host maps the VM's into it. */
 export interface RepairOutcome {
@@ -39,6 +41,8 @@ export type RepairEvent =
       /** What the disk would grow to now (`plannedStoreSize`). */
       readonly plannedSize: number
     }
+  /** A person asked for a failed repair to run again: whatever the disk could grow to. */
+  | { readonly kind: "retry-asked" }
   | { readonly kind: "stopping" }
   | { readonly kind: "stopped" }
   | { readonly kind: "progress"; readonly line: string }
@@ -92,6 +96,10 @@ function proposed(state: RepairState, event: RepairEvent): RepairState | null {
       return state.kind === "failed" && event.plannedSize <= state.sizeAtFailure
         ? null
         : { kind: "detected", trigger: event.trigger }
+    case "retry-asked":
+      return state.kind === "failed"
+        ? { kind: "detected", trigger: "asked-again" }
+        : null
     case "stopping":
       return { kind: "stopping-vm" }
     case "stopped":
@@ -149,10 +157,15 @@ function isOutcome(v: unknown): v is RepairOutcome {
   )
 }
 
-const TRIGGERS: readonly unknown[] = [
-  "room-spent-and-nothing-to-delete",
-  "disk-full-at-boot",
-] satisfies readonly RepairTrigger[]
+/** Every trigger the shared state may hold: one left out would read a stored state as unreadable. */
+const TRIGGERS = {
+  "room-spent-and-nothing-to-delete": true,
+  "disk-full-at-boot": true,
+  "asked-again": true,
+} as const satisfies Record<RepairTrigger, true>
+
+const isTrigger = (v: unknown): v is RepairTrigger =>
+  typeof v === "string" && Object.hasOwn(TRIGGERS, v)
 
 /**
  * The shared state's text as a state: none written is `idle`; text that is
@@ -175,8 +188,8 @@ export function decodeRepairState(
     case "stopping-vm":
       return { kind: s.kind }
     case "detected":
-      return TRIGGERS.includes(s.trigger)
-        ? { kind: "detected", trigger: s.trigger as RepairTrigger }
+      return isTrigger(s.trigger)
+        ? { kind: "detected", trigger: s.trigger }
         : "unreadable"
     case "booting-repair":
       return Array.isArray(s.progress) && s.progress.every(isText)

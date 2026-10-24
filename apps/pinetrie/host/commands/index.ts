@@ -90,6 +90,11 @@ export interface CommandDeps {
   /** The fact of an action on proposed changes is a late write. */
   readonly later: LaneDeps["later"]
   readonly relays: SendDeps["relays"]
+  /**
+   * Asks for the lane VM's failed repair again; null on a host without the
+   * repair's controls, which then has no `repair-again` command.
+   */
+  readonly repairAgain: (() => void) | null
 }
 
 /** Where a command runs: a step on the documents' keeper, your repo's owner, or a board move's three parts. */
@@ -127,6 +132,7 @@ const COMMAND_PLACE = {
   "undo-move": "documents",
   "set-command": "documents",
   "traces-seen": "documents",
+  "repair-again": "documents",
   workflow: "documents",
   mark: "documents",
   retitle: "documents",
@@ -416,6 +422,15 @@ export function createCommands(deps: CommandDeps): Commands {
       case "restore":
       case "resolve":
         throw new Error(`${intent.kind} is carried out outside a step`)
+      case "repair-again":
+        if (deps.repairAgain === null)
+          return settled({
+            kind: "refused",
+            code: ERR.UNKNOWN_KIND,
+            message: "this host does not repair the lane VM's disk",
+          })
+        deps.repairAgain()
+        return settled({ kind: "repair-asked" })
       case "reserve":
         return settled(
           (await deps.names.reserve(intent.lane)) === "held"

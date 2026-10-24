@@ -158,7 +158,8 @@ While the page syncs, "syncing…" leads its right end.
   panel is open); choosing **Inbox** shows the inbox's sections in the same
   menu, under **← back**. Then **Profile**, which opens your profile page
   (Pages, below), **Setup**, which opens what the host read of its config
-  (Pages, below), and **Sign in as someone else**, which forgets who this
+  (Pages, below), **Machine**, which opens the machine lanes run on (Pages,
+  below), and **Sign in as someone else**, which forgets who this
   device says you are and asks again (ADR-0037).
 - **Your inbox** (ADR-0030, ADR-0077, ADR-0091), beside you: one menu of
   what needs you, its trigger a tray icon named **Inbox** and what needs
@@ -218,16 +219,14 @@ While the page syncs, "syncing…" leads its right end.
   that failed, "the lane VM's disk could not be repaired: …; it is tried
   again once the disk could grow: raise `lanes.store.max`, or free the
   Mac's disk"). Shape and colour both, never colour alone; never a
-  badge, never moving. Its title, which is also its accessible name, names
-  the worst cause in words, with how many more ("The machine lanes run on:
+  badge, never moving. Its title names the worst cause in words, with how many more ("The machine lanes run on:
   work is slowed: the lanes' disk is low: 6 GB left, 20 GB at least", and,
   where the lane VM's disk will grow, "; it grows when the lane VM next
   starts"); a
   cause that slows no work says so without "work is slowed" ("a turn's
   snapshot could not be recorded: branching at it starts from the turn
-  before"). It is
-  a status, not a control, until the Machine page it will open (Deferred,
-  below). The host plans it from samples every few seconds, each cause
+  before"). Its accessible name is its title and where it goes: it is a
+  button that opens the Machine page (Pages, below). The host plans it from samples every few seconds, each cause
   entering and leaving by counts of samples so it does not flap, and writes
   it only when it changes, at its start and at its stop, so no tab reads a
   stopped host's (`packages/machine/TECHNICAL.md`).
@@ -317,6 +316,42 @@ nothing; Ctrl+Shift+L still folds the sidebar.
     folder, then every command.
   - **Context files**: the files the model is given, `AGENTS.md` and the
     like: pine·trie's own and those inside the project.
+- **Machine** (ADR-0210), from the same menu, under **Setup**, and from
+  the footer's machine glyph: the machine lanes run on, as the host last
+  sampled it, asked for again at each sample while the page shows (it
+  never makes the host sample sooner). Every reading pine·trie could not
+  take says why ("not read: the host outside this lane runs it"), never
+  0; before the first sample, each section waits for it.
+  - **Now**: each cause the glyph would name, worst first, with what
+    pine·trie is doing about it ("it holds new runs' starts until there is
+    room") and what you can do ("archive the canvases you are done with:
+    their snapshots are deleted; or raise `lanes.store.max`").
+  - **Threads**: each running lane by its thread's name, held lanes
+    first: its memory against its limit, its own and its cache, its
+    snapshots and their estimated size, and how it is held. A row opens
+    its thread's canvas; **Archive** beside it, where the board offers its
+    canvas the archive, asks first, saying what the upkeep then frees and
+    what it withdraws, and is disabled with why while the canvas is busy.
+  - **Machine**: memory available of its total and the memory rung; the
+    pressure; the lanes' disk against what pine·trie keeps and its
+    largest size ("38 GB unallocated of 400 GB; pine·trie keeps 40 GB at
+    least"); your disk against what pine·trie leaves free of it; on the
+    Mac, "the lane VM may use up to 8 GB of your Mac's memory".
+  - **Host**: lanehost's disk and privileged services and the file
+    observer, each against its limit.
+  - **Lately**: newest first, what happened: a lane held or let go,
+    memory's rung moving, the disk's repair moving, a command or a service
+    killed for memory, old snapshots deleted, the host stalling, a slow
+    step or `jj` command, a repair asked for again.
+  - **Repair again**, only where this host may repair the lane VM's disk
+    and its last repair failed: it asks first, saying what it costs
+    ("every running thread on every host waits while the lane VM is
+    stopped and its disk repaired") and why the last one failed.
+  - **Copy diagnostics** copies one text: the page in words, the
+    measurements' newest rows under what they were measured on (the
+    host's version among it), and on the Mac the lane VM's logs' tails.
+    **Ask an agent about this** opens a new canvas whose first thread has
+    `@agent ` and the diagnostics typed, not sent.
 - **A send that needs a model the host has not** is refused in the
   composer: the button reads **no model**, its title why, and **See Setup**
   beside it opens the page. A send to people needs no model, and is sent.
@@ -1688,9 +1723,8 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
-- **The Machine page** (ADR-0210): the footer's machine status (above)
-  opens it (`#machine`): each thread's lane, the machine, the host, and
-  what can be done. A red cause that needs a choice is in the inbox too.
+- **What the Machine page cannot do yet** (ADR-0210): restart the lane
+  VM, and a red cause that needs a choice in the inbox's **Needs you**.
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file. Threads from any root, note columns and media columns (ADR-0182)
   are built (above).

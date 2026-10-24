@@ -14,6 +14,7 @@ import { createBody } from "./api.ts"
 import { buildError } from "./cli.ts"
 import {
   cgroupMount,
+  containerService,
   type DockerHostFacts,
   dockerWords,
   eventsSince,
@@ -22,7 +23,6 @@ import {
   imageEnvPath,
   isNewEvent,
   isRootless,
-  killedService,
   LANEHOST_LABEL,
   type Listed,
   labelled,
@@ -40,6 +40,7 @@ import {
   renderHelper,
   renderRun,
   runningLanes,
+  runningServices,
   systemTimeNanos,
   unneededImageTags,
 } from "./plan.ts"
@@ -619,31 +620,60 @@ describe("the events a service's kill is heard from", () => {
 
   test("each role of this project, and this version's observer, is named", () => {
     expect([
-      killedService(
+      containerService(
         event("r", { [PROJECT_LABEL]: "p1", [LANEHOST_LABEL]: "disks" }),
         ours,
       ),
-      killedService(
+      containerService(
         event("r", { [PROJECT_LABEL]: "p1", [LANEHOST_LABEL]: "privileged" }),
         ours,
       ),
-      killedService(event(observerContainer("v1")), ours),
+      containerService(event(observerContainer("v1")), ours),
     ]).toEqual(["disks", "privileged", "observer"])
   })
 
   test("a lane, another project's role and another version's observer are none", () => {
     expect([
-      killedService(event("pinetrie-t-1", { [PROJECT_LABEL]: "p1" }), ours),
-      killedService(
+      containerService(event("pinetrie-t-1", { [PROJECT_LABEL]: "p1" }), ours),
+      containerService(
         event("r", { [PROJECT_LABEL]: "p2", [LANEHOST_LABEL]: "disks" }),
         ours,
       ),
-      killedService(event(observerContainer("v0")), ours),
-      killedService(event(observerContainer("v1")), {
+      containerService(event(observerContainer("v0")), ours),
+      containerService(event(observerContainer("v1")), {
         ...ours,
         observer: null,
       }),
     ]).toEqual([null, null, null, null])
+  })
+
+  test("the services running are this project's roles and this version's observer, each by its full id", () => {
+    const listed = (
+      id: string,
+      name: string,
+      state: string,
+      labels: Record<string, string> = {},
+    ) => ({ id, name, state, labels, binds: [] })
+    expect(
+      runningServices(
+        [
+          listed("d1", "r1", "running", {
+            [PROJECT_LABEL]: "p1",
+            [LANEHOST_LABEL]: "disks",
+          }),
+          listed("p1", "r2", "exited", {
+            [PROJECT_LABEL]: "p1",
+            [LANEHOST_LABEL]: "privileged",
+          }),
+          listed("l1", "pinetrie-t-1", "running", { [PROJECT_LABEL]: "p1" }),
+          listed("o1", observerContainer("v1"), "running"),
+        ],
+        ours,
+      ),
+    ).toEqual([
+      { service: "disks", id: "d1" },
+      { service: "observer", id: "o1" },
+    ])
   })
 
   test("a resume's since pads its nanoseconds", () => {

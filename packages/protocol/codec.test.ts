@@ -542,6 +542,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       command: null,
     },
     { kind: "traces-seen", traces: ["t-1", "t-2"] },
+    { kind: "repair-again" },
     {
       kind: "card-width",
       card: threadIdFor("abc"),
@@ -682,6 +683,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "reserved" },
     { kind: "seen" },
     { kind: "accepted-moved" },
+    { kind: "repair-asked" },
     { kind: "queued" },
     { kind: "moved" },
     { kind: "held" },

@@ -6,11 +6,21 @@ const markdown = "packages/web/markdown.ts"
 const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the Machine page, in the browser suite ──
+  {
+    name: "the footer's status opens no page",
+    file: "packages/web/footer.tsx",
+    from: 'onOpen={() => onIntent({ kind: "page", to: "machine" })}',
+    to: "onOpen={() => {}}",
+    suite: "browser",
+    scenario: "machine-page",
+    expect: "the footer's machine status opens the Machine page",
+  },
   // ── the machine's status, in the browser suite ──
   {
     name: "the footer leaves out the machine's status",
     file: "packages/web/footer.tsx",
-    from: "        <MachineStatus view={machine} />\n",
+    from: '        <MachineStatus\n          onOpen={() => onIntent({ kind: "page", to: "machine" })}\n          view={machine}\n        />\n',
     to: "",
     suite: "browser",
     scenario: "tools",

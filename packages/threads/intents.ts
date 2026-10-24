@@ -399,6 +399,11 @@ export type Intent =
    * the sender's are ignored.
    */
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
+  /**
+   * Run the lane VM's failed disk repair again (the Machine page's Repair
+   * again): a host without the repair's controls has no such command.
+   */
+  | { readonly kind: "repair-again" }
 
 /**
  * What can be done with proposed changes: accept it into accepted work or a

@@ -1,8 +1,9 @@
 // host/routes — what the host does with a request or an upgrade, pure:
-// admission first (admission.ts), then which requests it answers itself, an
-// image blob or a review's read. Everything else is the page's: Vite's,
-// or a file of the built page (`planPageRequest`). `http.ts` carries each
-// plan out.
+// admission first (admission.ts), then which requests it answers itself: an
+// image blob, a review's read, or the machine's (the Machine page's facts,
+// its diagnostics, the measurements' export). Everything else is the page's:
+// Vite's, or a file of the built page (`planPageRequest`). `http.ts` carries
+// each plan out.
 
 import { isSha256, type Sha256 } from "@pinetrie/core"
 import { parseReviewPath, type ReviewAsk } from "@pinetrie/rules"
@@ -15,6 +16,10 @@ export type Route =
   | { readonly kind: "review"; readonly ask: ReviewAsk }
   /** The machine's measurements of the last `days` days, as JSON lines. */
   | { readonly kind: "measurements"; readonly days: number }
+  /** The Machine page's facts, as JSON. */
+  | { readonly kind: "machine" }
+  /** The Machine page's diagnostics, as text. */
+  | { readonly kind: "machine-diagnostics" }
   | { readonly kind: "bad" }
   | { readonly kind: "other" }
 
@@ -32,8 +37,9 @@ function measurementsRoute(url: URL): Route {
 /**
  * What a request is for. `GET /blob/<anything>` is a blob's, with a null hash
  * when it names none: a 404. Anything under `/review/` that `parseReviewPath`
- * does not accept, or that is not a `GET`, is `bad`: a 400. Neither reaches
- * the page: Vite's fallback would answer `index.html`.
+ * does not accept, or that is not a `GET`, is `bad`: a 400; so is a `/machine`
+ * path asked with another method. None reaches the page: Vite's fallback
+ * would answer `index.html`.
  */
 export function route(method: string | undefined, url: URL): Route {
   const { pathname } = url
@@ -44,6 +50,10 @@ export function route(method: string | undefined, url: URL): Route {
   if (pathname === "/blob" && method === "POST") return { kind: "blob-post" }
   if (pathname === "/machine/measurements")
     return method === "GET" ? measurementsRoute(url) : { kind: "bad" }
+  if (pathname === "/machine")
+    return method === "GET" ? { kind: "machine" } : { kind: "bad" }
+  if (pathname === "/machine/diagnostics")
+    return method === "GET" ? { kind: "machine-diagnostics" } : { kind: "bad" }
   const ask = parseReviewPath(url)
   if (ask === null) return { kind: "other" }
   if (ask === "bad" || method !== "GET") return { kind: "bad" }

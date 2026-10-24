@@ -83,6 +83,7 @@ A type lives in the highest package that all its users can import
 | `folder.ts`, `runs.ts`, `output.ts`, `images.ts` | a folder project's history; what a command did to a disk; what a `bash` call wrote, by statement; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
 | `size.ts`, `machine.ts` | a size, read (`parseSize`); the machine's health (`MachineHealth`, `MachineCause`) and what lanehost reads of it (`Pressure`, `CgroupMemory`, `StoreRoom`), which `@pinetrie/machine` plans from, rules stores and interface words |
+| `machine-page.ts` | what the host serves the Machine page (`MachinePageFacts`): a reading or why not (`Measured`), each lane, each service (`ServiceReading`), what happened (`MachineLately`, `EventMeasured`), the actions this host can take (`MachineAction`), and the sample's cadence the page asks at (`MACHINE_SAMPLE_MS`) |
 
 ## Output apart from runs (`output.ts`)
 

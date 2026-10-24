@@ -40,5 +40,5 @@ service run as the user.
    wrote 5000 MiB again with the footprint unchanged.
 
 So the Mac's cost of the VM is its high-water mark up to its size
-(`vmMemory`), and only a stop gives it back: the launcher's idle stop
+(`vmMemoryCeiling`), and only a stop gives it back: the launcher's idle stop
 after 10 minutes without a lease does, and nothing else would.

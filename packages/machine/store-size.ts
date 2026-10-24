@@ -2,7 +2,7 @@
 // holds and the volume holding it, within both settings. The one maker of
 // `StoreSize`: a disk is only ever grown to one.
 
-import type { Capabilities } from "./capabilities.ts"
+import type { StoreCapabilities } from "./capabilities.ts"
 import type { MachineSample } from "./sample.ts"
 import {
   leaveFreeBytes,
@@ -37,7 +37,7 @@ export interface StoreSizeFacts {
 export function planStoreSize(
   facts: StoreSizeFacts,
   settings: Pick<StoreSettings, "max" | "leaveFree">,
-  capabilities: Capabilities,
+  capabilities: StoreCapabilities,
 ): StoreSize | null {
   if (!capabilities.grow) return null
   const unallocated = facts.size - facts.allocated
@@ -63,7 +63,7 @@ export function planStoreSize(
 export function plannedStoreSize(
   sample: MachineSample,
   settings: Pick<StoreSettings, "leaveFree" | "max">,
-  capabilities: Capabilities,
+  capabilities: StoreCapabilities,
 ): number | null {
   const { store } = sample
   if (store === null) return null

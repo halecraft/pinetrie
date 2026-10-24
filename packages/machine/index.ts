@@ -2,11 +2,11 @@
 // I/O: the host hands it ports (`TECHNICAL.md`).
 
 export {
-  type Capabilities,
-  planCapabilities,
+  planStoreCapabilities,
+  type StoreCapabilities,
   type StoreTarget,
 } from "./capabilities.ts"
-export { ROOM_SPENT } from "./health.ts"
+export { ROOM_SPENT, WAITING } from "./health.ts"
 export { type LaneImportance, rankLanes } from "./importance.ts"
 export {
   createMachineManager,
@@ -15,6 +15,7 @@ export {
   type ManagerNews,
 } from "./manager.ts"
 export {
+  causeEvents,
   commandProgram,
   type DecisionMeasured,
   type LaneMeasured,
@@ -40,6 +41,7 @@ export {
 export { runRepairSteps } from "./repair-steps.ts"
 export type {
   LaneSample,
+  MachineReading,
   MachineSample,
   SensedSample,
   UpkeepHeard,
@@ -49,8 +51,10 @@ export {
   ROW_STATES,
   type RowState,
   type SnapshotIndex,
+  type SnapshotReads,
   type SnapshotRow,
   type SnapshotTaking,
+  snapshotsByLane,
 } from "./snapshot-index.ts"
 export type {
   RecordedSnapshot,
@@ -61,6 +65,8 @@ export type {
 export {
   LEAVE_FREE_DEFAULT,
   type LeaveFree,
+  leaveFreeBytes,
+  minimumUnallocated,
   type StoreSettings,
 } from "./store-settings.ts"
 export {

@@ -4,6 +4,7 @@
 
 import type {
   Deletable,
+  EventMeasured,
   IndexedSnapshot,
   SnapshotId,
   ThreadId,
@@ -166,20 +167,24 @@ export function keptMeasurements(): MachineMeasurements & {
   readonly samples: SampleMeasured[]
   readonly lanes: LaneMeasured[]
   readonly decisions: DecisionMeasured[]
+  readonly events: EventMeasured[]
   readonly trims: { count: number }
 } {
   const samples: SampleMeasured[] = []
   const lanes: LaneMeasured[] = []
   const decisions: DecisionMeasured[] = []
+  const events: EventMeasured[] = []
   const trims = { count: 0 }
   return {
     samples,
     lanes,
     decisions,
+    events,
     trims,
     recordSample: row => void samples.push(row),
     recordLaneSamples: rows => void lanes.push(...rows),
     recordDecisions: rows => void decisions.push(...rows),
+    recordEvents: rows => void events.push(...rows),
     trim: () => {
       trims.count++
     },

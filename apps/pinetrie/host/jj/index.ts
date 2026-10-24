@@ -59,12 +59,19 @@ const commandWords = (c: TimedCommand): string => {
  * An `onSlowCommand` handler that logs `[host] <where>: <command> ran <n> ms`:
  * one command, where `slow` names only the step it ran in.
  */
-function slowCommand(
-  basics: Pick<Basics, "log">,
+export function slowCommand(
+  basics: Pick<Basics, "log" | "recordEvent">,
   where: string,
 ): (command: TimedCommand) => void {
-  return c =>
+  return c => {
     basics.log(`[host] ${where}: ${commandWords(c)} ran ${Math.round(c.ms)} ms`)
+    basics.recordEvent({
+      kind: "slow-command",
+      program: c.program,
+      subcommand: c.args[0] ?? null,
+      ms: Math.round(c.ms),
+    })
+  }
 }
 
 export function startJjProject(dir: JjProjectDir): ProjectAdapter {
