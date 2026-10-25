@@ -20,20 +20,22 @@ const NEXT = entryId("e-next")
 describe("planConflictAsk", () => {
   test("a copy with a conflict is asked about, and the ask names its run", () => {
     expect(planConflictAsk(LANE, ["a.txt"], RUN)).toEqual({
-      asked: true,
+      kind: "asked",
       writes: [setRecord(CONFLICT_ASK, { lane: LANE, run: RUN })],
     })
   })
 
   test("a copy with no conflict asks nothing and records nothing", () => {
-    expect(planConflictAsk(LANE, [], RUN)).toEqual({
-      asked: false,
-      writes: [],
-    })
+    expect(planConflictAsk(LANE, [], RUN)).toEqual({ kind: "no-conflict" })
+  })
+
+  test("a conflict with no run to name is not asked about", () => {
+    expect(planConflictAsk(LANE, ["a.txt"], null)).toEqual({ kind: "no-run" })
   })
 
   test("the record decodes as it was written", () => {
-    const [write] = planConflictAsk(LANE, ["a.txt"], RUN).writes
+    const plan = planConflictAsk(LANE, ["a.txt"], RUN)
+    const [write] = plan.kind === "asked" ? plan.writes : []
     expect(
       write?.kind === "set"
         ? CONFLICT_ASK.decode(write.value, write.key)

@@ -162,11 +162,16 @@ export type MergedOf<P extends string> =
   | { readonly kind: "refused"; readonly reason: string }
 type Merged = MergedOf<PointId>
 
-/** A conflicted merge on the lane's line, as `merge` answers one, and where it came from. */
-type UnresolvedMergeOf<P extends string> = Extract<
+/** A merge that left conflicts, as `merge` answers one. */
+export type ConflictedMergeOf<P extends string> = Extract<
   MergedOf<P>,
   { readonly kind: "conflicted" }
-> & { readonly source: MergeSource }
+>
+
+/** A conflicted merge on the lane's line, and where it came from. */
+export type UnresolvedMergeOf<P extends string> = ConflictedMergeOf<P> & {
+  readonly source: MergeSource
+}
 
 /** What a change to the lane is recorded as: its title and its entry. */
 export interface Edits {

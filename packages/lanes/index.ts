@@ -17,6 +17,7 @@ export { type ForkSteps, OLD_LANE_CONFIG_DIR, planFork } from "./fork.ts"
 export {
   type AcceptedNow,
   baseCheckout,
+  type ConflictedMergeOf,
   type Edits,
   type FileAt,
   type Follow,
@@ -29,6 +30,7 @@ export {
   type TouchedRevision,
   type TurnCommitted,
   type TurnCommittedOf,
+  type UnresolvedMergeOf,
 } from "./history-port.ts"
 export { gatherLinks } from "./host.ts"
 export { checkImage, prepareImages, projectContainerfile } from "./image.ts"

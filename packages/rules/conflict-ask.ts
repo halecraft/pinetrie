@@ -39,25 +39,33 @@ export const CONFLICT_ASK: RecordSpec<
   })),
 }
 
-/** What an `ask_about_conflict` call comes to. */
-interface ConflictAskPlan {
-  /** The person is asked: the lane's copy has a conflict to ask about. */
-  readonly asked: boolean
-  readonly writes: readonly ValueWrite<"session">[]
-}
+/**
+ * What an `ask_about_conflict` call comes to: the person asked, with the
+ * ask's record; or not, with no conflict to ask about, or no run to name.
+ */
+type ConflictAskPlan =
+  | {
+      readonly kind: "asked"
+      readonly writes: readonly ValueWrite<"session">[]
+    }
+  | { readonly kind: "no-conflict" }
+  | { readonly kind: "no-run" }
 
 /**
  * An ask is taken only while the lane's copy is conflicted (`conflicts`, from
- * its history); one taken is recorded with `run`, the asking run's prompt.
+ * its history), and recorded with `run`, the asking run's prompt; with none,
+ * nothing would ever end it, so it is not taken.
  */
 export const planConflictAsk = (
   lane: ThreadId,
   conflicts: readonly string[],
-  run: EntryId,
+  run: EntryId | null,
 ): ConflictAskPlan =>
   conflicts.length === 0
-    ? { asked: false, writes: [] }
-    : { asked: true, writes: [setRecord(CONFLICT_ASK, { lane, run })] }
+    ? { kind: "no-conflict" }
+    : run === null
+      ? { kind: "no-run" }
+      : { kind: "asked", writes: [setRecord(CONFLICT_ASK, { lane, run })] }
 
 /**
  * The lanes whose agent still waits on its question: its ask names the run

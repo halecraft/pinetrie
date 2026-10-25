@@ -1004,9 +1004,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a copy with no conflict is asked about",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: "      return plan.asked\n",
-    to: "      return true\n",
+    file: "packages/rules/conflict-ask.ts",
+    from: '  conflicts.length === 0\n    ? { kind: "no-conflict" }\n',
+    to: '  false\n    ? { kind: "no-conflict" }\n',
     command: unit,
     expect:
       "refused with no conflict, and for a lane that works directly, which jj is never asked about",

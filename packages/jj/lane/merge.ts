@@ -13,13 +13,13 @@
 import {
   type BaseTrailer,
   type CommitId,
-  type MergeSource,
   messageBase,
   messageSources,
   type ThreadId,
   trailerRevset,
 } from "@pinetrie/core"
 import {
+  type ConflictedMergeOf,
   describeFailure,
   executeOrThrow,
   type LaneRunners,
@@ -27,6 +27,7 @@ import {
   type MergedOf,
   type Runner,
   type TouchedRevision,
+  type UnresolvedMergeOf,
 } from "@pinetrie/lanes"
 import {
   bookmarkName,
@@ -412,7 +413,7 @@ async function conflictedMerge(
     readonly joined: readonly CommitId[]
     readonly files: readonly string[]
   },
-): Promise<Extract<MergedOf<CommitId>, { readonly kind: "conflicted" }>> {
+): Promise<ConflictedMergeOf<CommitId>> {
   const { from, ours, joined, files } = merge
   const contents: { path: string; content: string }[] = []
   for (const path of files)
@@ -453,12 +454,7 @@ export async function unresolvedMerge(
   jj: Runner,
   lane: ThreadId,
   wipPrefix: string,
-): Promise<
-  | (Extract<MergedOf<CommitId>, { readonly kind: "conflicted" }> & {
-      readonly source: MergeSource
-    })
-  | null
-> {
+): Promise<UnresolvedMergeOf<CommitId> | null> {
   // gather
   const files = await conflictsIn(jj)
   if (files.length === 0) return null

@@ -401,15 +401,14 @@ export function createUpdates(deps: {
         const doc = held === null ? null : await held.ready
         return doc === null ? null : readLatestPrompt(doc, lane)
       })()
-      if (run === null) {
+      const plan = planConflictAsk(lane, conflicts, run?.id ?? null)
+      if (plan.kind === "no-run")
         basics.log(
           `[host] ${readThreadName(docs.session, lane)}: an ask about a conflict found no run to name`,
         )
-        return false
-      }
-      const plan = planConflictAsk(lane, conflicts, run.id)
+      if (plan.kind !== "asked") return false
       await deps.records.writeValues(plan.writes)
-      return plan.asked
+      return true
     },
 
     async getLatestInRun(lane, from) {

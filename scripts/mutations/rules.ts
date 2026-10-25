@@ -2072,6 +2072,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a later run's report ends the ask",
   },
   {
+    name: "an ask with no run to name is taken",
+    file: "packages/rules/conflict-ask.ts",
+    from: '    : run === null\n      ? { kind: "no-run" }\n',
+    to: '    : false\n      ? { kind: "no-run" }\n',
+    command: unit,
+    expect: "a conflict with no run to name is not asked about",
+  },
+  {
     name: "a standing ask is not shown",
     file: "packages/rules/work-strip.ts",
     from: '  if (asking) return "needs-you"',

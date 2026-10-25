@@ -106,18 +106,13 @@ export function planGetLatest(
 
 /**
  * A conflicted merge the lane still holds, as its history found it again
- * (`LaneHistory.unresolvedMerge`, `@pinetrie/lanes`), read by its shape.
+ * (`LaneHistory.unresolvedMerge`, `@pinetrie/lanes`), read by its shape: a
+ * conflicted merge's facts before a floor is settled, and where it came from.
  */
-interface UnresolvedMerge {
-  readonly from: PointId
-  readonly contents: readonly {
-    readonly path: string
-    readonly content: string
-  }[]
-  readonly ours: readonly TouchedRevision[]
-  readonly theirs: readonly TouchedRevision[]
-  readonly source: MergeSource
-}
+type UnresolvedMerge = Omit<
+  Extract<SettleFacts, { readonly kind: "conflicted" }>,
+  "kind" | "floor" | "removed"
+> & { readonly source: MergeSource }
 
 /**
  * A conflicted merge the lane still holds, resolved again with nothing
