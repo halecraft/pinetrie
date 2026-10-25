@@ -16,20 +16,20 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   foreignIn,
-  heldIn,
+  notOnCanvasIn,
   runsIn,
   runThreads,
   takenIn,
-  threadCardHolding,
-} from "./held.ts"
+  threadSetAside,
+} from "./set-aside.ts"
 
-/** `heldIn` over `runThreads`: the gate's two steps, as it takes them. */
-const heldAt = (
+/** `notOnCanvasIn` over `runThreads`: the gate's two steps, as it takes them. */
+const setAsideAt = (
   at: Parameters<typeof runThreads>[0],
-  cards: Parameters<typeof heldIn>[1],
+  cards: Parameters<typeof notOnCanvasIn>[1],
   entryThread: Parameters<typeof runThreads>[1],
   forkOf: Parameters<typeof runThreads>[2],
-) => heldIn(runThreads(at, entryThread, forkOf), cards)
+) => notOnCanvasIn(runThreads(at, entryThread, forkOf), cards)
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -104,8 +104,8 @@ describe("runsIn: what each command runs or writes a message in", () => {
     expect(runsIn(command as Gated)).toEqual(at)
   })
 
-  test("heldIn: the first thread among them someone holds, an entry's by its tree", () => {
-    const held: CardRecord[] = [
+  test("notOnCanvasIn: the first thread among them in someone's inventory, an entry's by its tree", () => {
+    const inInventory: CardRecord[] = [
       {
         kind: "thread",
         id: T,
@@ -117,8 +117,13 @@ describe("runsIn: what each command runs or writes a message in", () => {
     ]
     const none = new Map()
     expect(
-      heldAt([{ kind: "thread", thread: T }], held, () => null, none),
-    ).toEqual({ thread: T, holding: { kind: "held", by: BEA } })
+      setAsideAt(
+        [{ kind: "thread", thread: T }],
+        inInventory,
+        () => null,
+        none,
+      ),
+    ).toEqual({ thread: T, setAside: { kind: "in-inventory", holder: BEA } })
     const COPY = threadIdFor("copy")
     const branch = {
       kind: "entry",
@@ -126,21 +131,21 @@ describe("runsIn: what each command runs or writes a message in", () => {
       entry: entryId("e"),
       starts: COPY,
     } as const
-    expect(heldAt([branch], held, () => T, none)).toEqual({
+    expect(setAsideAt([branch], inInventory, () => T, none)).toEqual({
       thread: T,
-      holding: { kind: "held", by: BEA },
+      setAside: { kind: "in-inventory", holder: BEA },
     })
     // A copy's first send, at its record's fork, runs in the copy.
     expect(
-      heldAt(
+      setAsideAt(
         [branch],
-        held,
+        inInventory,
         () => T,
         new Map([[COPY, { kind: "fork", at: entryId("e"), how: "copy" }]]),
       ),
     ).toBeNull()
     expect(
-      heldAt([{ kind: "thread", thread: T }], [], () => null, none),
+      setAsideAt([{ kind: "thread", thread: T }], [], () => null, none),
     ).toBeNull()
   })
 })
@@ -198,13 +203,13 @@ test("takenIn: the threads a change puts in an inventory that were not in one", 
     place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
     content: UNTICKED,
   }
-  const held: CardRecord = { ...on, place: { kind: "inventory", holder: BEA } }
-  expect(takenIn([on], [held])).toEqual([T])
-  expect(takenIn([held], [held])).toEqual([])
-  expect(takenIn([held], [on])).toEqual([])
+  const away: CardRecord = { ...on, place: { kind: "inventory", holder: BEA } }
+  expect(takenIn([on], [away])).toEqual([T])
+  expect(takenIn([away], [away])).toEqual([])
+  expect(takenIn([away], [on])).toEqual([])
 })
 
-test("a trashed thread is held by nobody, but trashing it stops its run and a command in it is refused", () => {
+test("a trashed thread is in nobody's inventory, but trashing it stops its run and a command in it is refused", () => {
   const on: CardRecord = {
     kind: "thread",
     id: T,
@@ -219,9 +224,29 @@ test("a trashed thread is held by nobody, but trashing it stops its run and a co
   }
   expect(takenIn([on], [trashed])).toEqual([T])
   expect(takenIn([trashed], [trashed])).toEqual([])
-  expect(threadCardHolding([trashed], T)).toEqual({ kind: "trashed" })
-  expect(threadCardHolding([on], T)).toEqual({ kind: "free" })
+  expect(threadSetAside([trashed], T)).toEqual({ kind: "trashed" })
   expect(
-    heldAt([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
-  ).toEqual({ thread: T, holding: { kind: "trashed" } })
+    setAsideAt(
+      [{ kind: "thread", thread: T }],
+      [trashed],
+      () => null,
+      new Map(),
+    ),
+  ).toEqual({ thread: T, setAside: { kind: "trashed" } })
+})
+
+test("threadSetAside: nothing keeps a thread on a canvas, or with no card, from running", () => {
+  const on: CardRecord = {
+    kind: "thread",
+    id: T,
+    owner: BEA,
+    placer: BEA,
+    place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
+    content: UNTICKED,
+  }
+  expect(threadSetAside([on], T)).toBeNull()
+  expect(threadSetAside([], T)).toBeNull()
+  expect(
+    threadSetAside([{ ...on, place: { kind: "inventory", holder: BEA } }], T),
+  ).toEqual({ kind: "in-inventory", holder: BEA })
 })

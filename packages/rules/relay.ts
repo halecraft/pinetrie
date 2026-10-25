@@ -24,11 +24,11 @@ import {
   ThreadIdSchema,
   WriterIdSchema,
 } from "./decode.ts"
-import { foreignLaneWords } from "./held.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { reachWords } from "./reach.ts"
 import { RelaySchema } from "./relay-codec.ts"
 import { transcriptLines } from "./request.ts"
+import { foreignLaneWords } from "./set-aside.ts"
 
 export const INCOMING_TYPE = "pinetrie.incoming"
 export const RELAY_TYPE = "pinetrie.relay"

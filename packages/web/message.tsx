@@ -134,7 +134,7 @@ function MessageView(p: MessageProps) {
         <span className="role">{speaker}</span>
         {p.crossCanvasLink !== undefined && (
           // Another canvas's thread it came from, opened as a fork row's link is;
-          // held elsewhere, it opens nothing.
+          // in someone else's inventory, it opens nothing.
           <Button
             look="plain"
             className="cross-canvas-link"

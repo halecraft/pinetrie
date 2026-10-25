@@ -133,9 +133,9 @@ describe("planGate", () => {
     })
     const roots = new Map([[ROOT, root]])
     expect(planGate(branch(), facts({ cards: [inInventory], roots }))).toEqual({
-      kind: "held",
+      kind: "not-on-canvas",
       thread: T,
-      holding: { kind: "held", by: BEA },
+      setAside: { kind: "in-inventory", holder: BEA },
     })
     expect(planGate(branch(), facts({ roots })).kind).toBe("cleared")
   })
@@ -152,22 +152,22 @@ describe("planGate", () => {
     )
   })
 
-  test("a send in a trashed thread is refused held, as trashed", () => {
+  test("a send in a trashed thread is refused as not on a canvas, trashed", () => {
     expect(planGate(popped, facts({ cards: [inTrash] }))).toEqual({
-      kind: "held",
+      kind: "not-on-canvas",
       thread: T,
-      holding: { kind: "trashed" },
+      setAside: { kind: "trashed" },
     })
   })
 
-  test("a send on a lane of another kind is refused foreign, after a hold", () => {
+  test("a send on a lane of another kind is refused foreign, after an inventory", () => {
     const lanes = new Map<ThreadId, LaneRecord>([[T, lane("folder")]])
     expect(planGate(atEnd, facts({ lanes }))).toEqual({
       kind: "foreign",
       lane: { kind: "foreign", lane: T, history: "folder" },
     })
     expect(planGate(atEnd, facts({ lanes, cards: [inInventory] })).kind).toBe(
-      "held",
+      "not-on-canvas",
     )
     expect(planGate(atEnd, facts({ lanes, kind: null })).kind).toBe("cleared")
   })

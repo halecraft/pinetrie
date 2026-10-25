@@ -81,6 +81,11 @@
   on a rail each says "Bea has it" and opens nothing. No agent's canvas
   list includes it. The words come from a value, in one function
   (`packages/interface/TECHNICAL.md`, "Words come from values").
+  *Amended (Duane, 2026-10-25):* they say "in Bea's inventory", as yours
+  says "in your inventory", and the code calls such a thread
+  `in-inventory`, never held: "held" is a queue paused, or a lane the
+  machine holds, and the page shows both beside a thread. The one wording
+  is rules' `inventoryHolderWords`.
 - **Its history above its fork is not its own.** A thread that branched
   from it still reads and shows its whole path; only the entries after the
   fork, which are the taken thread's, stay its holder's.

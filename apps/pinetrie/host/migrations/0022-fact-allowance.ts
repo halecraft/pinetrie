@@ -7,7 +7,7 @@
 // One-time: when deleted, its name moves to `RETIRED_MIGRATIONS`.
 
 import { FACT_TYPE } from "@pinetrie/rules"
-import { rewriteHistory, rewritePlacesRows } from "./rewrite.ts"
+import { queuedFactRow, rewriteHistory, rewritePlacesRows } from "./rewrite.ts"
 
 /** A stored fact in the old words, renamed; null for any other. */
 export function factAllowance(fact: unknown): object | null {
@@ -29,19 +29,7 @@ export const factAllowanceMigration = rewriteHistory({
 })
 
 /** A places row holding a queued fact in the old words, renamed; null for any other. */
-export function queuedFactAllowance(row: unknown): object | null {
-  if (row === null || typeof row !== "object") return null
-  const { fact } = row as { readonly fact?: unknown }
-  if (typeof fact !== "string" || fact === "") return null
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(fact)
-  } catch {
-    return null
-  }
-  const renamed = factAllowance(parsed)
-  return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }
-}
+export const queuedFactAllowance = queuedFactRow(factAllowance)
 
 export const queuedFactAllowanceMigration = rewritePlacesRows({
   name: "0022-queued-fact-allowance",

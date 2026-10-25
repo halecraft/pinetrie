@@ -89,11 +89,14 @@ describe("projectColumns", () => {
     ])
     expect([shared?.forkFrom, ids(shared?.above ?? [])]).toEqual(["1-t1", []])
   })
-  test("a branch not yet sent from a held thread leaves that thread's entries out", () => {
-    const held = entryThread(i, entryId("6-b1"))
-    expect(held).not.toBeNull()
+  test("a branch not yet sent from a thread in someone else's inventory leaves that thread's entries out", () => {
+    const inInventory = entryThread(i, entryId("6-b1"))
+    expect(inInventory).not.toBeNull()
     const [c] = projectColumns(i, [
-      { anchor: entryId("7-b2"), ...(held === null ? {} : { hide: held }) },
+      {
+        anchor: entryId("7-b2"),
+        ...(inInventory === null ? {} : { hide: inInventory }),
+      },
     ])
     expect(ids(c?.nodes ?? [])).toEqual(["1-t1", "2-t2"])
   })

@@ -108,7 +108,7 @@ const onRoot = (root: string): Layout =>
       list: [ROOT_CANVAS(root)],
       cardsOn: CANVASES.index.cardsOn,
       unstarted: new Map(),
-      holders: new Map(),
+      inventoryHolders: new Map(),
     },
   )
 /** On no canvas. */
@@ -750,7 +750,7 @@ describe("planIntent", () => {
     })
 
     test("put: a thread's card from your inventory lands unfolded just after the column it was put on", () => {
-      const held: CardRecord = {
+      const inYourInventory: CardRecord = {
         kind: "thread",
         id: LINKED,
         owner: ME,
@@ -760,7 +760,7 @@ describe("planIntent", () => {
       }
       const state = at(onRoot("1-r1"), indexAsks(index), {
         ...NO_CARDS,
-        cards: [held],
+        cards: [inYourInventory],
       })
       const effects = plan(
         {
@@ -802,7 +802,7 @@ describe("planIntent", () => {
       ])
     })
 
-    test("open-link: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing", () => {
+    test("open-link: a thread in your inventory opens its preview there; one in someone else's, or with no card, nothing", () => {
       const mine = threadLink(LINKED, [inventoryOf(ME)], ME)
       const slots = { "4": LINKED }
       expect(
@@ -815,9 +815,9 @@ describe("planIntent", () => {
         { kind: "inventory", act: { kind: "select", slot: 4 } },
         { kind: "inventory", act: { kind: "open" } },
       ])
-      const held = threadLink(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
+      const others = threadLink(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
       expect(
-        plan({ kind: "open-link", link: held, entry: entryId("3-b") }),
+        plan({ kind: "open-link", link: others, entry: entryId("3-b") }),
       ).toEqual([])
       expect(
         plan({

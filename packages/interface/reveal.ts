@@ -8,7 +8,7 @@ import type { EntryId, ThreadId } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import type { CardId, PlaceKey } from "@pinetrie/threads"
-import { heldByOthers } from "./canvas-columns.ts"
+import { threadsInOthersInventories } from "./canvas-columns.ts"
 import {
   type Effect,
   type IntentState,
@@ -148,7 +148,7 @@ function showThread(
     end,
     state.canvases.index,
     state.cards.lanes,
-    heldByOthers(state.cards.cards, state.cards.me),
+    threadsInOthersInventories(state.cards.cards, state.cards.me),
   )
   return {
     effects: [

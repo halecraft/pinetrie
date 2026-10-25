@@ -302,15 +302,15 @@ export function acceptanceDestinations(input: {
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
  * - `accepted`: accepted, as the commit with change id `as`;
- * - `held`: open, but it brings no file: accepted work already holds its work,
- *   by a route the ledger does not record, so there is nothing to add;
+ * - `nothing-to-add`: open, but it brings no file: accepted work already has
+ *   its work, by a route the ledger does not record;
  * - `open`: work to add. One you edited is open whatever its files: it is
  *   yours.
  */
 export type ProposedChangesStatus =
   | { readonly kind: "none" }
   | { readonly kind: "accepted"; readonly as: string }
-  | { readonly kind: "held"; readonly record: ProposedChangesRecord }
+  | { readonly kind: "nothing-to-add"; readonly record: ProposedChangesRecord }
   | { readonly kind: "open"; readonly record: ProposedChangesRecord }
 
 export function proposedChangesStatus(
@@ -318,20 +318,23 @@ export function proposedChangesStatus(
 ): ProposedChangesStatus {
   if (record === undefined) return { kind: "none" }
   if (record.kind === "folder")
-    return { kind: record.files.length === 0 ? "held" : "open", record }
+    return {
+      kind: record.files.length === 0 ? "nothing-to-add" : "open",
+      record,
+    }
   if (record.acceptedAs !== null)
     return { kind: "accepted", as: record.acceptedAs }
-  const held = record.files.length === 0 && !record.edited
-  return { kind: held ? "held" : "open", record }
+  const nothingToAdd = record.files.length === 0 && !record.edited
+  return { kind: nothingToAdd ? "nothing-to-add" : "open", record }
 }
 
-/** A record not yet accepted: open, or held (`proposedChangesStatus`). */
+/** A record not yet accepted: open, or with nothing to add (`proposedChangesStatus`). */
 export const isNotYetAccepted = (
   status: ProposedChangesStatus,
 ): status is Extract<
   ProposedChangesStatus,
-  { readonly kind: "open" | "held" }
-> => status.kind === "open" || status.kind === "held"
+  { readonly kind: "open" | "nothing-to-add" }
+> => status.kind === "open" || status.kind === "nothing-to-add"
 
 // ── its record, the page's cache ──────────────────────────────
 

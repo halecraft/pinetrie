@@ -240,8 +240,8 @@ the disk events' ring, batches or held notices.
 - What the host cannot tell, it does not act on (ADR-0067): proposed changes are
   built only from work known to change a file, from a known start, and an
   accepted thread commit that names no source (S97) leaves its lane
-  untraced until it gets the latest past it. Proposed changes already held are `held`
-  (S89).
+  untraced until it gets the latest past it. Proposed changes whose work accepted
+  work already has are `nothing-to-add` (S89).
 - A thread gets the latest from its base or the thread it branched from
   (ADR-0072); a publish catches your files up first (ADR-0090, ADR-0099),
   then moves the publish bookmark (ADR-0076). A publish's undo reverts its

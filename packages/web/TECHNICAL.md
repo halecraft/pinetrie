@@ -573,7 +573,8 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   folded, ＋ over its ▾, and makes a column of the canvas
   (`newColumnButton`).
 - **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
-  follow a `ThreadLink`; one held by someone else is disabled. A column
+  follow a `ThreadLink`; one to a thread in someone else's inventory is
+  disabled. A column
   whose path above its thread is folded (`ColumnView.above`) draws
   "↑ N earlier messages" under it, which unfolds it for the column's life.
 - **The rail draws a canvas's forest** (`canvasRail`), with each stub a button
@@ -582,7 +583,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   `ThreadPreviewView` opened on the bench (`thread-preview.tsx`), whose **put** puts it
   on the canvas you are on. A thread taken into an inventory stops, and its
   holder sees it there read only (ADR-0124): a mention of it opens nowhere
-  while someone else holds it (`inbox-menu.tsx`).
+  while it is in someone else's inventory (`inbox-menu.tsx`).
 - **Every column's header starts with its toggle and its box, and an
   unfolded one ends in ⋯** (ADR-0161, ADR-0177, ADR-0198): `.fold`,
   `.unfold` or `.trash-column` (a bin), then `.column-box`, a checkbox,
@@ -1152,8 +1153,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
   in an item's `⋯` names the threads whose proposed changes it withdraws (`openProposedByCanvas`,
   `dropsWords`). All read `openProposed`, which keeps only `proposedChangesStatus`'s
-  `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
-  add, so it is neither counted nor named, as the strip says.
+  `open` (ADR-0067): one whose work accepted work already has
+  (`nothing-to-add`) is neither counted nor named, as the strip says.
 - **Selectors in the browser suite:** a column's work strip is
   `.work.work-strip`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
@@ -1721,7 +1722,7 @@ inventory's grid columns are `--compact-w`, its frame two `--column`s.
   (`renderings.test.ts` proves it with `@ts-expect-error`). `DrawCard`
   picks the row by the card's kind, in a switch that is total too. A
   canvas's card is no `DrawnCard`: the board draws it (`boardView`), and an
-  inventory never holds one (`heldBy`).
+  inventory never has one (`ownInventoryCards`).
 - **The rows wrap what exists.** A text card normal is its text through
   `MessageText`, read only and bounded at a column's height
   (`.card-normal`); full, its editor in its frame (`BoundCardEditor`, with

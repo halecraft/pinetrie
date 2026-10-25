@@ -34,9 +34,9 @@ export type {
 } from "./client.ts"
 export {
   firstEmpty,
-  heldBy,
   type Intents,
   NO_INTENTS,
+  ownInventoryCards,
   type Slots,
   settleSlots,
 } from "./inventory.ts"

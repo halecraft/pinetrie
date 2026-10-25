@@ -45,7 +45,7 @@ import {
   type QueuedText,
   queuedOn,
   queuedTextCards,
-  threadCardHolding,
+  threadSetAside,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import {
@@ -266,10 +266,11 @@ export async function drain(
         lane,
         {
           running: readRunning(deps.basics.live, lane),
-          // A pop runs in its own thread: held, it has no runner, and a lane
-          // of another kind runs nothing. The gate refuses both at its send.
+          // A pop runs in its own thread: in an inventory or a trash, it has
+          // no runner, and a lane of another kind runs nothing. The gate
+          // refuses both at its send.
           away:
-            threadCardHolding(readPlaces(places), lane).kind !== "free" ||
+            threadSetAside(readPlaces(places), lane) !== null ||
             typeof deps.work.runnable(lane) === "object",
           held: readQueueHolds(deps.basics.session).has(lane),
           typing: readTypingIn(deps.presence),

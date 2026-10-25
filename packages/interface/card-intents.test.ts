@@ -105,7 +105,7 @@ const onR1: Layout = resolveLayout(
     list: [TEST_CANVAS],
     cardsOn: canvasesFor(index, [TEST_CANVAS, R1]).index.cardsOn,
     unstarted: new Map(),
-    holders: new Map(),
+    inventoryHolders: new Map(),
   },
 )
 const withUnstarted: Layout = layoutReducer(onR1, {
@@ -1342,14 +1342,17 @@ describe("landing a copy", () => {
     })
   })
 
-  test("an unaimed take is refused full at 12 held, though a slot among them is empty", () => {
-    const held = Array.from({ length: INVENTORY_SLOTS }, (_, n) =>
+  test("an unaimed take is refused full at 12 in the inventory, though a slot among them is empty", () => {
+    const inventoryCards = Array.from({ length: INVENTORY_SLOTS }, (_, n) =>
       card(cardIdFor(`h${n}`), inventory),
     )
     const s = state({
-      cards: held,
+      cards: inventoryCards,
       slots: Object.fromEntries(
-        held.map((c, n) => [String(n === 3 ? INVENTORY_SLOTS : n), c.id]),
+        inventoryCards.map((c, n) => [
+          String(n === 3 ? INVENTORY_SLOTS : n),
+          c.id,
+        ]),
       ),
     })
     expect(land(past, { kind: "inventory", slot: null }, s)).toEqual({

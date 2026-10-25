@@ -548,8 +548,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the fork point into view. A copy names its source instead, "↰ copied from
   amber-fox · Fix the sync bug", and a thread whose parent thread is in
   another canvas names that, "↰ from amber-fox · Fix the sync bug": clicking
-  either opens that canvas at the fork. Where someone holds the source in
-  their inventory, the row says "Bea has it" and opens nothing.
+  either opens that canvas at the fork. Where the source is in someone
+  else's inventory, the row says "in Bea's inventory" and opens nothing.
 - **A column's header is one line** (ADR-0198, ADR-0200, ADR-0203): its
   toggle, its box, its mark and name, its status, then who is reading,
   and ⋯. The mark and name are its handle: they drag it, and a press there
@@ -716,7 +716,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   bookmark and its proposed changes with it, and its messages stay in their root,
   where a link to it says "deleted".
 - **A branch not yet sent from a thread someone else has since taken**
-  keeps its text, but its column says "Bea has it" in place of that
+  keeps its text, but its column says "in Bea's inventory" in place of that
   thread's messages and sends nothing until the thread is on a canvas
   again.
 - **Each column's foot is its dock** (ADR-0113, ADR-0203), pinned there while the
@@ -965,8 +965,8 @@ the tree.
   for each root a thread of the canvas is in, each cut to the paths leading
   to the canvas's threads, in its root's own colours. A fork from those paths
   to a thread elsewhere is a stub, `↳ amber-fox`, titled where it is: a
-  click opens that canvas, or your inventory's preview; one someone else
-  holds says "Bea has it" and opens nothing.
+  click opens that canvas, or your inventory's preview; one in someone
+  else's inventory says "in Bea's inventory" and opens nothing.
 - A strip beside the sidebar draws every branch of a tree as a line,
   and every message as a dot, except for uneventful stretches (below). A row
   is a depth, not a turn in one order: a branch starts on the row under its
@@ -1105,7 +1105,7 @@ The rail is E; the column is T. Seeing both at once is the product.
     own agent out, as a person's mention does.
   - **Members are read from the thread's path**: a branch has the members
     its thread had where it forked. The column's header names them ("with
-    amber-fox"), a member out of reach as away ("slate-owl (Bea has it)",
+    amber-fox"), a member out of reach as away ("slate-owl (in Bea's inventory)",
     "(archived by Bea)"), and what agents talking from the thread spent
     ("agents used 38k of their 200k-token allowance"). An ask of a member out of reach is
     refused, saying why.
@@ -1573,8 +1573,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   **Enter, a click on the bench or on the card already selected, opens it
   there**, editable, the caret in its box; a reference opened shows **Edit
   as text**, and a thread its path read only, with no composer, queue or
-  run. Only its holder opens it: a link to it anywhere else says "Bea has
-  it". **×** on the open card, or **Escape**, closes it back to read only,
+  run. Only its holder opens it: a link to it anywhere else says "in Bea's
+  inventory". **×** on the open card, or **Escape**, closes it back to read only,
   the card kept in its slot; Escape with none open closes the panel. A
   click that ends a selection of the card's text opens nothing. A slot has
   no × of its own: **Delete** or Backspace on a selected slot trashes its

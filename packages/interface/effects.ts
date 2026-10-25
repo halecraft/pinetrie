@@ -40,7 +40,7 @@ import type {
   TypedMove,
 } from "@pinetrie/threads"
 import type { Raised } from "./attention.ts"
-import { firstUnticked, heldByOthers } from "./canvas-columns.ts"
+import { firstUnticked, threadsInOthersInventories } from "./canvas-columns.ts"
 import type { Canvases } from "./canvases.ts"
 import type { Quote } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
@@ -393,7 +393,7 @@ export function planOpenEntry(
     id,
     state.canvases.index,
     state.cards.lanes,
-    heldByOthers(state.cards.cards, state.cards.me),
+    threadsInOthersInventories(state.cards.cards, state.cards.me),
   )
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)

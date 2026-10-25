@@ -40,11 +40,11 @@ describe("inventoryView", () => {
     content: { command: null, unsent: null, origin: null },
   })
 
-  test("draws exactly settleSlots, the selection, and first lines; counts the cards held of 12", () => {
-    const held = [record(A), record(B)]
+  test("draws exactly settleSlots, the selection, and first lines; counts the cards in the inventory of 12", () => {
+    const inventoryCards = [record(A), record(B)]
     const slots = slotsOf({ "10": cardIdFor("cb") })
     const view = inventoryView({
-      held,
+      inventoryCards,
       slots,
       intents: NO_INTENTS,
       selected: 10,
@@ -63,7 +63,7 @@ describe("inventoryView", () => {
     )
     expect(drawn).toEqual(
       settleSlots(
-        held.map(c => c.id),
+        inventoryCards.map(c => c.id),
         slots,
         NO_INTENTS,
       ),
@@ -78,13 +78,13 @@ describe("inventoryView", () => {
       },
       selected: true,
     })
-    expect(view.held).toBe(2)
+    expect(view.inventoryCount).toBe(2)
     expect(view.grid.cells).toHaveLength(12)
   })
 
   test("labels the first nine slots 1–9 on their compacts", () => {
     const view = inventoryView({
-      held: [record(A)],
+      inventoryCards: [record(A)],
       slots: slotsOf({ "0": cardIdFor("ca") }),
       intents: NO_INTENTS,
       selected: 0,
@@ -109,7 +109,7 @@ describe("inventoryView", () => {
   test("the bench: an empty slot's number, a card normal, opened full", () => {
     const view = (selected: number, open: boolean) =>
       inventoryView({
-        held: [record(A)],
+        inventoryCards: [record(A)],
         slots: slotsOf({ "3": cardIdFor("ca") }),
         intents: NO_INTENTS,
         selected,
@@ -134,7 +134,7 @@ describe("inventoryView", () => {
   test("a slot's card may be trashed from it only if you may trash it, never an empty slot", () => {
     const cells = (me: typeof ADA) =>
       inventoryView({
-        held: [record(A)],
+        inventoryCards: [record(A)],
         slots: slotsOf({ "0": cardIdFor("ca") }),
         intents: NO_INTENTS,
         selected: 0,
@@ -186,7 +186,7 @@ test("a thread's glance: its name, its first line, where it ended, and its statu
   expect(glanceStatus(glance)).toBe("2 cards queued")
   expect(glanceStatus({ ...glance, stopped: true, queued: 0 })).toBe("stopped")
   const view = inventoryView({
-    held: [
+    inventoryCards: [
       {
         kind: "thread",
         id: T,

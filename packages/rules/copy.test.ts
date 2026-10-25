@@ -127,7 +127,7 @@ describe("planCopy", () => {
     ).toBe(false)
   })
 
-  test("refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory", () => {
+  test("refused: an end elsewhere, an id in use, a thread in someone else's inventory, or another's or a full inventory", () => {
     expect(plan({ end: entryId("c") })).toEqual({
       kind: "refused",
       why: "unknown",
@@ -145,13 +145,16 @@ describe("planCopy", () => {
         },
       }),
     ).toEqual({ kind: "refused", why: "taken" })
-    const held = {
+    const inBeasInventory = {
       ...onCanvas,
       place: { kind: "inventory", holder: BEA },
     } as const
-    expect(plan({}, [held])).toEqual({ kind: "refused", why: "held" })
-    // Your own held thread copies.
-    expect(plan({}, [held], BEA).kind).toBe("copy")
+    expect(plan({}, [inBeasInventory])).toEqual({
+      kind: "refused",
+      why: "in-others-inventory",
+    })
+    // A thread in your own inventory copies.
+    expect(plan({}, [inBeasInventory], BEA).kind).toBe("copy")
     expect(
       plan({
         move: {

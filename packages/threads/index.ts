@@ -100,7 +100,7 @@ export {
   UNTICKED,
 } from "./cards.ts"
 export { type TextEdit, tailEdit } from "./edits.ts"
-export type { Away, BranchedFact, Reach } from "./facts.ts"
+export type { Away, BranchedFact, InInventory, Reach } from "./facts.ts"
 export {
   firstEmpty,
   type Grid,

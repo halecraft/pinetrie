@@ -15,6 +15,7 @@ import { indexCanvases } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"
 import {
   awayWords,
+  inventoryHolderWords,
   lateAway,
   reachableAgents,
   reachWords,
@@ -54,7 +55,7 @@ describe("where a thread is", () => {
     const at = (t: typeof fox) => threadReach(t, { cards: all, archived })
     expect(at(fox)).toEqual({ kind: "open", canvas: open })
     expect(at(owl)).toEqual({ kind: "archived", canvas: done, record })
-    expect(at(elk)).toEqual({ kind: "held", by: bea })
+    expect(at(elk)).toEqual({ kind: "in-inventory", holder: bea })
     expect(at(threadIdFor("none"))).toEqual({ kind: "gone" })
   })
   test("each away reach in words, a sentence and a few", () => {
@@ -66,13 +67,27 @@ describe("where a thread is", () => {
         nameOf,
       ),
     ).toBe("slate-owl's canvas was archived by Ada")
-    expect(reachWords("jolly-elk", { kind: "held", by: bea }, nameOf)).toBe(
-      "Bea has jolly-elk",
-    )
+    expect(
+      reachWords("jolly-elk", { kind: "in-inventory", holder: bea }, nameOf),
+    ).toBe("jolly-elk is in Bea's inventory")
     expect(reachWords("x", { kind: "gone" }, nameOf)).toBe(
       "x is no longer on any canvas",
     )
-    expect(awayWords({ kind: "held", by: bea }, nameOf)).toBe("Bea has it")
+    expect(awayWords({ kind: "in-inventory", holder: bea }, nameOf)).toBe(
+      "in Bea's inventory",
+    )
+  })
+  test("an inventory is yours to its holder, and named to anyone else or to no person", () => {
+    const nameOf = (w: typeof ada) => (w === ada ? "Ada" : "Bea")
+    expect(inventoryHolderWords(bea, { me: bea, nameOf })).toBe(
+      "in your inventory",
+    )
+    expect(inventoryHolderWords(bea, { me: ada, nameOf })).toBe(
+      "in Bea's inventory",
+    )
+    expect(inventoryHolderWords(bea, { me: null, nameOf })).toBe(
+      "in Bea's inventory",
+    )
   })
   test("in reach: named threads of open canvases; not an archived canvas's, an inventory's, or an unnamed one", () => {
     const { cardsOn } = indexCanvases(all, new Map())

@@ -137,8 +137,8 @@ interface CanvasFacts {
   readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
   /** Each thread opened and not yet started (`unstartedThreads`). */
   readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
-  /** Each thread someone else holds, by its holder (`heldByOthers`). */
-  readonly holders: ReadonlyMap<ThreadId, WriterId>
+  /** Each thread in someone else's inventory, by its holder (`threadsInOthersInventories`). */
+  readonly inventoryHolders: ReadonlyMap<ThreadId, WriterId>
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
 }
@@ -442,7 +442,7 @@ export const drawnColumns = (
     index: facts.index,
     lanes: facts.lanes,
     unstarted: facts.unstarted,
-    holders: facts.holders,
+    inventoryHolders: facts.inventoryHolders,
   })
 }
 
@@ -483,7 +483,7 @@ export function planOpen(
   id: EntryId,
   canvases: Pick<CanvasIndex, "canvasOfThread" | "cardsOn">,
   lanes: readonly LaneView[],
-  holders: ReadonlyMap<ThreadId, WriterId>,
+  inventoryHolders: ReadonlyMap<ThreadId, WriterId>,
 ): OpenPlan | null {
   const thread = entryThread(index, id)
   if (thread === null || index.entries[id] === undefined) return null
@@ -494,7 +494,7 @@ export function planOpen(
       cardsOn: canvases.cardsOn,
       // An entry shown is in a started thread.
       unstarted: new Map(),
-      holders,
+      inventoryHolders,
       index,
       lanes,
     }),

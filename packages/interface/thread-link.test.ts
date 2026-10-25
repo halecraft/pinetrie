@@ -30,7 +30,7 @@ const at = (place: CardRecord["place"]): CardRecord[] => [
 ]
 const E = entryId("e-1")
 
-test("a link opens a thread's canvas, your own held thread's preview, and nothing for someone else's", () => {
+test("a link opens a thread's canvas, your own inventory's preview, and nothing for someone else's", () => {
   const open = threadLink(
     T,
     at({ kind: "canvas", canvas: CANVAS, order: "1", width: 1 }),
@@ -47,9 +47,12 @@ test("a link opens a thread's canvas, your own held thread's preview, and nothin
   const mine = threadLink(T, at({ kind: "inventory", holder: ADA }), ADA)
   expect(linkOpen(mine, E)).toEqual({ kind: "preview", thread: T })
   expect(linkWords(mine, reader, () => "")).toBe("in your inventory")
-  const held = threadLink(T, at({ kind: "inventory", holder: BEA }), ADA)
-  expect([linkOpen(held, E), opens(held)]).toEqual([{ kind: "nothing" }, false])
-  expect(linkWords(held, reader, () => "")).toBe("Bea has it")
+  const others = threadLink(T, at({ kind: "inventory", holder: BEA }), ADA)
+  expect([linkOpen(others, E), opens(others)]).toEqual([
+    { kind: "nothing" },
+    false,
+  ])
+  expect(linkWords(others, reader, () => "")).toBe("in Bea's inventory")
   const gone = threadLink(T, [], ADA)
   expect([linkOpen(gone, E), opens(gone)]).toEqual([{ kind: "nothing" }, false])
   expect(linkWords(gone, reader, () => "")).toBe("deleted")
@@ -73,7 +76,7 @@ test("a link to a trashed thread names the canvas it left, says so, and restores
 })
 
 test("a link is made only by threadLink", () => {
-  // @ts-expect-error: a link is threadLink's to make, so none reaches a held thread
+  // @ts-expect-error: a link is threadLink's to make, so none reaches a thread in someone else's inventory
   const forged: Parameters<typeof linkOpen>[0] = {
     kind: "open",
     thread: T,
@@ -100,10 +103,10 @@ test("a row from another canvas's thread says where it is; from this canvas, not
   expect([...came.keys()]).toEqual([entryId("a")])
   expect(came.get(entryId("a"))?.words).toBe("Sync bug")
   expect(crossCanvasLinks(nodes, { ...facts, here: CANVAS }).size).toBe(0)
-  const held = crossCanvasLinks(nodes, {
+  const others = crossCanvasLinks(nodes, {
     ...facts,
     cards: at({ kind: "inventory", holder: BEA }),
     here: CANVAS,
   })
-  expect(held.get(entryId("a"))?.words).toBe("Bea has it")
+  expect(others.get(entryId("a"))?.words).toBe("in Bea's inventory")
 })

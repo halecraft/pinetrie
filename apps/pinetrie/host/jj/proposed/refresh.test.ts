@@ -299,8 +299,8 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
   })
 }, 60_000)
 
-test("work you landed yourself leaves the proposed changes held: kept, with no files, and settled", async () => {
-  const you = await yourRepo("held")
+test("work you landed yourself leaves the proposed changes with nothing to add: kept, with no files, and settled", async () => {
+  const you = await yourRepo("nothing-to-add")
   const work = await you.commit(
     [you.base],
     { "a.txt": "a\n" },

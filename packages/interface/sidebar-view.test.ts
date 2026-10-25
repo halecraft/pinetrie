@@ -60,7 +60,7 @@ const layout = resolveLayout(
     list: [K("r1"), K("r2"), K("r3")],
     cardsOn: new Map(),
     unstarted: new Map(),
-    holders: new Map(),
+    inventoryHolders: new Map(),
   },
 )
 const none: UnsentSignals = {

@@ -504,7 +504,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inventory's grid never grows",
     file: "packages/threads/grid.ts",
-    from: "  rows: Math.max(INVENTORY_GRID.rows, Math.ceil(held / INVENTORY_GRID.width)),",
+    from: "  rows: Math.max(\n    INVENTORY_GRID.rows,\n    Math.ceil(inventoryCount / INVENTORY_GRID.width),\n  ),",
     to: "  rows: INVENTORY_GRID.rows,",
     command: unit,
     expect: "inventoryGrid grows a row for every two cards past 12",

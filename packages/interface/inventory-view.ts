@@ -33,8 +33,8 @@ type Bench =
 
 interface InventoryView {
   readonly grid: GridView
-  /** How many cards you hold, of `INVENTORY_SLOTS`: more while over. */
-  readonly held: number
+  /** How many cards your inventory has, of `INVENTORY_SLOTS`: more while over. */
+  readonly inventoryCount: number
   readonly bench: Bench
 }
 
@@ -44,7 +44,7 @@ export const slotKey = (slot: number): string | null =>
 
 /** What the panel draws: `settleSlots`, each slot with its card, and the bench. */
 export function inventoryView(input: {
-  readonly held: readonly DrawnCard[]
+  readonly inventoryCards: readonly DrawnCard[]
   readonly slots: Slots
   readonly intents: Intents
   readonly selected: number
@@ -64,10 +64,10 @@ export function inventoryView(input: {
   readonly open: boolean
 }): InventoryView {
   const byId = new Map<CardId, DrawnCard>(
-    input.held.map(c => [c.id, c] as const),
+    input.inventoryCards.map(c => [c.id, c] as const),
   )
   const settled = settleSlots(
-    input.held.map(c => c.id),
+    input.inventoryCards.map(c => c.id),
     input.slots,
     input.intents,
   )
@@ -77,7 +77,7 @@ export function inventoryView(input: {
     if (card !== undefined) placed.set(Number(slot), card)
   }
   const grid = gridView({
-    grid: inventoryGrid(input.held.length),
+    grid: inventoryGrid(input.inventoryCards.length),
     tone: "inventory",
     placed,
     selected: input.selected,
@@ -91,7 +91,7 @@ export function inventoryView(input: {
   })
   return {
     grid,
-    held: input.held.length,
+    inventoryCount: input.inventoryCards.length,
     bench:
       grid.card === null
         ? { kind: "empty", slot: input.selected }
@@ -104,8 +104,8 @@ export function inventoryView(input: {
 }
 
 /** The panel's count: "8/12", "13/12" while over. */
-export const inventoryCountWords = (held: number): string =>
-  `${held}/${INVENTORY_SLOTS}`
+export const inventoryCountWords = (inventoryCount: number): string =>
+  `${inventoryCount}/${INVENTORY_SLOTS}`
 
 /** What an empty slot on the bench says. */
 export const emptyBenchWords = (slot: number): string =>

@@ -964,8 +964,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
-    from: "    unstarted,\n    holders,\n  ])\n  // Every change is saved",
-    to: '    unstarted,\n    holders,\n  ])\n  const othersCanvases = canvases.byId.size\n  useEffect(() => {\n    const newest = [...canvases.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "canvas", canvas: newest } })\n  }, [othersCanvases])\n  // Every change is saved',
+    from: "    unstarted,\n    inventoryHolders,\n  ])\n  // Every change is saved",
+    to: '    unstarted,\n    inventoryHolders,\n  ])\n  const othersCanvases = canvases.byId.size\n  useEffect(() => {\n    const newest = [...canvases.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "canvas", canvas: newest } })\n  }, [othersCanvases])\n  // Every change is saved',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1470,8 +1470,8 @@ export const mutations: readonly Mutation[] = [
     // the strip reading the tree a frame late is what brings it back.
     name: "the strip reads the tree a frame behind the document",
     file: "packages/web/app.tsx",
-    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, index, lanes, holders],\n  )\n',
-    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, behind, lanes, holders],\n  )\n',
+    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            inventoryHolders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, index, lanes, inventoryHolders],\n  )\n',
+    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            inventoryHolders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, behind, lanes, inventoryHolders],\n  )\n',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -3178,7 +3178,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send runs in a thread in an inventory",
     file: "packages/rules/gate.ts",
-    from: '  if (held !== null) return { kind: "held", ...held }\n',
+    from: '  if (notOnCanvas !== null) return { kind: "not-on-canvas", ...notOnCanvas }\n',
     to: "",
     suite: "host",
     scenario: "cards",
@@ -3321,7 +3321,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the panel draws no clipboard cell",
     file: "packages/web/app.tsx",
-    from: "            cell={clipboardCellView(cell, slots, held.length)}",
+    from: "            cell={clipboardCellView(cell, slots, inventoryCards.length)}",
     to: "            cell={null}",
     suite: "browser",
     scenario: "images",

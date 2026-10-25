@@ -5,7 +5,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { HELD_WORDS } from "@pinetrie/interface"
+import { IN_INVENTORY_WORDS } from "@pinetrie/interface"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
@@ -414,7 +414,7 @@ test("nothing runs in a thread in an inventory", async () => {
     mode: "describe",
   })
   expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual(
-    Array(4).fill(["refused", HELD_WORDS]),
+    Array(4).fill(["refused", IN_INVENTORY_WORDS]),
   )
   const popped = await commands.sendPoppedQueuedCard(b.roots, ALICE, "s-1", {
     kind: "send",
@@ -430,7 +430,7 @@ test("nothing runs in a thread in an inventory", async () => {
   expect(popped).toEqual({
     kind: "refused",
     code: ERR.REFUSED,
-    message: HELD_WORDS,
+    message: IN_INVENTORY_WORDS,
   })
   expect(pi.calls).toEqual([])
 })
@@ -484,7 +484,7 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
   await commands.handle(sender, ALICE, said(cardIdFor("c2")))
   expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual([
     ["refused", words],
-    ["refused", HELD_WORDS],
+    ["refused", IN_INVENTORY_WORDS],
   ])
   expect(popped).toEqual({
     kind: "refused",

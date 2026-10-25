@@ -621,12 +621,18 @@ reading the store once, planning once, then acting:
     any mark is left alone. It must run before `recover`: an undecodable
     workflow reads as none, and `planWorkflowSeed` would write a new
     default whose state ids no canvas is in.
+  - `0030-fact-in-inventory` renames each `undelivered` fact's `why` from
+    `held` with its `by` to `in-inventory` with its `holder`, in every
+    root's history and every queued fact card (`factInInventory`), so
+    "held" names only a paused queue or lane, and `by` only who acted;
+    `content` untouched. The old shape no longer decodes.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
   with), which reads every document the namespace lives in before it
   writes any. `renamedFields` is the rewrite that renames top-level
-  fields. Given a `to`, it moves every record there, rewritten or as
+  fields, and `queuedFactRow` lifts a fact's rewrite to the places row of a
+  fact card still queued, whose fact is stored as JSON. Given a `to`, it moves every record there, rewritten or as
   stored, and deletes it from the old namespace in the same batch, so no
   run leaves a record in both, and over its own output the old namespace is
   empty. A migration names an old spelling or word on purpose, so its file
@@ -1535,7 +1541,7 @@ queued cards, which `planArchive` refuses.
     became of its thread, so a restored canvas's agents cannot spend it
     again;
   - the drain: a popped card's send is cleared by `planGate` (`writesIn`'s
-    `queue` case), its `away` is `threadCardHolding`, and no fact is queued in an
+    `queue` case), its `away` is `threadSetAside`, and no fact is queued in an
     archived canvas;
   - `relays.ts`' `ask`, `leave`, `relayMessage`, `relayCard` and `deliver`:
     each reads both threads' reach and refuses with `unreachableRefusal`
@@ -2351,7 +2357,7 @@ adapter's.
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
   `planInvites`, the responses, `planSettle`, `planInvocation`,
-  `storeChoice`, the startup lines' words (`startup-lines.ts`), `isHeld`,
+  `storeChoice`, the startup lines' words (`startup-lines.ts`),
   `planStart` (the store's start), and `planStartup` (`@pinetrie/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,

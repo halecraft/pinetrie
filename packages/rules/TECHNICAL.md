@@ -99,9 +99,9 @@ exported only where another package decides with it on its own
   answer; the relay's shape and an ask card's stored relay, which
   `card.ts` decodes.
 - `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
-- `held.ts`, `copy.ts`: a thread in an inventory (where a command runs,
-  who holds it, what a change takes) and a thread copied (ADR-0117,
-  ADR-0124).
+- `set-aside.ts`, `copy.ts`: a thread in an inventory or a trash (where a
+  command runs, whose inventory it is in, what a change takes) and a thread
+  copied (ADR-0117, ADR-0124).
 - `gate.ts`: the gate: what a command, or a send made for one, may do
   now, and its one pass (`Cleared`).
 - `queue-hold.ts`, `seat.ts`, `startup.ts`: a held queue, who wrote in a
@@ -656,7 +656,7 @@ which are swept.
   `someone-elses` for someone else's message). A move to `BACK`, or out of a
   trash to the very place the card left, is a restore. All of them share
   `handoff`, the compare-and-set and every check after it. A thread's
-  card in a trash is held by nobody (`threadCardHolding`: `trashed`), but its run
+  card in a trash is in nobody's inventory (`threadSetAside`: `trashed`), but its run
   stops (`takenIn`) and its queue waits. `planTrashSweep`
   (`card-history.ts`) deletes it once `trashDeadline` (its newest history
   event, `trashedTime`, plus the keep it is given) has passed, and with it every card
@@ -941,7 +941,7 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   if it is accepted, `planQueueHold` for the hold. `hold-if-idle` holds
   nothing on a running lane. The host writes the hold before it carries the
   move, so the move's drain finds the queue as planned. A send on an idle
-  held thread is `release`: sending removes the hold. A move with no `from`
+  thread whose queue is held is `release`: sending removes the hold. A move with no `from`
   makes the card in the queue, carrying the request's `command` in its
   first write, and a card that exists takes it in the move's own write
   (ADR-0203's "resolve and send"): a command sent as `set-command` after
@@ -1131,14 +1131,15 @@ width, so a card has one place by construction.
   copy's, from its record's `origin`: where its column ends before its
   first send, and whether its fork row says "copied from".
 
-# Threads as cards (`held.ts`, `copy.ts`, ADR-0117, ADR-0124)
+# Threads as cards (`set-aside.ts`, `copy.ts`, ADR-0117, ADR-0124)
 
 A thread's card is a canvas's, an inventory's or a trash's
 (`PLACES_OF.thread`), and moves between them as any card does
 (`planMove`, typed at the codec by `typedMove`). An inventory, and a
-trash, have no agent and no runner. Where its card leaves it is
-`threadCardHolding`: `free` on a canvas, `held` by an inventory's holder, or
-`trashed`, held by nobody.
+trash, have no agent and no runner. What keeps a thread from running is
+`threadSetAside`: `in-inventory`, naming the inventory's holder (threads'
+`InInventory`, which `Reach` shares), or `trashed`; null on a canvas or
+with no card, so a refusal never carries a thread that may run.
 
 - **Where each command runs** (`runsIn`, beside `writesIn`): what each
   command or send (`Gated`) runs or writes a message in: a send at a
@@ -1146,22 +1147,22 @@ trash, have no agent and no runner. Where its card leaves it is
   that may ask the agent (all but an acceptance) run in their thread; a branch in the thread its
   fork is in, read from its root's tree; a new root in none. Exhaustive, so
   a new kind of command does not compile until it says. `runThreads` turns
-  each into its thread, and `heldIn` finds the first of those held or
-  trashed (`threadCardHolding`); a copy's first send, at its own record's fork,
+  each into its thread, and `notOnCanvasIn` finds the first of those in an
+  inventory or a trash (`threadSetAside`); a copy's first send, at its own record's fork,
   runs in the copy. `foreignIn` (ADR-0150) finds the first place a run
   would start on a lane of another kind than the project's: a thread's own
   lane (`proveRunnable`), or for a send at an entry the lane whose disk it
   would clone (`sourceHistory`, its snapshot taken as kept), so a copy's
   first send is checked against the lane it copies. The gate refuses
-  every command and send by them (`planGate`, below: held first, a
-  person's own hold being the nearer reason, then foreign, worded by
+  every command and send by them (`planGate`, below: `not-on-canvas`
+  first, a person's own act being the nearer reason, then foreign, worded by
   `foreignLaneWords`), and the drain asks before it pops
-  (`planNextQueuedCardPop`'s `away`: its own thread's `threadCardHolding`, and the
+  (`planNextQueuedCardPop`'s `away`: its own thread's `threadSetAside`, and the
   lane's kind), so its messages wait. A
   fact on top is popped there all the same: it starts no run, and putting one away's
   stop must be in the thread for its face to say so (ADR-0126). Refused
-  as held or trashed (`ThreadHolding`), which interface words for the
-  person answered (`HELD_WORDS`, "put it on a canvas first";
+  as in an inventory or trashed (`SetAside`), which interface words for the
+  person answered (`IN_INVENTORY_WORDS`, "put it on a canvas first";
   `TRASHED_WORDS`, "restore it first").
 - **Putting a thread away stops the run** (`takenIn(before, after)`): every thread card
   in an inventory or a trash after a change that was not there before. The host's
@@ -1175,15 +1176,15 @@ trash, have no agent and no runner. Where its card leaves it is
   "Bea moved this thread to the canvas …"; the canvases' other running threads
   are told it was taken and added.
 - **`planCopy`**: a copy of `source` at `end`, refused unless `end` is in
-  the source (`entryThread`), the copy's id is new, and nobody else holds the
-  source. It opens through `planThreadOpen`: its record's `origin` is
+  the source (`entryThread`), the copy's id is new, and the source is in no
+  one else's inventory (`in-others-inventory`). It opens through `planThreadOpen`: its record's `origin` is
   `{ kind: "fork", at: end, how: "copy" }`, kept after its first send, so
   its fork row can say "copied from"; its card is made by **`planMake`**
   (`place-steps.ts`), the one rule every card is made by: `exists`, then
   `placeRefusal`'s refusals (a place its kind is never in, another's
   inventory, a full one). It lands on a canvas by **`rankOnCanvas`**, as a
   move's drop does. No entry is written: its first send is a branch at its
-  fork, which the gate lets through by the copy's own holding
+  fork, which the gate lets through by the copy's own card
   (`runThreads`'s fork rule) and `sendMessage` writes in the thread whose
   record names that fork (`forkEntry`), with no second record or card. A
   titled source's copy has its `CARD_TITLE` too, with the source's `by`,
@@ -1204,8 +1205,8 @@ not gated here: they ask `threadReach` (`reach.ts`).
   `archivedIn`), which needs no root, so a command it refuses opens none;
   then the roots a branch forks in, which it asks for as `read` until
   `GateFacts.roots` holds them, so no caller can pass a branch it never
-  read (`runThreads` reads a missing tree as no thread); then a thread held
-  or trashed (`runThreads`, `heldIn`); then a lane of another kind
+  read (`runThreads` reads a missing tree as no thread); then a thread in
+  an inventory or a trash (`runThreads`, `notOnCanvasIn`); then a lane of another kind
   (`foreignIn`).
 - **Its words are interface's** (`gateRefusal`, `@pinetrie/interface`'s
   `answer-words.ts`, ADR-0199): only the person whose command it refused
@@ -1981,14 +1982,14 @@ commit-message request `request.ts` (`describeRequest`).
   without one). **`planDescribeAgain`** refuses `describe` without named
   proposed changes.
 - **`proposedChangesStatus`** decodes a `pinetrie.proposed` record once (ADR-0067): `none`,
-  `accepted`, `held` or `open`. Every reader on the page switches on it, never
+  `accepted`, `nothing-to-add` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
   item (`openProposed`, client), and the review read (`planReviewRead`). An
-  record not yet accepted, with no files, that you did not edit is `held`: its work is
+  record not yet accepted, with no files, that you did not edit is `nothing-to-add`: its work is
   already where it sits, by a route the ledger does not record (S89), so
   nothing counts it, warns about it, reviews it or accepts it. One you edited
   is `open` whatever its files.
-  The host's records not yet accepted, open or held, are `isNotYetAccepted`: the lanes it
+  The host's records not yet accepted, open or with nothing to add, are `isNotYetAccepted`: the lanes it
   marks on a full observation, and the records `@` rewrites.
 - **Proposed changes' record is the page's cache** (ADR-0104): written from the
   repo after each of the host's steps, never read back to decide. Its
@@ -2007,11 +2008,11 @@ commit-message request `request.ts` (`describeRequest`).
   `ProposedChangesStatus`: the proposed changes' state, its buttons, its menu, which of those
   are `quiet` (listed, but drawn disabled: changing nothing now, or not
   yet possible), and the facts its words
-  are made from (`WorkStripFacts`: files, size, conflicts, bookmark, held, the
+  are made from (`WorkStripFacts`: files, size, conflicts, bookmark, `nothingToAdd`, the
   base as `effectiveBase` gives it, getting the latest, untraced, …). It writes
   no words: accepted work and the button labels are the client's (`workStripWords`,
   `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
-  when newer than the proposed changes. Held proposed changes are `nothing`, with no
+  when newer than the proposed changes. Proposed changes with nothing to add are `nothing`, with no
   destinations. When getting the latest `brings`, or the thread is untraced,
   getting the latest moves from the menu to the buttons; when it is `current` or
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
@@ -2563,10 +2564,11 @@ a round is done are read from the path (`threadMembers`, `lastIncomingEntry`,
   first message) is in no canvas and takes one; a canvas scope (a title's)
   takes one unless it is archived. A refusal is an `Away`, worded by
   `awayWords`. Three readings of whether a thread can take work, each for
-  its own question: `threadCardHolding` (`held.ts`), whether a person's command or
-  send may run or write a message there, which decides `planGate`'s held
-  step and the drain's `away` (held and trashed refuse); `isLivePlace`,
-  whether the host may write there late (held and trashed take it, a trash
+  its own question: `threadSetAside` (`set-aside.ts`), whether a person's command or
+  send may run or write a message there, which decides `planGate`'s
+  `not-on-canvas` step and the drain's `away` (an inventory and a trash
+  refuse); `isLivePlace`, whether the host may write there late (an
+  inventory and a trash take it, a trash
   from an archived canvas does not); `threadReach`, whether another
   thread's agent may reach it, and how a refusal is worded (only `open`
   takes one). They differ on two trash places (S199): `threadReach` calls
@@ -2574,9 +2576,12 @@ a round is done are read from the path (`threadMembers`, `lastIncomingEntry`,
   an inventory `gone`, since `Reach.trashed` names a canvas. One reader the
   three derive from is not built.
 - **Reach** (`reach.ts`): `threadReach` is the one reader of where a
-  thread is (open, archived with its record, held by whom, gone), and
+  thread is (open, archived with its record, in whose inventory, trashed,
+  gone), and
   `reachableAgents` every named thread on an open canvas.
-  `reachWords` and `awayWords` say why one is out of reach.
+  `reachWords` and `awayWords` say why one is out of reach, and
+  `inventoryHolderWords` is the one wording of whose inventory a thread is
+  in, for them and for interface's links.
   `unreachableRefusal` refuses an ask whose either thread is out of reach,
   first in `planRelay`; `planAnswer` makes an answer to an asker out of
   reach `undelivered`, a fact in the answering thread, worded without

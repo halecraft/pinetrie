@@ -31,6 +31,11 @@ export const RETIRED_IN_NAMES: readonly string[] = [
   "onwip",
   "wip_base",
   "discard",
+  // A thread in someone's inventory is never "held": that word is a paused
+  // queue's or lane's.
+  "heldwords",
+  "heldbyothers",
+  "cardholding",
 ]
 
 /**

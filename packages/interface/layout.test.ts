@@ -87,7 +87,7 @@ const resolve = (
     list,
     cardsOn,
     unstarted: new Map(),
-    holders: new Map(),
+    inventoryHolders: new Map(),
   })
 const sync = (l: Layout, i = index) => resolve(l, i)
 /** `l` drawn with `list` as the sidebar. */
@@ -108,7 +108,7 @@ const prune = (
     list,
     cardsOn,
     unstarted: new Map(),
-    holders: new Map(),
+    inventoryHolders: new Map(),
     known: new Set(i.roots.map(r => TK(r))),
   })
 /** A change to your view of `root`'s canvas, its first card the canvas's. */
@@ -125,7 +125,7 @@ const columnsOf = (l: Layout, root = "1-r1", i = index) =>
   drawnColumns(l, TK(root), {
     cardsOn: canvasesIn(i).cardsOn,
     unstarted: new Map(),
-    holders: new Map(),
+    inventoryHolders: new Map(),
     index: i,
     lanes: [],
   }).map(c => [c.kind !== "thread" ? c.card : c.column.key, c.folded])
@@ -286,7 +286,7 @@ describe("layoutReducer", () => {
       list,
       cardsOn: CANVASES.cardsOn,
       unstarted: new Map(),
-      holders: new Map(),
+      inventoryHolders: new Map(),
     })
     expect(stored).toEqual(shown)
   })
@@ -307,7 +307,7 @@ describe("layoutReducer", () => {
       drawnColumns(shown, TK("1-r1"), {
         cardsOn: ticked,
         unstarted: new Map(),
-        holders: new Map(),
+        inventoryHolders: new Map(),
         index,
         lanes: [],
       }).map(c => c.folded),
@@ -324,7 +324,7 @@ describe("layoutReducer", () => {
       drawnColumns(initialLayout(), TK("1-r1"), {
         cardsOn: CANVASES.cardsOn,
         unstarted: new Map(),
-        holders: new Map(),
+        inventoryHolders: new Map(),
         index,
         lanes: [],
       })[0],
@@ -334,7 +334,7 @@ describe("layoutReducer", () => {
       drawnColumns(initialLayout(), TK("1-r1"), {
         cardsOn: canvasesIn(replied).cardsOn,
         unstarted: new Map(),
-        holders: new Map(),
+        inventoryHolders: new Map(),
         index: replied,
         lanes: [],
       })[0],
@@ -452,7 +452,7 @@ describe("planOpen", () => {
     const [trunk] = drawnColumns(l, TK("1-r1"), {
       cardsOn: canvases.cardsOn,
       unstarted: new Map(),
-      holders: new Map(),
+      inventoryHolders: new Map(),
       index: grown,
       lanes: [],
     })

@@ -77,7 +77,7 @@ const TOGGLE = "#bottom .inventory-toggle, .account-inventory"
 export function InventoryPanel(p: {
   session: SessionClient
   /** Every card your inventory holds, as drawn. */
-  held: readonly DrawnCard[]
+  inventoryCards: readonly DrawnCard[]
   slots: Slots
   intents: Intents
   /** Shown or not, the selected slot, and whether the bench has its card open. */
@@ -90,7 +90,7 @@ export function InventoryPanel(p: {
   /** The column a put lands in: the one last focused, if any. */
   column: string | null
   onIntent: (intent: Intent) => void
-  /** Each held thread's glance, and its preview when opened. */
+  /** Each glance of a thread in your inventory, and its preview when opened. */
   threads: ReadonlyMap<ThreadId, ThreadGlance>
   previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
@@ -106,11 +106,11 @@ export function InventoryPanel(p: {
 }) {
   const texts = useCardTexts(
     p.session,
-    p.held.filter(isTextCard).map(c => c.id),
+    p.inventoryCards.filter(isTextCard).map(c => c.id),
   )
   const shown = isInventoryShown(p.state)
   const view = inventoryView({
-    held: p.held,
+    inventoryCards: p.inventoryCards,
     slots: p.slots,
     intents: p.intents,
     selected: p.state.selected,
@@ -271,7 +271,7 @@ export function InventoryPanel(p: {
         title="drag to dock left, centre or right"
       >
         <span className="inventory-title">
-          {INVENTORY} · {inventoryCountWords(view.held)}
+          {INVENTORY} · {inventoryCountWords(view.inventoryCount)}
         </span>
         {p.cell !== null && (
           <ClipboardChip

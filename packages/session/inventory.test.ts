@@ -41,7 +41,7 @@ describe("firstEmpty", () => {
 })
 
 describe("settleSlots and planSlots: the repair", () => {
-  test("an unslotted held card goes in the first empty slot, in id order", () => {
+  test("an unslotted card in the inventory goes in the first empty slot, in id order", () => {
     const slots = slotsOf({ "0": cardIdFor("cb") })
     expect(settleSlots([C, A, B], slots, NO_INTENTS)).toEqual({
       "0": B,
@@ -54,7 +54,7 @@ describe("settleSlots and planSlots: the repair", () => {
     })
   })
 
-  test("a slot naming a card not held is cleared, and a slot that is no slot", () => {
+  test("a slot naming a card not in the inventory is cleared, and a slot that is no slot", () => {
     const slots = slotsOf({
       "3": cardIdFor("ca"),
       "4": cardIdFor("c103"),
@@ -90,26 +90,34 @@ describe("settleSlots and planSlots: the repair", () => {
     })
   })
 
-  test("a 13th held card is drawn in the row past the sixth", () => {
-    const held = Array.from({ length: 13 }, (_, n) => textCardId(`c-${n}`))
-    const slots = Object.fromEntries(
-      held.slice(0, 12).map((c, n) => [String(n), c]),
+  test("a 13th card in the inventory is drawn in the row past the sixth", () => {
+    const inventoryCards = Array.from({ length: 13 }, (_, n) =>
+      textCardId(`c-${n}`),
     )
-    expect(settleSlots(held, slots, NO_INTENTS)).toEqual({
+    const slots = Object.fromEntries(
+      inventoryCards.slice(0, 12).map((c, n) => [String(n), c]),
+    )
+    expect(settleSlots(inventoryCards, slots, NO_INTENTS)).toEqual({
       ...slots,
-      "12": held[12],
+      "12": inventoryCards[12],
     })
-    expect(firstEmpty(settleSlots(held, slots, NO_INTENTS))).toBeNull()
+    expect(
+      firstEmpty(settleSlots(inventoryCards, slots, NO_INTENTS)),
+    ).toBeNull()
   })
 
-  test("holding 12 again, a card past the twelfth slot settles into the first empty", () => {
-    const held = Array.from({ length: 12 }, (_, n) => textCardId(`c-${n}`))
-    const slots = Object.fromEntries(
-      held.map((c, n) => [String(n === 3 ? 13 : n), c]),
+  test("with 12 again, a card past the twelfth slot settles into the first empty", () => {
+    const inventoryCards = Array.from({ length: 12 }, (_, n) =>
+      textCardId(`c-${n}`),
     )
-    expect(settleSlots(held, slots, NO_INTENTS)["3"]).toBe(held[3])
-    expect(planSlots(held, slots, NO_INTENTS, STEADY)).toEqual({
-      set: { "3": held[3] },
+    const slots = Object.fromEntries(
+      inventoryCards.map((c, n) => [String(n === 3 ? 13 : n), c]),
+    )
+    expect(settleSlots(inventoryCards, slots, NO_INTENTS)["3"]).toBe(
+      inventoryCards[3],
+    )
+    expect(planSlots(inventoryCards, slots, NO_INTENTS, STEADY)).toEqual({
+      set: { "3": inventoryCards[3] },
       clear: ["13"],
     })
   })
@@ -139,7 +147,7 @@ describe("settleSlots and planSlots: the repair", () => {
   test("a card not yet steady is neither placed nor has its slot cleared; a duplicate is settled at once", () => {
     const unsteady = (card: string) =>
       card !== cardIdFor("cb") && card !== cardIdFor("c103")
-    // B newly held and unslotted: not placed yet. A gone card's slot: kept.
+    // B newly in the inventory and unslotted: not placed yet. A gone card's slot: kept.
     expect(
       planSlots(
         [A, B],
@@ -166,7 +174,7 @@ describe("settleSlots and planSlots: the repair", () => {
     ).toEqual({ set: {}, clear: ["4", "x"] })
   })
 
-  test("steadiness: a card held, or not, for STEADY_MS; wake when the next one is", () => {
+  test("steadiness: a card in the inventory, or out, for STEADY_MS; wake when the next one is", () => {
     const first = steadiness(
       new Map(),
       [A],
@@ -186,7 +194,7 @@ describe("settleSlots and planSlots: the repair", () => {
       true,
       null,
     ])
-    // B becomes held: its clock starts again.
+    // B comes into the inventory: its clock starts again.
     const changed = steadiness(
       later.memory,
       [A, B],
@@ -228,7 +236,7 @@ describe("settleSlots and planSlots: the repair", () => {
   })
 
   test("the repair writes nothing until a card is steady, and says when to look again", () => {
-    const input = { held: [A], stored: {}, intents: NO_INTENTS }
+    const input = { inventoryCards: [A], stored: {}, intents: NO_INTENTS }
     const first = repairStep(new Map(), { ...input, now: 1_000 })
     expect(first.writes).toEqual({ set: {}, clear: [] })
     expect(first.wake).toBe(1_000 + STEADY_MS)

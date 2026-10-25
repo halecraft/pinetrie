@@ -26,8 +26,8 @@ import {
   canvasColumns,
   defaultView,
   firstUnticked,
-  heldByOthers,
   openColumns,
+  threadsInOthersInventories,
   type YourCanvasView,
 } from "./canvas-columns.ts"
 import { BOUND } from "./columns.ts"
@@ -91,9 +91,16 @@ const draw = (
   cards: readonly CardOnCanvas[],
   view: YourCanvasView,
   unstarted: ReadonlyMap<ThreadId, ThreadOpening> = new Map(),
-  holders: ReadonlyMap<ThreadId, WriterId> = new Map(),
+  inventoryHolders: ReadonlyMap<ThreadId, WriterId> = new Map(),
 ) =>
-  canvasColumns({ onCanvas: cards, view, index, lanes: [], unstarted, holders })
+  canvasColumns({
+    onCanvas: cards,
+    view,
+    index,
+    lanes: [],
+    unstarted,
+    inventoryHolders,
+  })
 
 const shape = (columns: readonly CardColumn[]) =>
   columns.map(c =>
@@ -233,23 +240,25 @@ describe("canvasColumns", () => {
     })
   })
 
-  test("a thread not yet started in a thread someone else holds says who, drawn without its entries", () => {
+  test("a thread not yet started in a thread in someone else's inventory says whose, drawn without its entries", () => {
     const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
     const BEA = writerId("bea@x.io")
     const opened = new Map([[F, { root: ROOT, fork: entryId("3-b") }]])
-    const held = draw(
+    const inBeasInventory = draw(
       canvasFor([TRUNK, F]),
       defaultView(TRUNK),
       opened,
       new Map([[TRUNK, BEA]]),
     ).find(c => c.kind === "thread" && c.card === F)
-    expect(held?.kind === "thread" && held.column.mode).toEqual({
+    expect(
+      inBeasInventory?.kind === "thread" && inBeasInventory.column.mode,
+    ).toEqual({
       kind: "unstarted",
       fork: entryId("3-b"),
       root: ROOT,
-      held: { thread: TRUNK, by: BEA },
+      forkInInventory: { thread: TRUNK, holder: BEA },
     })
-    // Who holds which, as the page reads it: your own held threads are none.
+    // Whose inventory each is in, as the page reads it: threads in your own are none.
     const card = (holder: typeof BEA): CardRecord => ({
       kind: "thread",
       id: TRUNK,
@@ -258,8 +267,10 @@ describe("canvasColumns", () => {
       place: { kind: "inventory", holder },
       content: UNTICKED,
     })
-    expect(heldByOthers([card(BEA)], ADA)).toEqual(new Map([[TRUNK, BEA]]))
-    expect(heldByOthers([card(ADA)], ADA)).toEqual(new Map())
+    expect(threadsInOthersInventories([card(BEA)], ADA)).toEqual(
+      new Map([[TRUNK, BEA]]),
+    )
+    expect(threadsInOthersInventories([card(ADA)], ADA)).toEqual(new Map())
     const free = draw(canvasFor([TRUNK, F]), defaultView(TRUNK), opened).find(
       c => c.kind === "thread" && c.card === F,
     )

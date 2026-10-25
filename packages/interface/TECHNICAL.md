@@ -121,14 +121,16 @@ declaring only this package, the session, core and threads, proves it
   has it.
 - **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
   ADR-0124), which only `threadLink(thread, cards, me)` makes (a brand): `open`
-  in a canvas, `mine` in your inventory (it opens on the bench: the
+  in a canvas, `in-your-inventory` (it opens on the bench: the
   inventory's `open` act),
-  `held` in someone else's, `trashed` in the trash of the canvas it left
+  `in-others-inventory`, `trashed` in the trash of the canvas it left
   (following it restores it, `planRestore`), `gone` with no card, worded
   "deleted". The inbox's rows, a
   mention, a reader's thread, a copy's or a parent elsewhere's fork row and
   a rail stub all follow one through the `open-link` intent
-  (`planOpenLink`); `linkWords` words it, "Bea has it" (`heldWords`).
+  (`planOpenLink`); `linkWords` words it, "in Bea's inventory" and "in your
+  inventory" through `inventoryWordsForReader`, over rules'
+  `inventoryHolderWords`, the one wording of whose inventory a thread is in.
   `open-at` serves only what is drawn: an entry whose thread is in no canvas
   gets no plan from `planOpen`.
 - **A write names its root**: `send` and `mark` find it from the held
@@ -596,17 +598,20 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   column or rail row draws them. Read a thread's shape (its fork, whether
   it started) from `firstOf`; read what a person sees first from
   `threadFirstMessage` (threads), as `threadGlance` and `canvasRail`'s stubs do.
-- **A thread not yet started in a thread someone else holds** is decided by
-  `canvasColumns` from `holders` (`heldByOthers`): its `UnstartedMode.held`
-  names that thread and who; `projectColumns` leaves the thread's entries
-  out (`hide`), and the strip draws the column read only, "Bea has it".
+- **A thread not yet started in a thread in someone else's inventory** is
+  decided by `canvasColumns` from `inventoryHolders`
+  (`threadsInOthersInventories`): its `UnstartedMode.forkInInventory` names
+  that thread and its holder; `projectColumns` leaves the thread's entries
+  out (`hide`), and the strip draws the column read only, "in Bea's
+  inventory".
 - **A column of another kind is read only, saying why** (ADR-0150,
   `foreign-column.ts`): `columnForeign` asks the rule the host's gate
   refuses by (`foreignIn`, `@pinetrie/rules`): a bound column's lane, or
   for a thread not yet started, the lane whose disk its first send would
   clone, so a branch or a copy from a thread of another kind is refused on
   the page as on the host. `columnReadOnly` decides what a thread column
-  says in place of its composer: who holds the thread a branch forks in,
+  says in place of its composer: whose inventory the thread a branch forks
+  in is in (`forkHolder`),
   else its canvas's archive, else its kind (`foreignWords`). The project's
   kind is `ProjectRecord.kind`, written at every start.
 - **Gotcha: the page cannot see snapshots, and takes each as kept.** A
@@ -1427,8 +1432,8 @@ composer*).
   beneath it". Conflicted proposed changes on the
   line offers "resolve in the thread", never an acceptance into it. The bookmark is
   a fact of its own, drawn apart (`.work-bookmark`), never in the line.
-  `workStrip` hands `workStripView` the record decoded (`proposedChangesStatus`): a `held`
-  proposed changes say "nothing to accept: accepted work already has this thread's
+  `workStrip` hands `workStripView` the record decoded (`proposedChangesStatus`): proposed changes with
+  `nothing-to-add` say "nothing to accept: accepted work already has this thread's
   work",
   and has no review. Open proposed changes' review reads jj proposed changes' revisions,
   or folder proposed changes' `start..tip` range (`proposedReview`), as an ask's range
@@ -1944,7 +1949,7 @@ one status line (the newest notice).
   `inventory` effect, and the page with the `inventory` intent. Never
   stored.
 - **Whoever opened it closes it.** Opened `held` (the toggle, a link to
-  your own held thread, an undo that shows it), it closes by ×, Escape or
+  a thread in your own inventory, an undo that shows it), it closes by ×, Escape or
   the toggle, never by a click elsewhere. A take while it was closed
   `peek`s: the shell ends the peek after `PEEK_MS`, naming it, so an old
   peek's end closes no newer one; a pointer moved over it (the page skips
@@ -1971,8 +1976,8 @@ one status line (the newest notice).
   else the panel closes (`inventoryReducer`'s `escape`). An Escape a box
   already took (a mention list closing) is not the page's: `App`'s
   listener skips it.
-- **The count is the cards held, of `INVENTORY_SLOTS`**
-  (`inventoryCountWords`): "13/12" while someone holds more, whose grid
+- **The count is the cards in your inventory, of `INVENTORY_SLOTS`**
+  (`inventoryCountWords`, `inventoryCount`): "13/12" while it has more, whose grid
   then grows a row for every two (`inventoryGrid`).
 - **A thread's card is drawn by its glance** (`thread-glance.ts`, ADR-0124):
   `threadGlance` (name, icon, first line, focus, the first line of where it
@@ -2190,7 +2195,7 @@ reads one back, is web-core's (`clip-carrier.ts`,
 
 Your inventory is a grid (`CardGrid`, `packages/web/card-grid.tsx`):
 threads' `grid.ts` says what a cell is (`INVENTORY_GRID`, 2 × 6, and
-`inventoryGrid`, which grows a row for every two cards held past its 12),
+`inventoryGrid`, which grows a row for every two cards past its 12),
 the first empty one (`firstEmpty`, which aims at the 12 alone) and a step
 (`step`).
 
@@ -2277,7 +2282,8 @@ gone.
   A member is away exactly when it is not in `inReach`, so `threadReach`
   is read for those alone, to say why (`awayWords`).
 - **`crossCanvasLinks`** gives each ask, answer and incoming row from a thread
-  on another canvas its `ThreadLink` and words ("Sync bug", "Bea has it"),
+  on another canvas its `ThreadLink` and words ("Sync bug", "in Bea's
+  inventory"),
   one value-compared map per column, as `joins` is; the message draws it
   beside its speaker and opens it through the column's `onLink`, as a fork
   row does. A thread on the column's own canvas gets none.

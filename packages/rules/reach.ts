@@ -14,7 +14,8 @@ export function threadReach(
   },
 ): Reach {
   const place = facts.cards.find(c => c.id === thread)?.place
-  if (place?.kind === "inventory") return { kind: "held", by: place.holder }
+  if (place?.kind === "inventory")
+    return { kind: "in-inventory", holder: place.holder }
   if (place?.kind === "trash" && place.left.kind === "canvas")
     return { kind: "trashed", canvas: place.left.canvas }
   if (place?.kind !== "canvas") return { kind: "gone" }
@@ -87,6 +88,22 @@ export function reachableAgents(input: {
   )
 }
 
+/**
+ * Whose inventory a thread is in: "in your inventory" when `holder` is
+ * `reader.me`, else by the holder's name. A reader that is no person (the
+ * agent, the host) has `me` null.
+ */
+export const inventoryHolderWords = (
+  holder: WriterId,
+  reader: {
+    readonly me: WriterId | null
+    readonly nameOf: (w: WriterId) => string
+  },
+): string =>
+  holder === reader.me
+    ? "in your inventory"
+    : `in ${reader.nameOf(holder)}'s inventory`
+
 /** Why `name` is out of reach, as a sentence. */
 export function reachWords(
   name: string,
@@ -96,8 +113,8 @@ export function reachWords(
   switch (reach.kind) {
     case "archived":
       return `${name}'s canvas was archived by ${nameOf(reach.record.by)}`
-    case "held":
-      return `${nameOf(reach.by)} has ${name}`
+    case "in-inventory":
+      return `${name} is ${inventoryHolderWords(reach.holder, { me: null, nameOf })}`
     case "trashed":
       return `${name} is in the trash`
     case "gone":
@@ -113,8 +130,8 @@ export function awayWords(
   switch (reach.kind) {
     case "archived":
       return `archived by ${nameOf(reach.record.by)}`
-    case "held":
-      return `${nameOf(reach.by)} has it`
+    case "in-inventory":
+      return inventoryHolderWords(reach.holder, { me: null, nameOf })
     case "trashed":
       return "in the trash"
     case "gone":

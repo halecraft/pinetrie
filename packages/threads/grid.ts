@@ -17,14 +17,17 @@ export const INVENTORY_GRID = { width: 2, rows: 6 } as const satisfies Grid
 export const INVENTORY_SLOTS = INVENTORY_GRID.width * INVENTORY_GRID.rows
 
 /**
- * The grid that draws `held` cards: the inventory's, with a row for every two
- * past its slots while someone holds more (a limit lowered, or cards an undo
- * brought back), so no card they hold is out of sight. Takes still aim at
- * `INVENTORY_GRID` alone.
+ * The grid that draws an inventory of `inventoryCount` cards: the
+ * inventory's, with a row for every two past its slots while it has more (a
+ * limit lowered, or cards an undo brought back), so none of its cards is out
+ * of sight. Takes still aim at `INVENTORY_GRID` alone.
  */
-export const inventoryGrid = (held: number): Grid => ({
+export const inventoryGrid = (inventoryCount: number): Grid => ({
   width: INVENTORY_GRID.width,
-  rows: Math.max(INVENTORY_GRID.rows, Math.ceil(held / INVENTORY_GRID.width)),
+  rows: Math.max(
+    INVENTORY_GRID.rows,
+    Math.ceil(inventoryCount / INVENTORY_GRID.width),
+  ),
 })
 
 /** Whether `n` is a cell of `grid`. */

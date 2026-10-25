@@ -773,13 +773,13 @@ describe("the proposed changes' policy over a gather", () => {
     })
   })
 
-  test("planWorkingCopyEdits: each record's files that @ changes, open and held alike, until it is accepted", () => {
+  test("planWorkingCopyEdits: each record's files that @ changes, open or with nothing to add, until it is accepted", () => {
     const open = {
       ...proposed,
       files: ["a.txt", "b.txt"],
       workingCopyEdits: [],
     }
-    const held = {
+    const nothingToAdd = {
       ...proposed,
       lane: threadIdFor("2"),
       files: [],
@@ -791,10 +791,13 @@ describe("the proposed changes' policy over a gather", () => {
       acceptedAs: "kt",
     }
     expect(
-      planWorkingCopyEdits([open, held, accepted], new Set(["b.txt", "c.txt"])),
+      planWorkingCopyEdits(
+        [open, nothingToAdd, accepted],
+        new Set(["b.txt", "c.txt"]),
+      ),
     ).toEqual([
       { ...open, workingCopyEdits: ["b.txt"] },
-      { ...held, workingCopyEdits: [] },
+      { ...nothingToAdd, workingCopyEdits: [] },
     ])
   })
 

@@ -22,20 +22,19 @@ import {
   type ImageRefusal,
   namesAndMore,
   type OpenPlan,
-  type ThreadHolding,
+  type SetAside,
 } from "@pinetrie/rules"
 import type { AcceptedAction } from "@pinetrie/threads"
 
 /** Why a command in a thread in an inventory is refused. */
-export const HELD_WORDS = "put it on a canvas first"
+export const IN_INVENTORY_WORDS = "put it on a canvas first"
 
 /** Why a command in a trashed thread is refused. */
 export const TRASHED_WORDS = "restore it first"
 
-/** Why a command in a thread held or trashed is refused, as the host says it. */
-const holdingWords = (
-  holding: Exclude<ThreadHolding, { readonly kind: "free" }>,
-): string => (holding.kind === "held" ? HELD_WORDS : TRASHED_WORDS)
+/** Why a command in a thread in an inventory or a trash is refused, as the host says it. */
+const notOnCanvasWords = (setAside: SetAside): string =>
+  setAside.kind === "in-inventory" ? IN_INVENTORY_WORDS : TRASHED_WORDS
 
 /** A gate's refusal, as the host answers it; `nameOf` names the archiver. */
 export function gateRefusal(
@@ -51,8 +50,8 @@ export function gateRefusal(
         ERR.CANVAS_ARCHIVED,
         `archived by ${nameOf(refusal.canvas.by)}: restore the canvas first`,
       )
-    case "held":
-      return refused(ERR.REFUSED, holdingWords(refusal.holding))
+    case "not-on-canvas":
+      return refused(ERR.REFUSED, notOnCanvasWords(refusal.setAside))
     case "foreign":
       return foreignRefusal(refusal.lane)
   }
@@ -202,11 +201,11 @@ export function copyRefusal(
         code: ERR.THREAD_TAKEN,
         message: "that copy's thread has started already",
       }
-    case "held":
+    case "in-others-inventory":
       return {
         kind: "refused",
         code: ERR.REFUSED,
-        message: "someone else holds that thread",
+        message: "that thread is in someone else's inventory",
       }
     default:
       return { kind: "unmoved", code: why, place: null, by: null }

@@ -863,7 +863,7 @@ describe("a lane's repo, with jj", () => {
   }, 60_000)
 
   test("proposed changes accepted work already holds is empty, and the lane's work still changes files: it is kept, not withdrawn and built again", async () => {
-    const rig = await turnRig("held")
+    const rig = await turnRig("nothing-to-add")
     const {
       ops,
       repoJj,

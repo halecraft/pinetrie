@@ -16,7 +16,7 @@ import { nearestRevision, type TreeIndex } from "@pinetrie/threads"
 import type { ReadOnly } from "./app-view.ts"
 import { type Column, unstartedMode } from "./columns.ts"
 import type { Reader } from "./send.ts"
-import { heldWords } from "./thread-link.ts"
+import { inventoryWordsForReader } from "./thread-link.ts"
 
 /**
  * Why a run cannot start from `column`: its own lane, or for a thread not
@@ -64,18 +64,22 @@ export const foreignWords = (lane: ForeignLane): string =>
     : "made when the project had no jj repo: nothing runs here now"
 
 /**
- * What a thread column says in place of its composer: who holds the thread a
- * branch forks in, else its canvas's archive, else a lane of another kind;
- * null when it may be written in.
+ * What a thread column says in place of its composer: whose inventory the
+ * thread a branch forks in is in, else its canvas's archive, else a lane of
+ * another kind; null when it may be written in.
  */
 export function columnReadOnly(input: {
   readonly canvas: ReadOnly | null
-  readonly heldBy: WriterId | null
+  /** Who has the thread a branch forks in in their inventory, when someone else does. */
+  readonly forkHolder: WriterId | null
   readonly foreign: ForeignLane | null
   readonly reader: Reader
 }): ReadOnly | null {
-  if (input.heldBy !== null)
-    return { label: heldWords(input.heldBy, input.reader), action: null }
+  if (input.forkHolder !== null)
+    return {
+      label: inventoryWordsForReader(input.forkHolder, input.reader),
+      action: null,
+    }
   if (input.canvas !== null) return input.canvas
   return input.foreign === null
     ? null

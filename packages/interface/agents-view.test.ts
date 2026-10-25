@@ -25,7 +25,7 @@ const owl = threadIdFor("owl")
 const bea = writerId("bea@example.com")
 const reach = {
   inReach: new Set([fox]),
-  threadReach: (): Reach => ({ kind: "held", by: bea }),
+  threadReach: (): Reach => ({ kind: "in-inventory", holder: bea }),
   nameOf: () => "Bea",
 }
 
@@ -39,7 +39,7 @@ describe("other threads' agents in a column's header", () => {
       allowances: new Map(),
     })
     expect(row === null ? "" : agentsWords(row)).toBe(
-      "with amber-fox, slate-owl (Bea has it)",
+      "with amber-fox, slate-owl (in Bea's inventory)",
     )
   })
   test("its members, and what agents talking from it spent", () => {

@@ -136,7 +136,7 @@ describe("workStripView: the work strip's states", () => {
       conflicts: 0,
       touchesWorkingCopyEdits: false,
       bookmark: "pinetrie-proposed/t-1",
-      held: false,
+      nothingToAdd: false,
       acceptedAs: null,
       base: { kind: "accepted" },
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
@@ -159,13 +159,13 @@ describe("workStripView: the work strip's states", () => {
       null,
       "zz12345678",
     ])
-    // Held: its bookmark is a fact in jj, and nothing in it is to accept.
-    const held = view({ ...proposed, files: [] })
-    expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
-      true,
-      "pinetrie-proposed/t-1",
-      [],
-    ])
+    // Nothing to add: its bookmark is a fact in jj, and nothing in it is to accept.
+    const nothingToAdd = view({ ...proposed, files: [] })
+    expect([
+      nothingToAdd.facts.nothingToAdd,
+      nothingToAdd.facts.bookmark,
+      nothingToAdd.destinations,
+    ]).toEqual([true, "pinetrie-proposed/t-1", []])
   })
   test("proposedChangesStatus: one decoding of a record, which every reader shares", () => {
     expect(proposedChangesStatus(undefined)).toEqual({ kind: "none" })
@@ -173,7 +173,9 @@ describe("workStripView: the work strip's states", () => {
       kind: "accepted",
       as: "zz",
     })
-    expect(proposedChangesStatus({ ...proposed, files: [] }).kind).toBe("held")
+    expect(proposedChangesStatus({ ...proposed, files: [] }).kind).toBe(
+      "nothing-to-add",
+    )
     expect(
       proposedChangesStatus({ ...proposed, files: [], edited: true }).kind,
     ).toBe("open")

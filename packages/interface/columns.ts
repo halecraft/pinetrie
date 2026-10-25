@@ -97,10 +97,10 @@ export interface Column {
 /**
  * A thread not yet started: its card is on its canvas,
  * shared, and its first send writes its first entry, a branch at `fork`, or
- * a new root's first for null, in `root`. `held`: the thread it forks from,
- * when someone else holds it: its entries are left out, the
- * column says who has it, and a send there is refused until it is on a
- * canvas again. `pending` and `prefill` are the opener's own: from their
+ * a new root's first for null, in `root`. `forkInInventory`: the thread it
+ * forks from, when it is in someone else's inventory: its entries are left
+ * out, the column says whose inventory it is in, and a send there is
+ * refused until it is on a canvas again. `pending` and `prefill` are the opener's own: from their
  * `CardView`, or, for a branch they opened from a proposal, its brief
  * (`ThreadOpening.draft`).
  */
@@ -108,7 +108,10 @@ export interface UnstartedMode {
   readonly kind: "unstarted"
   readonly fork: EntryId | null
   readonly root: RootId
-  readonly held?: { readonly thread: ThreadId; readonly by: WriterId }
+  readonly forkInInventory?: {
+    readonly thread: ThreadId
+    readonly holder: WriterId
+  }
   readonly pending?: Pending
   readonly prefill?: Prefill
 }

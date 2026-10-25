@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { whenSettled } from "@kyneta/exchange"
 import { type EntryId, entryId, ROOT, type ThreadId } from "@pinetrie/core"
-import { HELD_WORDS } from "@pinetrie/interface"
+import { IN_INVENTORY_WORDS } from "@pinetrie/interface"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import { personDocId } from "@pinetrie/protocol/writers"
@@ -1021,10 +1021,14 @@ async function run(check: Checks["check"]): Promise<void> {
       { actedAt: { kind: "column", key: "k-take" }, slot: 0 },
     )
     await waitFor(() => onHost(lane)?.place.kind === "inventory", 5_000)
-    const heldSend2 = await eve.send("@Ada while it is away", at(tipNow), {
-      mode: "reply",
-      thread: lane,
-    })
+    const sendInInventory = await eve.send(
+      "@Ada while it is away",
+      at(tipNow),
+      {
+        mode: "reply",
+        thread: lane,
+      },
+    )
     const COPY = newThreadId()
     const copied = await eve.request({
       kind: "copy-thread",
@@ -1072,11 +1076,11 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "a thread's card taken into an inventory runs nothing there, put it on a canvas first; put back, it takes a send",
       took.kind === "accepted" &&
-        heldSend2.kind === "refused" &&
-        heldSend2.message === HELD_WORDS &&
+        sendInInventory.kind === "refused" &&
+        sendInInventory.message === IN_INVENTORY_WORDS &&
         put.kind === "accepted" &&
         sentBack.kind === "appended",
-      `${took.kind}; ${heldSend2.kind}; ${put.kind}; ${sentBack.kind}`,
+      `${took.kind}; ${sendInInventory.kind}; ${put.kind}; ${sentBack.kind}`,
     )
     await waitFor(
       () => eve.cardText(keep).text() === "kept across a restart",

@@ -23,8 +23,8 @@ interface ColumnSpec {
    */
   readonly foldAbove?: ThreadId
   /**
-   * A thread someone else holds, whose entries a branch not yet sent from it
-   * leaves out, its column saying who has it in their place.
+   * A thread in someone else's inventory, whose entries a branch not yet
+   * sent from it leaves out, its column saying whose inventory in their place.
    */
   readonly hide?: ThreadId
 }

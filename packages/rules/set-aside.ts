@@ -1,5 +1,6 @@
-// held — a thread taken into an inventory, or trashed: no agent and no runner
-// there.
+// set-aside — a thread whose card is in an inventory or a trash: no agent
+// and no runner there. Where a command runs, to find such a thread or a lane
+// of another kind than the project's; and what a change to the places takes.
 
 import {
   type EntryId,
@@ -12,32 +13,30 @@ import {
   type RootId,
   refused,
   type ThreadId,
-  type WriterId,
 } from "@pinetrie/core"
-import type { Above, CardRecord, Gated, ThreadFork } from "@pinetrie/threads"
+import type {
+  Above,
+  CardRecord,
+  Gated,
+  InInventory,
+  ThreadFork,
+} from "@pinetrie/threads"
 import { sourceHistory } from "./work.ts"
 
-/**
- * Where a thread's card leaves it to run: free on a canvas (or with no
- * card), held in someone's inventory, or in a trash, which nobody holds.
- */
-export type ThreadHolding =
-  | { readonly kind: "free" }
-  | { readonly kind: "held"; readonly by: WriterId }
-  | { readonly kind: "trashed" }
+/** Why a thread's card keeps it from running: in someone's inventory, or in a trash, which is nobody's. */
+export type SetAside = InInventory | { readonly kind: "trashed" }
 
-const FREE: ThreadHolding = { kind: "free" }
-const TRASHED: ThreadHolding = { kind: "trashed" }
+const TRASHED: SetAside = { kind: "trashed" }
 
-/** Where `thread`'s card leaves it (`ThreadHolding`). */
-export function threadCardHolding(
+/** What keeps `thread` from running, or null when nothing does: its card is on a canvas, or it has none. */
+export function threadSetAside(
   cards: readonly CardRecord[],
   thread: ThreadId,
-): ThreadHolding {
+): SetAside | null {
   const card = cards.find(c => c.id === thread)
   if (card?.place.kind === "inventory")
-    return { kind: "held", by: card.place.holder }
-  return card?.place.kind === "trash" ? TRASHED : FREE
+    return { kind: "in-inventory", holder: card.place.holder }
+  return card?.place.kind === "trash" ? TRASHED : null
 }
 
 /**
@@ -109,7 +108,7 @@ export function runsIn(command: Gated): readonly RunAt[] {
       return []
     // Describing proposed changes asks its agent, and a squash or a refresh
     // asks it again when its description is wanted; an acceptance acts in your
-    // repo alone (proposed changes stay there while a thread is held).
+    // repo alone (proposed changes stay there while a thread is in an inventory).
     case "proposed":
       return command.action === "accept" ? [] : [thread(command.lane)]
     case "stop":
@@ -169,19 +168,16 @@ export function runThreads(
 }
 
 /**
- * The first of `threads` someone holds in their inventory, or that is
- * trashed, and how; null when none is.
+ * The first of `threads` in someone's inventory or a trash, and which;
+ * null when none is.
  */
-export function heldIn(
+export function notOnCanvasIn(
   threads: readonly ThreadId[],
   cards: readonly CardRecord[],
-): {
-  readonly thread: ThreadId
-  readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
-} | null {
+): { readonly thread: ThreadId; readonly setAside: SetAside } | null {
   for (const thread of threads) {
-    const holding = threadCardHolding(cards, thread)
-    if (holding.kind !== "free") return { thread, holding }
+    const setAside = threadSetAside(cards, thread)
+    if (setAside !== null) return { thread, setAside }
   }
   return null
 }

@@ -76,7 +76,7 @@ import {
 import { cardTexts } from "./card-texts.ts"
 import type { SessionClient } from "./client.ts"
 import { hostLine } from "./host-line.ts"
-import { heldBy, swapWrites } from "./inventory.ts"
+import { ownInventoryCards, swapWrites } from "./inventory.ts"
 import { inventorySlots } from "./inventory-slots.ts"
 import { openThreads } from "./open-threads.ts"
 import { presenceSeat } from "./presence-seat.ts"
@@ -169,7 +169,8 @@ export async function connectSession(
   const track = (command: ActingCommand, send: () => Promise<Outcome>) =>
     sendActing(acting, command, send, crypto.randomUUID())
   const inventory = inventorySlots(exchange, me, host.peerId, {
-    held: () => heldBy(local.current().records, me).map(c => c.id),
+    inventoryCards: () =>
+      ownInventoryCards(local.current().records, me).map(c => c.id),
     intents: () => slotIntents(local.current().moves),
   })
   // Before the directory arrives, a start would leave out every root not yet

@@ -37,9 +37,9 @@ import { fileDropProps } from "./file-drop.ts"
 import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
-/** A tone's class; the inventory's is `held`, since `.inventory` is the panel's. */
+/** A tone's class; the inventory's is `in-inventory`, since `.inventory` is the panel's. */
 const TONE_CLASS: Readonly<Record<CardFrameView["tone"], string>> = {
-  inventory: "held",
+  inventory: "in-inventory",
   composing: "composing",
   note: "note",
   queued: "queued",

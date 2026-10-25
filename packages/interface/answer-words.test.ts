@@ -14,7 +14,7 @@ import {
   branchOutRefusal,
   copyRefusal,
   gateRefusal,
-  HELD_WORDS,
+  IN_INVENTORY_WORDS,
   imageRefusal,
   openRefusal,
   publishUndone,
@@ -40,13 +40,17 @@ test("gateRefusal: an archive names its archiver, a hold and a trash say what to
   })
   expect(
     gateRefusal(
-      { kind: "held", thread: T, holding: { kind: "held", by: BEA } },
+      {
+        kind: "not-on-canvas",
+        thread: T,
+        setAside: { kind: "in-inventory", holder: BEA },
+      },
       nameOf,
     ),
-  ).toEqual({ kind: "refused", code: ERR.REFUSED, message: HELD_WORDS })
+  ).toEqual({ kind: "refused", code: ERR.REFUSED, message: IN_INVENTORY_WORDS })
   expect(
     gateRefusal(
-      { kind: "held", thread: T, holding: { kind: "trashed" } },
+      { kind: "not-on-canvas", thread: T, setAside: { kind: "trashed" } },
       nameOf,
     ).message,
   ).toBe(TRASHED_WORDS)
@@ -136,7 +140,9 @@ test("a card command's refusals each say what was refused, an unknown target and
     place: null,
     by: null,
   })
-  expect(copyRefusal("held")).toMatchObject({ code: ERR.REFUSED })
+  expect(copyRefusal("in-others-inventory")).toMatchObject({
+    code: ERR.REFUSED,
+  })
   expect(branchOutRefusal("running")).toMatchObject({
     message: "the run that proposed these has not ended",
   })

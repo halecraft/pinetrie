@@ -890,7 +890,7 @@ function planColumn(
 
 /**
  * Follow `link` to `entry` (`linkOpen`): in its canvas (`planOpenIn`); a thread
- * in your inventory, its preview there, read only; one someone else holds,
+ * in your inventory, its preview there, read only; one in someone else's,
  * or with no card, nothing.
  */
 function planOpenLink(

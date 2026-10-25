@@ -1514,20 +1514,21 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a trashed thread runs",
-    file: "packages/rules/held.ts",
-    from: '  return card?.place.kind === "trash" ? TRASHED : FREE',
-    to: "  return FREE",
+    file: "packages/rules/set-aside.ts",
+    from: '  return card?.place.kind === "trash" ? TRASHED : null',
+    to: "  return null",
     command: unit,
     expect:
-      "a trashed thread is held by nobody, but trashing it stops its run and a command in it is refused",
+      "a trashed thread is in nobody's inventory, but trashing it stops its run and a command in it is refused",
   },
   {
     name: "a thread trashed keeps running",
-    file: "packages/rules/held.ts",
+    file: "packages/rules/set-aside.ts",
     from: '    (c.place.kind === "inventory" || c.place.kind === "trash") &&\n',
     to: '    c.place.kind === "inventory" &&\n',
     command: unit,
-    expect: "a trashed thread is held by nobody, but trashing it stops its run",
+    expect:
+      "a trashed thread is in nobody's inventory, but trashing it stops its run",
   },
   {
     name: "a thread's origin this build does not know is read as a root",
@@ -2120,7 +2121,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes of no files can be accepted",
     file: "packages/rules/work-strip.ts",
-    from: '  if (proposed.kind === "held") return "nothing"\n',
+    from: '  if (proposed.kind === "nothing-to-add") return "nothing"\n',
     to: "",
     command: unit,
     expect: "every state, with its buttons",
@@ -2155,8 +2156,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes of no files are open",
     file: "packages/rules/proposed.ts",
-    from: "  const held = record.files.length === 0 && !record.edited\n",
-    to: "  const held = false\n",
+    from: "  const nothingToAdd = record.files.length === 0 && !record.edited\n",
+    to: "  const nothingToAdd = false\n",
     command: unit,
     expect:
       "proposedChangesStatus: one decoding of a record, which every reader shares",
@@ -2731,7 +2732,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planReviewRead: only a commit open proposed changes hold now",
   },
   {
-    name: "held proposed changes' commit is read",
+    name: "the commit of proposed changes with nothing to add is read",
     file: "packages/rules/review.ts",
     from: '      o.kind === "jj" && proposedChangesStatus(o).kind === "open"\n',
     to: '      o.kind === "jj" && o.acceptedAs === null\n',
@@ -4634,16 +4635,16 @@ export const mutations: readonly Mutation[] = [
     to: "    entryThread(input.index, copy.end) === null\n",
     command: unit,
     expect:
-      "refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory",
+      "refused: an end elsewhere, an id in use, a thread in someone else's inventory, or another's or a full inventory",
   },
   {
-    name: "a copy of a thread someone else holds is made",
+    name: "a copy of a thread in someone else's inventory is made",
     file: "packages/rules/copy.ts",
-    from: '  if (holding.kind === "held" && holding.by !== sender)\n',
-    to: '  if (holding.kind === "held" && holding.by === sender)\n',
+    from: '  if (setAside?.kind === "in-inventory" && setAside.holder !== sender)\n',
+    to: '  if (setAside?.kind === "in-inventory" && setAside.holder === sender)\n',
     command: unit,
     expect:
-      "refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory",
+      "refused: an end elsewhere, an id in use, a thread in someone else's inventory, or another's or a full inventory",
   },
   {
     name: "a copy forgets its fork",
@@ -4664,40 +4665,40 @@ export const mutations: readonly Mutation[] = [
       "planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run",
   },
   {
-    name: "a send at a held thread's end runs",
-    file: "packages/rules/held.ts",
+    name: "a send at the end of a thread in an inventory runs",
+    file: "packages/rules/set-aside.ts",
     from: '      return command.at.kind !== "branch"\n        ? [thread(command.at.thread)]',
     to: '      return command.at.kind !== "branch"\n        ? []',
     command: unit,
     expect: "a send at a thread's end: the thread",
   },
   {
-    name: "a branch at a held thread's entries runs",
-    file: "packages/rules/held.ts",
+    name: "a branch at the entries of a thread in an inventory runs",
+    file: "packages/rules/set-aside.ts",
     from: "        : command.at.at === null\n",
     to: "        : true\n",
     command: unit,
     expect: "a branch: the entry it forks at, in its root",
   },
   {
-    name: "a carry-on in a held thread runs",
-    file: "packages/rules/held.ts",
+    name: "a carry-on in a thread in an inventory runs",
+    file: "packages/rules/set-aside.ts",
     from: '    case "carry-on":\n      return [thread(command.lane)]',
     to: '    case "carry-on":\n      return []',
     command: unit,
     expect: "a carry-on: its lane",
   },
   {
-    name: "proposed changes' description in a held thread runs",
-    file: "packages/rules/held.ts",
+    name: "proposed changes' description in a thread in an inventory runs",
+    file: "packages/rules/set-aside.ts",
     from: '      return command.action === "accept" ? [] : [thread(command.lane)]',
     to: "      return []",
     command: unit,
     expect: "proposed changes' description, asked of its agent",
   },
   {
-    name: "a popped card in a held thread runs",
-    file: "packages/rules/held.ts",
+    name: "a popped card in a thread in an inventory runs",
+    file: "packages/rules/set-aside.ts",
     from: '      return command.at.kind !== "branch"\n',
     to: '      return command.at.kind === "end"\n',
     command: unit,
@@ -4721,12 +4722,12 @@ export const mutations: readonly Mutation[] = [
       "a send at an archived canvas's thread, or popped from its queue, is refused archived",
   },
   {
-    name: "the gate lets a command run in a held thread",
+    name: "the gate lets a command run in a thread in an inventory or a trash",
     file: "packages/rules/gate.ts",
-    from: '  if (held !== null) return { kind: "held", ...held }\n',
+    from: '  if (notOnCanvas !== null) return { kind: "not-on-canvas", ...notOnCanvas }\n',
     to: "",
     command: unit,
-    expect: "a send in a trashed thread is refused held, as trashed",
+    expect: "a send in a trashed thread is refused as not on a canvas, trashed",
   },
   {
     name: "the gate lets a run start on a lane of another kind",
@@ -4734,7 +4735,8 @@ export const mutations: readonly Mutation[] = [
     from: '  if (foreign !== null) return { kind: "foreign", lane: foreign }\n',
     to: "",
     command: unit,
-    expect: "a send on a lane of another kind is refused foreign, after a hold",
+    expect:
+      "a send on a lane of another kind is refused foreign, after an inventory",
   },
   {
     name: "the gate clears a branch whose tree it never read",
@@ -4746,17 +4748,17 @@ export const mutations: readonly Mutation[] = [
       "a branch at an entry asks for its root's tree, then is decided by it",
   },
   {
-    name: "a held thread is never found held",
-    file: "packages/rules/held.ts",
-    from: '    if (holding.kind !== "free") return { thread, holding }',
-    to: '    if (holding.kind === "free") return { thread, holding: TRASHED }',
+    name: "a thread in an inventory is never found there",
+    file: "packages/rules/set-aside.ts",
+    from: "    if (setAside !== null) return { thread, setAside }",
+    to: "    if (setAside === null) return { thread, setAside: TRASHED }",
     command: unit,
     expect:
-      "heldIn: the first thread among them someone holds, an entry's by its tree",
+      "notOnCanvasIn: the first thread among them in someone's inventory, an entry's by its tree",
   },
   {
     name: "a change takes no thread",
-    file: "packages/rules/held.ts",
+    file: "packages/rules/set-aside.ts",
     from: "    was.get(c.id) !== c.place.kind\n",
     to: "    was.get(c.id) === c.place.kind\n",
     command: [
@@ -4764,20 +4766,20 @@ export const mutations: readonly Mutation[] = [
       "exec",
       "vitest",
       "run",
-      "packages/rules/held.test.ts",
+      "packages/rules/set-aside.test.ts",
       "apps/pinetrie/host/commands/cards.test.ts",
     ],
     expect:
       "takenIn: the threads a change puts in an inventory that were not in one",
   },
   {
-    name: "a copy's first send is refused while its source is held",
-    file: "packages/rules/held.ts",
+    name: "a copy's first send is refused while its source is in an inventory",
+    file: "packages/rules/set-aside.ts",
     from: "        : forkOf.get(a.starts)?.at === a.entry\n",
     to: "        : forkOf.get(a.starts) === undefined\n",
     command: unit,
     expect:
-      "heldIn: the first thread among them someone holds, an entry's by its tree",
+      "notOnCanvasIn: the first thread among them in someone's inventory, an entry's by its tree",
   },
   {
     name: "a fact's words are read as no text",
@@ -5068,7 +5070,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send at an entry is never checked for its source's kind",
-    file: "packages/rules/held.ts",
+    file: "packages/rules/set-aside.ts",
     from: '    if (history !== kind) return { kind: "foreign", lane: a.starts, history }\n',
     to: "",
     command: unit,

@@ -59,6 +59,8 @@ export const OLD_SHAPES: readonly string[] = [
   "apps/pinetrie/host/migrations/0017-accepted-unfinished.ts",
   "apps/pinetrie/host/migrations/0025-run-end-report.ts",
   "apps/pinetrie/host/migrations/0025-run-end-report.test.ts",
+  "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
+  "apps/pinetrie/host/migrations/0030-fact-in-inventory.test.ts",
 ]
 
 const FILES = ["packages/**/*.{ts,tsx}", "apps/**/*.{ts,tsx}", "scripts/*.ts"]

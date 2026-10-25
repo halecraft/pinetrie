@@ -2228,10 +2228,10 @@ export const mutations: readonly Mutation[] = [
     expect: "the header's proposed changes are the open ones",
   },
   {
-    name: "held proposed changes review nothing, but the strip shows them",
+    name: "proposed changes with nothing to add review nothing, but the strip shows them",
     file: "packages/interface/column-view.ts",
     from: '    review: proposed.kind === "open" ? proposedReview(proposed.record) : null,',
-    to: '    review: proposed.kind === "open" || proposed.kind === "held" ? proposedReview(proposed.record) : null,',
+    to: '    review: proposed.kind === "open" || proposed.kind === "nothing-to-add" ? proposedReview(proposed.record) : null,',
     command: unit,
     expect:
       "open proposed changes with files can be reviewed, in every state; an accepted or empty one cannot",
@@ -2636,20 +2636,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inventory counts its cells, not its cards",
     file: "packages/interface/inventory-view.ts",
-    from: "    held: input.held.length,\n    bench:",
-    to: "    held: grid.cells.length,\n    bench:",
+    from: "    inventoryCount: input.inventoryCards.length,\n    bench:",
+    to: "    inventoryCount: grid.cells.length,\n    bench:",
     command: unit,
     expect:
-      "draws exactly settleSlots, the selection, and first lines; counts the cards held of 12",
+      "draws exactly settleSlots, the selection, and first lines; counts the cards in the inventory of 12",
   },
   {
-    name: "an unaimed take lands while 12 are held",
+    name: "an unaimed take lands while the inventory has 12",
     file: "packages/interface/card-intents.ts",
     from: "  if (inventoryFull(cards, me, card))\n",
     to: "  if (false)\n",
     command: unit,
     expect:
-      "an unaimed take is refused full at 12 held, though a slot among them is empty",
+      "an unaimed take is refused full at 12 in the inventory, though a slot among them is empty",
   },
   {
     name: "a peek stays past its end, engaged or not",
@@ -4039,22 +4039,22 @@ export const mutations: readonly Mutation[] = [
       "pinnedMarkers: a run's canvas pins and canvas list, above its prompt, mark it too",
   },
   {
-    name: "a link to someone else's held thread opens it",
+    name: "a link to a thread in someone else's inventory opens it",
     file: "packages/interface/thread-link.ts",
-    from: "        ? reach.by === me\n",
-    to: "        ? reach.by !== null\n",
+    from: "        ? reach.holder === me\n",
+    to: "        ? reach.holder !== null\n",
     command: unit,
     expect:
-      "a link opens a thread's canvas, your own held thread's preview, and nothing for someone else's",
+      "a link opens a thread's canvas, your own inventory's preview, and nothing for someone else's",
   },
   {
-    name: "a link to your own held thread opens nothing",
+    name: "a link to a thread in your own inventory opens nothing",
     file: "packages/interface/intent.ts",
     from: '      return slot === null\n        ? []\n        : [\n            { kind: "inventory", act: { kind: "show", how: "held" } },',
     to: '      return slot === slot\n        ? []\n        : [\n            { kind: "inventory", act: { kind: "show", how: "held" } },',
     command: unit,
     expect:
-      "open-link: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing",
+      "open-link: a thread in your inventory opens its preview there; one in someone else's, or with no card, nothing",
   },
   {
     name: "a copy lands first on the canvas, not after its source",
@@ -4119,29 +4119,31 @@ export const mutations: readonly Mutation[] = [
       "a thread whose parent thread is on no column of the canvas folds its path above it",
   },
   {
-    name: "a branch from a held thread shows its entries",
+    name: "a branch from a thread in someone else's inventory shows its entries",
     file: "packages/interface/column-paths.ts",
     from: "    const own = spine.slice(cut + 1).filter(n => n.thread !== hide)\n",
     to: "    const own = spine.slice(cut + 1)\n",
     command: unit,
     expect:
-      "a branch not yet sent from a held thread leaves that thread's entries out",
+      "a branch not yet sent from a thread in someone else's inventory leaves that thread's entries out",
   },
   {
-    name: "a branch in a held thread is drawn as any other",
+    name: "a branch in a thread in someone else's inventory is drawn as any other",
     file: "packages/interface/canvas-columns.ts",
-    from: "                : heldAt(index, opening.fork, facts.holders)),\n",
+    from: "                : forkInventoryHolder(\n                    index,\n                    opening.fork,\n                    facts.inventoryHolders,\n                  )),\n",
     to: "                : {}),\n",
     command: unit,
-    expect: "a thread not yet started in a thread someone else holds says who",
+    expect:
+      "a thread not yet started in a thread in someone else's inventory says whose",
   },
   {
-    name: "your own held threads are others'",
+    name: "the threads in your own inventory are others'",
     file: "packages/interface/canvas-columns.ts",
     from: "      c.place.holder !== me\n",
     to: "      c.place.holder !== null\n",
     command: unit,
-    expect: "a thread not yet started in a thread someone else holds says who",
+    expect:
+      "a thread not yet started in a thread in someone else's inventory says whose",
   },
   {
     name: "the rail draws every row of a canvas's roots",
@@ -4805,7 +4807,8 @@ export const mutations: readonly Mutation[] = [
     from: "  return input.foreign === null\n    ? null\n",
     to: "  return true\n    ? null\n",
     command: unit,
-    expect: "is read-only, saying why, after a hold and a canvas's archive",
+    expect:
+      "is read-only, saying why, after an inventory and a canvas's archive",
   },
   {
     name: "a branch's column is read as its own thread, not its source",

@@ -977,7 +977,7 @@ export function workStripWords(
         ? `an earlier accept of this thread can't be traced: get the latest from ${base} to show what's new`
         : brings
           ? moved
-          : facts.held
+          : facts.nothingToAdd
             ? "nothing to accept: accepted work already has this thread's work"
             : "nothing to accept yet"
       : state === "running"

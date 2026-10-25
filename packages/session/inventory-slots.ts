@@ -10,7 +10,7 @@ import { personDocId } from "@pinetrie/protocol/writers"
 import { InventoryDoc, readSlots } from "@pinetrie/schema"
 import type { CardId } from "@pinetrie/threads"
 import {
-  type HeldSince,
+  type InInventorySince,
   type Intents,
   putAwayWrites,
   repairStep,
@@ -44,7 +44,7 @@ export function inventorySlots(
      * ones, so a put in flight keeps its slot until the host accepts it,
      * and a refused put finds it there.
      */
-    readonly held: () => readonly CardId[]
+    readonly inventoryCards: () => readonly CardId[]
     /** The slots this tab's takes into the inventory in flight chose (`slotIntents`). */
     readonly intents: () => Intents
   },
@@ -64,17 +64,17 @@ export function inventorySlots(
         d.slots.set(slot, card)
     })
   }
-  let heldSince: HeldSince = new Map()
+  let inInventorySince: InInventorySince = new Map()
   let wake: ReturnType<typeof setTimeout> | null = null
   const repair = () => {
     if (!own.ready()) return
-    const step = repairStep(heldSince, {
-      held: inputs.held(),
+    const step = repairStep(inInventorySince, {
+      inventoryCards: inputs.inventoryCards(),
       stored: readSlots(inventory),
       intents: inputs.intents(),
       now: Date.now(),
     })
-    heldSince = step.memory
+    inInventorySince = step.memory
     if (wake !== null) clearTimeout(wake)
     wake =
       step.wake === null

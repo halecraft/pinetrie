@@ -1799,7 +1799,7 @@ export const mutations: readonly Mutation[] = [
     to: "  getLatest: null,\n",
     command: unit,
     expect:
-      "work you landed yourself leaves the proposed changes held: kept, with no files, and settled",
+      "work you landed yourself leaves the proposed changes with nothing to add: kept, with no files, and settled",
   },
   {
     name: "a fetch is never imported",
@@ -2501,7 +2501,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planRebuild: a root a thread names",
   },
   {
-    name: "the dispatcher lets a command run in a held thread",
+    name: "the dispatcher lets a command run in a thread in an inventory",
     file: "apps/pinetrie/host/commands/gate.ts",
     from: "    cards: readPlaces(places),",
     to: "    cards: [],",
@@ -2509,10 +2509,10 @@ export const mutations: readonly Mutation[] = [
     expect: "nothing runs in a thread in an inventory",
   },
   {
-    name: "the drain pops a held thread's card",
+    name: "the drain pops the card of a thread in an inventory",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "          away:\n            threadCardHolding(",
-    to: "          away:\n            false &&\n            threadCardHolding(",
+    from: "          away:\n            threadSetAside(",
+    to: "          away:\n            false &&\n            threadSetAside(",
     command: unit,
     expect:
       "pops nothing while its thread is in an inventory: its cards stay queued",
@@ -3276,9 +3276,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued fact's row is rewritten without its fact",
-    file: "apps/pinetrie/host/migrations/0019-queued-fact-unfinished.ts",
-    from: "  return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }\n",
-    to: "  return renamed === null ? null : { ...row }\n",
+    file: "apps/pinetrie/host/migrations/rewrite.ts",
+    from: "    return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }\n",
+    to: "    return renamed === null ? null : { ...row }\n",
     command: unit,
     expect:
       "a queued fact into a WIP is rewritten in its row, the row's other fields kept",
@@ -3541,6 +3541,24 @@ export const mutations: readonly Mutation[] = [
     to: '  const topics = named("Topics")',
     command: unit,
     expect: "falls back to the first open state and no Active",
+  },
+  {
+    name: "an undelivered fact to a thread in an inventory keeps its old shape",
+    file: "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
+    from: '  if (whyKind !== "held") return null\n',
+    to: "  return null\n",
+    command: unit,
+    expect:
+      "an undelivered fact to a thread in an inventory decodes again, its holder kept",
+  },
+  {
+    name: "the renamed fact names its holder by",
+    file: "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
+    from: '  return { ...fact, why: { ...rest, kind: "in-inventory", holder: by } }\n',
+    to: '  return { ...fact, why: { ...rest, kind: "in-inventory", by } }\n',
+    command: unit,
+    expect:
+      "an undelivered fact to a thread in an inventory decodes again, its holder kept",
   },
   {
     name: "a resume's run is announced as a prompt's",

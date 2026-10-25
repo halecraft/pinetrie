@@ -13,9 +13,9 @@ import {
 } from "@pinetrie/threads"
 import { planThreadOpen } from "./canvas-index.ts"
 import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
-import { threadCardHolding } from "./held.ts"
 import type { PlaceStep } from "./place-steps.ts"
 import { setRecord } from "./records.ts"
+import { threadSetAside } from "./set-aside.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
 export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">
@@ -32,10 +32,10 @@ export type CopyPlan =
       readonly kind: "refused"
       /**
        * `unknown`: the source has no record, or `end` is not in it;
-       * `taken`: the copy's id names a thread already; `held`: someone
-       * else holds the source; or a move's refusal.
+       * `taken`: the copy's id names a thread already; `in-others-inventory`:
+       * the source is in someone else's inventory; or a move's refusal.
        */
-      readonly why: "unknown" | "taken" | "held" | MoveRefusal
+      readonly why: "unknown" | "taken" | "in-others-inventory" | MoveRefusal
     }
 
 /**
@@ -73,9 +73,9 @@ export function planCopy(input: {
     cards.some(c => c.id === move.card)
   )
     return { kind: "refused", why: "taken" }
-  const holding = threadCardHolding(cards, copy.source)
-  if (holding.kind === "held" && holding.by !== sender)
-    return { kind: "refused", why: "held" }
+  const setAside = threadSetAside(cards, copy.source)
+  if (setAside?.kind === "in-inventory" && setAside.holder !== sender)
+    return { kind: "refused", why: "in-others-inventory" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
   const { to } = move
   if (to.kind === "trash" || to.kind === "back" || to.kind === "new-canvas")

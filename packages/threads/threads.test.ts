@@ -530,7 +530,7 @@ describe("a card's place as flat fields", () => {
       order: "m",
       width: 1,
     } as const
-    const held = { kind: "inventory", holder: by } as const
+    const inInventory = { kind: "inventory", holder: by } as const
     const column: CardRecord = {
       kind: "note-column",
       id: NOTES,
@@ -547,8 +547,8 @@ describe("a card's place as flat fields", () => {
       placer: by,
       content: UNTICKED,
     }
-    expect(placed(thread, held)?.place).toEqual(held)
-    expect(placed(column, held)).toBeUndefined()
+    expect(placed(thread, inInventory)?.place).toEqual(inInventory)
+    expect(placed(column, inInventory)).toBeUndefined()
     expect(placed(column, { ...canvasPlace, order: "n" })?.place).toMatchObject(
       {
         order: "n",

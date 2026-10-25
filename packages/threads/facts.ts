@@ -57,6 +57,12 @@ export interface UnansweredFact {
   readonly by: WriterId
 }
 
+/** A thread whose card is in `holder`'s inventory: theirs alone, run by nobody. */
+export interface InInventory {
+  readonly kind: "in-inventory"
+  readonly holder: WriterId
+}
+
 /** Where a thread is: `threadReach` (`@pinetrie/rules`) reads it. */
 export type Reach =
   | { readonly kind: "open"; readonly canvas: CanvasId }
@@ -65,12 +71,12 @@ export type Reach =
       readonly canvas: CanvasId
       readonly record: ArchivedCanvas
     }
-  | { readonly kind: "held"; readonly by: WriterId }
+  | InInventory
   /** In the trash of `canvas`'s canvas, until it is restored or deleted. */
   | { readonly kind: "trashed"; readonly canvas: CanvasId }
   | { readonly kind: "gone" }
 
-/** A thread out of reach: its canvas archived, held in an inventory, trashed, or gone. */
+/** A thread out of reach: its canvas archived, in an inventory, trashed, or gone. */
 export type Away = Exclude<Reach, { readonly kind: "open" }>
 
 /**

@@ -62,6 +62,10 @@ import { CARD_TICKED } from "./0026-card-ticked.ts"
 import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
 import { workflowMarks } from "./0028-workflow-marks.ts"
 import { STREAM_STATEMENT } from "./0029-stream-statement.ts"
+import {
+  factInInventoryMigration,
+  queuedFactInInventoryMigration,
+} from "./0030-fact-in-inventory.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -154,6 +158,8 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   trashedTraces,
   runEndReportMigration,
   workflowMarks,
+  factInInventoryMigration,
+  queuedFactInInventoryMigration,
 ]
 
 /**

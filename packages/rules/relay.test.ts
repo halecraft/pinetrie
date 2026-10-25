@@ -102,11 +102,11 @@ describe("planRelay", () => {
       kind: "refused",
       why: { kind: "away", side: "to", name: "amber-fox", reach: ARCHIVED },
     })
-    const asker = relay({ fromReach: { kind: "held", by: BEA } })
+    const asker = relay({ fromReach: { kind: "in-inventory", holder: BEA } })
     expect(asker).toMatchObject({ why: { kind: "away", side: "from" } })
     if (asker.kind !== "refused") return
     expect(relayRefusalText(asker.why, () => "Bea")).toBe(
-      "Bea has sable-meadow: its ask was not relayed.",
+      "sable-meadow is in Bea's inventory: its ask was not relayed.",
     )
   })
   test("only a member with a lane, while the budget lasts, is asked", () => {

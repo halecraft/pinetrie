@@ -153,18 +153,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the slots settle on the 12 alone",
     file: "packages/session/inventory.ts",
-    from: "  const grid = inventoryGrid(held.length)\n  const out: Record<string, CardId> = {}",
+    from: "  const grid = inventoryGrid(inventoryCards.length)\n  const out: Record<string, CardId> = {}",
     to: "  const grid = INVENTORY_GRID\n  const out: Record<string, CardId> = {}",
     command: unit,
-    expect: "a 13th held card is drawn in the row past the sixth",
+    expect: "a 13th card in the inventory is drawn in the row past the sixth",
   },
   {
     name: "unslotted cards are placed in reverse id order",
     file: "packages/session/inventory.ts",
-    from: "  for (const card of [...held].sort()) {",
-    to: "  for (const card of [...held].sort().reverse()) {",
+    from: "  for (const card of [...inventoryCards].sort()) {",
+    to: "  for (const card of [...inventoryCards].sort().reverse()) {",
     command: unit,
-    expect: "an unslotted held card goes in the first empty slot, in id order",
+    expect:
+      "an unslotted card in the inventory goes in the first empty slot, in id order",
   },
   {
     name: "a card in two slots keeps the higher",
@@ -175,12 +176,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a card in two slots keeps the lower",
   },
   {
-    name: "a slot keeps a card not held",
+    name: "a slot keeps a card not in the inventory",
     file: "packages/session/inventory.ts",
-    from: "    if (card === undefined || !isHeld.has(card) || placed.has(card)) continue",
+    from: "    if (card === undefined || !isInInventory.has(card) || placed.has(card))\n      continue",
     to: "    if (card === undefined || placed.has(card)) continue",
     command: unit,
-    expect: "a slot naming a card not held is cleared",
+    expect: "a slot naming a card not in the inventory is cleared",
   },
   {
     name: "the repair writes over the slot a take into the inventory chose",
@@ -202,7 +203,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the repair clears a slot before its card is steady",
     file: "packages/session/inventory.ts",
-    from: "        (!isCell(grid, Number(slot)) || isHeld.has(card) || steady(card)),",
+    from: "        (!isCell(grid, Number(slot)) ||\n          isInInventory.has(card) ||\n          steady(card)),",
     to: "        true,",
     command: unit,
     expect: "a card not yet steady is neither placed nor has its slot cleared",
@@ -210,10 +211,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card's steady clock restarts on every look",
     file: "packages/session/inventory.ts",
-    from: "      was !== undefined && was.held === holds\n        ? was",
+    from: "      was !== undefined && was.inInventory === inInventory\n        ? was",
     to: "      false\n        ? was",
     command: unit,
-    expect: "steadiness: a card held, or not, for STEADY_MS",
+    expect: "steadiness: a card in the inventory, or out, for STEADY_MS",
   },
   {
     name: "a take into the inventory leaves the card in its other slot",

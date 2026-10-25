@@ -87,7 +87,10 @@ const QueuedFactSchema = Type.Union([
           at: Type.Number(),
         }),
       }),
-      Type.Object({ kind: Type.Literal("held"), by: WriterIdSchema }),
+      Type.Object({
+        kind: Type.Literal("in-inventory"),
+        holder: WriterIdSchema,
+      }),
       Type.Object({ kind: Type.Literal("trashed"), canvas: CanvasIdSchema }),
       Type.Object({ kind: Type.Literal("gone") }),
     ]),
@@ -159,7 +162,7 @@ const into = (to: LatestFrom) =>
 const awayLine = (name: string, why: Away): string =>
   why.kind === "archived"
     ? `${name}'s canvas is archived`
-    : why.kind === "held"
+    : why.kind === "in-inventory"
       ? `${name} is in someone's inventory`
       : `${name} is no longer on any canvas`
 

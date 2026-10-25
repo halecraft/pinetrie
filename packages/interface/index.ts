@@ -19,7 +19,7 @@ export {
   branchOutRefusal,
   copyRefusal,
   gateRefusal,
-  HELD_WORDS,
+  IN_INVENTORY_WORDS,
   imageRefusal,
   openRefusal,
   publishUndone,
@@ -125,10 +125,10 @@ export {
 } from "./canvas-column-view.ts"
 export {
   type CardColumn,
-  heldByOthers,
   openColumns,
   type Strip,
   stripCards,
+  threadsInOthersInventories,
 } from "./canvas-columns.ts"
 export { canvasesOnBoard } from "./canvases.ts"
 export {

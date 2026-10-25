@@ -1134,7 +1134,7 @@ describe("workStripWords", () => {
   test.each([
     ["nothing", undefined, "idle", "nothing to accept yet"],
     [
-      "held: the project already has its work",
+      "nothing to add: the project already has its work",
       { ...proposed, files: [] },
       "idle",
       "nothing to accept: accepted work already has this thread's work",

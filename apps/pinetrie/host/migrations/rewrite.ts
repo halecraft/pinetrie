@@ -56,6 +56,27 @@ export const renamedFields =
   }
 
 /**
+ * A rewrite of a places row holding a queued fact, stored as JSON in its
+ * `fact`, by `rewrite` of the fact: the row's other fields kept; null for a
+ * row with no fact, one that does not parse, or one `rewrite` leaves.
+ */
+export const queuedFactRow =
+  (rewrite: Rewrite): Rewrite =>
+  row => {
+    if (row === null || typeof row !== "object") return null
+    const { fact } = row as { readonly fact?: unknown }
+    if (typeof fact !== "string" || fact === "") return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(fact)
+    } catch {
+      return null
+    }
+    const renamed = rewrite(parsed)
+    return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }
+  }
+
+/**
  * The writes to `target` that rewrite `stored`, `from`'s records. In place
  * (`to` is `from`), a set for each record `rewrite` changes. Into another
  * namespace, every record is set under `to`, rewritten or as stored, and

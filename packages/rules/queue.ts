@@ -178,7 +178,7 @@ export function planNextQueuedCardPop(
   facts: {
     readonly running: boolean
     /**
-     * Its thread is in someone's inventory or a trash (`threadCardHolding`), or its
+     * Its thread is in someone's inventory or a trash (`threadSetAside`), or its
      * lane keeps a history of another kind (`proveRunnable`): nothing runs
      * there.
      */

@@ -85,8 +85,8 @@ interface Projected {
   readonly view: ColumnView
   readonly path: ReadonlySet<EntryId>
   readonly track: number
-  /** Who holds the thread a branch not yet sent forks in, when someone else does. */
-  readonly heldBy: WriterId | null
+  /** Whose inventory the thread a branch not yet sent forks in is in, when someone else's. */
+  readonly forkHolder: WriterId | null
   /** Why no run starts from it: its lane, or the one its first send clones, is of another kind. */
   readonly foreign: ForeignLane | null
   /** Its matches while a search applies, else null. */
@@ -156,7 +156,7 @@ export function Strip(p: {
         }
         readOnly={columnReadOnly({
           canvas: readOnly,
-          heldBy: projected.heldBy,
+          forkHolder: projected.forkHolder,
           foreign: projected.foreign,
           reader: p.reader,
         })}

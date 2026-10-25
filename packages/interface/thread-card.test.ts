@@ -114,7 +114,7 @@ describe("threadCardHead", () => {
         list: [K1],
         cardsOn: new Map(),
         unstarted: new Map(),
-        holders: new Map(),
+        inventoryHolders: new Map(),
       },
     )
     const sidebar = sidebarView({

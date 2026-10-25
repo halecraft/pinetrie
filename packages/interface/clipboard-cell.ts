@@ -25,21 +25,21 @@ export interface ClipboardCellView {
 }
 
 /**
- * The cell for `clip`, the last copy this tab made; null before any. `held`
- * is how many cards your inventory holds: at `INVENTORY_SLOTS` keep is not
+ * The cell for `clip`, the last copy this tab made; null before any. At
+ * `INVENTORY_SLOTS` cards in your inventory (`inventoryCount`) keep is not
  * offered, whatever slot is drawn empty.
  */
 export function clipboardCellView(
   clip: Clip | null,
   slots: Slots,
-  held: number,
+  inventoryCount: number,
 ): ClipboardCellView | null {
   if (clip === null) return null
   return {
     summary: clipSummary(clip),
     words: CLIPBOARD_CELL,
     title: CLIPBOARD_CELL_TITLE,
-    save: held < INVENTORY_SLOTS && firstEmpty(slots) !== null,
+    save: inventoryCount < INVENTORY_SLOTS && firstEmpty(slots) !== null,
   }
 }
 

@@ -324,15 +324,6 @@ export {
   type Settle,
   type SettleFacts,
 } from "./get-latest.ts"
-export {
-  foreignIn,
-  foreignLaneWords,
-  foreignRefusal,
-  type RunAt,
-  type ThreadHolding,
-  takenIn,
-  threadCardHolding,
-} from "./held.ts"
 export { planReorder } from "./in-place.ts"
 export {
   decodeLand,
@@ -446,6 +437,7 @@ export {
 export { rankOfDrop } from "./rank.ts"
 export {
   awayWords,
+  inventoryHolderWords,
   type LateScope,
   lateAway,
   reachableAgents,
@@ -531,6 +523,15 @@ export {
   type SendRefusal,
   type SharedBlob,
 } from "./send.ts"
+export {
+  foreignIn,
+  foreignLaneWords,
+  foreignRefusal,
+  type RunAt,
+  type SetAside,
+  takenIn,
+  threadSetAside,
+} from "./set-aside.ts"
 export {
   type ModelLine,
   type NoModel,

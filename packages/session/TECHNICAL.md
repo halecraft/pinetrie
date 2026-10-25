@@ -223,7 +223,7 @@ session or someone else's inventory throws before it is made.
 ## Your inventory's slots (`inventory.ts`, `inventory-slots.ts`, ADR-0059)
 
 - **Two layers.** The host's records say which cards are in your inventory
-  (`CardPlace` `inventory`, `heldBy`); your inventory document
+  (`CardPlace` `inventory`, `ownInventoryCards`); your inventory document
   (`inventory:<you>`, `InventoryDoc`) says which slot holds each. The
   session opens it and repairs it on every change (`repairStep`:
   `steadiness`, then `planSlots`), since your tabs write it at once (S76).
@@ -231,15 +231,16 @@ session or someone else's inventory throws before it is made.
   (`inventoryView`, `@pinetrie/interface`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
   first empty. Both are threads' grid rule (`grid.ts`).
-- **The grid grows past its 12 slots only while you hold more**
-  (`inventoryGrid(held.length)`, ADR-0171): a 13th card held (an undo, a
-  limit lowered) is drawn and kept in the row past the sixth, and once you
-  hold 12 or fewer, a card in a slot past the twelfth is no slot and
+- **The grid grows past its 12 slots only while your inventory has more**
+  (`inventoryGrid(inventoryCards.length)`, ADR-0171): a 13th card (an undo,
+  a limit lowered) is drawn and kept in the row past the sixth, and once it
+  has 12 or fewer, a card in a slot past the twelfth is no slot and
   settles into the first empty one. `firstEmpty` aims at the 12 alone, so
   a take never lands past them.
 - **The repair waits for a card to be steady** (`steadiness`, S79): it
-  places a card, or clears its slot, only once the card has been held, or
-  not, for `STEADY_MS`, and looks again then. It reads the host's records,
+  places a card, or clears its slot, only once the card has been in the
+  inventory, or out, for `STEADY_MS`, and looks again then. Its memory
+  (`InInventorySince`) is the tab's, never stored. It reads the host's records,
   not the drawn ones, so a put in flight keeps its slot until accepted.
   It writes nothing when nothing differs.
 - **The slot putting a card away chose is written at the answer** (`slotOnAccept`, then

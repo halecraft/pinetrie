@@ -147,8 +147,8 @@ export function canvasColumns(input: {
   readonly lanes: readonly LaneView[]
   /** Each thread opened and not yet started (`unstartedThreads`): where its column ends. */
   readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
-  /** Each thread someone else holds in their inventory, by its holder (`heldByOthers`). */
-  readonly holders: ReadonlyMap<ThreadId, WriterId>
+  /** Each thread in someone else's inventory, by its holder (`threadsInOthersInventories`). */
+  readonly inventoryHolders: ReadonlyMap<ThreadId, WriterId>
 }): readonly CardColumn[] {
   const ids = new Set<string>(input.onCanvas.map(c => c.id))
   return input.onCanvas.flatMap(c => {
@@ -167,7 +167,7 @@ function cardColumn(
   seen: CardView | undefined,
   facts: Pick<
     Parameters<typeof canvasColumns>[0],
-    "index" | "lanes" | "unstarted" | "holders"
+    "index" | "lanes" | "unstarted" | "inventoryHolders"
   >,
   onCanvas: ReadonlySet<string>,
 ): CardColumn | null {
@@ -193,7 +193,11 @@ function cardColumn(
               root: opening.root,
               ...(opening.fork === null
                 ? {}
-                : heldAt(index, opening.fork, facts.holders)),
+                : forkInventoryHolder(
+                    index,
+                    opening.fork,
+                    facts.inventoryHolders,
+                  )),
               ...(seen?.pending === undefined ? {} : { pending: seen.pending }),
               ...unstartedPrefill(seen, opening),
             },
@@ -258,22 +262,24 @@ function foldAboveOf(
   return from === null || onCanvas.has(from) ? null : thread
 }
 
-/** The thread `at` is in, and who holds it, when someone else does. */
-const heldAt = (
+/** The thread `at` is in, and whose inventory it is in, when someone else's. */
+const forkInventoryHolder = (
   index: TreeIndex,
   at: EntryId,
-  holders: ReadonlyMap<ThreadId, WriterId>,
-): Pick<UnstartedMode, "held"> => {
+  inventoryHolders: ReadonlyMap<ThreadId, WriterId>,
+): Pick<UnstartedMode, "forkInInventory"> => {
   const thread = entryThread(index, at)
-  const by = thread === null ? undefined : holders.get(thread)
-  return thread === null || by === undefined ? {} : { held: { thread, by } }
+  const holder = thread === null ? undefined : inventoryHolders.get(thread)
+  return thread === null || holder === undefined
+    ? {}
+    : { forkInInventory: { thread, holder } }
 }
 
 /**
- * Each thread someone other than `me` holds in their inventory, by its
- * holder: what `canvasColumns` decides a thread not yet started from it by.
+ * Each thread in the inventory of someone other than `me`, by its holder:
+ * what `canvasColumns` decides a thread not yet started from it by.
  */
-export const heldByOthers = (
+export const threadsInOthersInventories = (
   cards: readonly CardRecord[],
   me: WriterId,
 ): ReadonlyMap<ThreadId, WriterId> =>

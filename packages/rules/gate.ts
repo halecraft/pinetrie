@@ -26,11 +26,11 @@ import { archivedIn, writesIn } from "./archive.ts"
 import type { CanvasIndex } from "./canvas-index.ts"
 import {
   foreignIn,
-  heldIn,
+  notOnCanvasIn,
   runsIn,
   runThreads,
-  type ThreadHolding,
-} from "./held.ts"
+  type SetAside,
+} from "./set-aside.ts"
 
 declare const clearedBrand: unique symbol
 /**
@@ -61,9 +61,9 @@ export interface GateFacts {
 export type GateRefusal =
   | { readonly kind: "archived"; readonly canvas: ArchivedCanvas }
   | {
-      readonly kind: "held"
+      readonly kind: "not-on-canvas"
       readonly thread: ThreadId
-      readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
+      readonly setAside: SetAside
     }
   | { readonly kind: "foreign"; readonly lane: ForeignLane }
 
@@ -77,8 +77,8 @@ type GatePlan<C extends Gated> =
  * Whether `command` may go on. The archive first, which needs no root, so a
  * command it refuses opens none; then the roots a branch forks in, asked for
  * as `read` until `facts.roots` holds them, so no branch passes unread; then
- * a thread held or trashed (a person's own hold is the nearer reason); then
- * a lane of another kind.
+ * a thread in an inventory or a trash (a person's own act, so the nearer
+ * reason); then a lane of another kind.
  */
 export function planGate<C extends Gated>(
   command: C,
@@ -98,7 +98,7 @@ export function planGate<C extends Gated>(
     ),
   ]
   if (unread.length > 0) return { kind: "read", roots: unread }
-  const held = heldIn(
+  const notOnCanvas = notOnCanvasIn(
     runThreads(
       at,
       (root, entry) => {
@@ -109,7 +109,7 @@ export function planGate<C extends Gated>(
     ),
     facts.cards,
   )
-  if (held !== null) return { kind: "held", ...held }
+  if (notOnCanvas !== null) return { kind: "not-on-canvas", ...notOnCanvas }
   const foreign = foreignIn(at, {
     lanes: facts.lanes,
     kind: facts.kind,

@@ -63,7 +63,6 @@ import {
   type FocusKey,
   foldMemory,
   type HeldView,
-  heldByOthers,
   heldLaneTreatments,
   historyView,
   type Identity,
@@ -145,6 +144,7 @@ import {
   threadIcon,
   threadLink,
   threadPreview,
+  threadsInOthersInventories,
   threadTrack,
   threadWork,
   trackIndex,
@@ -155,7 +155,7 @@ import {
   type WorkflowState,
 } from "@pinetrie/interface"
 import {
-  heldBy,
+  ownInventoryCards,
   type SessionClient,
   settleSlots,
   slotIntents,
@@ -590,8 +590,8 @@ export function App({
   )
   // Each thread someone else holds: a branch not yet sent from
   // one is drawn without its entries.
-  const holders = useMemo(
-    () => heldByOthers(cards, session.writer),
+  const inventoryHolders = useMemo(
+    () => threadsInOthersInventories(cards, session.writer),
     [cards, session.writer],
   )
   const layout = useMemo(
@@ -603,9 +603,18 @@ export function App({
         list,
         cardsOn,
         unstarted,
-        holders,
+        inventoryHolders,
       }),
-    [stored, index, lanes, archivedCanvases, list, cardsOn, unstarted, holders],
+    [
+      stored,
+      index,
+      lanes,
+      archivedCanvases,
+      list,
+      cardsOn,
+      unstarted,
+      inventoryHolders,
+    ],
   )
   useEffect(() => {
     if (layout !== stored)
@@ -617,7 +626,7 @@ export function App({
         list,
         cardsOn,
         unstarted,
-        holders,
+        inventoryHolders,
       })
   }, [
     layout,
@@ -628,7 +637,7 @@ export function App({
     list,
     cardsOn,
     unstarted,
-    holders,
+    inventoryHolders,
   ])
   // Every change is saved, the document's too, so a restored column's anchor
   // is never older than the tree it was drawn from.
@@ -694,7 +703,7 @@ export function App({
         list,
         cardsOn,
         unstarted,
-        holders,
+        inventoryHolders,
         known: new Set(canvases.byId.keys()),
       })
   }, [settled])
@@ -717,7 +726,7 @@ export function App({
         list,
         cardsOn,
         unstarted,
-        holders,
+        inventoryHolders,
         known: now,
       })
   }, [settled, canvases])
@@ -731,12 +740,12 @@ export function App({
         ? canvasStrip(layout, active.canvas, {
             cardsOn,
             unstarted,
-            holders,
+            inventoryHolders,
             index,
             lanes,
           })
         : null,
-    [layout, active, cardsOn, unstarted, index, lanes, holders],
+    [layout, active, cardsOn, unstarted, index, lanes, inventoryHolders],
   )
   // The canvas's thread columns drawn whole. Every projection below is keyed
   // on this one, so it keeps its identity while its data does: the strip is
@@ -763,11 +772,13 @@ export function App({
       projectColumns(
         index,
         columns.map(c => {
-          const held = unstartedMode(c)?.held
+          const forkInInventory = unstartedMode(c)?.forkInInventory
           return {
             anchor: c.anchor,
             ...(c.foldAbove === undefined ? {} : { foldAbove: c.foldAbove }),
-            ...(held === undefined ? {} : { hide: held.thread }),
+            ...(forkInInventory === undefined
+              ? {}
+              : { hide: forkInInventory.thread }),
           }
         }),
       ),
@@ -1089,7 +1100,8 @@ export function App({
                   view: columnView,
                   path: paths[i] ?? new Set<EntryId>(),
                   track: slot.track,
-                  heldBy: unstartedMode(column)?.held?.by ?? null,
+                  forkHolder:
+                    unstartedMode(column)?.forkInInventory?.holder ?? null,
                   foreign: columnForeign(column, index, workFacts),
                   matches: search === null ? null : (matches?.[i] ?? null),
                 },
@@ -1382,8 +1394,8 @@ export function App({
     session.slots.subscribe,
     session.slots.current,
   )
-  const held = useMemo(
-    () => heldBy(cards, session.writer),
+  const inventoryCards = useMemo(
+    () => ownInventoryCards(cards, session.writer),
     [cards, session.writer],
   )
   const intents = useMemo(() => slotIntents(moves), [moves])
@@ -1410,24 +1422,24 @@ export function App({
       attention.threads,
     ],
   )
-  // Each thread you hold, as its slot draws it.
+  // Each thread in your inventory, as its slot draws it.
   const threadGlances = useMemo(
     () =>
       new Map(
-        held.flatMap(c =>
+        inventoryCards.flatMap(c =>
           c.kind === "thread" ? [[c.id, threadGlanceOf(c.id)] as const] : [],
         ),
       ),
-    [held, threadGlanceOf],
+    [inventoryCards, threadGlanceOf],
   )
   const slots = useMemo(
     () =>
       settleSlots(
-        held.map(c => c.id),
+        inventoryCards.map(c => c.id),
         storedSlots,
         intents,
       ),
-    [held, storedSlots, intents],
+    [inventoryCards, storedSlots, intents],
   )
   // Your inventory panel: shown or not and why, its selection, its bench.
   const [inventory, onInventory] = useReducer(
@@ -1698,7 +1710,7 @@ export function App({
     state: stateOf.get(canvas) ?? null,
   })
   const openAt = (entry: EntryId) => onIntent({ kind: "open-at", entry })
-  /** Follow `link` to `entry`: a held thread's opens nothing. */
+  /** Follow `link` to `entry`: one to a thread in someone else's inventory opens nothing. */
   const openLink = (entry: EntryId, link: ThreadLink) =>
     onIntent({ kind: "open-link", link, entry })
 
@@ -1806,7 +1818,7 @@ export function App({
             colorOf={colorOf}
             column={lastColumnKey}
             dock={dock}
-            held={held}
+            inventoryCards={inventoryCards}
             intents={intents}
             onDock={d => setDock(stores.dock.save(d))}
             onIntent={onIntent}
@@ -1818,7 +1830,7 @@ export function App({
             titles={cardTitles}
             threadNames={workFacts.names}
             threads={threadGlances}
-            cell={clipboardCellView(cell, slots, held.length)}
+            cell={clipboardCellView(cell, slots, inventoryCards.length)}
             reader={{ me: session.writer, nameOf }}
             notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
             state={inventory}
@@ -2063,7 +2075,7 @@ export function App({
             session={session}
             inventory={{
               open: inventoryOpen,
-              count: held.length,
+              count: inventoryCards.length,
               onToggle: () => onInventory({ kind: "toggle" }),
             }}
             folded={listWidth === "icons"}

@@ -94,8 +94,8 @@ interface WorkStripFacts {
   readonly touchesWorkingCopyEdits: boolean
   /** Its bookmark, to find it in jj; null with no proposed changes not yet accepted. */
   readonly bookmark: string | null
-  /** Proposed changes not yet accepted whose work accepted work already holds (`held`). */
-  readonly held: boolean
+  /** Proposed changes not yet accepted whose work accepted work already has (`nothing-to-add`). */
+  readonly nothingToAdd: boolean
   /** The change id it was accepted as, or null. */
   readonly acceptedAs: string | null
   /**
@@ -166,7 +166,7 @@ export function workStripView(input: {
   const { proposed, asked } = input
   const activity = workStripActivity(input.activity, input.queued)
   const notYetAccepted =
-    proposed.kind === "open" || proposed.kind === "held"
+    proposed.kind === "open" || proposed.kind === "nothing-to-add"
       ? proposed.record
       : undefined
   const open = proposed.kind === "open" ? proposed.record : undefined
@@ -186,7 +186,7 @@ export function workStripView(input: {
     conflicts: open?.conflicts.length ?? 0,
     touchesWorkingCopyEdits: (jjOpen?.workingCopyEdits.length ?? 0) > 0,
     bookmark: notYetAccepted?.kind === "jj" ? notYetAccepted.bookmark : null,
-    held: proposed.kind === "held",
+    nothingToAdd: proposed.kind === "nothing-to-add",
     acceptedAs: proposed.kind === "accepted" ? proposed.as : null,
     base: effectiveBase(input.base),
     into: input.into,
@@ -298,7 +298,7 @@ export function workStripState(input: {
   if (proposed.kind === "accepted") return "accepted"
   const { record } = proposed
   if (asked !== null && asked > record.at) return "needs-you"
-  if (proposed.kind === "held") return "nothing"
+  if (proposed.kind === "nothing-to-add") return "nothing"
   if (record.kind === "jj" && record.edited) return "edited"
   if (record.conflicts.length > 0) return "conflicts"
   // Folder proposed changes are its files: never split, never a stack.
