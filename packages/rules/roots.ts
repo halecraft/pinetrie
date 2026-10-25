@@ -4,6 +4,7 @@
 import {
   type EntryId,
   entryId,
+  isSha256,
   isThreadId,
   type RootId,
   type Sha256,
@@ -11,7 +12,13 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, rootKey, ThreadIdSchema } from "./decode.ts"
+import {
+  List,
+  recordDecoder,
+  rootKey,
+  ThreadIdSchema,
+  WriterIdSchema,
+} from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const Id = Type.String({ minLength: 1 })
@@ -21,17 +28,17 @@ const RootRecordSchema = Type.Object({
   firstLine: Type.String(),
   messages: Type.Number(),
   newest: Type.Union([Id, Type.Null()]),
-  writers: Type.Array(Type.String()),
-  threads: Type.Record(Type.String(), Type.Array(Type.String())),
-  mentions: Type.Array(
+  writers: List(WriterIdSchema),
+  threads: Type.Record(Type.String(), List(WriterIdSchema)),
+  mentions: List(
     Type.Object({
       id: Id,
-      by: Type.String(),
+      by: WriterIdSchema,
       text: Type.String(),
       thread: ThreadIdSchema,
     }),
   ),
-  blobs: Type.Array(Type.String()),
+  blobs: List(Type.String()),
 })
 
 const idOrNull = (id: string | null): EntryId | null =>
@@ -39,11 +46,11 @@ const idOrNull = (id: string | null): EntryId | null =>
 
 /** Each thread's writers, a key that is no lane name dropped. */
 const threadsOf = (
-  threads: Readonly<Record<string, readonly string[]>>,
+  threads: Readonly<Record<string, readonly WriterId[]>>,
 ): Readonly<Record<ThreadId, readonly WriterId[]>> =>
   Object.fromEntries(
     Object.entries(threads).flatMap(([lane, writers]) =>
-      isThreadId(lane) ? [[lane, writers as WriterId[]]] : [],
+      isThreadId(lane) ? [[lane, writers]] : [],
     ),
   )
 
@@ -90,28 +97,32 @@ export interface RootRecord {
  * alone, so a record that does not decode in this build's shape is rebuilt
  * at a host's start (`host/directory.ts`), never migrated.
  */
-export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
+export const ROOT: RecordSpec<
+  RootRecord,
+  RootId,
+  "session",
+  typeof RootRecordSchema
+> = {
   namespace: "pinetrie.root",
   home: "session",
   derived: true,
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(RootRecordSchema, contents, rootKey(key), (r, root) => ({
-      root,
-      entry: idOrNull(r.entry),
-      first: idOrNull(r.first),
-      firstLine: r.firstLine,
-      messages: r.messages,
-      newest: idOrNull(r.newest),
-      writers: r.writers as WriterId[],
-      threads: threadsOf(r.threads),
-      mentions: r.mentions.map(m => ({
-        id: entryId(m.id),
-        by: m.by as WriterId,
-        text: m.text,
-        thread: m.thread,
-      })),
-      blobs: r.blobs as Sha256[],
+  decode: recordDecoder(RootRecordSchema, rootKey, (r, root) => ({
+    root,
+    entry: idOrNull(r.entry),
+    first: idOrNull(r.first),
+    firstLine: r.firstLine,
+    messages: r.messages,
+    newest: idOrNull(r.newest),
+    writers: r.writers,
+    threads: threadsOf(r.threads),
+    mentions: r.mentions.map(m => ({
+      id: entryId(m.id),
+      by: m.by,
+      text: m.text,
+      thread: m.thread,
     })),
+    blobs: r.blobs.filter(isSha256),
+  })),
 }

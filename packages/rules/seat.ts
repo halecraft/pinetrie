@@ -2,12 +2,12 @@
 
 import type { WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, textKey } from "./decode.ts"
+import { recordDecoder, textKey, WriterIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const SeatSchema = Type.Object({
   clientId: Type.Number(),
-  writer: Type.String(),
+  writer: WriterIdSchema,
   at: Type.Number(),
 })
 
@@ -30,18 +30,22 @@ export interface SeatRecord {
  * operations carry it and Yjs derives it from the peer (`seatIdentity`, in
  * `@pinetrie/schema`), which this package cannot.
  */
-export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
+export const SEAT: RecordSpec<
+  SeatRecord,
+  string,
+  "session",
+  typeof SeatSchema
+> = {
   namespace: "pinetrie.seat",
   home: "session",
   keyOf: s => s.peer,
   encode: ({ peer, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(SeatSchema, contents, textKey(key), (s, peer) => ({
-      peer,
-      clientId: s.clientId,
-      writer: s.writer as WriterId,
-      at: s.at,
-    })),
+  decode: recordDecoder(SeatSchema, textKey, (s, peer) => ({
+    peer,
+    clientId: s.clientId,
+    writer: s.writer,
+    at: s.at,
+  })),
 }
 
 /**

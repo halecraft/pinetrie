@@ -5,7 +5,7 @@
 
 import type { ThreadId, ValueWrite } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { recordDecoder, threadKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 const ConflictAskSchema = Type.Object({ at: Type.Number() })
@@ -17,18 +17,21 @@ export interface ConflictAskRecord {
   readonly at: number
 }
 
-export const CONFLICT_ASK: RecordSpec<ConflictAskRecord, ThreadId, "session"> =
-  {
-    namespace: "pinetrie.conflict-ask",
-    home: "session",
-    keyOf: r => r.lane,
-    encode: ({ lane, ...contents }) => contents,
-    decode: (contents, key) =>
-      decodeRecord(ConflictAskSchema, contents, threadKey(key), (r, lane) => ({
-        lane,
-        at: r.at,
-      })),
-  }
+export const CONFLICT_ASK: RecordSpec<
+  ConflictAskRecord,
+  ThreadId,
+  "session",
+  typeof ConflictAskSchema
+> = {
+  namespace: "pinetrie.conflict-ask",
+  home: "session",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => contents,
+  decode: recordDecoder(ConflictAskSchema, threadKey, (r, lane) => ({
+    lane,
+    at: r.at,
+  })),
+}
 
 /** What an `ask_about_conflict` call comes to. */
 interface ConflictAskPlan {

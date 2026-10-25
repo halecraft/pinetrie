@@ -27,7 +27,7 @@ import {
 import { Type } from "typebox"
 import { byOrder } from "./card.ts"
 import type { CardHistoryRecord } from "./card-history.ts"
-import { decodeRecord, fixedKey } from "./decode.ts"
+import { choiceSchema, fixedKey, recordDecoder } from "./decode.ts"
 import { orderAfter } from "./order.ts"
 import type { PlaceStep } from "./place-steps.ts"
 import { rankAfter } from "./rank.ts"
@@ -44,7 +44,7 @@ const OpenStateSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   name: Type.String({ minLength: 1 }),
   /** Absent for a state with no mark. */
-  mark: Type.Optional(Type.Union(WORKFLOW_MARKS.map(m => Type.Literal(m)))),
+  mark: Type.Optional(choiceSchema(WORKFLOW_MARKS)),
 })
 
 const WorkflowSchema = Type.Object({
@@ -112,7 +112,12 @@ const decodedState = (s: {
   isWorkflowStateId(s.id) ? { id: s.id, name: s.name } : undefined
 
 /** The session's workflow: one value, at `WORKFLOW_KEY`. */
-export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
+export const WORKFLOW: RecordSpec<
+  Workflow,
+  typeof WORKFLOW_KEY,
+  "session",
+  typeof WorkflowSchema
+> = {
   namespace: "pinetrie.workflow",
   home: "session",
   keyOf: () => WORKFLOW_KEY,
@@ -122,8 +127,10 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
     ),
     archive: { id: w.archive.id, name: w.archive.name },
   }),
-  decode: (contents, key) =>
-    decodeRecord(WorkflowSchema, contents, fixedKey(WORKFLOW_KEY, key), w => {
+  decode: recordDecoder(
+    WorkflowSchema,
+    key => fixedKey(WORKFLOW_KEY, key),
+    w => {
       const open: OpenState[] = []
       for (const s of w.open) {
         const state = decodedState(s)
@@ -132,7 +139,8 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
       }
       const archive = decodedState(w.archive)
       return archive === undefined ? undefined : checkedWorkflow(open, archive)
-    }),
+    },
+  ),
 }
 
 /**

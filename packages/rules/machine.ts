@@ -3,19 +3,18 @@
 // host's start and at its stop, so no tab reads a stopped host's.
 
 import {
-  type HeldLane,
   LANE_TREATMENTS,
   MACHINE_SERVICES,
   MACHINE_STATES,
-  type MachineCause,
   type MachineHealth,
   UNSAMPLED_REASONS,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import {
   choiceSchema,
-  decodeRecord,
   fixedKey,
+  List,
+  recordDecoder,
   ThreadIdSchema,
 } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -73,7 +72,18 @@ const CauseSchema = Type.Union([
     kind: Type.Literal("room-unrecoverable"),
     unallocated: Bytes,
     minimum: Bytes,
+    isRepaired: Type.Boolean(),
   }),
+  Type.Object({
+    kind: Type.Literal("disk-being-repaired"),
+    step: Type.Union([
+      Type.Literal("detected"),
+      Type.Literal("stopping-vm"),
+      Type.Literal("booting-repair"),
+    ]),
+    progress: Type.Union([Type.String(), Type.Null()]),
+  }),
+  Type.Object({ kind: Type.Literal("disk-repair-failed"), why: Type.String() }),
   Type.Object({
     kind: Type.Literal("unsampled"),
     reason: choiceSchema(UNSAMPLED_REASONS),
@@ -83,8 +93,8 @@ const CauseSchema = Type.Union([
 
 const HealthSchema = Type.Object({
   state: choiceSchema(MACHINE_STATES),
-  causes: Type.Array(CauseSchema),
-  treatments: Type.Array(
+  causes: List(CauseSchema),
+  treatments: List(
     Type.Object({
       lane: ThreadIdSchema,
       treatment: Type.Object({ kind: choiceSchema(LANE_TREATMENTS) }),
@@ -92,23 +102,35 @@ const HealthSchema = Type.Object({
   ),
 })
 
-export const MACHINE: RecordSpec<MachineHealth, typeof MACHINE_KEY, "session"> =
-  {
-    namespace: "pinetrie.machine",
-    home: "session",
-    keyOf: () => MACHINE_KEY,
-    encode: h => ({
+/**
+ * The machine's health, at `MACHINE_KEY`. A cause added to core fails the
+ * type check here until `CauseSchema` stores it: one stored without it would
+ * not decode, and every tab would read no health at all.
+ */
+export const MACHINE: RecordSpec<
+  MachineHealth,
+  typeof MACHINE_KEY,
+  "session",
+  typeof HealthSchema
+> = {
+  namespace: "pinetrie.machine",
+  home: "session",
+  keyOf: () => MACHINE_KEY,
+  encode: h => ({
+    state: h.state,
+    causes: h.causes.map(c => ({ ...c })),
+    treatments: h.treatments.map(t => ({
+      lane: t.lane,
+      treatment: { ...t.treatment },
+    })),
+  }),
+  decode: recordDecoder(
+    HealthSchema,
+    key => fixedKey(MACHINE_KEY, key),
+    h => ({
       state: h.state,
-      causes: h.causes.map(c => ({ ...c })),
-      treatments: h.treatments.map(t => ({
-        lane: t.lane,
-        treatment: { ...t.treatment },
-      })),
+      causes: h.causes,
+      treatments: h.treatments,
     }),
-    decode: (contents, key) =>
-      decodeRecord(HealthSchema, contents, fixedKey(MACHINE_KEY, key), h => ({
-        state: h.state,
-        causes: h.causes as readonly MachineCause[],
-        treatments: h.treatments as readonly HeldLane[],
-      })),
-  }
+  ),
+}

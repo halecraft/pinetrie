@@ -2,7 +2,7 @@
 // commands.
 
 import { Type } from "typebox"
-import { choiceSchema, decodeRecord, fixedKey } from "./decode.ts"
+import { choiceSchema, fixedKey, recordDecoder } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.commands` value's key: what the host's pi loaded. */
@@ -54,19 +54,18 @@ interface CommandsRecord {
 export const COMMANDS: RecordSpec<
   CommandsRecord,
   typeof COMMANDS_KEY,
-  "session"
+  "session",
+  typeof CommandsRecordSchema
 > = {
   namespace: "pinetrie.commands",
   home: "session",
   keyOf: () => COMMANDS_KEY,
   encode: r => ({ commands: r.commands.map(c => ({ ...c })) }),
-  decode: (contents, key) =>
-    decodeRecord(
-      CommandsRecordSchema,
-      contents,
-      fixedKey(COMMANDS_KEY, key),
-      r => r,
-    ),
+  decode: recordDecoder(
+    CommandsRecordSchema,
+    key => fixedKey(COMMANDS_KEY, key),
+    r => r,
+  ),
 }
 
 /** A command as pi loaded it, before it has a label: what the host gathers. */

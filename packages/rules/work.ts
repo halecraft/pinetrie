@@ -32,10 +32,11 @@ import { Type } from "typebox"
 import type { ForkBegin } from "./base.ts"
 import {
   choiceSchema,
-  decodeRecord,
   entryKey,
   fixedKey,
+  List,
   PointSchema,
+  recordDecoder,
   threadKey,
   WriterIdSchema,
 } from "./decode.ts"
@@ -52,22 +53,22 @@ const ProjectKindSchema = Type.Union([
 const LaneRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
   history: Type.Union([ProjectKindSchema, Type.Null()]),
-  by: Type.String(),
+  by: WriterIdSchema,
   createdAt: Type.Number(),
 })
 
 const ListedSchema = Type.Object({
-  paths: Type.Array(Type.String()),
+  paths: List(Type.String()),
   more: Type.Integer({ minimum: 0 }),
 })
 
 const TurnDiskSchema = Type.Object({
   derived: ListedSchema,
   private: ListedSchema,
-  unignored: Type.Array(Type.String()),
-  leftovers: Type.Array(Type.String()),
+  unignored: List(Type.String()),
+  leftovers: List(Type.String()),
   shared: Type.Object({
-    wrote: Type.Array(
+    wrote: List(
       Type.Object({
         path: Type.String(),
         version: Type.Integer({ minimum: 1 }),
@@ -81,8 +82,8 @@ const RevisionRecordSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
   point: Type.Union([PointSchema, Type.Null()]),
   snapshot: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
-  paths: Type.Array(Type.String()),
-  conflicts: Type.Array(Type.String()),
+  paths: List(Type.String()),
+  conflicts: List(Type.String()),
   disk: Type.Union([TurnDiskSchema, Type.Null()]),
 })
 
@@ -96,27 +97,36 @@ const ProjectRecordSchema = Type.Object({
  * Each lane's record, written as the lane is created: the root it works in,
  * and the kind of history its own copy keeps, null for none.
  */
-export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
+export const LANE: RecordSpec<
+  LaneRecord,
+  ThreadId,
+  "session",
+  typeof LaneRecordSchema
+> = {
   namespace: "pinetrie.lane",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(LaneRecordSchema, contents, threadKey(key), (r, lane) =>
-      isRootId(r.root)
-        ? {
-            lane,
-            root: r.root,
-            history: r.history,
-            by: r.by as WriterId,
-            createdAt: r.createdAt,
-          }
-        : undefined,
-    ),
+  decode: recordDecoder(LaneRecordSchema, threadKey, (r, lane) =>
+    isRootId(r.root)
+      ? {
+          lane,
+          root: r.root,
+          history: r.history,
+          by: r.by,
+          createdAt: r.createdAt,
+        }
+      : undefined,
+  ),
 }
 
 /** The state and disk at an entry, and its turn's paths and conflicts, at the entry. */
-export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
+export const REVISION: RecordSpec<
+  RevisionRecord,
+  EntryId,
+  "root",
+  typeof RevisionRecordSchema
+> = {
   namespace: "pinetrie.revision",
   home: "root",
   keyOf: r => r.entry,
@@ -125,20 +135,19 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
     paths: [...contents.paths],
     conflicts: [...contents.conflicts],
   }),
-  decode: (contents, key) =>
-    decodeRecord(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
-      isThreadId(r.lane)
-        ? {
-            entry,
-            lane: r.lane,
-            point: r.point,
-            snapshot: r.snapshot === null ? null : snapshotId(r.snapshot),
-            paths: r.paths,
-            conflicts: r.conflicts,
-            disk: r.disk,
-          }
-        : undefined,
-    ),
+  decode: recordDecoder(RevisionRecordSchema, entryKey, (r, entry) =>
+    isThreadId(r.lane)
+      ? {
+          entry,
+          lane: r.lane,
+          point: r.point,
+          snapshot: r.snapshot === null ? null : snapshotId(r.snapshot),
+          paths: r.paths,
+          conflicts: r.conflicts,
+          disk: r.disk,
+        }
+      : undefined,
+  ),
 }
 
 /**
@@ -158,20 +167,22 @@ export interface ProjectRecord {
 }
 
 /** What the host found where it runs, at its one key. */
-export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
-  {
-    namespace: "pinetrie.project",
-    home: "session",
-    keyOf: () => PROJECT_KEY,
-    encode: r => ({ ...r }),
-    decode: (contents, key) =>
-      decodeRecord(
-        ProjectRecordSchema,
-        contents,
-        fixedKey(PROJECT_KEY, key),
-        r => ({ root: r.root, kind: r.kind, owner: r.owner }),
-      ),
-  }
+export const PROJECT: RecordSpec<
+  ProjectRecord,
+  typeof PROJECT_KEY,
+  "session",
+  typeof ProjectRecordSchema
+> = {
+  namespace: "pinetrie.project",
+  home: "session",
+  keyOf: () => PROJECT_KEY,
+  encode: r => ({ ...r }),
+  decode: recordDecoder(
+    ProjectRecordSchema,
+    key => fixedKey(PROJECT_KEY, key),
+    r => ({ root: r.root, kind: r.kind, owner: r.owner }),
+  ),
+}
 
 // ── turns and forks ────────────────────────────────────────────────────────
 
@@ -490,23 +501,27 @@ const LaneForkSchema = Type.Union([
 ])
 
 /** Each lane of its own's fork, at the lane. */
-export const LANE_FORK: RecordSpec<LaneForkRecord, ThreadId, "session"> = {
+export const LANE_FORK: RecordSpec<
+  LaneForkRecord,
+  ThreadId,
+  "session",
+  typeof LaneForkSchema
+> = {
   namespace: "pinetrie.lane-fork",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(LaneForkSchema, contents, threadKey(key), (r, lane) =>
-      r.state === "owed"
-        ? { lane, base: r.base, state: "owed" }
-        : {
-            lane,
-            base: r.base,
-            state: "begun",
-            lost: r.lost === null ? null : snapshotId(r.lost),
-            instead: r.instead ?? (r.lost === null ? null : "base"),
-          },
-    ),
+  decode: recordDecoder(LaneForkSchema, threadKey, (r, lane) =>
+    r.state === "owed"
+      ? { lane, base: r.base, state: "owed" }
+      : {
+          lane,
+          base: r.base,
+          state: "begun",
+          lost: r.lost === null ? null : snapshotId(r.lost),
+          instead: r.instead ?? (r.lost === null ? null : "base"),
+        },
+  ),
 }
 
 /**

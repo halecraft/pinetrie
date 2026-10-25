@@ -28,6 +28,7 @@ import { testWorkflow } from "./fixtures.ts"
 import {
   ACCEPTED,
   ACCESS,
+  type AnyRecordSpec,
   BANNER,
   BASE,
   byTarget,
@@ -53,7 +54,6 @@ import {
   QUEUE_HOLD,
   RECORD_SPECS,
   REVISION,
-  type RecordSpec,
   ROOT,
   RUN_END_REPORT,
   SEAT,
@@ -98,27 +98,31 @@ const proposed: JjProposedChangesRecord = {
 /** A spec and a record of it, erased to one type so a table can hold both. */
 type Sample = readonly [
   string,
-  RecordSpec<unknown, string>,
+  AnyRecordSpec<unknown, string>,
   unknown,
   /** The record's key field, which the stored contents must not hold. */
   string | null,
 ]
 const sample = <R, K extends string>(
   name: string,
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   record: NoInfer<R>,
   keyField: (keyof R & string) | null,
-): Sample => [name, spec as RecordSpec<unknown, string>, record, keyField]
+): Sample => [name, spec as AnyRecordSpec<unknown, string>, record, keyField]
 
 const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** A record's write to the document its home names: the test's root for a root's. */
-const writeOf = (spec: RecordSpec<unknown, string>, record: unknown) =>
+const writeOf = (spec: AnyRecordSpec<unknown, string>, record: unknown) =>
   spec.home === "root"
-    ? setRecord(spec as RecordSpec<unknown, string, "root">, record, TEST_ROOT)
-    : setRecord(spec as RecordSpec<unknown, string, "session">, record)
+    ? setRecord(
+        spec as AnyRecordSpec<unknown, string, "root">,
+        record,
+        TEST_ROOT,
+      )
+    : setRecord(spec as AnyRecordSpec<unknown, string, "session">, record)
 
 const rootRecord: RootRecord = {
   root: TEST_ROOT,

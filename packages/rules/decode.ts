@@ -3,6 +3,7 @@
 // dropped, never thrown, and cannot break every client's render.
 
 import {
+  type AgentId,
   CANVAS_PATTERN,
   type CanvasId,
   type CommitId,
@@ -12,6 +13,7 @@ import {
   isRootId,
   isThreadId,
   type PointId,
+  pointId,
   type RootId,
   THREAD_PATTERN,
   type ThreadId,
@@ -65,19 +67,33 @@ export function decodeWith<S extends TSchema, T>(
 }
 
 /**
- * `decodeWith` for a record's contents at its address. `key` is
- * the address as one of the key readers below gives it, or undefined when
- * the address is malformed, and then so is the record.
+ * A record's contents at its address -> the record, or undefined when either
+ * is malformed. It carries the schema it checks with, so a spec's type names
+ * that schema, and its `encode` must return the same schema's type
+ * (`RecordSpec`).
  */
-export function decodeRecord<S extends TSchema, K, T>(
+export interface RecordDecoder<R, S extends TSchema> {
+  (contents: unknown, key: string): R | undefined
+  readonly schema: S
+}
+
+/**
+ * A record's decoder: `readKey` reads the address, with one of the key
+ * readers below, and undefined there drops the record; `build` makes the
+ * record from contents `schema` accepted, and may refuse them too.
+ */
+export function recordDecoder<S extends TSchema, A, R>(
   schema: S,
-  contents: unknown,
-  key: K | undefined,
-  build: (wire: Static<S>, key: K) => T | undefined,
-): T | undefined {
-  return key === undefined
-    ? undefined
-    : decodeWith(schema, contents, wire => build(wire, key))
+  readKey: (key: string) => A | undefined,
+  build: (wire: Static<S>, key: A) => R | undefined,
+): RecordDecoder<R, S> {
+  const decode = (contents: unknown, key: string): R | undefined => {
+    const address = readKey(key)
+    return address === undefined
+      ? undefined
+      : decodeWith(schema, contents, wire => build(wire, address))
+  }
+  return Object.assign(decode, { schema })
 }
 
 // An address read as the key it names, or undefined. Never parsed: each
@@ -88,6 +104,9 @@ export const textKey = (key: string): string | undefined =>
 
 export const entryKey = (key: string): EntryId | undefined =>
   key === "" ? undefined : entryId(key)
+
+export const pointKey = (key: string): PointId | undefined =>
+  key === "" ? undefined : pointId(key)
 
 export const writerKey = (key: string): WriterId | undefined =>
   key === "" ? undefined : (key as WriterId)
@@ -140,6 +159,14 @@ export const WriterIdSchema = Type.Unsafe<WriterId>(
   Type.String({ minLength: 1 }),
 )
 
+/**
+ * Who wrote a title, as stored: a person or the agent (`isAgentId` tells
+ * them apart), never empty.
+ */
+export const AuthorSchema = Type.Unsafe<WriterId | AgentId>(
+  Type.String({ minLength: 1 }),
+)
+
 /** A thread's two-word name, as stored: never empty. */
 export const ThreadNameSchema = Type.Unsafe<ThreadName>(
   Type.String({ minLength: 1 }),
@@ -148,9 +175,11 @@ export const ThreadNameSchema = Type.Unsafe<ThreadName>(
 /**
  * A closed set's schema, from the `as const` list its type is built from
  * too, so the stored shape and the type cannot accept different values.
+ * A union built from an array, not a tuple, has `never` for its `Static`,
+ * which takes any value the type checker meets, so its `Static` is given.
  */
 export const choiceSchema = <V extends string>(values: readonly V[]) =>
-  Type.Union(values.map(v => Type.Literal(v)))
+  Type.Unsafe<V>(Type.Union(values.map(v => Type.Literal(v))))
 
 /** A card's id, as stored: never empty. */
 export const CardIdSchema = Type.Unsafe<CardId>(Type.String({ minLength: 1 }))

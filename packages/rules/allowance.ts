@@ -3,7 +3,12 @@
 
 import type { EntryId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, entryKey } from "./decode.ts"
+import {
+  entryKey,
+  recordDecoder,
+  ThreadIdSchema,
+  WriterIdSchema,
+} from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 /** A budget, at the message that set it. */
@@ -23,28 +28,32 @@ export interface AllowanceRecord {
 }
 
 const AllowanceSchema = Type.Object({
-  thread: Type.String({ minLength: 1 }),
-  by: Type.String({ minLength: 1 }),
+  thread: ThreadIdSchema,
+  by: WriterIdSchema,
   limit: Type.Number({ minimum: 0 }),
   spent: Type.Number({ minimum: 0 }),
   over: Type.Boolean(),
 })
 
 /** Each budget, at the message that set it. */
-export const ALLOWANCE: RecordSpec<AllowanceRecord, EntryId, "session"> = {
+export const ALLOWANCE: RecordSpec<
+  AllowanceRecord,
+  EntryId,
+  "session",
+  typeof AllowanceSchema
+> = {
   namespace: "pinetrie.allowance",
   home: "session",
   keyOf: r => r.message,
   encode: ({ message, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(AllowanceSchema, contents, entryKey(key), (r, message) => ({
-      message,
-      thread: r.thread as ThreadId,
-      by: r.by as WriterId,
-      limit: r.limit,
-      spent: r.spent,
-      over: r.over,
-    })),
+  decode: recordDecoder(AllowanceSchema, entryKey, (r, message) => ({
+    message,
+    thread: r.thread,
+    by: r.by,
+    limit: r.limit,
+    spent: r.spent,
+    over: r.over,
+  })),
 }
 
 /** The budget a person's message sets when no config names one. */

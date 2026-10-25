@@ -10,7 +10,7 @@ import {
   type ThreadName,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { recordDecoder, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /**
@@ -95,20 +95,24 @@ export function planReserve(
 }
 
 const NameRecordSchema = Type.Object({
-  name: Type.String({ pattern: "^[a-z]+-[a-z]+$" }),
+  name: Type.Unsafe<ThreadName>(Type.String({ pattern: "^[a-z]+-[a-z]+$" })),
   at: Type.Number(),
 })
 
 /** Each thread's name, `word-word`, at its lane. */
-export const NAME: RecordSpec<NameRecord, ThreadId, "session"> = {
+export const NAME: RecordSpec<
+  NameRecord,
+  ThreadId,
+  "session",
+  typeof NameRecordSchema
+> = {
   namespace: "pinetrie.name",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(NameRecordSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      name: r.name as ThreadName,
-      at: r.at,
-    })),
+  decode: recordDecoder(NameRecordSchema, threadKey, (r, lane) => ({
+    lane,
+    name: r.name,
+    at: r.at,
+  })),
 }

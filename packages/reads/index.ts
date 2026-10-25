@@ -33,6 +33,7 @@ import {
   type AccessRecord,
   ALLOWANCE,
   type AllowanceRecord,
+  type AnyRecordSpec,
   BANNER,
   BASE,
   type BannerRecord,
@@ -81,7 +82,6 @@ import {
   type QueueHold,
   queuedOn,
   REVISION,
-  type RecordSpec,
   ROOT,
   type RootRecord,
   RUN_END_REPORT,
@@ -407,7 +407,7 @@ const decoded = new WeakMap<
  */
 export function readRecords<R, K extends string, H extends Home>(
   doc: HomeDoc<H>,
-  spec: RecordSpec<R, K, H>,
+  spec: AnyRecordSpec<R, K, H>,
 ): ReadonlyMap<K, R> {
   const namespace = readNamespace(doc, spec.namespace)
   const bySpec = decoded.get(spec) ?? new WeakMap()

@@ -9,7 +9,7 @@ import {
   type TreeIndex,
 } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { decodeRecord, entryKey } from "./decode.ts"
+import { entryKey, List, recordDecoder } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 import {
   bareLine,
@@ -29,7 +29,7 @@ const DigestSchema = Type.Union([
   ),
   Type.Object({
     headline: Type.String(),
-    points: Type.Array(Type.String()),
+    points: List(Type.String()),
     at: Type.Number(),
     final: Type.Literal(true),
   }),
@@ -68,23 +68,27 @@ export type DigestRecord =
     } & DigestBody)
 
 /** Each ask's digest, at its prompt's entry id. */
-export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
+export const DIGEST: RecordSpec<
+  DigestRecord,
+  EntryId,
+  "root",
+  typeof DigestSchema
+> = {
   namespace: "pinetrie.digest",
   home: "root",
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(DigestSchema, contents, entryKey(key), (r, prompt) =>
-      r.final
-        ? {
-            prompt,
-            headline: r.headline,
-            points: r.points,
-            at: r.at,
-            final: true,
-          }
-        : { prompt, headline: r.headline, at: r.at, final: false },
-    ),
+  decode: recordDecoder(DigestSchema, entryKey, (r, prompt) =>
+    r.final
+      ? {
+          prompt,
+          headline: r.headline,
+          points: r.points,
+          at: r.at,
+          final: true,
+        }
+      : { prompt, headline: r.headline, at: r.at, final: false },
+  ),
 }
 
 // ── the reply ─────────────────────────────────────────────────────────────

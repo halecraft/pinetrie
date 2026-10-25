@@ -11,7 +11,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { ModelRef } from "./config.ts"
-import { choiceSchema, decodeRecord, fixedKey, threadKey } from "./decode.ts"
+import { choiceSchema, fixedKey, recordDecoder, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BannerRecordSchema = Type.Object({
@@ -45,15 +45,19 @@ export interface IconsRecord {
 }
 
 /** Each thread's column banner, the image's hash, at its lane. */
-export const BANNER: RecordSpec<BannerRecord, ThreadId, "session"> = {
+export const BANNER: RecordSpec<
+  BannerRecord,
+  ThreadId,
+  "session",
+  typeof BannerRecordSchema
+> = {
   namespace: "pinetrie.banner",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(BannerRecordSchema, contents, threadKey(key), (r, lane) =>
-      isSha256(r.sha) ? { lane, sha: r.sha, at: r.at } : undefined,
-    ),
+  decode: recordDecoder(BannerRecordSchema, threadKey, (r, lane) =>
+    isSha256(r.sha) ? { lane, sha: r.sha, at: r.at } : undefined,
+  ),
 }
 
 // ── the setting ───────────────────────────────────────────────────────────
@@ -89,13 +93,21 @@ const IconsRecordSchema = Type.Object({
 })
 
 /** The host's icon source, at its one key, for the page to read. */
-export const ICONS: RecordSpec<IconsRecord, typeof ICONS_KEY, "session"> = {
+export const ICONS: RecordSpec<
+  IconsRecord,
+  typeof ICONS_KEY,
+  "session",
+  typeof IconsRecordSchema
+> = {
   namespace: "pinetrie.icons",
   home: "session",
   keyOf: () => ICONS_KEY,
   encode: r => ({ source: r.source }),
-  decode: (contents, key) =>
-    decodeRecord(IconsRecordSchema, contents, fixedKey(ICONS_KEY, key), r => r),
+  decode: recordDecoder(
+    IconsRecordSchema,
+    key => fixedKey(ICONS_KEY, key),
+    r => r,
+  ),
 }
 
 // ── the decision ──────────────────────────────────────────────────────────

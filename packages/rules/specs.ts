@@ -28,7 +28,7 @@ import { NAME } from "./names.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
 import { PROPOSED_CHANGES } from "./proposed.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
-import { deleteRecord, type RecordSpec } from "./records.ts"
+import { type AnyRecordSpec, deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { RUN_END_REPORT } from "./run-end-report.ts"
 import { SEAT } from "./seat.ts"
@@ -39,13 +39,13 @@ import { THREAD } from "./thread.ts"
 import { LANE, LANE_FORK, PROJECT, REVISION } from "./work.ts"
 
 /** What a check over every record reads of a spec: its address and its decoder. */
-type AnyRecordSpec = Pick<
-  RecordSpec<unknown, string>,
+type DeclaredSpec = Pick<
+  AnyRecordSpec<unknown, string>,
   "namespace" | "home" | "decode"
 >
 
 /** Every record's spec. */
-export const RECORD_SPECS: readonly AnyRecordSpec[] = [
+export const RECORD_SPECS: readonly DeclaredSpec[] = [
   FOLDER_WRITE_JOURNAL,
   ACCESS,
   BANNER,
@@ -84,7 +84,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
 ]
 
 /** Each declared namespace's home. */
-const DECLARED: ReadonlyMap<string, AnyRecordSpec["home"]> = new Map(
+const DECLARED: ReadonlyMap<string, DeclaredSpec["home"]> = new Map(
   RECORD_SPECS.map(spec => [spec.namespace, spec.home]),
 )
 

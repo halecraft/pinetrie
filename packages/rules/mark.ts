@@ -18,14 +18,14 @@ import {
 } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
-import { decodeRecord, parseCanvasKey } from "./decode.ts"
+import { AuthorSchema, parseCanvasKey, recordDecoder } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
 // titles `parseTitle` accepted, so the title rule is not repeated here.
 const MarkSchema = Type.Object({
   title: Type.String({ minLength: 1 }),
-  by: Type.String(),
+  by: AuthorSchema,
   at: Type.Number(),
 })
 
@@ -43,19 +43,22 @@ export interface MarkRecord {
 }
 
 /** Each canvas's title, at the canvas's id. */
-export const MARK: RecordSpec<MarkRecord, CanvasId, "session"> = {
+export const MARK: RecordSpec<
+  MarkRecord,
+  CanvasId,
+  "session",
+  typeof MarkSchema
+> = {
   namespace: "pinetrie.mark",
   home: "session",
   keyOf: r => r.canvas,
   encode: ({ canvas, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({
-      canvas,
-      title: r.title,
-      // A writer id always starts `w-` (`writerId`), so neither is read as the other.
-      by: r.by as WriterId | AgentId,
-      at: r.at,
-    })),
+  decode: recordDecoder(MarkSchema, parseCanvasKey, (r, canvas) => ({
+    canvas,
+    title: r.title,
+    by: r.by,
+    at: r.at,
+  })),
 }
 
 type MarkPlan =

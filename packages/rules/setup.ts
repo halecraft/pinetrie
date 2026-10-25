@@ -11,7 +11,7 @@ import {
   REFUSAL_REASONS,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { choiceSchema, decodeRecord, fixedKey } from "./decode.ts"
+import { choiceSchema, fixedKey, List, recordDecoder } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.setup` value's key. */
@@ -130,14 +130,14 @@ export interface SetupSession {
 }
 
 const SetupRecordSchema = Type.Object({
-  files: Type.Array(
+  files: List(
     Type.Object({
       layer: Layer,
       file: Type.String(),
       state: choiceSchema(CONFIG_FILE_STATES),
     }),
   ),
-  refusals: Type.Array(
+  refusals: List(
     Type.Object({
       layer: Layer,
       file: Type.String(),
@@ -150,7 +150,7 @@ const SetupRecordSchema = Type.Object({
     Type.Object({
       kind: Type.Literal("model"),
       label: Type.String(),
-      origins: Type.Array(Origin),
+      origins: List(Origin),
     }),
     Type.Object({
       kind: Type.Literal("none"),
@@ -158,19 +158,19 @@ const SetupRecordSchema = Type.Object({
       named: Type.Union([Type.String(), Type.Null()]),
     }),
   ]),
-  credentials: Type.Array(
+  credentials: List(
     Type.Object({ provider: Type.String(), source: Type.String() }),
   ),
-  settings: Type.Array(
+  settings: List(
     Type.Object({
       key: Type.String(),
       describe: Type.String(),
       value: Type.String(),
-      origins: Type.Array(Origin),
+      origins: List(Origin),
     }),
   ),
-  refusedPackages: Type.Array(Type.String()),
-  contextFiles: Type.Array(Type.String()),
+  refusedPackages: List(Type.String()),
+  contextFiles: List(Type.String()),
   subscription: Type.Union([
     Type.Object({
       package: Type.String(),
@@ -198,11 +198,19 @@ const SetupRecordSchema = Type.Object({
 })
 
 /** What the host read of its config, at its one key, for the setup page. */
-export const SETUP: RecordSpec<SetupRecord, typeof SETUP_KEY, "session"> = {
+export const SETUP: RecordSpec<
+  SetupRecord,
+  typeof SETUP_KEY,
+  "session",
+  typeof SetupRecordSchema
+> = {
   namespace: "pinetrie.setup",
   home: "session",
   keyOf: () => SETUP_KEY,
   encode: r => ({ ...r }),
-  decode: (contents, key) =>
-    decodeRecord(SetupRecordSchema, contents, fixedKey(SETUP_KEY, key), r => r),
+  decode: recordDecoder(
+    SetupRecordSchema,
+    key => fixedKey(SETUP_KEY, key),
+    r => r,
+  ),
 }

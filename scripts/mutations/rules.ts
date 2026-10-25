@@ -1641,8 +1641,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no copy of its own decodes as a jj lane",
     file: "packages/rules/work.ts",
-    from: "            history: r.history,",
-    to: '            history: r.history ?? "jj",',
+    from: "          history: r.history,",
+    to: '          history: r.history ?? "jj",',
     command: unit,
     expect:
       "a lane's history round-trips as its kind, or null for no copy of its own",
@@ -3289,8 +3289,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an old copy of the key wins",
     file: "packages/rules/mark.ts",
-    from: "    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      title: r.title,",
-    to: "    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      ...r,\n      title: r.title,",
+    from: "  decode: recordDecoder(MarkSchema, parseCanvasKey, (r, canvas) => ({\n    canvas,\n    title: r.title,",
+    to: "  decode: recordDecoder(MarkSchema, parseCanvasKey, (r, canvas) => ({\n    canvas,\n    ...r,\n    title: r.title,",
     command: unit,
     expect: "the address wins",
   },
@@ -3864,8 +3864,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root record from before its threads is read",
     file: "packages/rules/roots.ts",
-    from: "  threads: Type.Record(Type.String(), Type.Array(Type.String())),",
-    to: "  threads: Type.Optional(Type.Record(Type.String(), Type.Array(Type.String()))),",
+    from: "  threads: Type.Record(Type.String(), List(WriterIdSchema)),",
+    to: "  threads: Type.Optional(Type.Record(Type.String(), List(WriterIdSchema))),",
     command: unit,
     expect: "a root record in an older shape does not decode",
   },
@@ -5157,8 +5157,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a participant's name is decoded with a schema built at each call",
     file: "packages/rules/participant.ts",
-    from: "    decodeRecord(StoredText, contents, writerKey(key), (name, writer) => ({\n",
-    to: "    decodeRecord(Type.String(), contents, writerKey(key), (name, writer) => ({\n",
+    from: "  decode: recordDecoder(StoredText, writerKey, (name, writer) => ({\n",
+    to: "  decode: recordDecoder(Type.String(), writerKey, (name, writer) => ({\n",
     command: unit,
     expect:
       "no decode builds its schema inline, which would compile it at every call",
@@ -5568,5 +5568,23 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a cgroup stuck at its limit, a lane's or a service's, is read back as it was written",
+  },
+  {
+    name: "the machine record stores no failed repair",
+    file: "packages/rules/machine.ts",
+    from: '  Type.Object({ kind: Type.Literal("disk-repair-failed"), why: Type.String() }),\n',
+    to: "",
+    command: unit,
+    expect:
+      "a health holding disk-repair-failed is read back as it was written",
+  },
+  {
+    name: "a cause's field is stored narrower than its type",
+    file: "packages/rules/machine.ts",
+    from: "    isRepaired: Type.Boolean(),",
+    to: "    isRepaired: Type.Literal(false),",
+    command: unit,
+    expect:
+      "a health holding room-unrecoverable is read back as it was written",
   },
 ]

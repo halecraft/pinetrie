@@ -32,7 +32,12 @@ import {
 } from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
-import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
+import {
+  CommitSchema,
+  PointSchema,
+  recordDecoder,
+  threadKey,
+} from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const WorkSchema = Type.Union([
@@ -85,6 +90,10 @@ const FolderBaseSchema = Type.Object({
 /** A lane's base record as stored: jj's or a folder's. */
 const BaseRecordSchema = Type.Union([JjBaseSchema, FolderBaseSchema])
 
+const copiedGetLatest = <G extends { readonly files: readonly string[] }>(
+  getLatest: G | null,
+) => (getLatest === null ? null : { ...getLatest, files: [...getLatest.files] })
+
 /**
  * A thread's base as its lane's history says it: a host-written
  * `pinetrie.base` value keyed by lane, of the project's kind, a cache the
@@ -97,50 +106,48 @@ export type BaseRecord = JjBaseRecord | FolderBaseRecord
  * lane. A record written before records had a kind decodes as none, until
  * the host writes it again.
  */
-export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
+export const BASE: RecordSpec<
+  BaseRecord,
+  ThreadId,
+  "session",
+  typeof BaseRecordSchema
+> = {
   namespace: "pinetrie.base",
   home: "session",
   keyOf: r => r.lane,
-  encode: ({ lane, ...contents }) => {
-    const getLatest =
-      contents.getLatest === null
-        ? null
-        : { ...contents.getLatest, files: [...contents.getLatest.files] }
-    return contents.kind === "folder"
-      ? { ...contents, getLatest }
+  encode: ({ lane, ...contents }) =>
+    contents.kind === "folder"
+      ? { ...contents, getLatest: copiedGetLatest(contents.getLatest) }
       : {
           ...contents,
-          getLatest,
+          getLatest: copiedGetLatest(contents.getLatest),
           base: { ...contents.base },
           untraced: [...contents.untraced],
-        }
-  },
-  decode: (contents, key) =>
-    decodeRecord(
-      BaseRecordSchema,
-      contents,
-      threadKey(key),
-      (r, lane): BaseRecord =>
-        r.kind === "folder"
-          ? { ...r, lane }
-          : {
-              kind: "jj",
-              lane,
-              base: r.base,
-              start: commitId(r.start),
-              state: r.state,
-              getLatest:
-                r.getLatest === null
-                  ? null
-                  : {
-                      tip: commitId(r.getLatest.tip),
-                      to: commitId(r.getLatest.to),
-                      files: r.getLatest.files,
-                    },
-              untraced: r.untraced.map(commitId),
-              work: r.work,
-            },
-    ),
+        },
+  decode: recordDecoder(
+    BaseRecordSchema,
+    threadKey,
+    (r, lane): BaseRecord =>
+      r.kind === "folder"
+        ? { ...r, lane }
+        : {
+            kind: "jj",
+            lane,
+            base: r.base,
+            start: commitId(r.start),
+            state: r.state,
+            getLatest:
+              r.getLatest === null
+                ? null
+                : {
+                    tip: commitId(r.getLatest.tip),
+                    to: commitId(r.getLatest.to),
+                    files: r.getLatest.files,
+                  },
+            untraced: r.untraced.map(commitId),
+            work: r.work,
+          },
+  ),
 }
 
 /** What of a lane's base record says which base it follows. */

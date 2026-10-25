@@ -9,7 +9,7 @@ import {
   threadAsks,
 } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { recordDecoder, threadKey } from "./decode.ts"
 import type { DigestRecord } from "./digest.ts"
 import type { RecordSpec } from "./records.ts"
 import { firstAndNewest, oneLine, transcriptLine } from "./request.ts"
@@ -35,18 +35,22 @@ export interface FocusRecord {
 }
 
 /** Each thread's focus, at its thread. */
-export const FOCUS: RecordSpec<FocusRecord, ThreadId, "session"> = {
+export const FOCUS: RecordSpec<
+  FocusRecord,
+  ThreadId,
+  "session",
+  typeof FocusSchema
+> = {
   namespace: "pinetrie.focus",
   home: "session",
   keyOf: r => r.thread,
   encode: ({ thread, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(FocusSchema, contents, threadKey(key), (r, thread) => ({
-      thread,
-      focus: r.focus,
-      ask: entryId(r.ask),
-      at: r.at,
-    })),
+  decode: recordDecoder(FocusSchema, threadKey, (r, thread) => ({
+    thread,
+    focus: r.focus,
+    ask: entryId(r.ask),
+    at: r.at,
+  })),
 }
 
 // ── the reply ─────────────────────────────────────────────────────────────

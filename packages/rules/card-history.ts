@@ -27,7 +27,12 @@ import {
 } from "@pinetrie/threads"
 import { Type } from "typebox"
 import { placeEnd } from "./card.ts"
-import { choiceSchema, decodeRecord, textKey } from "./decode.ts"
+import {
+  choiceSchema,
+  recordDecoder,
+  textKey,
+  WriterIdSchema,
+} from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The most events a card's history keeps: its first, and the newest. */
@@ -67,7 +72,7 @@ const CARD_EVENT_KINDS = [
 
 const EventSchema = Type.Object({
   kind: choiceSchema(CARD_EVENT_KINDS),
-  by: Type.Union([Str, Type.Null()]),
+  by: Type.Union([WriterIdSchema, Type.Null()]),
   from: OrNull(FieldsSchema),
   to: FieldsSchema,
   at: Type.Number(),
@@ -75,9 +80,9 @@ const EventSchema = Type.Object({
 const HistorySchema = Type.Object({ events: Type.Array(EventSchema) })
 
 const TraceSchema = Type.Object({
-  for: Type.String({ minLength: 1 }),
+  for: WriterIdSchema,
   card: Type.String({ minLength: 1 }),
-  by: Type.String({ minLength: 1 }),
+  by: WriterIdSchema,
   from: FieldsSchema,
   to: OrNull(FieldsSchema),
   message: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
@@ -150,7 +155,12 @@ export interface TraceRecord {
  * Each card's history, at the card's id. An event whose place this build
  * cannot read is dropped, not the history.
  */
-export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
+export const CARD_HISTORY: RecordSpec<
+  CardHistoryRecord,
+  CardId,
+  "session",
+  typeof HistorySchema
+> = {
   namespace: "pinetrie.card-history",
   home: "session",
   keyOf: r => r.card,
@@ -161,26 +171,30 @@ export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
       to: placeFields(e.to),
     })),
   }),
-  decode: (contents, key) =>
-    decodeRecord(HistorySchema, contents, textKey(key), (r, id) => {
-      const card = parseCardId(id)
-      return card === undefined
-        ? undefined
-        : {
-            card,
-            events: r.events.flatMap(e => {
-              const from = keyOrNull(e.from)
-              const to = keyOfFields(asPlaceFields(e.to))
-              return from === undefined || to === undefined
-                ? []
-                : [{ ...e, by: e.by as WriterId | null, from, to }]
-            }),
-          }
-    }),
+  decode: recordDecoder(HistorySchema, textKey, (r, id) => {
+    const card = parseCardId(id)
+    return card === undefined
+      ? undefined
+      : {
+          card,
+          events: r.events.flatMap(e => {
+            const from = keyOrNull(e.from)
+            const to = keyOfFields(asPlaceFields(e.to))
+            return from === undefined || to === undefined
+              ? []
+              : [{ ...e, from, to }]
+          }),
+        }
+  }),
 }
 
 /** Each trace, at its own id. */
-export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
+export const TRACE: RecordSpec<
+  TraceRecord,
+  string,
+  "session",
+  typeof TraceSchema
+> = {
   namespace: "pinetrie.trace",
   home: "session",
   keyOf: r => r.id,
@@ -189,26 +203,25 @@ export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
     from: placeFields(t.from),
     to: keyFields(t.to),
   }),
-  decode: (contents, key) =>
-    decodeRecord(TraceSchema, contents, textKey(key), (r, id) => {
-      const key = keyOfFields(asPlaceFields(r.from))
-      // A trace is left only at a traced place (`TRACED`).
-      const from = key === undefined ? null : tracedKey(key)
-      const to = keyOrNull(r.to)
-      const card = parseCardId(r.card)
-      return from === null || to === undefined || card === undefined
-        ? undefined
-        : {
-            id,
-            for: r.for as WriterId,
-            card,
-            by: r.by as WriterId,
-            from,
-            to,
-            message: r.message === null ? null : entryId(r.message),
-            at: r.at,
-          }
-    }),
+  decode: recordDecoder(TraceSchema, textKey, (r, id) => {
+    const key = keyOfFields(asPlaceFields(r.from))
+    // A trace is left only at a traced place (`TRACED`).
+    const from = key === undefined ? null : tracedKey(key)
+    const to = keyOrNull(r.to)
+    const card = parseCardId(r.card)
+    return from === null || to === undefined || card === undefined
+      ? undefined
+      : {
+          id,
+          for: r.for,
+          card,
+          by: r.by,
+          from,
+          to,
+          message: r.message === null ? null : entryId(r.message),
+          at: r.at,
+        }
+  }),
 }
 
 // ── what a change was ─────────────────────────────────────────────────────

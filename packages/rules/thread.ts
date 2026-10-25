@@ -2,7 +2,7 @@
 // (each entry's `thread`, `firstOf` and `threadEnd` in @pinetrie/core), never
 // a record's.
 
-import { entryId, isRootId, type ThreadId, type WriterId } from "@pinetrie/core"
+import { entryId, isRootId, type ThreadId } from "@pinetrie/core"
 import {
   parseTextCardId,
   ROOT_ORIGIN,
@@ -11,12 +11,12 @@ import {
   type ThreadRecord,
 } from "@pinetrie/threads"
 import { type Static, Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { recordDecoder, threadKey, WriterIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const ThreadRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
-  by: Type.String({ minLength: 1 }),
+  by: WriterIdSchema,
   createdAt: Type.Number(),
   origin: Type.Union([
     Type.Object({ kind: Type.Literal("root") }),
@@ -62,24 +62,28 @@ const originOf = (
 }
 
 /** Each thread, at its id, in the session. */
-export const THREAD: RecordSpec<ThreadRecord, ThreadId, "session"> = {
+export const THREAD: RecordSpec<
+  ThreadRecord,
+  ThreadId,
+  "session",
+  typeof ThreadRecordSchema
+> = {
   namespace: "pinetrie.thread",
   home: "session",
   keyOf: r => r.thread,
   encode: ({ thread, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(ThreadRecordSchema, contents, threadKey(key), (r, thread) => {
-      if (!isRootId(r.root)) return undefined
-      const { origin } = r
-      const spun =
-        origin.kind === "spun" ? parseTextCardId(origin.card) : undefined
-      if (origin.kind === "spun" && spun === undefined) return undefined
-      return {
-        thread,
-        root: r.root,
-        by: r.by as WriterId,
-        createdAt: r.createdAt,
-        origin: originOf(origin, spun),
-      }
-    }),
+  decode: recordDecoder(ThreadRecordSchema, threadKey, (r, thread) => {
+    if (!isRootId(r.root)) return undefined
+    const { origin } = r
+    const spun =
+      origin.kind === "spun" ? parseTextCardId(origin.card) : undefined
+    if (origin.kind === "spun" && spun === undefined) return undefined
+    return {
+      thread,
+      root: r.root,
+      by: r.by,
+      createdAt: r.createdAt,
+      origin: originOf(origin, spun),
+    }
+  }),
 }

@@ -10,7 +10,12 @@ import {
 } from "@pinetrie/core"
 import type { AskOutcome } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { choiceSchema, decodeRecord, threadKey } from "./decode.ts"
+import {
+  choiceSchema,
+  recordDecoder,
+  threadKey,
+  WriterIdSchema,
+} from "./decode.ts"
 import {
   type Answer,
   type AskLines,
@@ -39,7 +44,7 @@ const RunEndReportSchema = Type.Object({
     Type.Object({ kind: Type.Literal("failed"), error: Type.String() }),
     Type.Object({
       kind: Type.Literal("stopped"),
-      by: Type.Union([Id, Type.Null()]),
+      by: Type.Union([WriterIdSchema, Type.Null()]),
     }),
     Type.Object({ kind: Type.Literal("unclassified") }),
   ]),
@@ -85,22 +90,19 @@ export interface RunEndReportRecord {
 export const RUN_END_REPORT: RecordSpec<
   RunEndReportRecord,
   ThreadId,
-  "session"
+  "session",
+  typeof RunEndReportSchema
 > = {
   namespace: "pinetrie.run-end-report",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(RunEndReportSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      ask: entryId(r.ask),
-      end: entryId(r.end),
-      report:
-        r.report.kind === "stopped"
-          ? { kind: "stopped", by: r.report.by as WriterId | null }
-          : r.report,
-    })),
+  decode: recordDecoder(RunEndReportSchema, threadKey, (r, lane) => ({
+    lane,
+    ask: entryId(r.ask),
+    end: entryId(r.end),
+    report: r.report,
+  })),
 }
 
 /**

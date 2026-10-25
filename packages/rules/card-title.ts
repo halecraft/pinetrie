@@ -9,13 +9,13 @@ import {
   type TitledCardId,
 } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { decodeRecord, titledCardKey } from "./decode.ts"
+import { AuthorSchema, recordDecoder, titledCardKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 // The shape only: the host stores only titles `parseTitle` accepted.
 const CardTitleSchema = Type.Object({
   title: Type.String({ minLength: 1 }),
-  by: Type.String({ minLength: 1 }),
+  by: AuthorSchema,
   at: Type.Number(),
 })
 
@@ -34,26 +34,23 @@ export interface CardTitleRecord {
 }
 
 /** Each titled card's title, at its id. */
-export const CARD_TITLE: RecordSpec<CardTitleRecord, TitledCardId, "session"> =
-  {
-    namespace: "pinetrie.card-title",
-    home: "session",
-    keyOf: r => r.card,
-    encode: ({ card, ...contents }) => contents,
-    decode: (contents, key) =>
-      decodeRecord(
-        CardTitleSchema,
-        contents,
-        titledCardKey(key),
-        (r, card) => ({
-          card,
-          title: r.title,
-          // A writer id always starts `w-` (`writerId`), so neither is read as the other.
-          by: r.by as WriterId | AgentId,
-          at: r.at,
-        }),
-      ),
-  }
+export const CARD_TITLE: RecordSpec<
+  CardTitleRecord,
+  TitledCardId,
+  "session",
+  typeof CardTitleSchema
+> = {
+  namespace: "pinetrie.card-title",
+  home: "session",
+  keyOf: r => r.card,
+  encode: ({ card, ...contents }) => contents,
+  decode: recordDecoder(CardTitleSchema, titledCardKey, (r, card) => ({
+    card,
+    title: r.title,
+    by: r.by,
+    at: r.at,
+  })),
+}
 
 /** Every titled card anyone may title now: any not in a trash. */
 export const titledCards = (

@@ -16,10 +16,10 @@ import type { AcceptedAction } from "@pinetrie/threads"
 import { Type } from "typebox"
 import {
   CommitSchema,
-  decodeRecord,
   fixedKey,
   List,
   PointSchema,
+  recordDecoder,
 } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -115,7 +115,8 @@ export type AcceptedRecord = JjAcceptedRecord | FolderAcceptedRecord
 export const ACCEPTED: RecordSpec<
   AcceptedRecord,
   typeof ACCEPTED_KEY,
-  "session"
+  "session",
+  typeof AcceptedRecordSchema
 > = {
   namespace: "pinetrie.accepted",
   home: "session",
@@ -144,30 +145,28 @@ export const ACCEPTED: RecordSpec<
             },
           },
         },
-  decode: (contents, key) =>
-    decodeRecord(
-      AcceptedRecordSchema,
-      contents,
-      fixedKey(ACCEPTED_KEY, key),
-      (r): AcceptedRecord =>
-        r.kind === "folder"
-          ? r
-          : {
-              ...r,
-              commit: r.commit === null ? null : commitId(r.commit),
-              unfinishedWork: r.unfinishedWork.map(w => ({
-                ...w,
-                commit: commitId(w.commit),
-              })),
-              published: {
-                ...r.published,
-                commit:
-                  r.published.commit === null
-                    ? null
-                    : commitId(r.published.commit),
-              },
+  decode: recordDecoder(
+    AcceptedRecordSchema,
+    key => fixedKey(ACCEPTED_KEY, key),
+    (r): AcceptedRecord =>
+      r.kind === "folder"
+        ? r
+        : {
+            ...r,
+            commit: r.commit === null ? null : commitId(r.commit),
+            unfinishedWork: r.unfinishedWork.map(w => ({
+              ...w,
+              commit: commitId(w.commit),
+            })),
+            published: {
+              ...r.published,
+              commit:
+                r.published.commit === null
+                  ? null
+                  : commitId(r.published.commit),
             },
-    ),
+          },
+  ),
 }
 
 /**

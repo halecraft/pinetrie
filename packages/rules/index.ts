@@ -452,11 +452,11 @@ export {
   threadReach,
 } from "./reach.ts"
 export {
+  type AnyRecordSpec,
   byTarget,
   decodeRecords,
   deleteRecord,
   type Home,
-  type RecordSpec,
   recordsIn,
   setIfChanged,
   setRecord,

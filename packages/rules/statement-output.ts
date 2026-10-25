@@ -16,7 +16,7 @@ import type {
   ValueWrite,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord } from "./decode.ts"
+import { recordDecoder, textKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 /** What the join reads of a statement's place in the command: its lines, from 1. */
@@ -441,11 +441,14 @@ export function outputSplitRecord(
       ? { text: "", truncated: false }
       : view((i + 1) as StatementIndex),
   )
-  return {
-    call,
-    statements: storedSplit(views, limits),
-  } as unknown as OutputSplitRecord
+  return recordedSplit(call, storedSplit(views, limits))
 }
+
+/** The one place an `OutputSplitRecord` is branded, for a settled split's record and a decoded one. */
+const recordedSplit = (
+  call: string,
+  statements: readonly StoredStatement[],
+): OutputSplitRecord => ({ call, statements }) as OutputSplitRecord
 
 const OutputSplitSchema = Type.Object({
   statements: Type.Array(
@@ -454,7 +457,12 @@ const OutputSplitSchema = Type.Object({
 })
 
 /** Each split `bash` call's output by statement, at its call's id. */
-export const OUTPUT_SPLIT: RecordSpec<OutputSplitRecord, string, "root"> = {
+export const OUTPUT_SPLIT: RecordSpec<
+  OutputSplitRecord,
+  string,
+  "root",
+  typeof OutputSplitSchema
+> = {
   namespace: "pinetrie.output-split",
   home: "root",
   keyOf: r => r.call,
@@ -464,14 +472,9 @@ export const OUTPUT_SPLIT: RecordSpec<OutputSplitRecord, string, "root"> = {
       truncated: s.truncated,
     })),
   }),
-  decode: (contents, key) =>
-    decodeRecord(
-      OutputSplitSchema,
-      contents,
-      key === "" ? undefined : key,
-      (r, call) =>
-        ({ call, statements: r.statements }) as unknown as OutputSplitRecord,
-    ),
+  decode: recordDecoder(OutputSplitSchema, textKey, (r, call) =>
+    recordedSplit(call, r.statements),
+  ),
 }
 
 /** The write that stores `record` in `root`. */

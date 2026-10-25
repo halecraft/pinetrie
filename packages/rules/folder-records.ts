@@ -11,11 +11,12 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import {
-  decodeRecord,
   decodeWith,
   EntryIdSchema,
   List,
   PointSchema,
+  pointKey,
+  recordDecoder,
   ThreadIdSchema,
   textKey,
   WriterIdSchema,
@@ -53,7 +54,12 @@ const StateSchema = Type.Object({
 })
 
 /** Each state of a folder project's history, by its snapshot's name. */
-export const STATE: RecordSpec<StateRecord, StateRecord["id"], "session"> = {
+export const STATE: RecordSpec<
+  StateRecord,
+  StateRecord["id"],
+  "session",
+  typeof StateSchema
+> = {
   namespace: "pinetrie.state",
   home: "session",
   keyOf: r => r.id,
@@ -62,14 +68,13 @@ export const STATE: RecordSpec<StateRecord, StateRecord["id"], "session"> = {
     parents: [...contents.parents],
     made: { ...contents.made },
   }),
-  decode: (contents, key) =>
-    decodeRecord(StateSchema, contents, textKey(key), (r, id) => ({
-      id: id as StateRecord["id"],
-      parents: r.parents,
-      made: r.made,
-      at: r.at,
-      by: r.by,
-    })),
+  decode: recordDecoder(StateSchema, pointKey, (r, id) => ({
+    id,
+    parents: r.parents,
+    made: r.made,
+    at: r.at,
+    by: r.by,
+  })),
 }
 
 const InodeSchema = Type.Object({
@@ -103,20 +108,23 @@ const WriteJournalSchema = Type.Object({
  * before its first move until its asides are dealt with: what a host
  * stopped part way finishes or puts back at its next start.
  */
-export const FOLDER_WRITE_JOURNAL: RecordSpec<WriteJournal, string, "session"> =
-  {
-    namespace: "pinetrie.folder-write",
-    home: "session",
-    keyOf: j => j.id,
-    encode: ({ id, ...contents }) => JSON.parse(JSON.stringify(contents)),
-    decode: (contents, key) =>
-      decodeRecord(WriteJournalSchema, contents, textKey(key), (r, id) => ({
-        id,
-        record: r.record,
-        paths: r.paths,
-        status: r.status,
-      })),
-  }
+export const FOLDER_WRITE_JOURNAL: RecordSpec<
+  WriteJournal,
+  string,
+  "session",
+  typeof WriteJournalSchema
+> = {
+  namespace: "pinetrie.folder-write",
+  home: "session",
+  keyOf: j => j.id,
+  encode: ({ id, ...contents }) => structuredClone(contents),
+  decode: recordDecoder(WriteJournalSchema, textKey, (r, id) => ({
+    id,
+    record: r.record,
+    paths: r.paths,
+    status: r.status,
+  })),
+}
 
 /**
  * A conflict's address: its lane, then its path. A lane's id holds no `:`,
@@ -143,18 +151,22 @@ const ConflictSchema = Type.Object({
 })
 
 /** Each path a merge into a folder lane left conflicted. */
-export const CONFLICT: RecordSpec<ConflictRecord, string, "session"> = {
+export const CONFLICT: RecordSpec<
+  ConflictRecord,
+  string,
+  "session",
+  typeof ConflictSchema
+> = {
   namespace: "pinetrie.conflict",
   home: "session",
   keyOf: r => conflictKey(r.lane, r.path),
   encode: ({ lane, path, ...contents }) => ({ ...contents }),
-  decode: (contents, key) =>
-    decodeRecord(ConflictSchema, contents, conflictAddress(key), (r, at) => ({
-      ...at,
-      base: r.base,
-      ours: r.ours,
-      theirs: r.theirs,
-    })),
+  decode: recordDecoder(ConflictSchema, conflictAddress, (r, at) => ({
+    ...at,
+    base: r.base,
+    ours: r.ours,
+    theirs: r.theirs,
+  })),
 }
 
 const FolderStampsSchema = Type.Record(

@@ -21,7 +21,7 @@ import {
   type TurnShared,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, textKey } from "./decode.ts"
+import { List, recordDecoder, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** A lane's write of a shared file: the version it was based on, and the one it left. */
@@ -441,36 +441,40 @@ const VersionSchema = Type.Object({
 })
 
 const LineSchema = Type.Object({
-  versions: Type.Array(VersionSchema),
+  versions: List(VersionSchema),
   next: Type.Integer({ minimum: 1 }),
   read: Type.Record(Type.String(), Type.String({ minLength: 1 })),
 })
 
 /** Each shared file's lineage, at its path from the disk's root. */
-export const SHARED_LINEAGE: RecordSpec<SharedLineage, string, "session"> = {
+export const SHARED_LINEAGE: RecordSpec<
+  SharedLineage,
+  string,
+  "session",
+  typeof LineSchema
+> = {
   namespace: "pinetrie.shared",
   home: "session",
   keyOf: l => l.path,
   encode: ({ path: _, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(LineSchema, contents, textKey(key), (l, path) => {
-      const versions: SharedVersion[] = []
-      for (const v of l.versions) {
-        const writer: SharedWriter | null =
-          v.writer.kind === "outside"
-            ? { kind: "outside" }
-            : isThreadId(v.writer.lane)
-              ? {
-                  kind: "lane",
-                  lane: v.writer.lane,
-                  entry: entryId(v.writer.entry),
-                }
-              : null
-        if (writer === null) return undefined
-        versions.push({ ...v, stamp: stamp(v.stamp), writer })
-      }
-      const read: Record<string, Stamp> = {}
-      for (const [lane, s] of Object.entries(l.read)) read[lane] = stamp(s)
-      return { path, versions, next: l.next, read }
-    }),
+  decode: recordDecoder(LineSchema, textKey, (l, path) => {
+    const versions: SharedVersion[] = []
+    for (const v of l.versions) {
+      const writer: SharedWriter | null =
+        v.writer.kind === "outside"
+          ? { kind: "outside" }
+          : isThreadId(v.writer.lane)
+            ? {
+                kind: "lane",
+                lane: v.writer.lane,
+                entry: entryId(v.writer.entry),
+              }
+            : null
+      if (writer === null) return undefined
+      versions.push({ ...v, stamp: stamp(v.stamp), writer })
+    }
+    const read: Record<string, Stamp> = {}
+    for (const [lane, s] of Object.entries(l.read)) read[lane] = stamp(s)
+    return { path, versions, next: l.next, read }
+  }),
 }

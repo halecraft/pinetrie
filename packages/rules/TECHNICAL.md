@@ -162,7 +162,7 @@ package must never require changing stored data.
 
 # Records (`records.ts`, ADR-0062)
 
-**Each spec names its home** (ADR-0063), `RecordSpec<R, K, H>` with `H`
+**Each spec names its home** (ADR-0063), `RecordSpec<R, K, H, S>` with `H`
 `"session"` or `"root"`: a record read across roots lives in the session's
 document, one keyed by a root's entries in that root's. `setRecord`,
 `deleteRecord` and `setIfChanged` take the root exactly when the home is
@@ -243,7 +243,7 @@ root's record is written only through a step's documents (ADR-0162).
   command carries its canvases, or its places and cards, which the
   `CanvasIndex` maps to canvases, so no root's document is opened to check.
 
-Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
+Each host record is one `RecordSpec<R, K, H, S>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
 `PROPOSED_CHANGES` in `proposed.ts`). Everything else goes through the spec:
 `setRecord` and `deleteRecord` build the `ValueWrite`s the host writes
@@ -255,13 +255,40 @@ address and decoder, for a check over every record, as a migration's
 (ADR-0096); a test fails when a spec is left out of it. A starting host
 deletes every record whose namespace no spec declares, or that is stored
 outside its spec's home (`planUndeclaredSweep`, ADR-0100), so a renamed,
-retired or rehomed record type leaves nothing behind.
+retired or rehomed record type leaves nothing behind. Code that only
+writes or reads records takes `AnyRecordSpec<R, K, H>`, a spec whatever
+its schema.
 
+- **A record's schema matches its type by construction.** The schema its
+  contents are stored as is the spec's type parameter `S`: `encode` returns
+  `Static<S>`, and `decode` is a `RecordDecoder<R, S>`, which only
+  `recordDecoder` makes, from `S` itself, a key reader and a `build` that
+  makes `R` from `Static<S>`. No decoder casts: an id is a branded schema
+  (`WriterIdSchema`, `ThreadIdSchema`, `AuthorSchema` for a person or the
+  agent), an array the type holds `readonly` is a `List`, and a closed set
+  is `choiceSchema`, whose `Static` is the set itself (a union built from
+  an array has `never` for its `Static`, which any value passes). So a
+  schema that drifts from its type, either way, fails `tsc`, not a read of
+  a stored record. A type error is not a mutation, so `tsc`
+  is the only check of the construction; the round trips in each
+  module's tests (`machine.test.ts` holds one of every cause) are what a
+  mutation proves. A field the type has and the schema lacks passes at
+  run time, since a schema accepts properties it does not name: only
+  `tsc` catches it.
+- **Six stored checks were tightened to the shared schemas**, so each
+  branded id has one schema: `MARK`'s and `CARD_TITLE`'s `by`
+  (`AuthorSchema`, non-empty), `SEAT`'s `writer`, `LANE`'s `by` and
+  `CARD_HISTORY`'s events' `by` (`WriterIdSchema`, non-empty), and
+  `ALLOWANCE`'s `thread` (`ThreadIdSchema`, a lane's pattern, where it was
+  cast past `isThreadId`). No stored record fails them: `writerId` throws
+  on an empty writer, so none was ever written, and every allowance's
+  thread is a lane's id. `NAME`'s `name` keeps its own `word-word`
+  pattern, branded where it is declared.
 - **The address holds the key; the contents never repeat it.** `encode`
   leaves the key field out (`entry`, `root`, `lane`, `id`, `prompt`,
   `peer`, `writer`), and `decode(contents, key)` reads the address with a
-  key reader (`entryKey`, `threadKey`, `textKey`, `writerKey`, or `fixedKey`
-  for a singleton, in `decode.ts`) and sets the field from it: `decodeRecord`
+  key reader (`entryKey`, `threadKey`, `textKey`, `writerKey`, `pointKey`, or `fixedKey`
+  for a singleton, in `decode.ts`) and sets the field from it: `recordDecoder`
   drops the record when the reader finds no key. So a write and a read cannot disagree on a key, and
   `DigestRecord` and `SeatRecord` carry their key in memory
   though their contents never held it.

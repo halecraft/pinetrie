@@ -9,13 +9,13 @@ import type {
   QueueMove,
 } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { recordDecoder, threadKey, WriterIdSchema } from "./decode.ts"
 import { type MovesStep, planMoveCommand } from "./moves.ts"
 import { isQueuedMessage, type QueuedCard } from "./queue.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 const QueueHoldSchema = Type.Object({
-  by: Type.String({ minLength: 1 }),
+  by: WriterIdSchema,
   at: Type.Number(),
 })
 
@@ -32,17 +32,21 @@ export interface QueueHold {
 }
 
 /** Each held queue, at its lane. */
-export const QUEUE_HOLD: RecordSpec<QueueHold, ThreadId, "session"> = {
+export const QUEUE_HOLD: RecordSpec<
+  QueueHold,
+  ThreadId,
+  "session",
+  typeof QueueHoldSchema
+> = {
   namespace: "pinetrie.queue-hold",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(QueueHoldSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      by: r.by as WriterId,
-      at: r.at,
-    })),
+  decode: recordDecoder(QueueHoldSchema, threadKey, (r, lane) => ({
+    lane,
+    by: r.by,
+    at: r.at,
+  })),
 }
 
 /**

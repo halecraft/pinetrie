@@ -27,7 +27,7 @@ test("a schema is compiled once, however often it checks", () => {
 
 test("no decode builds its schema inline, which would compile it at every call", () => {
   const dir = import.meta.dirname
-  const inline = /\b(decodeRecord|decodeWith|isWellFormed)\(\s*Type\./
+  const inline = /\b(recordDecoder|decodeWith|isWellFormed)\(\s*Type\./
   const found = readdirSync(dir)
     .filter(f => f.endsWith(".ts") && !f.endsWith(".test.ts"))
     .filter(f => inline.test(readFileSync(path.join(dir, f), "utf8")))

@@ -8,10 +8,25 @@ import {
   type Target,
   type ValueWrite,
 } from "@pinetrie/core"
+import type { Static, TSchema } from "typebox"
+import type { RecordDecoder } from "./decode.ts"
 
 export type { Home }
 
-export interface RecordSpec<R, K extends string, H extends Home = Home> {
+/**
+ * A host record of type `R`, stored as schema `S`. `encode` must return
+ * `S`'s type and `decode` is built on `S` (`recordDecoder`), so a schema
+ * that drifts from `R` fails the type check rather than a read of a stored
+ * record. Only the type check catches a field `R` has and `S` lacks: a
+ * schema accepts properties it does not name, so such a record still
+ * reads back whole.
+ */
+export interface RecordSpec<
+  R,
+  K extends string,
+  H extends Home,
+  S extends TSchema,
+> {
   readonly namespace: HostNamespace
   readonly home: H
   /**
@@ -23,13 +38,16 @@ export interface RecordSpec<R, K extends string, H extends Home = Home> {
   /** The address a write goes to. */
   readonly keyOf: (record: R) => K
   /** The plain JSON contents stored, without the key. */
-  readonly encode: (record: R) => unknown
-  /**
-   * Contents and address -> the record, or undefined when either is
-   * malformed. Total (`decodeWith`).
-   */
-  readonly decode: (contents: unknown, key: string) => R | undefined
+  readonly encode: (record: R) => Static<S>
+  readonly decode: RecordDecoder<R, S>
 }
+
+/** A spec as code that writes and reads its records takes it, whatever its schema. */
+export type AnyRecordSpec<
+  R,
+  K extends string,
+  H extends Home = Home,
+> = RecordSpec<R, K, H, TSchema>
 
 type SetWrite<H extends Home = Home> = Extract<ValueWrite<H>, { kind: "set" }>
 type DeleteWrite<H extends Home = Home> = Extract<
@@ -59,16 +77,16 @@ const targetOf = (root: RootId | undefined): Target =>
   root === undefined ? SESSION_TARGET : { kind: "root", root }
 
 export function setRecord<R, K extends string>(
-  spec: RecordSpec<R, K, "session">,
+  spec: AnyRecordSpec<R, K, "session">,
   record: NoInfer<R>,
 ): SetWrite<"session">
 export function setRecord<R, K extends string>(
-  spec: RecordSpec<R, K, "root">,
+  spec: AnyRecordSpec<R, K, "root">,
   record: NoInfer<R>,
   root: RootId,
 ): SetWrite<"root">
 export function setRecord<R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   record: NoInfer<R>,
   root?: RootId,
 ): SetWrite {
@@ -82,16 +100,16 @@ export function setRecord<R, K extends string>(
 }
 
 export function deleteRecord<R, K extends string>(
-  spec: RecordSpec<R, K, "session">,
+  spec: AnyRecordSpec<R, K, "session">,
   key: K,
 ): DeleteWrite<"session">
 export function deleteRecord<R, K extends string>(
-  spec: RecordSpec<R, K, "root">,
+  spec: AnyRecordSpec<R, K, "root">,
   key: K,
   root: RootId,
 ): DeleteWrite<"root">
 export function deleteRecord<R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   key: K,
   root?: RootId,
 ): DeleteWrite {
@@ -105,7 +123,7 @@ export function deleteRecord<R, K extends string>(
 
 /** Stored values -> each decoded record, by its address; malformed ones dropped. */
 export function decodeRecords<R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   values: Iterable<{ readonly key: string; readonly value: unknown }>,
 ): ReadonlyMap<K, R> {
   const out = new Map<K, R>()
@@ -118,7 +136,7 @@ export function decodeRecords<R, K extends string>(
 
 /** A namespace as stored (`records[namespace]`) -> its records. */
 export const recordsIn = <R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   namespace: Readonly<Record<string, unknown>>,
 ): ReadonlyMap<K, R> =>
   decodeRecords(
@@ -149,7 +167,7 @@ const sameJson = (a: unknown, b: unknown): boolean =>
  * that made the new record, so the order of keys is ignored.
  */
 const recordChanged = <R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
 ): boolean =>
@@ -157,18 +175,18 @@ const recordChanged = <R, K extends string>(
 
 /** The write that stores `record`, if it changed (`recordChanged`); else none. */
 export function setIfChanged<R, K extends string>(
-  spec: RecordSpec<R, K, "session">,
+  spec: AnyRecordSpec<R, K, "session">,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
 ): readonly ValueWrite<"session">[]
 export function setIfChanged<R, K extends string>(
-  spec: RecordSpec<R, K, "root">,
+  spec: AnyRecordSpec<R, K, "root">,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
   root: RootId,
 ): readonly ValueWrite<"root">[]
 export function setIfChanged<R, K extends string>(
-  spec: RecordSpec<R, K>,
+  spec: AnyRecordSpec<R, K>,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
   root?: RootId,

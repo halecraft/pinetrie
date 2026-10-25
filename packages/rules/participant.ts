@@ -12,7 +12,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, writerKey } from "./decode.ts"
+import { recordDecoder, writerKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 /**
@@ -34,16 +34,20 @@ interface PictureRecord {
   readonly sha256: Sha256
 }
 
-export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
+export const PARTICIPANT: RecordSpec<
+  ParticipantRecord,
+  WriterId,
+  "session",
+  typeof StoredText
+> = {
   namespace: "pinetrie.participant",
   home: "session",
   keyOf: r => r.writer,
   encode: r => r.name,
-  decode: (contents, key) =>
-    decodeRecord(StoredText, contents, writerKey(key), (name, writer) => ({
-      writer,
-      name,
-    })),
+  decode: recordDecoder(StoredText, writerKey, (name, writer) => ({
+    writer,
+    name,
+  })),
 }
 
 /**
@@ -73,15 +77,19 @@ export function participants(
  * Each writer's picture, at the writer's id. The contents are the blob's
  * SHA-256 alone; anything else is malformed.
  */
-export const PICTURE: RecordSpec<PictureRecord, WriterId, "session"> = {
+export const PICTURE: RecordSpec<
+  PictureRecord,
+  WriterId,
+  "session",
+  typeof StoredText
+> = {
   namespace: "pinetrie.picture",
   home: "session",
   keyOf: r => r.writer,
   encode: r => r.sha256,
-  decode: (contents, key) =>
-    decodeRecord(StoredText, contents, writerKey(key), (sha, writer) =>
-      isSha256(sha) ? { writer, sha256: sha } : undefined,
-    ),
+  decode: recordDecoder(StoredText, writerKey, (sha, writer) =>
+    isSha256(sha) ? { writer, sha256: sha } : undefined,
+  ),
 }
 
 /**

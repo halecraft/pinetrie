@@ -12,7 +12,7 @@ import {
 } from "@pinetrie/core"
 import type { AccessAnswer } from "@pinetrie/threads"
 import { Type } from "typebox"
-import { decodeRecord, threadKey, WriterIdSchema } from "./decode.ts"
+import { List, recordDecoder, threadKey, WriterIdSchema } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 const HostSchema = Type.Union([Type.String(), Type.Null()])
@@ -47,8 +47,8 @@ const OutsideSchema = Type.Object({
 const AccessRecordSchema = Type.Object({
   personal: Type.Union([PersonalSchema, Type.Null()]),
   outside: Type.Union([OutsideSchema, Type.Null()]),
-  services: Type.Array(Type.String()),
-  hosts: Type.Array(Type.String()),
+  services: List(Type.String()),
+  hosts: List(Type.String()),
 })
 
 /**
@@ -108,19 +108,23 @@ export interface AccessRecord {
 }
 
 /** Each lane's ssh identities and what its owner said, at its lane. */
-export const ACCESS: RecordSpec<AccessRecord, ThreadId, "session"> = {
+export const ACCESS: RecordSpec<
+  AccessRecord,
+  ThreadId,
+  "session",
+  typeof AccessRecordSchema
+> = {
   namespace: "pinetrie.access",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeRecord(AccessRecordSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      personal: r.personal,
-      outside: r.outside,
-      services: r.services,
-      hosts: r.hosts,
-    })),
+  decode: recordDecoder(AccessRecordSchema, threadKey, (r, lane) => ({
+    lane,
+    personal: r.personal,
+    outside: r.outside,
+    services: r.services,
+    hosts: r.hosts,
+  })),
 }
 
 /** A lane that has asked nothing and used nothing. */

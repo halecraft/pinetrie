@@ -29,7 +29,12 @@ import {
   type ThreadName,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
+import {
+  CommitSchema,
+  PointSchema,
+  recordDecoder,
+  threadKey,
+} from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const JjProposedChangesSchema = Type.Object({
@@ -75,7 +80,8 @@ const ProposedChangesSchema = Type.Union([
 export const PROPOSED_CHANGES: RecordSpec<
   ProposedChangesRecord,
   ThreadId,
-  "session"
+  "session",
+  typeof ProposedChangesSchema
 > = {
   namespace: "pinetrie.proposed",
   home: "session",
@@ -102,14 +108,12 @@ export const PROPOSED_CHANGES: RecordSpec<
                   start: [...contents.ledger.start],
                 },
         },
-  decode: (contents, key) =>
-    decodeRecord(
-      ProposedChangesSchema,
-      contents,
-      threadKey(key),
-      (r, lane): ProposedChangesRecord =>
-        r.kind === "folder" ? { ...r, lane } : decodeJjProposedChanges(r, lane),
-    ),
+  decode: recordDecoder(
+    ProposedChangesSchema,
+    threadKey,
+    (r, lane): ProposedChangesRecord =>
+      r.kind === "folder" ? { ...r, lane } : decodeJjProposedChanges(r, lane),
+  ),
 }
 
 // Field by field: the schema lets a stored record hold keys it does not
