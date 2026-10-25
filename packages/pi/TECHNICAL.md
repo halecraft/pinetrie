@@ -946,6 +946,20 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
   `utf8ByteLength`. Each statement's view is the same capture, over that
   statement's bytes. `BASH_LIMITS` is the one value for when output is cut:
   the capture, the spill's counts and the stored split all take it.
+- **The capture keeps each character's pipe, for the row alone**: its
+  buffer's stretches by pipe (`streams`), trimmed with it, give the view's
+  stderr as `TextRange`s of its text (`CaptureView.stderr`). The model's
+  result never carries them.
+  - **Gotcha: pi's cut drops the buffer's final newline.** `truncateTail`
+    splits the text into lines, drops the empty one after a final `\n`, and
+    joins what it keeps without it, so a cut view starts one code unit
+    earlier in the buffer than its length says.
+  - pi's sanitising deletes single code units, so each stretch is
+    sanitised on its own; the stretches must then rebuild the view's text
+    exactly, or the view has no ranges. A wrong belief about pi's cut
+    costs the marks, never a character.
+  - A character split across chunks takes the pipe of the chunk that
+    completes it.
 - **The command runs through `ToolContext.shell`** (`laneShell`,
   `lane-env.ts`), the lane's own capability, as the search tools find their
   programs: pine·trie's bash and its `mkfifo` (`RUNTIME_SHELL_PATHS`), as
@@ -968,8 +982,10 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
     (S341). The helper's read end opens non-blocking, so it needs no
     writer yet; the shell's end blocks, as libuv makes a child's
     descriptors 0 to 2, whatever their flags. Where the pipes
-    cannot be made, the call runs on Node's sockets, and shows undivided:
-    the observer sees no byte of it, so its counts never match;
+    cannot be made, the call runs on Node's sockets, which the observer
+    sees no byte of; its start says so (`output: "sockets"`, beside the
+    run's number), and its join is undivided as `no-pipes` before any
+    chunk, never left to read as `count-mismatch`;
   - each read is one update, `{ fd, bytes }`, never split or joined: one
     message per read keeps the count low, as the channel carries bytes as
     base64 in JSON;
@@ -985,11 +1001,20 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
     exit code, or 128 and the signal, and the spill's file.
 - **`ShellRun`** is one handle, so the tool and its join cannot start
   without what they need: the run's number once the lane names it, the
-  lane's `attribution`, one `events` stream (chunks, `over-cap`, and the
-  observer's notices of the run's output, claimed as soon as the run is
-  named), how the call ended, and `settled`. The stream ends only after
-  the observer's flush after the call has answered, and the run's output
-  is let go then, so every event of the call is in it.
+  lane's `attribution`, one `events` stream, how the call ended, and
+  `settled`. The stream ends only after the observer's flush after the
+  call has answered, and the run's output is let go then, so every event
+  of the call is in it.
+  - **`ShellEvent` is a tagged union**: `chunk`, `notice` (the observer's
+    events of the run's output, claimed as soon as the run is named),
+    `over-cap`, and `no-pipes` (pushed before any chunk when the start says
+    `sockets`). The bash tool `switch`es on `kind` with `assertNever`, so a
+    new member is a type error, not a runtime one.
+  - **`settled` is a `ShellSettled`**: the join's `CallFlush` (settled
+    with the flush's proof, `no-observer`, or `flush-failed` when `settle`
+    threw), or `not-started`, when no start ever came. `callFlush` drops
+    only `not-started`, so a call never started stores no record, and the
+    fold gets every other case as it was.
 - **The join's shell** (`statement-join.ts`) splits the same chunks by
   statement, for the call's row, never for the model; the fold it drives
   is `@pinetrie/rules`' (`statement-output.ts`):
@@ -1002,11 +1027,18 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
     the tools' `stream` sink (`ToolsInput`, the agent's `onStream`); a
     split that stops verifying sends `tool-undivided` once, and the call
     is shown whole;
-  - when the call has returned and `settled` has resolved, it folds `done`;
-    a settled split's record goes to `LaneHooks.storeOutputSplit`, and the
-    host writes it into the lane's root. A store that fails leaves the row
-    its whole output. No view is published at `done`: the record replaces
+  - when the call has returned and `settled` has resolved, it folds `done`
+    with the flush, and answers with a `BashOutputRecord` for every call
+    that started: the split, or why it is undivided, and the whole output's
+    stderr, from the tool's own capture. It goes to
+    `LaneHooks.storeBashOutput`, and the host writes it into the lane's
+    root. A store that fails leaves the row its whole output, unmarked and
+    with no reason. No view is published at `done`: the record replaces
     the live streams.
+  - **The record's whole-output ranges index the result's text from its
+    start**: `bashResult` starts from the view's text and only appends pi's
+    notes, and a test holds it to that. A prefix there would move every
+    range.
   - the command's statements are `parseStatements`' (`@pinetrie/shell`),
     none for a command that does not parse, so any signal leaves it whole.
 

@@ -1521,21 +1521,32 @@ pipe's own order. Counts only, never bytes: `packages/pi`'s join shell
   shell, never shown.
 - **`joinVerdict` alone makes a `VerifiedSplit`**, and the record, the live
   statement streams and the page take nothing else. A split while the call
-  runs has `settled` null; only one folded with `done`, which carries the
-  observer's flush token (`Settled`, made only by the lane observation's
-  `settle`), narrows to a `SettledSplit` (`settledSplit`). The verdict is
-  `pending` until a byte is attributed.
-- **Undivided, and why** (`UndividedWhy`): attribution off on the lane
+  runs has `settled` null; only one folded with a `done` whose flush
+  settled, carrying the observer's flush token (`Settled`, made only by the
+  lane observation's `settle`), narrows to a `SettledSplit`
+  (`settledSplit`). The verdict is `pending` until a byte is attributed.
+- **`done` carries how the flush went** (`CallFlush`): settled with its
+  proof, `no-observer` or `flush-failed`, each of the last two a reason
+  `endedState` breaks the call for. The state keeps it as its `end`, null
+  while the call runs, so "ended" and "how" are one value. The fold, not
+  its shell, decides every reason, and no split is made without a proof.
+  `endedVerdict` is an ended call's verdict, a split with its proof or a
+  reason, and null while it runs: the one input of the stored record.
+- **Undivided, and why** (`UndividedWhy`, listed once in `UNDIVIDED_WHYS`
+  for the type and the stored schema): attribution off on the lane
   (`no-observer`, `missing-hook`, `other-version`, from the start, as
-  `joinStart` is given it); `over-cap`; `output-lost`; `unknown-statement`
-  (a writer or signal naming no statement of the command, the kernel's
-  statement 0 among them); `line-outside-statement` (a signal's line not
-  within its statement's lines); `count-mismatch` (at `done`, a pipe's
-  attributed bytes are not exactly its read ones). Over the cap and lost
-  output outrank any reason found before them; otherwise the first stands,
-  and once undivided a call takes no more checks. So a disagreement between
-  the patch's count of statements and `statementSpans`' can only leave a
-  call undivided, never wrongly split.
+  `joinStart` is given it); `no-pipes` (the shell wrote to Node's sockets,
+  which the observer never sees, folded before any byte); `over-cap`;
+  `output-lost`; `unknown-statement` (a writer or signal naming no
+  statement of the command, the kernel's statement 0 among them);
+  `line-outside-statement` (a signal's line not within its statement's
+  lines); `count-mismatch` (at `done`, a pipe's attributed bytes are not
+  exactly its read ones); `flush-failed` (the observer's flush after the
+  call did not answer). Over the cap and lost output outrank any reason
+  found before them; otherwise the first stands, and once undivided a call
+  takes no more checks. So a disagreement between the patch's count of
+  statements and `statementSpans`' can only leave a call undivided, never
+  wrongly split.
 - **`planVerdictChange`**: a split that turns undivided closes the call's
   statement streams (`tool-undivided`), so its row shows the whole output;
   no other change closes anything.
@@ -1544,17 +1555,27 @@ pipe's own order. Counts only, never bytes: `packages/pi`'s join shell
   statement that prints nothing has none; one naming none is the call's own
   stream, as before. `tool-undivided` closes the call's statement streams
   and keeps its own. `planEndRun` and `planClear` close them with the rest.
-- **Stored** (`OUTPUT_SPLIT`, `pinetrie.output-split`, in the root, keyed by
-  tool call id): an `OutputSplitRecord` is branded, made only from a
-  `SettledSplit` (`outputSplitRecord`) or by its decoder. It asks for the
-  view of each statement that printed, and `storedSplit` cuts them so the
-  whole record keeps within the limits it is given, pi's, as a call's
-  result does: every statement first keeps its last `STATEMENT_FLOOR_LINES`
-  (3) lines, from the last statement backwards while they fit, then each
-  grows backwards from the last; a line counts its UTF-8 bytes and its
-  newline, and a last line too long for what is left keeps its tail, never
-  splitting a character. A statement cut here or by its capture is stored
-  `truncated`.
+- **Stored** (`BASH_OUTPUT`, `pinetrie.bash-output`, in the root, keyed by
+  tool call id): a `BashOutputRecord` is how a call that started reads,
+  branded, made only from an `EndedVerdict` (`bashOutputRecord`) or by its
+  decoder. Its `verdict` (`StoredVerdict`) is the split, or undivided with
+  its reason; its `stderr` is the whole output's, as `TextRange`s of the
+  call's result's text from its start, which begins with the output.
+  - For a split it asks for the view of each statement that printed, and
+    `storedSplit` cuts them so the whole record keeps within the limits it
+    is given, pi's, as a call's result does: every statement first keeps
+    its last `STATEMENT_FLOOR_LINES` (3) lines, from the last statement
+    backwards while they fit, then each grows backwards from the last; a
+    line counts its UTF-8 bytes and its newline, and a last line too long
+    for what is left keeps its tail, never splitting a character. A
+    statement cut here or by its capture is stored `truncated`.
+  - **A stored statement's text is a suffix of its view** (its last lines
+    rejoined, or the tail of its last), so its stderr ranges are the view's
+    moved back by what the cut took from the front, and a range wholly in
+    the cut part is dropped.
+  - Records stored as `pinetrie.output-split` before the verdict existed
+    move here by the host's migration `0031-bash-output`, as splits with no
+    stderr marked.
 
 # A model setting (`config.ts`)
 

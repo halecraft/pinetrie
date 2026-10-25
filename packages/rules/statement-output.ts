@@ -4,7 +4,8 @@
 // statement, in the pipe's own order). Counts only: the bytes stay with the
 // caller, which moves each range `joinStep` attributes into its statement's
 // capture. A split is shown or stored only as a `VerifiedSplit`, which
-// `joinVerdict` alone makes.
+// `joinVerdict` alone makes; every other ending is undivided, for a reason
+// the fold found.
 
 import type {
   Attribution,
@@ -13,10 +14,11 @@ import type {
   RootId,
   Settled,
   StatementIndex,
+  TextRange,
   ValueWrite,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { recordDecoder, textKey } from "./decode.ts"
+import { choiceSchema, List, recordDecoder, textKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 /** What the join reads of a statement's place in the command: its lines, from 1. */
@@ -31,28 +33,44 @@ export type JoinEvent =
   | { readonly kind: "notice"; readonly event: OutputEvent }
   /** The lane stopped sending chunks: the rest of the output never arrives. */
   | { readonly kind: "over-cap" }
+  /** The shell's output is not pipes the observer reads, so no byte of it is attributed. */
+  | { readonly kind: "no-pipes" }
   /**
-   * The call returned and the observer's flush after it answered: every
-   * event before it has arrived. Not the run's end, which a background job
-   * may outlive.
+   * The call returned, and how the observer's flush after it went: once it
+   * answered, every event before it has arrived. Not the run's end, which a
+   * background job may outlive.
    */
-  | { readonly kind: "done"; readonly settled: Settled }
+  | { readonly kind: "done"; readonly flush: CallFlush }
 
-/** Why a call's output is shown whole. */
-type UndividedWhy =
-  /** The call's lane had no observer. */
-  | "no-observer"
-  /** The observer's kernel lacks a hook attribution needs. */
-  | "missing-hook"
-  /** The observer is another version's, which attributes nothing. */
-  | "other-version"
-  | "over-cap"
-  | "output-lost"
-  /** The bytes attributed to a pipe never met the bytes read from it. */
-  | "count-mismatch"
-  /** A signal or a writer named a statement the command does not have. */
-  | "unknown-statement"
-  | "line-outside-statement"
+/** How the observer's flush after a call went; anything but settled is the call's reason to be whole. */
+export type CallFlush =
+  | { readonly kind: "settled"; readonly proof: Settled }
+  /** The lane has no observer to flush. */
+  | { readonly kind: "no-observer" }
+  | { readonly kind: "flush-failed" }
+
+/** Why a call's output is shown whole, one list for the type and the stored schema. */
+const UNDIVIDED_WHYS = [
+  // The call's lane had no observer.
+  "no-observer",
+  // The observer's kernel lacks a hook attribution needs.
+  "missing-hook",
+  // The observer is another version's, which attributes nothing.
+  "other-version",
+  "over-cap",
+  "output-lost",
+  // The bytes attributed to a pipe never met the bytes read from it.
+  "count-mismatch",
+  // A signal or a writer named a statement the command does not have.
+  "unknown-statement",
+  "line-outside-statement",
+  // The helper could not make the call's output pipes: it ran on sockets.
+  "no-pipes",
+  // The observer's flush after the call did not answer.
+  "flush-failed",
+] as const
+
+export type UndividedWhy = (typeof UNDIVIDED_WHYS)[number]
 
 /** The bytes of one statement's output, by pipe. */
 interface StatementBytes {
@@ -108,7 +126,8 @@ export interface JoinState {
   readonly why: UndividedWhy | null
   readonly pipes: Readonly<Record<OutputFd, Pipe>>
   readonly statements: readonly StatementBytes[]
-  readonly settled: Settled | null
+  /** How the call's flush went, once `done` was folded; null while it runs. An ended call takes no more events. */
+  readonly end: CallFlush | null
 }
 
 const NO_PIPE: Pipe = { received: 0, placed: 0, ahead: [] }
@@ -129,7 +148,7 @@ export function joinStart(
           : attribution.why,
     pipes: { stdout: NO_PIPE, stderr: NO_PIPE },
     statements: lines.map(() => NO_BYTES),
-    settled: null,
+    end: null,
   }
 }
 
@@ -139,14 +158,16 @@ interface JoinStep {
   readonly attributed: readonly Attributed[]
 }
 
-/** `event` folded into `state`; a call that has settled takes no more. */
+/** `event` folded into `state`; a call that has ended takes no more. */
 export function joinStep(state: JoinState, event: JoinEvent): JoinStep {
-  if (state.settled !== null) return { state, attributed: [] }
+  if (state.end !== null) return { state, attributed: [] }
   switch (event.kind) {
     case "over-cap":
       return unchanged(broken(state, "over-cap"))
+    case "no-pipes":
+      return unchanged(broken(state, "no-pipes"))
     case "done":
-      return unchanged(settledState(state, event.settled))
+      return unchanged(endedState(state, event.flush))
     case "chunk": {
       if (state.why !== null) return unchanged(state)
       const pipe = state.pipes[event.fd]
@@ -237,17 +258,20 @@ function advance(state: JoinState, fd: OutputFd): JoinStep {
 }
 
 /**
- * The call's every event is in: the bytes attributed to each pipe must be
- * exactly those read from it, or the split cannot be trusted.
+ * The call returned. Once its flush has answered, every event is in, and
+ * the bytes attributed to each pipe must be exactly those read from it, or
+ * the split cannot be trusted. A flush that failed leaves no proof.
  */
-function settledState(state: JoinState, settled: Settled): JoinState {
+function endedState(state: JoinState, flush: CallFlush): JoinState {
+  if (flush.kind !== "settled")
+    return { ...broken(state, flush.kind), end: flush }
   const met = (pipe: Pipe) =>
     pipe.placed === pipe.received && pipe.ahead.length === 0
   const checked =
     state.why === null && !(met(state.pipes.stdout) && met(state.pipes.stderr))
       ? broken(state, "count-mismatch")
       : state
-  return { ...checked, settled }
+  return { ...checked, end: flush }
 }
 
 /**
@@ -264,6 +288,8 @@ const WHY_RANK: Readonly<Record<UndividedWhy, number>> = {
   "count-mismatch": 2,
   "unknown-statement": 2,
   "line-outside-statement": 2,
+  "no-pipes": 2,
+  "flush-failed": 2,
 }
 
 function broken(state: JoinState, why: UndividedWhy): JoinState {
@@ -281,20 +307,35 @@ const unchanged = (state: JoinState): JoinStep => ({ state, attributed: [] })
 /** What the join's state says of the call's output now. */
 export function joinVerdict(state: JoinState): Verdict {
   if (state.why !== null) return { kind: "undivided", why: state.why }
+  const settled = state.end?.kind === "settled" ? state.end.proof : null
   const placed = state.pipes.stdout.placed + state.pipes.stderr.placed
-  if (state.settled === null && placed === 0) return { kind: "pending" }
+  if (settled === null && placed === 0) return { kind: "pending" }
   return {
     kind: "split",
-    split: {
-      statements: state.statements,
-      settled: state.settled,
-    } as VerifiedSplit,
+    split: { statements: state.statements, settled } as VerifiedSplit,
   }
 }
 
 /** A split's proof that its call has returned, or null while it runs. */
 export const settledSplit = (split: VerifiedSplit): SettledSplit | null =>
   split.settled === null ? null : (split as SettledSplit)
+
+/** An ended call's verdict: a split with its flush's proof, or why it is undivided. */
+type EndedVerdict =
+  | { readonly kind: "split"; readonly split: SettledSplit }
+  | { readonly kind: "undivided"; readonly why: UndividedWhy }
+
+/** The verdict of a call that has ended; null while it runs. */
+export function endedVerdict(state: JoinState): EndedVerdict | null {
+  const { end, why } = state
+  if (end === null) return null
+  if (why !== null) return { kind: "undivided", why }
+  if (end.kind !== "settled") return { kind: "undivided", why: end.kind }
+  return {
+    kind: "split",
+    split: { statements: state.statements, settled: end.proof } as SettledSplit,
+  }
+}
 
 /** What a change of verdict asks of the call's shell. */
 type VerdictStep = {
@@ -327,6 +368,8 @@ interface StatementView {
   readonly text: string
   /** Its capture already dropped lines from its start. */
   readonly truncated: boolean
+  /** What it wrote to stderr, in `text`. */
+  readonly stderr: readonly TextRange[]
 }
 
 /** A statement's output as stored: a tail of its view. */
@@ -334,6 +377,8 @@ interface StoredStatement {
   readonly text: string
   /** Lines were dropped from its start, by its capture or to fit the record. */
   readonly truncated: boolean
+  /** What it wrote to stderr, in `text`. */
+  readonly stderr: readonly TextRange[]
 }
 
 /**
@@ -386,7 +431,25 @@ export function storedSplit(
     return {
       text,
       truncated: view.truncated || n < own.length || tail !== null,
+      stderr: shiftedRanges(view.stderr, text.length - view.text.length),
     }
+  })
+}
+
+/**
+ * `ranges` moved by `by` code units and clipped at 0. A stored text is a
+ * suffix of its view (its last lines, or the tail of its last), so its
+ * ranges are the view's moved back by what was cut from the front.
+ */
+function shiftedRanges(
+  ranges: readonly TextRange[],
+  by: number,
+): readonly TextRange[] {
+  if (by === 0) return ranges
+  return ranges.flatMap(r => {
+    const from = Math.max(0, r.from + by)
+    const to = r.to + by
+    return to > from ? [{ from, to }] : []
   })
 }
 
@@ -415,70 +478,123 @@ function utf8Tail(s: string, bytes: number): string {
 }
 
 declare const recorded: unique symbol
+
+/** How a `bash` call's output is stored: by statement, or whole and why. */
+type StoredVerdict =
+  | {
+      readonly kind: "split"
+      /** Each statement's output, by ordinal from 1 at index 0. */
+      readonly statements: readonly StoredStatement[]
+    }
+  | { readonly kind: "undivided"; readonly why: UndividedWhy }
+
 /**
- * A `bash` call's output by statement, as stored in its root at the call's
- * id: made only from a settled split (`outputSplitRecord`), or decoded.
+ * How a `bash` call's output reads, as stored in its root at the call's id:
+ * made only from an ended call's verdict (`bashOutputRecord`), or decoded.
  */
-export interface OutputSplitRecord {
+export interface BashOutputRecord {
   readonly [recorded]: true
   readonly call: string
-  /** Each statement's output, by ordinal from 1 at index 0. */
-  readonly statements: readonly StoredStatement[]
+  readonly verdict: StoredVerdict
+  /**
+   * What it wrote to stderr, in its whole output: ranges of its result's
+   * text from its start, which begins with the output.
+   */
+  readonly stderr: readonly TextRange[]
 }
 
 /**
- * The record of a settled split: each statement's view, from `view`, for a
- * statement that printed; the whole cut to `limits`.
+ * The record of an ended call: for a split, each statement's view, from
+ * `view`, for a statement that printed, the whole cut to `limits`; for an
+ * undivided call, its reason. `stderr` is the whole output's.
  */
-export function outputSplitRecord(
+export function bashOutputRecord(
   call: string,
-  split: SettledSplit,
+  verdict: EndedVerdict,
   view: (statement: StatementIndex) => StatementView,
+  stderr: readonly TextRange[],
   limits: OutputLimits,
-): OutputSplitRecord {
-  const views = split.statements.map((bytes, i) =>
+): BashOutputRecord {
+  if (verdict.kind === "undivided") return recordedOutput(call, verdict, stderr)
+  const views = verdict.split.statements.map((bytes, i) =>
     bytes.stdout + bytes.stderr === 0
-      ? { text: "", truncated: false }
+      ? NO_VIEW
       : view((i + 1) as StatementIndex),
   )
-  return recordedSplit(call, storedSplit(views, limits))
+  return recordedOutput(
+    call,
+    { kind: "split", statements: storedSplit(views, limits) },
+    stderr,
+  )
 }
 
-/** The one place an `OutputSplitRecord` is branded, for a settled split's record and a decoded one. */
-const recordedSplit = (
-  call: string,
-  statements: readonly StoredStatement[],
-): OutputSplitRecord => ({ call, statements }) as OutputSplitRecord
+const NO_VIEW: StatementView = { text: "", truncated: false, stderr: [] }
 
-const OutputSplitSchema = Type.Object({
-  statements: Type.Array(
-    Type.Object({ text: Type.String(), truncated: Type.Boolean() }),
-  ),
+/** The one place a `BashOutputRecord` is branded, for an ended call's record and a decoded one. */
+const recordedOutput = (
+  call: string,
+  verdict: StoredVerdict,
+  stderr: readonly TextRange[],
+): BashOutputRecord => ({ call, verdict, stderr }) as BashOutputRecord
+
+const RangesSchema = List(
+  Type.Object({ from: Type.Integer(), to: Type.Integer() }),
+)
+
+const BashOutputSchema = Type.Object({
+  verdict: Type.Union([
+    Type.Object({
+      kind: Type.Literal("split"),
+      statements: List(
+        Type.Object({
+          text: Type.String(),
+          truncated: Type.Boolean(),
+          stderr: RangesSchema,
+        }),
+      ),
+    }),
+    Type.Object({
+      kind: Type.Literal("undivided"),
+      why: choiceSchema(UNDIVIDED_WHYS),
+    }),
+  ]),
+  stderr: RangesSchema,
 })
 
-/** Each split `bash` call's output by statement, at its call's id. */
-export const OUTPUT_SPLIT: RecordSpec<
-  OutputSplitRecord,
+const ranges = (rs: readonly TextRange[]): TextRange[] =>
+  rs.map(r => ({ from: r.from, to: r.to }))
+
+/** Each `bash` call's output as it reads, at its call's id. */
+export const BASH_OUTPUT: RecordSpec<
+  BashOutputRecord,
   string,
   "root",
-  typeof OutputSplitSchema
+  typeof BashOutputSchema
 > = {
-  namespace: "pinetrie.output-split",
+  namespace: "pinetrie.bash-output",
   home: "root",
   keyOf: r => r.call,
   encode: r => ({
-    statements: r.statements.map(s => ({
-      text: s.text,
-      truncated: s.truncated,
-    })),
+    verdict:
+      r.verdict.kind === "undivided"
+        ? { kind: "undivided", why: r.verdict.why }
+        : {
+            kind: "split",
+            statements: r.verdict.statements.map(s => ({
+              text: s.text,
+              truncated: s.truncated,
+              stderr: ranges(s.stderr),
+            })),
+          },
+    stderr: ranges(r.stderr),
   }),
-  decode: recordDecoder(OutputSplitSchema, textKey, (r, call) =>
-    recordedSplit(call, r.statements),
+  decode: recordDecoder(BashOutputSchema, textKey, (r, call) =>
+    recordedOutput(call, r.verdict, r.stderr),
   ),
 }
 
 /** The write that stores `record` in `root`. */
-export const outputSplitWrite = (
-  record: OutputSplitRecord,
+export const bashOutputWrite = (
+  record: BashOutputRecord,
   root: RootId,
-): ValueWrite<"root"> => setRecord(OUTPUT_SPLIT, record, root)
+): ValueWrite<"root"> => setRecord(BASH_OUTPUT, record, root)

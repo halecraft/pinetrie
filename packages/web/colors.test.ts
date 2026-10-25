@@ -108,6 +108,12 @@ describe.each(SCHEMES)("on a %s page", scheme => {
     )
   })
 
+  test("a command's stderr reads on its output, at 4.5:1 or more on --sunk", () => {
+    expect(
+      contrast(named("stderr", scheme), named("sunk", scheme)),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+
   test.each(PALETTE)("%s is 4.5:1 or more on --page", color => {
     expect(page).not.toBe("")
     expect(contrast(color, page)).toBeGreaterThanOrEqual(4.5)

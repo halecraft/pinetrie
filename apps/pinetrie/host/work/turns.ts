@@ -20,8 +20,8 @@ import type { SnapshotTaking } from "@pinetrie/machine"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
 import {
-  type OutputSplitRecord,
-  outputSplitWrite,
+  type BashOutputRecord,
+  bashOutputWrite,
   planTurn,
   planTurnRevision,
   REVISION,
@@ -70,8 +70,8 @@ export function queueTurnEnd<T>(queueSnapshot: () => T, follow: Follow): T {
 export interface Turns {
   /** pi's hook when a turn ends: its revision, its snapshot, its fetch. */
   turnDone: LaneHooks["turnDone"]
-  /** pi's hook when a `bash` call's split verified: its record, in the lane's root. */
-  storeOutputSplit: LaneHooks["storeOutputSplit"]
+  /** pi's hook when a `bash` call that started has returned: how its output reads, in the lane's root. */
+  storeBashOutput: LaneHooks["storeBashOutput"]
   /**
    * Settles when every turn record being written now has. A fork waits for
    * it, so a branch taken at a turn whose snapshot is still running gets that
@@ -136,12 +136,12 @@ export function createTurns(deps: {
 
   return {
     writeRevision,
-    async storeOutputSplit(lane: ThreadId, record: OutputSplitRecord) {
+    async storeBashOutput(lane: ThreadId, record: BashOutputRecord) {
       const root = docs.rootOfLane(lane)
       if (root === null) return
       await using held = basics.leases.root(root)
       await held.ready
-      await held.records.writeValues([outputSplitWrite(record, root)])
+      await held.records.writeValues([bashOutputWrite(record, root)])
     },
     pendingRecords: async () => {
       await Promise.all([...recording])

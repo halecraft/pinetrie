@@ -1142,6 +1142,9 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   (`HANDLE_CHARS`, threads), so "rail" finds "rail-view". The flags are `giu`.
 - **The query is composed (NFC), the text is not.** Composing the text would
   move the ranges a snippet cuts by; text typed in a browser is NFC already.
+- **A match's place is core's `TextRange`**, in UTF-16 code units, and
+  `snippet` cuts its window with `markedParts` (`marked-parts.ts`), the one
+  cut a row's stderr uses too.
 - **Unlike the board's label search, on purpose.** The board keeps any label
   holding every word typed, anywhere in it and in any order (`board-view.ts`),
   which suits short labels. This finds a phrase in prose, from a word's
@@ -1188,25 +1191,46 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   (`startsStatement`), from `RowSummary.starts`, which `@pinetrie/shell`
   reads for a shell command and is empty for any other. The summary's
   lines are the command's first, so a line keeps its index cut or whole.
+- **A row's output is one value, `RowOutput`**, made by `rowOutput` in
+  interface, never the page: once the call has a result, its text and what
+  its stored `BashOutputRecord` says (its stderr, its split, or why it is
+  undivided, `whyUndivided`); while it runs, its own stream's text and its
+  statements' live streams (`liveRowSplit`, null before a statement has
+  printed, or for an ordinal the command lacks), with no stderr. The page
+  gathers what it reads and calls `rowOutput`; it decides nothing about
+  splits.
+- **Output is drawn as runs** (`OutputRun`: its text, and whether it came
+  through stderr), cut at the record's ranges by `outputRuns`
+  (`markedParts`). A range past the text is clipped: a result's text is
+  its output and then pi's notes, which are never stderr. The line helpers
+  (`headLines`, `tailLines`) are generic over a run's kind (`RunKind`: how
+  it makes a plain run, and which runs merge), so a command's `Run`s and
+  an output's `OutputRun`s share them; `wholeOutput` cuts runs, keeping a
+  mark on what is left of a cut one.
 - **A `bash` call's detail shows each statement's output under it**
   (ADR-0204), from a `RowSplit`, which only what the host wrote of a
-  verified split makes: `storedRowSplit` from the call's `OutputSplitRecord`
-  once it has a result, `liveRowSplit` from its statement streams while it
-  runs (null before a statement has printed, or for an ordinal the command
-  lacks). Each `CommandLine` carries the outputs of the statements that end
-  on it (`RowSummary.statements`, `@pinetrie/shell`'s lines in the text
-  shown, laid out or not), so `a; b` shows both under its one line; a
-  statement that printed nothing shows none, and one whose start was cut
-  is headed `EARLIER_LINES`. The body then shows no whole output. A split
-  of another count of statements than the command's is not drawn, and the
-  summary is the same with a split or without, so a row keeps its height.
-  No reason a call is undivided reaches the page: only a verified split is
-  stored, and the live streams carry no verdict.
+  verified split makes, and only for a command `isSplittable` (a shell
+  command of two or more statements): a single statement's output is the
+  body's, as any call's. Each `CommandLine` carries the outputs of the
+  statements that end on it (`RowSummary.statements`, `@pinetrie/shell`'s
+  lines in the text shown, laid out or not), so `a; b` shows both under
+  its one line; a statement that printed nothing shows none, and one whose
+  start was cut is headed `EARLIER_LINES`. The body then shows no whole
+  output. A split of another count of statements than the command's is
+  not drawn, and the summary is the same with a split or without, so a
+  row keeps its height.
+- **The detail says why a command's output is whole**
+  (`RowView.undividedNote`): only open, only for a text body of a command
+  `isSplittable`, and only when its record says why (`whyUndivided`). A
+  single statement, a running call and a call with no record say nothing,
+  and the summary is the same with a reason or without, so a row keeps its
+  height. `undividedWords` (`undivided-words.ts`) words each reason in one
+  line, exhaustive over `UndividedWhy`.
 - **`liveWork` takes a call's own stream, of its whole output**, never a
   statement's (`tools`), and keeps a call's statement streams apart, by
-  ordinal (`statements`); `callStatementStreams` and `callSplits` give a
-  message its own calls', as plain data. The facts carry the roots' stored
-  splits (`outputSplits`, `readOutputSplits` in `@pinetrie/reads`).
+  ordinal (`statements`); `callStatementStreams` and `callBashOutputs` give
+  a message its own calls', as plain data. The facts carry the roots'
+  stored records (`bashOutputs`, `readBashOutputs` in `@pinetrie/reads`).
 - **`callPurpose` says what a call is for in one line:** its intent, else
   `callLabel`'s cut words. Outline's live line and a turn's revision title
   use it; a message's copy keeps `callLabel`, since pasting wants the

@@ -367,6 +367,9 @@ defines, which would draw nothing (S277).
   - `--highlight`: a search's match.
   - `--command`: a command's name.
   - `--danger` and `--danger-soft`: a stop or a deletion.
+  - `--stderr`: what a command wrote to stderr, on its output's `--sunk`;
+    not a failure's red, since stderr is often progress or a warning.
+    `colors.test.ts` holds it at 4.5:1 or more on `--sunk`.
   - `--ok` and `--ok-soft`: a success or an addition.
 - **A tint is a mix, not a literal.** A blue band, an amber fill or a
   hue's line is `color-mix(in srgb, var(--hue) p%, var(--page))`, so it
@@ -934,17 +937,22 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   rest hanging 2ch in, so the rest never reads as a statement of its own;
   an empty line keeps its height (`.tool-line:empty`).
 - **A `bash` call split by statement shows each statement's output under
-  its lines**, in its detail alone (ADR-0204). `ToolRow` gives `rowView` a
-  split: its statement streams' texts while it runs (`statementStreams`,
-  read in one `useSelector` as one string, so the value compares equal
-  while no text changes), its stored record once it has a result
-  (`splits`); `MessageList` hands each message its own calls'
-  (`callStatementStreams`, `callSplits`), from the facts' `outputSplits`
-  and `LiveWork.statements`. A line's `outputs` are each a
-  `pre.tool-output.tool-statement-output` inside its `.tool-line`, which
-  undoes the line's hanging indent, so the next statement's gap still
-  comes after it, and the row's own `.tool-output` is then empty, not
-  drawn.
+  its lines**, in its detail alone (ADR-0204). `ToolRow` gathers what
+  `rowOutput` reads, and draws what it gives: its statement streams' texts
+  while it runs (`statementStreams`, read in one `useSelector` as one
+  string, so the value compares equal while no text changes), its stored
+  record once it has a result (`bashOutputs`); `MessageList` hands each
+  message its own calls' (`callStatementStreams`, `callBashOutputs`), from
+  the facts' `bashOutputs` and `LiveWork.statements`. A line's `outputs`
+  are each a `pre.tool-output.tool-statement-output` inside its
+  `.tool-line`, which undoes the line's hanging indent, so the next
+  statement's gap still comes after it, and the row's own `.tool-output`
+  is then empty, not drawn.
+- **Output is drawn by `OutputRuns`**: a run that came through stderr is a
+  `span.tool-stderr` in `--stderr`, the rest plain text, in the body's
+  `pre` and in each statement's. A detail that shows a command's output
+  whole says why in `div.tool-undivided`, between the command and the
+  output, in `--text-muted`.
 - **A row is its summary or its detail** (`RowMemory.open`, `data-open`).
   The summary shows the command's first 5 lines and the output's last 5
   (`headLines`, `tailLines`), as written: the command is cut after its

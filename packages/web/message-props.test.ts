@@ -32,7 +32,7 @@ const props = (
     density: "story",
     streams: {},
     statementStreams: {},
-    splits: {},
+    bashOutputs: {},
     live: LIVE,
     rows: ROWS,
     nameOf: NAMES,

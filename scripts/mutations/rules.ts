@@ -5,6 +5,32 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a bash call's verdict and its stderr ──
+  {
+    name: "output on sockets is joined as on pipes",
+    file: "packages/rules/statement-output.ts",
+    from: '      return unchanged(broken(state, "no-pipes"))',
+    to: "      return unchanged(state)",
+    command: unit,
+    expect: "output not on pipes makes the call undivided before any byte",
+  },
+  {
+    name: "a failed flush is taken as settled",
+    file: "packages/rules/statement-output.ts",
+    from: "    return { ...broken(state, flush.kind), end: flush }\n",
+    to: "    return { ...state, end: flush }\n",
+    command: unit,
+    expect: "a call whose flush failed is undivided, never split",
+  },
+  {
+    name: "a stored statement keeps its view's stderr ranges unmoved",
+    file: "packages/rules/statement-output.ts",
+    from: "      stderr: shiftedRanges(view.stderr, text.length - view.text.length),\n",
+    to: "      stderr: view.stderr,\n",
+    command: unit,
+    expect:
+      "a statement cut to its last lines keeps its stderr on the same characters",
+  },
   // ── a bash call's output by statement ──
   {
     name: "a pipe's counts need not meet at the call's end",
@@ -60,7 +86,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a call with nothing attributed splits",
     file: "packages/rules/statement-output.ts",
-    from: 'if (state.settled === null && placed === 0) return { kind: "pending" }',
+    from: 'if (settled === null && placed === 0) return { kind: "pending" }',
     to: "",
     command: unit,
     expect: "before any byte is attributed, the verdict waits",
@@ -76,7 +102,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a settled call takes more events",
     file: "packages/rules/statement-output.ts",
-    from: "if (state.settled !== null) return { state, attributed: [] }",
+    from: "if (state.end !== null) return { state, attributed: [] }",
     to: "",
     command: unit,
     expect: "a settled call takes no more events",

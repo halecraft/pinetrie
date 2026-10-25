@@ -12,6 +12,24 @@ const command = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a moved split's statements mark no stderr field",
+    file: "apps/pinetrie/host/migrations/0031-bash-output.ts",
+    from: "      statements: statements.map(s => (isRaw(s) ? { ...s, stderr: [] } : s)),\n",
+    to: "      statements,\n",
+    command: unit,
+    expect: "a stored split decodes again as a split, marking no stderr",
+  },
+  {
+    name: "a split statement's record drops its stderr",
+    file: "packages/pi/statement-join.ts",
+    from: "            stderr: view.stderr,\n",
+    to: "            stderr: [],\n",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "a bash call's stored split marks what a statement wrote to stderr, and only that",
+  },
+  {
     name: "a host's shutdown leaves its lanehost roles running",
     file: "apps/pinetrie/host/work/runtime.ts",
     from: "    close: () => runtime.close(),\n",

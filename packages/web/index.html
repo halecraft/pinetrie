@@ -53,6 +53,9 @@
         --danger-soft: light-dark(#7d393c, #e89a9a);
         --ok: light-dark(#037030, #7bd88f);
         --ok-soft: light-dark(#2a552c, #a8d8a8);
+        /* What a command wrote to stderr, on its output's --sunk: not a
+           failure's red, since stderr is often progress or a warning. */
+        --stderr: light-dark(#a3502e, #eea27c);
         /* The same on both pages: the action's fill and the white on it, an
            image's checker, and a branch not yet started. */
         --action: #2f6feb; --white: #fff; --checker: #eee; --slot-pending: #777;
@@ -875,6 +878,10 @@
          still comes after it. */
       .tool-statement-output { margin: var(--space-2) 0 var(--space-4); text-indent: 0;
         color: var(--text); }
+      /* What a command wrote to stderr, in its output (`OutputRun`). */
+      .tool-stderr { color: var(--stderr); }
+      /* Why a detail shows a command's output whole, not by statement. */
+      .tool-undivided { margin: var(--space-4) 0 0; font-size: var(--font-sm); color: var(--text-muted); }
       /* A result's images, in place of its text (`toolBody`). A tall one is a
          thumbnail in the summary, 10rem tall (THUMB_HEIGHT) through its width. */
       .tool-images { clear: both; margin: var(--space-4) 0 0; }

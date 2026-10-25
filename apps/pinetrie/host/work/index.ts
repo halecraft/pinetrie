@@ -289,7 +289,7 @@ export async function startLaneWork(input: {
     // One `turns`: the fork waits on the records this `turnDone` adds.
     hooks: {
       turnDone: turns.turnDone,
-      storeOutputSplit: turns.storeOutputSplit,
+      storeBashOutput: turns.storeBashOutput,
       askedAboutConflict: updates.askedAboutConflict,
       getLatest: updates.getLatestInRun,
       async resolveConflict(lane, path, choose) {
@@ -374,7 +374,7 @@ const NO_LANES: LaneWork = {
   },
   hooks: {
     turnDone: async () => {},
-    storeOutputSplit: async () => {},
+    storeBashOutput: async () => {},
     askedAboutConflict: async () => false,
     getLatest: async () => refusedAnswer("no-copy"),
     resolveConflict: async path =>

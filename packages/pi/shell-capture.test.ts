@@ -51,3 +51,64 @@ test("a long output keeps its tail and its counts whole", () => {
   expect(view.text.endsWith("4999\n5000")).toBe(true)
   expect(view.truncation.outputLines).toBe(BASH_LIMITS.maxLines)
 })
+
+/** The text of each stderr range of `view`. */
+const stderrOf = (view: {
+  text: string
+  stderr: readonly { from: number; to: number }[]
+}) => view.stderr.map(r => view.text.slice(r.from, r.to))
+
+test("stderr between stdout is one range at its own offsets", () => {
+  const view = viewOf([
+    { fd: "stdout", bytes: text("out\n") },
+    { fd: "stderr", bytes: text("err\n") },
+    { fd: "stdout", bytes: text("more\n") },
+  ])
+  expect(view.stderr).toEqual([{ from: 4, to: 8 }])
+})
+
+test("a cut view whose output ends in a newline keeps stderr on its own text", () => {
+  const limits = { maxBytes: 1000, maxLines: 2 }
+  const view = viewOf(
+    [
+      { fd: "stdout", bytes: text("a\nb\n") },
+      { fd: "stderr", bytes: text("E\n") },
+      { fd: "stdout", bytes: text("c\n") },
+    ],
+    limits,
+  )
+  expect(view.text).toBe("E\nc")
+  expect(stderrOf(view)).toEqual(["E\n"])
+})
+
+test("a control character pi removes shrinks the stderr range with it", () => {
+  const view = viewOf([
+    { fd: "stdout", bytes: text("a") },
+    { fd: "stderr", bytes: text("b\x1b[0mc") },
+  ])
+  expect(view.text).toBe("ab[0mc")
+  expect(stderrOf(view)).toEqual(["b[0mc"])
+})
+
+test("a character split across two stderr chunks is marked whole", () => {
+  const view = viewOf([
+    { fd: "stdout", bytes: text("x") },
+    { fd: "stderr", bytes: bytes(0xe2, 0x82) },
+    { fd: "stderr", bytes: bytes(0xac) },
+  ])
+  expect(stderrOf(view)).toEqual(["€"])
+})
+
+test("stderr past the buffer's trim stays on its own text", () => {
+  const limits = { maxBytes: 8, maxLines: 1000 }
+  const view = viewOf(
+    [
+      { fd: "stdout", bytes: text("o".repeat(40)) },
+      { fd: "stderr", bytes: text("\nEE\n") },
+      { fd: "stdout", bytes: text("tail") },
+    ],
+    limits,
+  )
+  expect(view.text).toBe("EE\ntail")
+  expect(stderrOf(view)).toEqual(["EE\n"])
+})

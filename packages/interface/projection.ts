@@ -26,6 +26,7 @@ import {
   readAllowances,
   readBanners,
   readBases,
+  readBashOutputs,
   readCardHistories,
   readCardTitles,
   readCommands,
@@ -42,7 +43,6 @@ import {
   readMachineHealth,
   readMarks,
   readNames,
-  readOutputSplits,
   readProject,
   readProposedByLane,
   readQueueHolds,
@@ -57,11 +57,11 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import type {
+  BashOutputRecord,
   CardHistoryRecord,
   CardTitleRecord,
   DigestRecord,
   MarkRecord,
-  OutputSplitRecord,
   RunEndReportRecord,
   SeatRecord,
   TraceRecord,
@@ -114,8 +114,8 @@ export interface SessionFacts {
   readonly asks: AskIndex
   /** Each ask's model-written digest, when digests are on, by its prompt. */
   readonly digests: ReadonlyMap<EntryId, DigestRecord>
-  /** Each `bash` call's output by statement, where its split verified, by call id. */
-  readonly outputSplits: ReadonlyMap<string, OutputSplitRecord>
+  /** How each `bash` call's output reads, stored once it returned, by call id. */
+  readonly bashOutputs: ReadonlyMap<string, BashOutputRecord>
   readonly activity: readonly AgentRun[]
   /** Every lane replying, in any root, held or not (`readRunningLanes`). */
   readonly running: readonly {
@@ -202,7 +202,7 @@ function readFacts(view: HeldView): SessionFacts {
     index,
     asks: indexAsks(index),
     digests: readHeld(roots, readDigests),
-    outputSplits: readHeld(roots, readOutputSplits),
+    bashOutputs: readHeld(roots, readBashOutputs),
     activity,
     running: readRunningLanes(doc, live),
     live: liveWork(readStreamRecords(live), activity),

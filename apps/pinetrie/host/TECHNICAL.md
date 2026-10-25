@@ -636,6 +636,11 @@ reading the store once, planning once, then acting:
     root's history and every queued fact card (`factInInventory`), so
     "held" names only a paused queue or lane, and `by` only who acted;
     `content` untouched. The old shape no longer decodes.
+  - `0031-bash-output` moves each `bash` call's stored split from
+    `pinetrie.output-split` to `BASH_OUTPUT`'s namespace as a verdict, a
+    split of the same statements marking no stderr (`bashOutputNow`); a
+    value without the old `statements` moves as stored. The old shape no
+    longer decodes.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
@@ -905,7 +910,9 @@ as it first loads (§ Roots: steps, leases and the upkeep).
      banners, digests, titles, names and the split call, each
      with the records and the setup;
   4. lane work, with them, which returns once its lanes are ready, the
-     observer connected (`Ready` is a value, ADR-0191);
+     observer connected (`Ready` is a value, ADR-0191); where its hello
+     says attribution is off, the host logs once why (`attributionLine`),
+     since every `bash` call's output will show whole;
   5. the agent, last, with lane work's `access` and `hooks`, banners'
      `request` and digests' `step`; then base news, which steers its lanes
      and joins lane work's `onBaseChanged`, the runs, the delivery, the

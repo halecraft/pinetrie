@@ -95,6 +95,8 @@ export interface ObserverClient {
    * saying why, where the channel cannot open or the loader refused.
    */
   connect(): Promise<void>
+  /** The attribution the role's last hello said: off before any hello. */
+  readonly attribution: Attribution
   /** Close the channel: the next call opens it again, and registers every lane again. */
   reset(): void
   /** Close the channel and wait for it to end: every call after it is refused (`ClientClosed`). */
@@ -265,6 +267,9 @@ export function observerClient(input: {
   return {
     async connect() {
       await opened()
+    },
+    get attribution() {
+      return attribution
     },
     async observe(lane) {
       const held: Held = {

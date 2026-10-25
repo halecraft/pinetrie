@@ -25,6 +25,7 @@ import {
   agentsRow,
   agentsWords,
   askLine,
+  type BashOutputRecord,
   buttonCommand,
   type ColumnAct,
   type ColumnHow,
@@ -66,7 +67,6 @@ import {
   noModelLine,
   noticeKey,
   noticeWords,
-  type OutputSplitRecord,
   opens,
   type Pending,
   type ProposalMemory,
@@ -263,8 +263,8 @@ export interface ColumnProps {
   folds: FoldMemory
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
-  /** Each `bash` call's output by statement, where its split verified, by call id. */
-  outputSplits: ReadonlyMap<string, OutputSplitRecord>
+  /** How each `bash` call's output reads, stored once it returned, by call id. */
+  bashOutputs: ReadonlyMap<string, BashOutputRecord>
   /**
    * How far you have read each thread, on every device of yours.
    */
@@ -1213,7 +1213,7 @@ export function Column(p: ColumnProps) {
                     revisions={p.work.revisions}
                     runningAsk={runningAsk}
                     digests={p.digests}
-                    outputSplits={p.outputSplits}
+                    bashOutputs={p.bashOutputs}
                     margins={margins}
                     marginSlot={marginSlot}
                     onMargin={onMargin}

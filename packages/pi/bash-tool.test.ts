@@ -17,9 +17,9 @@ import {
   statementIndex,
   threadIdFor,
 } from "@pinetrie/core"
-import type { OutputSplitRecord } from "@pinetrie/rules"
+import type { BashOutputRecord } from "@pinetrie/rules"
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { bashResult, bashTool } from "./bash-tool.ts"
+import { bashResult, bashTool, callFlush } from "./bash-tool.ts"
 import {
   type LaneChannel,
   laneShell,
@@ -41,9 +41,12 @@ afterAll(async () => {
 })
 
 /** A lane's shell, its helper's side run in this process. */
-const localShell = (observation: ShellObservation | null = null) =>
+const localShell = (
+  observation: ShellObservation | null = null,
+  mkfifo = "mkfifo",
+) =>
   laneShell(
-    { bash: "bash", mkfifo: "mkfifo" },
+    { bash: "bash", mkfifo },
     dir,
     async () => ({
       observation,
@@ -234,7 +237,7 @@ test("a call the observer attributes is stored by statement, its output claimed 
     },
     settle: async () => ({}) as Settled,
   }
-  const stored: OutputSplitRecord[] = []
+  const stored: BashOutputRecord[] = []
   const tool = bashTool({
     stream: () => {},
     store: async (_lane, record) => {
@@ -250,7 +253,85 @@ test("a call the observer attributes is stored by statement, its output claimed 
   )
   expect(text).toBe("a\nbb\n")
   expect([claimed, released]).toEqual([["1"], ["1"]])
-  expect(stored.map(r => r.statements.map(x => x.text))).toEqual([
-    ["a\n", "bb\n"],
+  expect(
+    stored.map(r =>
+      r.verdict.kind === "split" ? r.verdict.statements.map(x => x.text) : [],
+    ),
+  ).toEqual([["a\n", "bb\n"]])
+  expect(stored[0]?.stderr.map(r => text.slice(r.from, r.to))).toEqual(["bb\n"])
+})
+
+/** A tool that keeps every record it is asked to store. */
+function storingTool() {
+  const stored: BashOutputRecord[] = []
+  const tool = bashTool({
+    stream: () => {},
+    store: async (_lane, record) => {
+      stored.push(record)
+    },
+  })
+  return { tool, stored }
+}
+
+const attributing: ShellObservation = {
+  attribution: { on: true },
+  output: () => () => {},
+  settle: async () => ({}) as Settled,
+}
+
+test("a call whose output pipes cannot be made is stored undivided, saying so", async () => {
+  const { tool, stored } = storingTool()
+  await resultOf(
+    tool,
+    {
+      shell: localShell(attributing, "/no/such/mkfifo"),
+    } satisfies Pick<ToolContext, "shell">,
+    { command: "echo a; echo b" },
+    undefined,
+    threadIdFor("lane"),
+  )
+  expect(stored.map(r => r.verdict)).toEqual([
+    { kind: "undivided", why: "no-pipes" },
   ])
+})
+
+test("a call that never started stores no record", async () => {
+  const { tool, stored } = storingTool()
+  const shell: ToolContext["shell"] = () => ({
+    started: new Promise(() => {}),
+    attribution: Promise.resolve({ on: true }),
+    events: (async function* () {})(),
+    end: Promise.resolve({ kind: "aborted", spill: null }),
+    settled: Promise.resolve({ kind: "not-started" }),
+  })
+  await resultOf(
+    tool,
+    { shell } satisfies Pick<ToolContext, "shell">,
+    { command: "echo a; echo b" },
+    undefined,
+    threadIdFor("lane"),
+  )
+  expect(stored).toEqual([])
+})
+
+test("a call that never started has no flush to fold, and any other its own", () => {
+  expect(callFlush({ kind: "not-started" })).toBe(null)
+  expect(callFlush({ kind: "no-observer" })).toEqual({ kind: "no-observer" })
+})
+
+test("bashResult: a result's text begins with its view's, so the view's ranges index it", () => {
+  const view = { ...captureView(captureStart(BASH_LIMITS)), text: "out\n" }
+  for (const end of [
+    { kind: "exited", code: 0, spill: null },
+    { kind: "exited", code: 3, spill: null },
+    { kind: "timeout", spill: null },
+  ] as const)
+    expect(bashResult(view, end, 1).text.startsWith(view.text)).toBe(true)
+  expect(
+    bashResult(
+      cut(5000, 2000),
+      { kind: "exited", code: 1, spill: "/f" },
+      1,
+    ).text.startsWith("tail"),
+  ).toBe(true)
 })

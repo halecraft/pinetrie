@@ -66,6 +66,7 @@ import {
   factInInventoryMigration,
   queuedFactInInventoryMigration,
 } from "./0030-fact-in-inventory.ts"
+import { bashOutputMigration } from "./0031-bash-output.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -160,6 +161,7 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   workflowMarks,
   factInInventoryMigration,
   queuedFactInInventoryMigration,
+  bashOutputMigration,
 ]
 
 /**

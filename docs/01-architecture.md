@@ -314,7 +314,9 @@ in and attributes each byte entering the call's output pipes to its
 writer's statement, on a route of its own apart from the disk's events. The
 host joins those attributions to the bytes the lane read, and shows a
 call's output under each statement only when every byte verifies; otherwise
-whole, as before. A host inside a lane is relayed its outer host's
+whole, and its detail says why, from the reason the host stored with the
+call. What the call wrote to stderr is kept as ranges of its text, for the
+row alone. A host inside a lane is relayed its outer host's
 observer, and one that predates attribution leaves every call whole.
 From those runs and `.gitignore`, each path is source, derived or local. A
 recipe is a recorded run, and a disk made for a new state (an update's

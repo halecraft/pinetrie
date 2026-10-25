@@ -1630,9 +1630,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a result's text is never drawn",
-    file: "packages/web/message.tsx",
-    from: "    call.result?.text ?? streamed,",
-    to: "    streamed,",
+    file: "packages/interface/tool-row.ts",
+    from: "    text: call.result.text,\n",
+    to: "    text: streamed,\n",
     suite: "browser",
     scenario: "tools",
     expect:

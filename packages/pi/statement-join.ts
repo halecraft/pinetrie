@@ -9,19 +9,20 @@ import type {
   Attribution,
   OutputEvent,
   OutputFd,
-  Settled,
   StatementIndex,
+  TextRange,
 } from "@pinetrie/core"
 import {
   type Attributed,
+  type BashOutputRecord,
+  bashOutputRecord,
+  type CallFlush,
+  endedVerdict,
   type JoinEvent,
   joinStart,
   joinStep,
   joinVerdict,
-  type OutputSplitRecord,
-  outputSplitRecord,
   planVerdictChange,
-  settledSplit,
   type Verdict,
   type VerifiedSplit,
 } from "@pinetrie/rules"
@@ -55,11 +56,17 @@ export interface StatementJoin {
   chunk(fd: OutputFd, bytes: Uint8Array): void
   notice(event: OutputEvent): void
   overCap(): void
+  /** The shell's output is not pipes the observer reads. */
+  noPipes(): void
   /**
-   * The call returned and its flush answered: the record of its split, or
-   * null where it did not verify. Takes nothing after.
+   * The call returned, and how its flush went: the record of how its output
+   * reads, with `stderr`, the whole output's. Takes nothing after.
    */
-  done(call: string, settled: Settled): OutputSplitRecord | null
+  done(
+    call: string,
+    flush: CallFlush,
+    stderr: readonly TextRange[],
+  ): BashOutputRecord
 }
 
 export function statementJoin(
@@ -141,22 +148,31 @@ export function statementJoin(
     overCap() {
       step({ kind: "over-cap" })
     },
-    done(call, settled) {
-      step({ kind: "done", settled })
+    noPipes() {
+      step({ kind: "no-pipes" })
+    },
+    done(call, flush, stderr) {
+      step({ kind: "done", flush })
       stopPublishing()
-      const split =
-        verdict.kind === "split" ? settledSplit(verdict.split) : null
-      if (split === null) return null
-      return outputSplitRecord(
+      const verdict = endedVerdict(state)
+      // `done` was just folded, so the call has ended.
+      if (verdict === null)
+        throw new Error("a call's join ended without a verdict")
+      return bashOutputRecord(
         call,
-        split,
+        verdict,
         statement => {
           const capture = captures.get(statement)
           const view = captureView(
             captureFinish(capture ?? captureStart(BASH_LIMITS)),
           )
-          return { text: view.text, truncated: view.truncation.truncated }
+          return {
+            text: view.text,
+            truncated: view.truncation.truncated,
+            stderr: view.stderr,
+          }
         },
+        stderr,
         BASH_LIMITS,
       )
     },

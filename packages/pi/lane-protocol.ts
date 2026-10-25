@@ -138,8 +138,12 @@ export interface ShellRequest {
 
 /** A `shell` call's update, in the order the helper makes them. */
 export type ShellUpdate =
-  /** The run's number, before any output. */
-  | { readonly started: string }
+  /**
+   * The run's number, before any output, and what the shell writes its
+   * output to: the helper's pipes, or Node's sockets where it could not make
+   * them, which the observer cannot attribute.
+   */
+  | { readonly started: string; readonly output: "pipes" | "sockets" }
   /** A chunk as one read gave it, never split or joined. */
   | { readonly fd: OutputFd; readonly bytes: Uint8Array }
   /** The cap is reached: no more chunks are sent. */

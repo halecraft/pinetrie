@@ -7,9 +7,10 @@
 // in JavaScript it knows only ASCII word characters, so it would find "rail"
 // in "éraile". The edges here are Unicode classes instead.
 
-import type { CanvasId, EntryId } from "@pinetrie/core"
+import type { CanvasId, EntryId, TextRange } from "@pinetrie/core"
 import { entryMessage, type RailRow, type TreeIndex } from "@pinetrie/threads"
 import type { Here } from "./layout.ts"
+import { markedParts } from "./marked-parts.ts"
 
 /** The search of the canvas you are on; null while the bar is closed. Never stored. */
 export interface SearchState {
@@ -135,15 +136,9 @@ export const searchCorpus = (
     return m === null ? [] : [{ id: r.id, text: m.text }]
   })
 
-/** A match's place in its message's text, in UTF-16 units. */
-interface Range {
-  readonly from: number
-  readonly to: number
-}
-
 export interface SearchResult {
   /** Each matching message, with every match in its text, in order. */
-  readonly hits: ReadonlyMap<EntryId, readonly [Range, ...Range[]]>
+  readonly hits: ReadonlyMap<EntryId, readonly [TextRange, ...TextRange[]]>
 }
 
 export function searchTexts(
@@ -151,7 +146,7 @@ export function searchTexts(
   query: Query,
 ): SearchResult {
   const pattern = queryPattern(query)
-  const hits = new Map<EntryId, readonly [Range, ...Range[]]>()
+  const hits = new Map<EntryId, readonly [TextRange, ...TextRange[]]>()
   for (const { id, text } of corpus) {
     const [first, ...rest] = [...text.matchAll(pattern)].map(m => ({
       from: m.index,
@@ -176,7 +171,7 @@ export interface SnippetPart {
  */
 export function snippet(
   text: string,
-  ranges: readonly [Range, ...Range[]],
+  ranges: readonly [TextRange, ...TextRange[]],
   max: number,
 ): readonly SnippetPart[] {
   const flat = text.replace(/[\r\n\t]/g, " ")
@@ -202,18 +197,15 @@ export function snippet(
       if (r.from < end && r.to > end) end = r.to
     }
   }
-  const parts: SnippetPart[] = []
-  const add = (s: string, match: boolean) => {
-    if (s !== "") parts.push({ text: s, match })
-  }
-  let at = start
-  for (const r of ranges) {
-    if (r.from < start || r.to > end) continue
-    add(flat.slice(at, r.from), false)
-    add(flat.slice(r.from, r.to), true)
-    at = r.to
-  }
-  add(flat.slice(at, end), false)
+  const inside = ranges.flatMap(r =>
+    r.from < start || r.to > end
+      ? []
+      : [{ from: r.from - start, to: r.to - start }],
+  )
+  const parts = markedParts(flat.slice(start, end), inside).map(p => ({
+    text: p.text,
+    match: p.marked,
+  }))
   return [
     ...(start > 0 ? [{ text: "…", match: false }] : []),
     ...parts,

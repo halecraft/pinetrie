@@ -64,6 +64,22 @@
   names, and gives the write ends to the shell. A FIFO's writes go through
   `anon_pipe_write`, as an anonymous pipe's do. Where the pipes cannot be
   made, the call runs on sockets and shows undivided.
+- **The host stores how every call that started reads, not only a split**:
+  its verdict (the split, or undivided with the reason the join found) and
+  what it wrote to stderr, as ranges of its text. The reasons are one list,
+  and the join's pure fold decides each, the flush's too: a call whose
+  flush failed is undivided as `flush-failed`, never split. A call on
+  sockets says so at its start, and is undivided as `no-pipes`, not left
+  to read as a byte count that did not add up.
+- **A detail that shows a command's output whole says why**, in one line,
+  for a command of two or more statements; a single statement's output is
+  shown as any call's. The summary says nothing new, so a row keeps its
+  height. A host whose observer cannot attribute output logs why once, at
+  start.
+- **stderr is marked in what the row draws, never in what the model
+  reads**: the capture keeps each character's pipe beside pi's view, and a
+  mark that cannot be placed exactly through pi's cut and sanitising is
+  dropped, never a character moved.
 - **The statement is a field of the run tag the observer already keeps**
   for every task (ADR-0135). A task takes its parent's tag at birth, and
   keeps it across `exec`, a move or a new namespace, so a script, a nested
@@ -116,7 +132,10 @@
 
 - **What people see:** a call's output under each of its statements,
   including its failed redirections, subshells and late background lines;
-  or, where the attribution cannot be trusted, the output whole, as now.
+  or, where the attribution cannot be trusted, the output whole, with a
+  line in the detail saying why. What a command wrote to stderr is in a
+  colour of its own once the call has returned; live output is unmarked
+  until then.
 - **The same shell in every project:** the agent can be told which bash
   it has, and an image with no bash gets one.
 - **A command's stdout and stderr are pipes, where pi's own tool gives
@@ -149,6 +168,19 @@
   if the image build proves too slow.
 
 **Alternatives rejected.**
+
+- **Lane-wide reasons only on the setup or Machine page:** the observer's
+  hooks are no setting, and a missing split is noticed on the card. The
+  card's line is short, and the host's log names the hook.
+- **The reason in the summary's footer:** a row with nothing hidden has no
+  footer, so the reason would add a line when the result arrives.
+- **stderr marked by line:** a line can hold both pipes' output; ranges
+  are exact.
+- **stderr marked live:** live output is one text stream per call and per
+  statement, and marks would need another beside each; the row takes its
+  marks with its result, at the same height.
+- **stderr in pi's result `details`:** that is pi's shape, kept so the
+  model meets the tool it knows; the stored record is pine·trie's.
 
 - **Markers in the output, between statements:** no marker can be
   guaranteed absent from a command's own output, and an inserted

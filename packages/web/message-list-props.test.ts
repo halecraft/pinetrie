@@ -53,7 +53,7 @@ const shared = {
   revisions: new Map(),
   folds: foldMemory(),
   digests: new Map(),
-  outputSplits: new Map(),
+  bashOutputs: new Map(),
   margins: new Map(),
   openMargin: null,
   marginSlot: null,

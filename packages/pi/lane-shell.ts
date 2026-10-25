@@ -9,7 +9,8 @@
 //   quiet for `QUIET_AFTER_EXIT_MS` after the exit, so a background job that
 //   holds them does not hold the call;
 // - its stdout and stderr are pipes (`outputPipes`), the observer's to
-//   attribute by statement; Node would give the shell sockets;
+//   attribute by statement; Node would give the shell sockets, which it
+//   falls back to where the pipes cannot be made, its start saying which;
 // - a timeout or an abort kills the process group;
 // - once either count passes the spill's limits, every byte from the start
 //   goes to a file as well, for the model to read whole.
@@ -75,9 +76,9 @@ const run = promisify(execFile)
  * A call's stdout and stderr as pipes, made as FIFOs by the runtime's
  * `mkfifo` and unlinked once both ends are open, so each is a pipe as
  * `pipe()` makes one; null when they cannot be made, and the call runs on
- * Node's sockets, which the observer cannot attribute, so it shows
- * undivided. The read end opens non-blocking, so it needs no writer yet;
- * the shell's end is blocking, as libuv makes a child's descriptors 0 to 2.
+ * Node's sockets, which the observer cannot attribute: its start says so.
+ * The read end opens non-blocking, so it needs no writer yet; the shell's
+ * end is blocking, as libuv makes a child's descriptors 0 to 2.
  */
 export async function outputPipes(
   mkfifo: string,
@@ -159,7 +160,7 @@ export async function runShell(
       stdout: outputReader(pipes?.stdout ?? null, child.stdout),
       stderr: outputReader(pipes?.stderr ?? null, child.stderr),
     }
-    update({ started: runId })
+    update({ started: runId, output: pipes === null ? "sockets" : "pipes" })
     let timedOut = false
     const kill = () => {
       try {

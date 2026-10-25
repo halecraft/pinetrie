@@ -9,6 +9,15 @@ const disks = "packages/lanehost/disks.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the host says nothing of a missing hook",
+    file: "packages/lanehost/observer.ts",
+    from: "  if (attribution.on) return null\n",
+    to: '  if (attribution.on || attribution.why === "missing-hook") return null\n',
+    command: unit,
+    expect:
+      "the host's line says nothing when attribution is on, and names what is missing when off",
+  },
+  {
     name: "a client's close settles before its roles exit",
     file: "packages/lanehost/client.ts",
     from: "              channel.close()\n              return channel.closed\n",

@@ -500,6 +500,7 @@ export function dockerRuntime(input: {
         async observer() {
           await client.connect()
           return {
+            attribution: client.attribution,
             observe: (container, shared, fold) =>
               client.observe({
                 fold,

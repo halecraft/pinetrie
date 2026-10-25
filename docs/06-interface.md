@@ -1265,8 +1265,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   statement that printed nothing shows nothing, and one whose output was
   cut says "… earlier lines left out". The summary is the same as any
   row's. Where pine·trie cannot vouch for every byte (no observer, an
-  older one, a call over its cap), the detail shows the output whole, as
-  before; nothing it shows is ever split wrongly.
+  older one, a call over its cap, output that was not a pipe), the detail
+  shows the output whole and says why in one line ("Not split by
+  statement: its output wasn't a pipe."); nothing it shows is ever split
+  wrongly. A single statement's output is shown as any call's.
+- **What a command wrote to stderr has its own colour**, in its summary and
+  its detail, once the call has returned; what the model reads is the
+  same text, unmarked.
 - **In story, a row says what its call is for** (ADR-0173): `shell`, `edit`
   and `write` calls carry an intent, the model's few plain words ("Run the
   unit tests"), and a story row leads with it where the command would be,

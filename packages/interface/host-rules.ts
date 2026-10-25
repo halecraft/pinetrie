@@ -7,6 +7,7 @@
 
 export type {
   AcceptedRecord,
+  BashOutputRecord,
   BlockNode,
   CardHistoryRecord,
   CardOnCanvas,
@@ -14,7 +15,6 @@ export type {
   CommandSummary,
   DigestRecord,
   MarginCard,
-  OutputSplitRecord,
   QueuedCard,
   QueuedText,
   RootRecord,

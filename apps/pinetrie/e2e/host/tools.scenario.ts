@@ -10,7 +10,7 @@ import { ROOT, rootDocId, threadIdFor } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import {
-  readOutputSplits,
+  readBashOutputs,
   readParticipantNames,
   readPlaces,
   readThreadName,
@@ -216,14 +216,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
 
     // 3b. A bash call's output, stored by statement. The background job
-    // prints once the fourth statement made `go`, after the third printed,
+    // prints once the fifth statement made `go`, after the third printed,
     // from the second's process; `wait` holds the call open until it lands.
+    // The fourth writes to stderr.
     script.use([
       {
         tool: "bash",
         args: {
           command:
-            "echo one\n{ until [ -e go ]; do :; done; echo late; } &\necho three\n: > go\nwait",
+            "echo one\n{ until [ -e go ]; do :; done; echo late; } &\necho three\necho err >&2\n: > go\nwait",
         },
       },
       { text: "split" },
@@ -240,15 +241,26 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const split =
       splitDoc == null || splitCall === undefined
         ? undefined
-        : readOutputSplits(splitDoc).get(splitCall.id)
+        : readBashOutputs(splitDoc).get(splitCall.id)
+    const statements =
+      split?.verdict.kind === "split" ? split.verdict.statements : null
     check(
       "a bash call's stored split puts each statement's output under it, a background job's late line under the statement that started it",
-      JSON.stringify(split?.statements.map(s => s.text)) ===
-        JSON.stringify(["one\n", "late\n", "three\n", "", ""]),
+      JSON.stringify(statements?.map(s => s.text)) ===
+        JSON.stringify(["one\n", "late\n", "three\n", "err\n", "", ""]),
       JSON.stringify({
-        statements: split?.statements ?? null,
+        verdict: split?.verdict ?? null,
         result: splitCall?.result?.text ?? null,
       }),
+    )
+    const errStatement = statements?.[3]
+    check(
+      "a bash call's stored split marks what a statement wrote to stderr, and only that",
+      JSON.stringify(
+        errStatement?.stderr.map(r => errStatement.text.slice(r.from, r.to)),
+      ) === JSON.stringify(["err\n"]) &&
+        (statements ?? []).every((s, i) => i === 3 || s.stderr.length === 0),
+      JSON.stringify(statements ?? null),
     )
 
     // 4. Two assistant messages in one run: two reply streams, one at a time.

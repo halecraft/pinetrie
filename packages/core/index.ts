@@ -257,6 +257,7 @@ export {
   STATEMENT_SIGNAL,
   type StatementIndex,
   statementIndex,
+  type TextRange,
 } from "./output.ts"
 export { isWithin, pathUnder } from "./paths.ts"
 export { HOST_OPERATOR, PRODUCT_NAME } from "./product.ts"

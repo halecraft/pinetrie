@@ -2,6 +2,7 @@
 // values (`ContainerShape`, `DiskOp`); a runtime turns them into commands. The host picks the runtime and hands it in.
 
 import type {
+  Attribution,
   DiskOp as CoreDiskOp,
   DiskDiff,
   FoldNotices,
@@ -96,6 +97,11 @@ export type ImageBuild = "lane" | "lanehost" | "observer"
 
 /** The machine's observer, connected: the one way to observe a lane. */
 export interface Observer {
+  /**
+   * Whether it attributes a `bash` call's output to its statements, as its
+   * hello said when this host connected.
+   */
+  readonly attribution: Attribution
   /**
    * The running container's runs, observed from now: its first process
    * registered with the observer, `shared` its shared directories as the

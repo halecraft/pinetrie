@@ -325,6 +325,7 @@ export {
 } from "./history-view.ts"
 export {
   type AcceptedRecord,
+  type BashOutputRecord,
   BLOCK_PROPERTY,
   type BlockNode,
   blankQueued,
@@ -349,7 +350,6 @@ export {
   marginCounts,
   markBlocks,
   movedBackBy,
-  type OutputSplitRecord,
   pinnedCardsAtEnd,
   type QueuedCard,
   type QueuedText,
@@ -725,19 +725,19 @@ export {
   threadLink,
 } from "./thread-link.ts"
 export {
+  callBashOutputs,
   callMark,
-  callSplits,
   callStatus,
-  liveRowSplit,
   NO_MEMORY,
+  type OutputRun,
   REVEAL_MS,
   type RowMemory,
   type Run,
   rowLead,
+  rowOutput,
   rowSummary,
   rowView,
   runningFor,
-  storedRowSplit,
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, callPurpose, toolWord } from "./tool-words.ts"

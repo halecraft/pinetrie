@@ -27,7 +27,7 @@ const unused = async (): Promise<never> => {
 const input = {
   hooks: {
     turnDone: unused,
-    storeOutputSplit: unused,
+    storeBashOutput: unused,
     askedAboutConflict: unused,
     configWritten: async () => null,
     getLatest: unused,

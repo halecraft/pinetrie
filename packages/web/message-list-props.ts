@@ -4,6 +4,7 @@
 
 import type { EntryId, RevisionRecord, WriterId } from "@pinetrie/core"
 import type {
+  BashOutputRecord,
   ColumnAct,
   ColumnView,
   CrossCanvasLink,
@@ -13,7 +14,6 @@ import type {
   LaneJoin,
   LiveWork,
   MessageAct,
-  OutputSplitRecord,
   ProposalFacts,
   ProposalMemory,
   RowMemory,
@@ -72,8 +72,8 @@ export interface MessageListProps {
   leftBefore: EntryId | null
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
-  /** Each `bash` call's output by statement, where its split verified, by call id. */
-  outputSplits: ReadonlyMap<string, OutputSplitRecord>
+  /** How each `bash` call's output reads, stored once it returned, by call id. */
+  bashOutputs: ReadonlyMap<string, BashOutputRecord>
   /** How many comments each entry's margin holds (`marginCounts`). */
   margins: ReadonlyMap<EntryId, number>
   /** The entry whose margin is open, drawn as `marginSlot` under it; null for none. */
@@ -131,7 +131,7 @@ const MESSAGE_LIST_PROPS = {
   folds: "identity",
   leftBefore: "value",
   digests: "value",
-  outputSplits: "value",
+  bashOutputs: "value",
   margins: "value",
   openMargin: "value",
   marginSlot: "identity",

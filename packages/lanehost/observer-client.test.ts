@@ -314,6 +314,14 @@ test("settle answers after the role's flush", async () => {
   expect(role.flushes()).toBe(1)
 })
 
+test("the client's attribution is off before a hello, and the hello's once connected", async () => {
+  const client = observerClient({ open: fakeRole().open })
+  expect(client.attribution.on).toBe(false)
+  await client.connect()
+  expect(client.attribution).toEqual({ on: true })
+  await client.close()
+})
+
 test("a lane's attribution is the role's hello's", async () => {
   const lane = await observed(fakeRole())
   expect(lane.attribution).toEqual({ on: true })

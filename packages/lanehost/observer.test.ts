@@ -9,6 +9,7 @@ import { describe, expect, test } from "vitest"
 import { standInRole } from "./fixtures.ts"
 import {
   ATTRIBUTION_HOOKS,
+  attributionLine,
   decodeLoaderLine,
   encodeLoaderCommand,
   HELD_PER_LANE,
@@ -490,6 +491,15 @@ describe("attribution", () => {
     expect(helloAttribution(hello({ on: true }))).toEqual({ on: true })
     const missing = { on: false, why: "missing-hook", hook: "pipe_unlock" }
     expect(helloAttribution(hello(missing))).toEqual(missing)
+  })
+  test("the host's line says nothing when attribution is on, and names what is missing when off", () => {
+    expect(attributionLine({ on: true })).toBeNull()
+    expect(
+      attributionLine({ on: false, why: "missing-hook", hook: "pipe_unlock" }),
+    ).toContain("pipe_unlock")
+    expect(
+      attributionLine({ on: false, why: "other-version", version: "b387fa" }),
+    ).toContain("b387fa")
   })
   test("a hello without an attribution this host reads is off, naming the role's version", () => {
     const off = { on: false, why: "other-version", version: "b387fa49da13" }

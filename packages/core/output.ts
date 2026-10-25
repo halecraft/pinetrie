@@ -6,6 +6,12 @@
 /** The pipe a piece of a `bash` call's output came through. */
 export type OutputFd = "stdout" | "stderr"
 
+/** A stretch of a text, in its UTF-16 code units, from `from` up to `to`. */
+export interface TextRange {
+  readonly from: number
+  readonly to: number
+}
+
 declare const statementIndexBrand: unique symbol
 /** A statement's ordinal among a command's top-level statements, from 1. */
 export type StatementIndex = number & {

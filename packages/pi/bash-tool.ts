@@ -9,10 +9,11 @@
 // keeps serving the other tools.
 
 import { type Context, formatSize } from "@earendil-works/pi-agent-core"
-import type { ThreadId } from "@pinetrie/core"
-import type { OutputSplitRecord } from "@pinetrie/rules"
+import { assertNever, type ThreadId } from "@pinetrie/core"
+import type { BashOutputRecord, CallFlush } from "@pinetrie/rules"
 import { BASH_TOOL, type StreamEvent } from "@pinetrie/threads"
 import { Type } from "typebox"
+import type { ShellSettled } from "./lane-env.ts"
 import type { ShellEnd } from "./lane-protocol.ts"
 import type { ToolContext } from "./lanes.ts"
 import {
@@ -127,8 +128,8 @@ type Update = (
 export interface StatementSinks {
   /** A statement's live output, or its call's turn to undivided. */
   readonly stream: (event: StreamEvent) => void
-  /** Stores a call's verified split in its lane's root. */
-  readonly store: (lane: ThreadId, record: OutputSplitRecord) => Promise<void>
+  /** Stores how a call's output reads in its lane's root. */
+  readonly store: (lane: ThreadId, record: BashOutputRecord) => Promise<void>
 }
 
 /** pi's `bash` tool, made pine·trie's: see the module's header. */
@@ -183,26 +184,37 @@ export function bashTool(sinks: StatementSinks | null = null) {
       let state: CaptureState = captureStart(BASH_LIMITS)
       const publisher = published(() => captureView(state), onUpdate)
       for await (const event of run.events) {
-        if (event === "over-cap") join?.overCap()
-        else if ("notice" in event) join?.notice(event.notice)
-        else {
-          state = captureChunk(state, event)
-          publisher.changed()
-          join?.chunk(event.fd, event.bytes)
+        switch (event.kind) {
+          case "chunk":
+            state = captureChunk(state, event)
+            publisher.changed()
+            join?.chunk(event.fd, event.bytes)
+            break
+          case "notice":
+            join?.notice(event.event)
+            break
+          case "over-cap":
+            join?.overCap()
+            break
+          case "no-pipes":
+            join?.noPipes()
+            break
+          default:
+            assertNever(event)
         }
       }
       const end = await run.end
       state = captureFinish(state)
       publisher.stop()
-      const settled = await run.settled
+      const view = captureView(state)
+      const flush = callFlush(await run.settled)
       const record =
-        join === null || settled === null
+        join === null || flush === null
           ? null
-          : join.done(toolCallId, settled)
-      // A split that fails to store leaves the row its whole output.
+          : join.done(toolCallId, flush, view.stderr)
+      // A record that fails to store leaves the row its whole output, plain.
       if (record !== null && lane !== undefined && sinks !== null)
         await sinks.store(lane, record).catch(() => {})
-      const view = captureView(state)
       const result = bashResult(view, end, timeout)
       if (!result.ok) throw new Error(result.text)
       return {
@@ -212,6 +224,10 @@ export function bashTool(sinks: StatementSinks | null = null) {
     },
   }
 }
+
+/** The flush a call's join folds; null for a run that never started, which has nothing to record. */
+export const callFlush = (settled: ShellSettled): CallFlush | null =>
+  settled.kind === "not-started" ? null : settled
 
 /**
  * Publishes a running call's view at most every `PUBLISH_MS`, only when it

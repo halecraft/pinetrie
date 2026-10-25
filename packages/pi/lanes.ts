@@ -21,8 +21,8 @@ import {
 } from "@pinetrie/core"
 import {
   AGENTS_RULE,
+  type BashOutputRecord,
   CONTEXT_RULES,
-  type OutputSplitRecord,
   type PutImageAsk,
   type ToolAnswer,
 } from "@pinetrie/rules"
@@ -245,8 +245,8 @@ export interface LaneHooks {
   readBlob(lane: ThreadId, blob: string): Promise<BlobAnswer>
   /** `put_image` was called, its image stored: the host's answer. */
   putImage(lane: ThreadId, ask: PutImageAsk): Promise<ToolAnswer>
-  /** A `bash` call's output split by statement: store it in the lane's root. */
-  storeOutputSplit(lane: ThreadId, record: OutputSplitRecord): Promise<void>
+  /** How a `bash` call's output reads, once it returned: store it in the lane's root. */
+  storeBashOutput(lane: ThreadId, record: BashOutputRecord): Promise<void>
   /** `read_card` was called: what the card says, and an image to show. */
   readCard(
     lane: ThreadId,

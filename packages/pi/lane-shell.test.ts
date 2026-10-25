@@ -86,10 +86,11 @@ test("a call's stdout and stderr are pipes", async () => {
   expect(r.piped("stderr").toString()).toBe("err-pipe\n")
 })
 
-test("where its pipes cannot be made, a call runs on sockets, its output whole", async () => {
+test("where its pipes cannot be made, a call runs on sockets, its output whole, and its start says so", async () => {
   const r = await shell("[ -p /dev/stdout ] || echo not-a-pipe; echo err >&2", {
     shell: { bash: "bash", mkfifo: path.join(dir, "no-such-mkfifo") },
   })
+  expect(r.updates[0]).toEqual({ started: "7", output: "sockets" })
   expect(r.end).toEqual({ kind: "exited", code: 0, spill: null })
   expect(r.piped("stdout").toString()).toBe("not-a-pipe\n")
   expect(r.piped("stderr").toString()).toBe("err\n")
@@ -107,7 +108,7 @@ test("a call leaves no descriptor of its pipes open in the helper", async () => 
 test("the run is started once, with its command, and named first", async () => {
   const r = await shell("echo $PINETRIE_RUN")
   expect(r.started).toEqual(["echo $PINETRIE_RUN"])
-  expect(r.updates[0]).toEqual({ started: "7" })
+  expect(r.updates[0]).toEqual({ started: "7", output: "pipes" })
   expect(r.piped("stdout").toString()).toBe("7\n")
 })
 

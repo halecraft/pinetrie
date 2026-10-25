@@ -137,7 +137,7 @@ describe("banners in a harness", () => {
               },
               hooks: {
                 turnDone: async () => {},
-                storeOutputSplit: async () => {},
+                storeBashOutput: async () => {},
                 askedAboutConflict: async () => false,
                 configWritten: async () => null,
                 getLatest: async () => {

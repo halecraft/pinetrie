@@ -21,11 +21,12 @@ import type {
   LaneDrain,
   LaneObservation,
   OutputEvent,
+  OutputFd,
   Recipe,
   RecipeCheck,
   RuntimeShell,
-  Settled,
 } from "@pinetrie/core"
+import type { CallFlush } from "@pinetrie/rules"
 import {
   type EnvMethod,
   type IgnoreFacts,
@@ -251,9 +252,6 @@ export function laneRunner(channel: LaneChannel): {
   }
 }
 
-/** A chunk of a `bash` call's output, as one read in the lane gave it. */
-export type ShellChunk = Extract<ShellUpdate, { readonly fd: unknown }>
-
 /** What a `bash` call's join reads of its lane's observer. */
 export type ShellObservation = Pick<
   LaneObservation,
@@ -269,11 +267,24 @@ export interface OpenedLane {
 
 /** What a running `bash` call hands its tool, in the order it came. */
 export type ShellEvent =
-  | ShellChunk
-  /** The cap is reached: no more chunks. */
-  | "over-cap"
+  /** A chunk of the call's output, as one read in the lane gave it. */
+  | {
+      readonly kind: "chunk"
+      readonly fd: OutputFd
+      readonly bytes: Uint8Array
+    }
   /** What the observer saw of the run's output. */
-  | { readonly notice: OutputEvent }
+  | { readonly kind: "notice"; readonly event: OutputEvent }
+  /** The cap is reached: no more chunks. */
+  | { readonly kind: "over-cap" }
+  /** The shell writes to Node's sockets, which the observer cannot attribute. */
+  | { readonly kind: "no-pipes" }
+
+/**
+ * How the observer's flush after a `bash` call went, once its events end:
+ * the join's flush, or a run that never started, with nothing to flush.
+ */
+export type ShellSettled = CallFlush | { readonly kind: "not-started" }
 
 /** A `bash` call's command, running: its run, its output as it comes, and how it ended. */
 export interface ShellRun {
@@ -289,11 +300,8 @@ export interface ShellRun {
    */
   readonly events: AsyncIterable<ShellEvent>
   readonly end: Promise<ShellEnd>
-  /**
-   * The flush's proof, once `events` ends; null where the lane has no
-   * observer, the call never started, or the flush failed.
-   */
-  readonly settled: Promise<Settled | null>
+  /** How the observer's flush went, once `events` ends. */
+  readonly settled: Promise<ShellSettled>
 }
 
 /** What a `bash` call asks of its lane, beyond its command. */
@@ -332,7 +340,10 @@ export function laneShell(
       () => null,
     )
     // Set in the update's callback, which the compiler cannot follow.
-    const claim: { release: (() => void) | null } = { release: null }
+    const claim: { started: boolean; release: (() => void) | null } = {
+      started: false,
+      release: null,
+    }
     const end = (async (): Promise<ShellEnd> => {
       let lane: OpenedLane
       try {
@@ -349,12 +360,15 @@ export function laneShell(
         update => {
           if ("started" in update) {
             started(update.started)
+            claim.started = true
+            if (update.output === "sockets") events.push({ kind: "no-pipes" })
             claim.release =
-              observation?.output(update.started, notice =>
-                events.push({ notice }),
+              observation?.output(update.started, event =>
+                events.push({ kind: "notice", event }),
               ) ?? null
-          } else if ("overCap" in update) events.push("over-cap")
-          else events.push(update)
+          } else if ("overCap" in update) events.push({ kind: "over-cap" })
+          else
+            events.push({ kind: "chunk", fd: update.fd, bytes: update.bytes })
         },
       )
       try {
@@ -372,14 +386,15 @@ export function laneShell(
         message: String(error),
       }),
     )
-    const settled = (async (): Promise<Settled | null> => {
+    const settled = (async (): Promise<ShellSettled> => {
       await end
       try {
-        if (claim.release === null) return null
+        if (!claim.started) return { kind: "not-started" }
         const observation = (await opened).observation
-        return observation === null ? null : await observation.settle()
+        if (observation === null) return { kind: "no-observer" }
+        return { kind: "settled", proof: await observation.settle() }
       } catch {
-        return null
+        return { kind: "flush-failed" }
       } finally {
         claim.release?.()
         events.close()
@@ -405,7 +420,7 @@ export function refusingShell(why: string): LaneShell {
       attribution: Promise.resolve(null),
       events: events.iterable,
       end: Promise.resolve({ kind: "failed", message: why }),
-      settled: Promise.resolve(null),
+      settled: Promise.resolve({ kind: "not-started" }),
     }
   }
 }

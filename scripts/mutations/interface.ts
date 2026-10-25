@@ -5,6 +5,49 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a bash call's verdict and its stderr ──
+  {
+    name: "a single statement is splittable",
+    file: "packages/interface/tool-row.ts",
+    from: "  summary.statements.length > 1",
+    to: "  summary.statements.length > 0",
+    command: unit,
+    expect: "a single statement is never split",
+  },
+  {
+    name: "the summary says why a call is undivided",
+    file: "packages/interface/tool-row.ts",
+    from: "      inDetail && output.whyUndivided !== null",
+    to: "      output.whyUndivided !== null",
+    command: unit,
+    expect:
+      "the open detail of an undivided command of statements says why, and nothing else does",
+  },
+  {
+    name: "a call with its result reads its live streams",
+    file: "packages/interface/tool-row.ts",
+    from: "  if (call.result === undefined)\n    return {\n      text: streamed,",
+    to: "  if (true)\n    return {\n      text: streamed,",
+    command: unit,
+    expect:
+      "once a call has its result, its stored record; before, its live streams",
+  },
+  {
+    name: "every part of an output reads as stderr",
+    file: "packages/interface/tool-row.ts",
+    from: "  markedParts(text, stderr).map(p => ({ text: p.text, stderr: p.marked }))",
+    to: "  markedParts(text, stderr).map(p => ({ text: p.text, stderr: true }))",
+    command: unit,
+    expect: "a result's notes after its output are never stderr",
+  },
+  {
+    name: "a marked text loses its end after the last range",
+    file: "packages/interface/marked-parts.ts",
+    from: "  add(text.slice(at), false)\n",
+    to: "",
+    command: unit,
+    expect: "a text is cut at its ranges, each part marked when inside one",
+  },
   // ── the Health page ──
   {
     name: "an archive is offered that the facts do not carry",
@@ -77,16 +120,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the summary shows a split",
     file: "packages/interface/tool-row.ts",
-    from: "    open &&\n",
-    to: "",
+    from: "const inDetail = open && ",
+    to: "const inDetail = ",
     command: unit,
     expect: "the summary of a split call is as any call's",
   },
   {
     name: "a split call's detail keeps its whole output too",
     file: "packages/interface/tool-row.ts",
-    from: "text: byStatement",
-    to: "text: false",
+    from: "runs: byStatement ? [] :",
+    to: "runs: false ? [] :",
     command: unit,
     expect:
       "each statement's output is under the line it ends on, and the body has none",
@@ -94,8 +137,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a statement's cut start goes unsaid",
     file: "packages/interface/tool-row.ts",
-    from: "wholeOutput(o.truncated ? `${EARLIER_LINES}\\n${o.text}` : o.text)",
-    to: "wholeOutput(o.text)",
+    from: "    ...(o.truncated ? [plainOutput(`${EARLIER_LINES}\\n`)] : []),\n",
+    to: "",
     command: unit,
     expect: "a statement's output whose start was left out says so above it",
   },
@@ -1408,24 +1451,24 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a summary shows every line of a command",
     file: "packages/interface/tool-row.ts",
-    from: "  return cutOf(lines, lines.slice(0, SUMMARY_LINES))",
-    to: "  return cutOf(lines, lines)",
+    from: "  return cutOf(COMMAND_RUNS, lines, lines.slice(0, SUMMARY_LINES))",
+    to: "  return cutOf(COMMAND_RUNS, lines, lines)",
     command: unit,
     expect: "the head is the first five lines",
   },
   {
     name: "a summary's output is its head",
     file: "packages/interface/tool-row.ts",
-    from: "  return cutOf(lines, lines.slice(-SUMMARY_LINES))",
-    to: "  return cutOf(lines, lines.slice(0, SUMMARY_LINES))",
+    from: "  return cutOf(OUTPUT_RUNS, lines, lines.slice(-SUMMARY_LINES))",
+    to: "  return cutOf(OUTPUT_RUNS, lines, lines.slice(0, SUMMARY_LINES))",
     command: unit,
     expect: "the tail the last five",
   },
   {
     name: "a run split at a line break loses its role",
     file: "packages/interface/tool-row.ts",
-    from: '      if (text !== "") lines.at(-1)?.push({ text, role: run.role })',
-    to: '      if (text !== "") lines.at(-1)?.push({ text, role: "plain" })',
+    from: '      if (text !== "") lines.at(-1)?.push({ ...run, text })',
+    to: '      if (text !== "") lines.at(-1)?.push({ text, role: "plain" } as unknown as R)',
     command: unit,
     expect: "both parts keep its role",
   },
@@ -1440,8 +1483,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the detail's output keeps its start",
     file: "packages/interface/tool-row.ts",
-    from: '  return `… ${plural(left, "earlier character")}\\n${text.slice(left)}`',
-    to: "  return text.slice(0, SHOWN)",
+    from: "  let skip = length - SHOWN\n",
+    to: "  let skip = 0\n",
     command: unit,
     expect: "the detail's output is whole, or its end",
   },

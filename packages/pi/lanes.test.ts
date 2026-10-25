@@ -114,7 +114,7 @@ test("the prompt no longer tells the model to search with bash", () => {
     stream: () => {},
     hooks: {
       turnDone: async () => {},
-      storeOutputSplit: async () => {},
+      storeBashOutput: async () => {},
       askedAboutConflict: async () => false,
       configWritten: async () => null,
       getLatest: async () => {
@@ -404,7 +404,7 @@ describe("lanes in a harness", () => {
           return where
         },
         hooks: {
-          storeOutputSplit: async () => {},
+          storeBashOutput: async () => {},
           async turnDone(_lane, tip) {
             turns.push(`start ${tip}`)
             await new Promise(r => setTimeout(r, 20))
@@ -479,7 +479,7 @@ describe("lanes in a harness", () => {
         access,
         hooks: {
           turnDone: async () => {},
-          storeOutputSplit: async () => {},
+          storeBashOutput: async () => {},
           askedAboutConflict: async () => false,
           configWritten: async () => null,
           getLatest: async () => {

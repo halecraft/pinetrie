@@ -1022,9 +1022,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // A split call's detail draws each statement's output under its
-        // line, stderr's as stdout's, and nothing under one that printed
-        // nothing. Six statements: more than the summary's five lines, so
-        // its toggle opens the detail.
+        // line, stderr's in its own colour, and nothing under one that
+        // printed nothing. Six statements: more than the summary's five
+        // lines, so its toggle opens the detail.
         {
           const SPLIT = [
             "echo alpha",
@@ -1071,6 +1071,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 ["epsilon"],
               ]),
             JSON.stringify(under),
+          )
+          const marked = await row.evaluate(d =>
+            [...d.querySelectorAll(".tool-statement-output .tool-stderr")].map(
+              o => (o.textContent ?? "").trim(),
+            ),
+          )
+          check(
+            "a split call's detail draws what a statement wrote to stderr, and only that, as stderr",
+            JSON.stringify(marked) === JSON.stringify(["beta"]),
+            JSON.stringify(marked),
           )
         }
 

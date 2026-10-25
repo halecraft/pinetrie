@@ -3,12 +3,12 @@
 
 import type { EntryId, WriterId } from "@pinetrie/core"
 import type {
+  BashOutputRecord,
   CrossCanvasLink,
   Density,
   LaneJoin,
   MessageAct,
   MessageTools,
-  OutputSplitRecord,
   PinnedMarker,
   RowMemory,
   StatementStreams,
@@ -29,8 +29,8 @@ export interface MessageProps {
   streams: Readonly<Record<string, StreamId>>
   /** Each of its running `bash` calls' statement streams, by call id (`liveWork`). */
   statementStreams: Readonly<Record<string, StatementStreams>>
-  /** Each of its `bash` calls' stored output by statement, by call id. */
-  splits: Readonly<Record<string, OutputSplitRecord>>
+  /** How each of its `bash` calls' output reads, stored once it returned, by call id. */
+  bashOutputs: Readonly<Record<string, BashOutputRecord>>
   /** Where a running call's output is read. */
   live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */
@@ -67,7 +67,7 @@ const MESSAGE_PROPS = {
   density: "value",
   streams: "value",
   statementStreams: "value",
-  splits: "value",
+  bashOutputs: "value",
   live: "identity",
   rows: "identity",
   tools: "value",

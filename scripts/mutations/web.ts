@@ -7,10 +7,20 @@ const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a command's stderr is drawn as stdout",
+    file: "packages/web/message.tsx",
+    from: "    run.stderr ? (\n",
+    to: "    false ? (\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a split call's detail draws what a statement wrote to stderr, and only that, as stderr",
+  },
+  {
     name: "a split row's detail draws no statement's output",
     file: "packages/web/message.tsx",
-    from: "              {line.outputs.map((text, j) => (\n",
-    to: "              {line.outputs.slice(0, 0).map((text, j) => (\n",
+    from: "              {line.outputs.map((runs, j) => (\n",
+    to: "              {line.outputs.slice(0, 0).map((runs, j) => (\n",
     suite: "browser",
     scenario: "tools",
     expect:

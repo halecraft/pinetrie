@@ -5,6 +5,49 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 const config = ["pnpm", "exec", "vitest", "run", "packages/pi/config.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a bash call's verdict and its stderr ──
+  {
+    name: "the capture's stderr ignores the newline a cut drops",
+    file: "packages/pi/shell-capture.ts",
+    from: '(retained.truncated && state.buffer.endsWith("\\n") ? 1 : 0)',
+    to: "0",
+    command: unit,
+    expect:
+      "a cut view whose output ends in a newline keeps stderr on its own text",
+  },
+  {
+    name: "the capture's stretches are not trimmed with its buffer",
+    file: "packages/pi/shell-capture.ts",
+    from: "    streams = withoutFirst(streams, whole - buffer.length)\n",
+    to: "",
+    command: unit,
+    expect: "stderr past the buffer's trim stays on its own text",
+  },
+  {
+    name: "a call on sockets says its output is pipes",
+    file: "packages/pi/lane-shell.ts",
+    from: 'output: pipes === null ? "sockets" : "pipes"',
+    to: 'output: "pipes"',
+    command: unit,
+    expect: "and its start says so",
+  },
+  {
+    name: "the bash tool drops the shell's no-pipes",
+    file: "packages/pi/bash-tool.ts",
+    from: "            join?.noPipes()\n",
+    to: "",
+    command: unit,
+    expect:
+      "a call whose output pipes cannot be made is stored undivided, saying so",
+  },
+  {
+    name: "a flush that throws reads as a call never started",
+    file: "packages/pi/lane-env.ts",
+    from: '        return { kind: "flush-failed" }\n',
+    to: '        return { kind: "not-started" }\n',
+    command: unit,
+    expect: "a call whose flush throws says the flush failed",
+  },
   {
     name: "the gate ignores the call's abort",
     file: "packages/pi/lane-env.ts",
@@ -58,7 +101,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the observer's events never reach the tool",
     file: "packages/pi/lane-env.ts",
-    from: "events.push({ notice }),",
+    from: 'events.push({ kind: "notice", event }),',
     to: "{},",
     command: unit,
     expect: "a call the observer attributes is stored by statement",
@@ -665,8 +708,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool is named other than its id",
     file: "packages/pi/tools.ts",
-    from: "      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),\n    }),",
-    to: '      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),\n    }) && { ...bashTool(), name: "shell" },',
+    from: "      store: (lane, record) => input.hooks.storeBashOutput(lane, record),\n    }),",
+    to: '      store: (lane, record) => input.hooks.storeBashOutput(lane, record),\n    }) && { ...bashTool(), name: "shell" },',
     command: unit,
     expect: "bash is the name of the tool made for it",
   },

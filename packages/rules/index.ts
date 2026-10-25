@@ -575,16 +575,18 @@ export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
   type Attributed,
+  BASH_OUTPUT,
+  type BashOutputRecord,
+  bashOutputRecord,
+  bashOutputWrite,
+  type CallFlush,
+  endedVerdict,
   type JoinEvent,
   joinStart,
   joinStep,
   joinVerdict,
-  OUTPUT_SPLIT,
-  type OutputSplitRecord,
-  outputSplitRecord,
-  outputSplitWrite,
   planVerdictChange,
-  settledSplit,
+  type UndividedWhy,
   type Verdict,
   type VerifiedSplit,
 } from "./statement-output.ts"

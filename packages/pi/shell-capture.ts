@@ -6,6 +6,8 @@
 // cut to its tail by pi's own exported functions, with pi's running counts
 // of bytes and lines. A character split across chunks is held until its last
 // byte arrives, in the order the chunks came, whichever pipe each is from.
+// Beside pi's view, the capture keeps which pipe each character came from,
+// and gives the view's stderr as ranges of its text, never for the model.
 
 import {
   DEFAULT_MAX_BYTES,
@@ -15,7 +17,7 @@ import {
   truncateTail,
   utf8ByteLength,
 } from "@earendil-works/pi-agent-core"
-import type { OutputFd } from "@pinetrie/core"
+import type { OutputFd, TextRange } from "@pinetrie/core"
 
 /** How much of the output a view keeps: its last lines and bytes. */
 export interface CaptureLimits {
@@ -51,6 +53,16 @@ export interface CaptureState {
   readonly currentLineBytes: number
   /** A character's first bytes, waiting for its last. */
   readonly pending: Uint8Array
+  /** The pipe of each stretch of `buffer`, in order, covering all of it. */
+  readonly streams: readonly Stretch[]
+  /** The pipe of the chunk that left `pending`. */
+  readonly pendingFd: OutputFd
+}
+
+/** Some of a capture's buffer, in UTF-16 code units, from one pipe. */
+interface Stretch {
+  readonly fd: OutputFd
+  readonly length: number
 }
 
 /** pi's bash tool's truncation, with its whole output's counts. */
@@ -65,6 +77,8 @@ export interface CaptureTruncation
 /** What the output reads as. */
 export interface CaptureView {
   readonly text: string
+  /** What came through stderr, in `text`; none where it cannot be placed exactly. */
+  readonly stderr: readonly TextRange[]
   readonly truncation: CaptureTruncation
   /** The last line's bytes, when the view cuts inside it. */
   readonly lastLineBytes?: number
@@ -79,6 +93,8 @@ export const captureStart = (limits: CaptureLimits): CaptureState => ({
   endsWithNewline: true,
   currentLineBytes: 0,
   pending: new Uint8Array(),
+  streams: [],
+  pendingFd: "stdout",
 })
 
 export const captureChunk = (
@@ -88,14 +104,16 @@ export const captureChunk = (
   const bytes = joined(state.pending, chunk.bytes)
   const cut = completeLength(bytes)
   return {
-    ...appended(state, decoded(bytes.subarray(0, cut))),
+    // A character completed by this chunk is this chunk's pipe's.
+    ...appended(state, decoded(bytes.subarray(0, cut)), chunk.fd),
     pending: bytes.slice(cut),
+    pendingFd: chunk.fd,
   }
 }
 
 /** The output ended: a character still waiting for its last byte is decoded as it is. */
 export const captureFinish = (state: CaptureState): CaptureState => ({
-  ...appended(state, decoded(state.pending)),
+  ...appended(state, decoded(state.pending), state.pendingFd),
   pending: new Uint8Array(),
 })
 
@@ -105,8 +123,15 @@ export const captureView = (state: CaptureState): CaptureView => {
   const totalLines = linesOf(state)
   const truncated = state.totalBytes > maxBytes || totalLines > maxLines
   const { content, ...truncation } = retained
+  const text = sanitizeBinaryOutput(content)
+  // A cut view drops the buffer's final newline with the lines before it.
+  const start =
+    state.buffer.length -
+    content.length -
+    (retained.truncated && state.buffer.endsWith("\n") ? 1 : 0)
   return {
-    text: sanitizeBinaryOutput(content),
+    text,
+    stderr: viewStderr(state, start, content, text),
     truncation: {
       ...truncation,
       truncated,
@@ -171,7 +196,80 @@ const lastBytes = (text: string, maxBytes: number): string => {
   return decoder.decode(b.subarray(start))
 }
 
-function appended(state: CaptureState, text: string): CaptureState {
+/**
+ * The stderr ranges of a view whose unsanitised text is `content`, at
+ * `start` in the buffer: each stretch sanitised on its own, which pi's
+ * sanitising allows, as it deletes single code units. Empty when the
+ * stretches do not rebuild `text` exactly, so a mark never moves a
+ * character.
+ */
+function viewStderr(
+  state: CaptureState,
+  start: number,
+  content: string,
+  text: string,
+): readonly TextRange[] {
+  if (state.buffer.slice(start, start + content.length) !== content) return []
+  const ranges: TextRange[] = []
+  let rebuilt = ""
+  let at = 0
+  for (const stretch of state.streams) {
+    const from = Math.max(at, start)
+    const to = Math.min(at + stretch.length, start + content.length)
+    at += stretch.length
+    if (to <= from) continue
+    const part = sanitizeBinaryOutput(state.buffer.slice(from, to))
+    if (stretch.fd === "stderr" && part !== "") {
+      const last = ranges.at(-1)
+      if (last !== undefined && last.to === rebuilt.length)
+        ranges[ranges.length - 1] = {
+          from: last.from,
+          to: last.to + part.length,
+        }
+      else
+        ranges.push({ from: rebuilt.length, to: rebuilt.length + part.length })
+    }
+    rebuilt += part
+  }
+  return rebuilt === text ? ranges : []
+}
+
+/** `streams` with `length` more code units of `fd`, merged into the last stretch of the same pipe. */
+function withStretch(
+  streams: readonly Stretch[],
+  fd: OutputFd,
+  length: number,
+): readonly Stretch[] {
+  if (length === 0) return streams
+  const last = streams.at(-1)
+  return last?.fd === fd
+    ? [...streams.slice(0, -1), { fd, length: last.length + length }]
+    : [...streams, { fd, length }]
+}
+
+/** `streams` less their first `n` code units, as the buffer drops them. */
+function withoutFirst(
+  streams: readonly Stretch[],
+  n: number,
+): readonly Stretch[] {
+  let left = n
+  const out: Stretch[] = []
+  for (const stretch of streams) {
+    if (left >= stretch.length) {
+      left -= stretch.length
+      continue
+    }
+    out.push({ fd: stretch.fd, length: stretch.length - left })
+    left = 0
+  }
+  return out
+}
+
+function appended(
+  state: CaptureState,
+  text: string,
+  fd: OutputFd,
+): CaptureState {
   if (text === "") return state
   const n = utf8ByteLength(text)
   const last = text.lastIndexOf("\n")
@@ -180,16 +278,20 @@ function appended(state: CaptureState, text: string): CaptureState {
     newlines++
   let buffer = state.buffer + text
   let bufferBytes = state.bufferBytes + n
+  let streams = withStretch(state.streams, fd, text.length)
   // As pi's capture: past twice the guard, keep the guard's tail.
   const guard = state.limits.maxBytes * 2
   if (bufferBytes > guard * 2) {
+    const whole = buffer.length
     buffer = lastBytes(buffer, guard)
     bufferBytes = utf8ByteLength(buffer)
+    streams = withoutFirst(streams, whole - buffer.length)
   }
   return {
     ...state,
     buffer,
     bufferBytes,
+    streams,
     totalBytes: state.totalBytes + n,
     newlines,
     endsWithNewline: text.endsWith("\n"),

@@ -10,6 +10,7 @@ import { type ConfigPlaces, ownDirs, type StartLayers } from "@pinetrie/config"
 import { errorText, isThreadId } from "@pinetrie/core"
 import type { Install } from "@pinetrie/install"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
+import { attributionLine } from "@pinetrie/lanehost"
 import {
   checkImage,
   ensureRuntime,
@@ -444,7 +445,7 @@ async function prepare(
   refreshBaseNow: RefreshBase,
   progress: StartProgress,
 ): Promise<Ready> {
-  const { root, found, files, configs, opened } = laid
+  const { root, found, files, configs, opened, log } = laid
   const { runtime } = found
   progress.begin("lane-images")
   const { lane, runtimeFrom } = await prepareImages(
@@ -472,12 +473,17 @@ async function prepare(
   })
 
   progress.begin("observer")
+  const observer = await served.observer()
+  // Once, at start: a role that restarts may say otherwise, and each call's
+  // detail says what that call found.
+  const unattributed = attributionLine(observer.attribution)
+  if (unattributed !== null) log(unattributed)
   const ready: Ready = {
     ...laidOut,
     image: lane,
     imagePath,
     identity,
-    observer: await served.observer(),
+    observer,
   }
 
   progress.begin("base-snapshot")

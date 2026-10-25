@@ -6,7 +6,7 @@
 import type { EntryId } from "@pinetrie/core"
 import {
   askView,
-  callSplits,
+  callBashOutputs,
   callStatementStreams,
   callStreams,
   LEFT_WORDS,
@@ -63,7 +63,7 @@ function MessageListView(p: MessageListProps) {
             transcriptCalls(node),
             p.statements,
           )}
-          splits={callSplits(transcriptCalls(node), p.outputSplits)}
+          bashOutputs={callBashOutputs(transcriptCalls(node), p.bashOutputs)}
           closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
           forkTracks={p.forks.get(node.id) ?? []}
           join={p.joins.get(node.id)}

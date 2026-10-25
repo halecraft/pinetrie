@@ -9,13 +9,14 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   type Attributed,
+  BASH_OUTPUT,
+  bashOutputRecord,
+  endedVerdict,
   type JoinEvent,
   type JoinState,
   joinStart,
   joinStep,
   joinVerdict,
-  OUTPUT_SPLIT,
-  outputSplitRecord,
   planVerdictChange,
   STATEMENT_FLOOR_LINES,
   type StatementLines,
@@ -53,7 +54,10 @@ const wrote = (n: number | null, fd: OutputFd, bytes: number): JoinEvent =>
     statement: n === null ? null : s(n),
     bytes,
   })
-const DONE: JoinEvent = { kind: "done", settled: SETTLED }
+const DONE: JoinEvent = {
+  kind: "done",
+  flush: { kind: "settled", proof: SETTLED },
+}
 
 /** The events folded in order: the last state, and every range attributed. */
 function fold(
@@ -248,6 +252,26 @@ describe("joinVerdict", () => {
     )
   })
 
+  test("output not on pipes makes the call undivided before any byte, and stays the reason", () => {
+    expect(why(joinVerdict(fold([{ kind: "no-pipes" }, ...CALL]).state))).toBe(
+      "no-pipes",
+    )
+  })
+
+  test("a call whose lane had no observer to flush is undivided for it", () => {
+    const none: JoinEvent = { kind: "done", flush: { kind: "no-observer" } }
+    expect(why(joinVerdict(fold([...CALL.slice(0, -1), none]).state))).toBe(
+      "no-observer",
+    )
+  })
+
+  test("a call whose flush failed is undivided, never split", () => {
+    const failed: JoinEvent = { kind: "done", flush: { kind: "flush-failed" } }
+    expect(why(joinVerdict(fold([...CALL.slice(0, -1), failed]).state))).toBe(
+      "flush-failed",
+    )
+  })
+
   test("a settled call takes no more events", () => {
     const { state } = fold(CALL)
     expect(joinStep(state, chunk("stdout", 1)).state).toBe(state)
@@ -328,6 +352,7 @@ describe("storedSplit", () => {
   const view = (n: number, prefix = "l") => ({
     text: Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`).join("\n"),
     truncated: false,
+    stderr: [],
   })
   const lineCount = (t: string) => (t === "" ? 0 : t.split("\n").length)
 
@@ -335,8 +360,8 @@ describe("storedSplit", () => {
     expect(
       storedSplit([view(2), view(3)], { maxLines: 10, maxBytes: 1000 }),
     ).toEqual([
-      { text: "l1\nl2", truncated: false },
-      { text: "l1\nl2\nl3", truncated: false },
+      { text: "l1\nl2", truncated: false, stderr: [] },
+      { text: "l1\nl2\nl3", truncated: false, stderr: [] },
     ])
   })
 
@@ -369,29 +394,49 @@ describe("storedSplit", () => {
 
   test("a last line too long for what is left keeps its tail, whole characters only", () => {
     // 6 bytes, less its newline, leave 5: one "€", and no part of the next.
-    const [only] = storedSplit([{ text: "ab€€", truncated: false }], {
-      maxLines: 10,
-      maxBytes: 6,
-    })
-    expect(only).toEqual({ text: "€", truncated: true })
+    const [only] = storedSplit(
+      [{ text: "ab€€", truncated: false, stderr: [] }],
+      { maxLines: 10, maxBytes: 6 },
+    )
+    expect(only).toEqual({ text: "€", truncated: true, stderr: [] })
   })
 
   test("a statement that printed nothing stores nothing", () => {
     expect(
       storedSplit([view(0), view(1)], { maxLines: 5, maxBytes: 100 }),
     ).toEqual([
-      { text: "", truncated: false },
-      { text: "l1", truncated: false },
+      { text: "", truncated: false, stderr: [] },
+      { text: "l1", truncated: false, stderr: [] },
     ])
   })
 
   test("a view its capture cut is stored as cut", () => {
     expect(
-      storedSplit([{ text: "x", truncated: true }], {
+      storedSplit([{ text: "x", truncated: true, stderr: [] }], {
         maxLines: 5,
         maxBytes: 100,
       }),
-    ).toEqual([{ text: "x", truncated: true }])
+    ).toEqual([{ text: "x", truncated: true, stderr: [] }])
+  })
+
+  test("a statement cut to its last lines keeps its stderr on the same characters", () => {
+    // "a1\na2\nE3\na4": stderr is "E3", at 6..8.
+    const text = "a1\na2\nE3\na4"
+    const [only] = storedSplit(
+      [{ text, truncated: false, stderr: [{ from: 6, to: 8 }] }],
+      { maxLines: 2, maxBytes: 100 },
+    )
+    const kept = only?.text ?? ""
+    expect(kept).toBe("E3\na4")
+    expect(only?.stderr.map(r => kept.slice(r.from, r.to))).toEqual(["E3"])
+  })
+
+  test("a stderr range wholly in the cut part is dropped", () => {
+    const [only] = storedSplit(
+      [{ text: "E1\na2", truncated: false, stderr: [{ from: 0, to: 3 }] }],
+      { maxLines: 1, maxBytes: 100 },
+    )
+    expect(only).toEqual({ text: "a2", truncated: true, stderr: [] })
   })
 })
 
@@ -407,31 +452,53 @@ describe("the stored record", () => {
     chunk("stdout", 3),
     DONE,
   ]
-  const settled = (() => {
-    const v = joinVerdict(fold(quiet).state)
-    const split = v.kind === "split" ? settledSplit(v.split) : null
-    if (split === null) throw new Error("no settled split")
-    return split
-  })()
+  const LIMITS = { maxLines: 100, maxBytes: 1000 }
+  const ended = (events: readonly JoinEvent[]) => {
+    const verdict = endedVerdict(fold(events).state)
+    if (verdict === null) throw new Error("the call has not ended")
+    return verdict
+  }
+  const roundTrip = (record: ReturnType<typeof bashOutputRecord>) =>
+    BASH_OUTPUT.decode(BASH_OUTPUT.encode(record), BASH_OUTPUT.keyOf(record))
 
   test("asks for the views of statements that printed, and round-trips", () => {
     const asked: number[] = []
-    const record = outputSplitRecord(
+    const record = bashOutputRecord(
       "call-1",
-      settled,
+      ended(quiet),
       n => {
         asked.push(n)
-        return { text: `out ${n}`, truncated: false }
+        return {
+          text: `out ${n}`,
+          truncated: false,
+          stderr: [{ from: 0, to: 3 }],
+        }
       },
-      { maxLines: 100, maxBytes: 1000 },
+      [{ from: 2, to: 4 }],
+      LIMITS,
     )
     expect(asked).toEqual([1, 3])
-    expect(record.statements[1]).toEqual({ text: "", truncated: false })
     expect(
-      OUTPUT_SPLIT.decode(
-        OUTPUT_SPLIT.encode(record),
-        OUTPUT_SPLIT.keyOf(record),
-      ),
-    ).toEqual(record)
+      record.verdict.kind === "split" ? record.verdict.statements[1] : null,
+    ).toEqual({ text: "", truncated: false, stderr: [] })
+    expect(roundTrip(record)).toEqual(record)
+  })
+
+  test("an undivided call stores its reason, and round-trips", () => {
+    const record = bashOutputRecord(
+      "call-2",
+      ended([{ kind: "no-pipes" }, chunk("stdout", 3), DONE]),
+      () => {
+        throw new Error("an undivided call asks for no view")
+      },
+      [],
+      LIMITS,
+    )
+    expect(record.verdict).toEqual({ kind: "undivided", why: "no-pipes" })
+    expect(roundTrip(record)).toEqual(record)
+  })
+
+  test("a call that has not ended has no verdict to store", () => {
+    expect(endedVerdict(fold(quiet.slice(0, -1)).state)).toBe(null)
   })
 })

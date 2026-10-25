@@ -33,6 +33,7 @@ export {
 export { holdingMount, type Mount } from "./mountinfo.ts"
 export {
   ATTRIBUTION_HOOKS,
+  attributionLine,
   decodeLoaderLine,
   encodeLoaderCommand,
   isRaced,

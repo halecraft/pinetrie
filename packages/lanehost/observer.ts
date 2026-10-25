@@ -805,6 +805,19 @@ export const planObserver = (facts: ObserverFacts): ObserverPlan =>
           why: `rootless Docker cannot load the observer that attributes a lane's file calls, and no pine·trie host outside relays it here (${OBSERVER_SOCKET})`,
         }
 
+/**
+ * The host's line at start when the machine's observer cannot attribute a
+ * `bash` call's output to its statements; null when it can.
+ */
+export function attributionLine(attribution: Attribution): string | null {
+  if (attribution.on) return null
+  const why =
+    attribution.why === "missing-hook"
+      ? `its kernel hook ${attribution.hook} did not attach`
+      : `it is another version's (${attribution.version || "unnamed"}), which attributes nothing`
+  return `[host] a bash call's output is shown whole, never by statement: the machine's observer cannot attribute it, as ${why}`
+}
+
 /** Why lanes are refused, from the machine role's hello; null when its loader is ready. */
 export function loaderRefusal(hello: ObserverHello): string | null {
   const { loader } = hello

@@ -89,7 +89,7 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
   [BASH_TOOL]: input =>
     bashTool({
       stream: input.stream,
-      store: (lane, record) => input.hooks.storeOutputSplit(lane, record),
+      store: (lane, record) => input.hooks.storeBashOutput(lane, record),
     }),
   [GREP_TOOL]: () => grepTool(),
   [FIND_TOOL]: () => findTool(),

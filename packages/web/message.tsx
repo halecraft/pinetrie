@@ -4,6 +4,7 @@
 
 import { useSelector } from "@kyneta/react"
 import {
+  type BashOutputRecord,
   COMMENT,
   COPY_MESSAGE,
   callLabel,
@@ -15,11 +16,10 @@ import {
   copyText,
   type Density,
   joinWords,
-  liveRowSplit,
   type MessageAct,
   type MessageTools,
   NO_MEMORY,
-  type OutputSplitRecord,
+  type OutputRun,
   opens,
   pinnedMarkerWords,
   plural,
@@ -28,13 +28,13 @@ import {
   type Run,
   retiredWords,
   rowLead,
+  rowOutput,
   rowSummary,
   rowView,
   runningFor,
   type StatementStreams,
   showsText,
   speakerWords,
-  storedRowSplit,
   toolBody,
 } from "@pinetrie/interface"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
@@ -189,7 +189,7 @@ function MessageView(p: MessageProps) {
             rows={p.rows}
             stream={p.streams[call.id]}
             statements={p.statementStreams[call.id]}
-            stored={p.splits[call.id]}
+            stored={p.bashOutputs[call.id]}
           />
         ))}
         <Tools node={node} onAct={p.onAct} tools={p.tools} />
@@ -344,8 +344,8 @@ function ToolRow({
   stream: StreamId | undefined
   /** Its statements' live streams, by ordinal, while it runs. */
   statements: StatementStreams | undefined
-  /** Its output by statement, stored once its split verified. */
-  stored: OutputSplitRecord | undefined
+  /** How its output reads, stored once it returned. */
+  stored: BashOutputRecord | undefined
   doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
   /** The column's density: in story a call leads with its intent (`rowLead`). */
@@ -388,22 +388,22 @@ function ToolRow({
       [ordinals, statements],
     ),
   )
-  const split = useMemo(() => {
-    if (call.result !== undefined)
-      return stored === undefined ? null : storedRowSplit(stored)
+  const output = useMemo(() => {
     const texts = JSON.parse(liveTexts) as string[]
-    return liveRowSplit(
+    return rowOutput(
+      call,
+      streamed,
+      stored,
       Object.fromEntries(ordinals.map((n, i) => [n, texts[i] ?? ""])),
       summary.statements.length,
     )
-  }, [call.result, stored, liveTexts, ordinals, summary])
+  }, [call, streamed, stored, liveTexts, ordinals, summary])
   const view = rowView(
     summary,
     rowLead(summary, density),
-    call.result?.text ?? streamed,
+    output,
     toolBody(call.result),
     open,
-    split,
   )
   // Set once and never unset: it rings a call that lasts. A result within
   // REVEAL_MS clears the timer: the row was never ringed.
@@ -442,13 +442,13 @@ function ToolRow({
               key={i}
             >
               <Runs runs={line.runs} />
-              {line.outputs.map((text, j) => (
+              {line.outputs.map((runs, j) => (
                 <pre
                   className="tool-output tool-statement-output"
                   // biome-ignore lint/suspicious/noArrayIndexKey: a line's outputs are its statements', in order
                   key={j}
                 >
-                  {text}
+                  <OutputRuns runs={runs} />
                 </pre>
               ))}
             </div>
@@ -457,6 +457,9 @@ function ToolRow({
       )}
       {view.caption !== null && (
         <div className="tool-caption">{view.caption}</div>
+      )}
+      {view.undividedNote !== null && (
+        <div className="tool-undivided">{view.undividedNote}</div>
       )}
       {body.kind === "images" ? (
         <div className="tool-images" data-thumb={body.thumb || undefined}>
@@ -470,7 +473,11 @@ function ToolRow({
           ))}
         </div>
       ) : (
-        body.text !== "" && <pre className="tool-output">{body.text}</pre>
+        body.runs.length > 0 && (
+          <pre className="tool-output">
+            <OutputRuns runs={body.runs} />
+          </pre>
+        )
       )}
       {view.more !== undefined && (
         <Button
@@ -483,6 +490,20 @@ function ToolRow({
         </Button>
       )}
     </div>
+  )
+}
+
+/** A command's output, what it wrote to stderr drawn apart. */
+function OutputRuns({ runs }: { runs: readonly OutputRun[] }) {
+  return runs.map((run, i) =>
+    run.stderr ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: a view's runs are fixed for it, and never reordered
+      <span className="tool-stderr" key={i}>
+        {run.text}
+      </span>
+    ) : (
+      run.text
+    ),
   )
 }
 

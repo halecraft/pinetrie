@@ -34,7 +34,7 @@ import { RUN_END_REPORT } from "./run-end-report.ts"
 import { SEAT } from "./seat.ts"
 import { SETUP } from "./setup.ts"
 import { SHARED_LINEAGE } from "./shared.ts"
-import { OUTPUT_SPLIT } from "./statement-output.ts"
+import { BASH_OUTPUT } from "./statement-output.ts"
 import { THREAD } from "./thread.ts"
 import { LANE, LANE_FORK, PROJECT, REVISION } from "./work.ts"
 
@@ -63,7 +63,7 @@ export const RECORD_SPECS: readonly DeclaredSpec[] = [
   MACHINE,
   MARK,
   NAME,
-  OUTPUT_SPLIT,
+  BASH_OUTPUT,
   PROPOSED_CHANGES,
   PARTICIPANT,
   PICTURE,

@@ -12,6 +12,7 @@ import {
   BACKGROUND_CONTEXT,
   withAbortSignal,
 } from "@earendil-works/pi-agent-core/harness/context"
+import type { Settled } from "@pinetrie/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
   type LaneChannel,
@@ -298,5 +299,55 @@ describe("the gate", () => {
     const end = await run.end
     expect(end.kind).toBe("exited")
     expect(said).toEqual(["started echo allowed", "ended exited"])
+  })
+})
+
+describe("a bash call's flush", () => {
+  const observed =
+    (settle: () => Promise<Settled>) => async (): Promise<OpenedLane> => ({
+      channel,
+      observation: {
+        attribution: { on: true },
+        output: () => () => {},
+        settle,
+      },
+    })
+  const flushOf = async (
+    gate: (signal: AbortSignal | undefined) => Promise<OpenedLane>,
+    signal?: AbortSignal,
+  ) =>
+    (
+      await laneShell(
+        { bash: "bash", mkfifo: "mkfifo" },
+        dir,
+        gate,
+        () => () => {},
+      )("echo a", ASK, signal).settled
+    ).kind
+
+  test("a call the observer flushed after is settled", async () => {
+    expect(await flushOf(observed(async () => ({}) as Settled))).toBe("settled")
+  })
+
+  test("a call whose flush throws says the flush failed", async () => {
+    expect(
+      await flushOf(
+        observed(async () => {
+          throw new Error("gone")
+        }),
+      ),
+    ).toBe("flush-failed")
+  })
+
+  test("a call in a lane with no observer says so", async () => {
+    expect(await flushOf(async () => ({ channel, observation: null }))).toBe(
+      "no-observer",
+    )
+  })
+
+  test("a call stopped at its gate never started", async () => {
+    const control = new AbortController()
+    control.abort()
+    expect(await flushOf(heldGate().gate, control.signal)).toBe("not-started")
   })
 })
