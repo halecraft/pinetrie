@@ -671,7 +671,10 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   (`recordTurn`, `merge`): `planFetch` decides which commits the bundle may
   leave out (a turn's bookmark before it; a clean merge's `ours` and `from`;
   a mark's `ours`; nothing for a conflicted merge, whose resolution's turns
-  fetch the lane). The caller fires it after the snapshot step it queues,
+  fetch the lane). A conflicted merge left unresolved is so never in your
+  repo, and a later catch-up finds nothing new: a card's catch-up then
+  plans its resolution again from the merge commit (`unresolvedMerge`).
+  The caller fires it after the snapshot step it queues,
   so the bundle never runs before the snapshot, and lane work never learns
   that your repo needs telling. It is never named `then`: `await` would
   take the result for a promise.
@@ -910,6 +913,21 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   conflicts again. With a clean base jj already takes them.
 - **A clean update's changed files come from `changedPaths`**, the turn's
   read.
+- **A conflicted merge is found again from its own commit**
+  (`unresolvedMerge`, while `conflictsIn` finds any): the newest of
+  `(::<bookmark>) & merges() & conflicts()`, never by a trailer, since
+  only a catch-up from accepted work carries one. One `jj log` reads it
+  (`UNRESOLVED_MERGE_ROW`), and `unresolvedMergeShape` (`lane/plan.ts`)
+  reads its sides and where it came from: `ours` its first parent, `from`
+  its last, a middle one the last join, whose parents in `::<from> ~
+  ::<ours>` are the accepted thread commits it joined; its source the
+  merge's own base trailer, else a WIP's trailer on `from` (the copy
+  `planUnfinishedCopy` made), else the thread it branched from. Then the
+  same conflicted read as `mergeUpdate`'s, for the files conflicted now.
+- **Read a merge's parents with the template, never `parents()`**
+  (S347): the revset lists them in no promised order, so it cannot tell
+  `ours` from `from`; `parents.map(|c| c.commit_id())` keeps the order
+  they were given.
 
 ## Tests
 

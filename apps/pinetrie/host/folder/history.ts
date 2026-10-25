@@ -289,6 +289,10 @@ export function folderHistory(
 
     conflicts: async () => openConflicts(),
 
+    // A folder lane's conflicts are settled by choosing versions, never by a
+    // resolution run.
+    unresolvedMerge: async () => null,
+
     async resolve(path, choose, who) {
       // gather
       const open = store.conflicts(lane).find(c => c.path === path)

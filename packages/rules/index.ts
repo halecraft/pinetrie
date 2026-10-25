@@ -236,6 +236,7 @@ export {
 } from "./commands.ts"
 export { type ModelRef, modelRef } from "./config.ts"
 export {
+  askingLanes,
   CONFLICT_ASK,
   type ConflictAskRecord,
   planConflictAsk,
@@ -320,6 +321,7 @@ export {
   planLatestInRun,
   planLatestInRunAnswer,
   planSettle,
+  planUnresolvedMerge,
   type Resolution,
   type Settle,
   type SettleFacts,

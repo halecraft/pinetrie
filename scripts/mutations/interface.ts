@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "the ▾ resolves only on conflicts",
+    file: "packages/interface/column-view.ts",
+    from: "  const button = strip?.resolvingButton ?? null",
+    to: '  const button = strip?.state === "conflicts" ? strip.resolvingButton : null',
+    command: unit,
+    expect:
+      "the send button's ▾ resolves in needs-you, and its line asks for your answer",
+  },
+  {
+    name: "a set is equal only to itself",
+    file: "packages/interface/same-data.ts",
+    from: "  if (a instanceof Set || b instanceof Set) {",
+    to: "  if (false) {",
+    command: unit,
+    expect: "sameData: a set by its members",
+  },
   // ── a bash call's verdict and its stderr ──
   {
     name: "a single statement is splittable",
@@ -5102,17 +5119,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a conflict that came with the copy resolves by getting accepted work",
     file: "packages/interface/column-view.ts",
-    from: '    if (button === "update" || button === "get-latest-from-parent")\n      return buttonCommand(button)',
-    to: '    if (button === "update" || button === "get-latest-from-parent")\n      return "get-latest"',
-    command: unit,
-    expect:
-      "a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves",
-  },
-  {
-    name: "ready changes offer resolving",
-    file: "packages/interface/column-view.ts",
-    from: '  if (strip?.state !== "conflicts") return null',
-    to: "  if (strip === null) return null",
+    from: "  return button === null ? null : buttonCommand(button)",
+    to: '  return button === null ? null : "get-latest"',
     command: unit,
     expect:
       "a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves",

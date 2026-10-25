@@ -1113,8 +1113,8 @@ export function App({
   // Each lane's work strip state, from facts every lane has: the one read
   // of it that a thread's status and the board's ready count share.
   const strips = useMemo(
-    () => stripStates(workFacts.proposedByLane, workFacts.conflictAsks),
-    [workFacts.proposedByLane, workFacts.conflictAsks],
+    () => stripStates(workFacts.proposedByLane, workFacts.asking),
+    [workFacts.proposedByLane, workFacts.asking],
   )
   const proposed = useMemo(
     () =>

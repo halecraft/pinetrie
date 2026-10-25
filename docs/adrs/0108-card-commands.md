@@ -6,6 +6,11 @@
 - **Supersedes:**
   - ADR-0055: restated whole, with ADR-0059, ADR-0060, ADR-0061, ADR-0072,
     ADR-0080, ADR-0083 and ADR-0100 folded in.
+- **Revised:**
+  - 2026-10-25: a catch-up with nothing new, on a copy that still holds a
+    conflicted merge, runs that merge's resolution with the card's text; the
+    send button's "resolve and send" is offered while the agent's question
+    about a conflict stands, as while the changes conflict.
 
 Restates ADR-0055 as amended by ADR-0059, ADR-0060, ADR-0061, ADR-0072,
 ADR-0080, ADR-0083, ADR-0100 and its own revision of 2026-10-02; decides
@@ -55,7 +60,9 @@ write the context first and choose what to do with it last, as vim's `:w
     starts no run;
   - conflicted: ADR-0033's resolution run, with the card's text as the
     person's intent;
-  - nothing new: the card's text alone is sent;
+  - nothing new: the card's text alone is sent; unless the copy still holds
+    a conflicted merge, whose resolution then runs with the card's text
+    (revised 2026-10-25, ADR-0080);
   - refused (a thread without its own copy, a base that cannot be read):
     the card goes back below the line, marked with why (S69, answer 5).
 - **A button queues its command at once.** "catch up" and "split" each

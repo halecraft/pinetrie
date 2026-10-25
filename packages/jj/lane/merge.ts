@@ -13,6 +13,7 @@
 import {
   type BaseTrailer,
   type CommitId,
+  type MergeSource,
   messageBase,
   messageSources,
   type ThreadId,
@@ -37,7 +38,9 @@ import {
   type AcceptedThreadCommitAbove,
   type Join,
   type MergePlan,
+  type MergeRow,
   planJoins,
+  unresolvedMergeShape,
 } from "./plan.ts"
 import {
   ACCEPTED_THREAD_COMMIT_ROW,
@@ -341,8 +344,9 @@ const withoutAcceptedThreadCommits = (
 /**
  * An update in a lane, after its edits are committed: `plan`'s steps, the
  * accepted thread commits it holds joined and the merge (`mergeBase`), a mark
- * when the plan asks and nothing merged, then what the merge left. The caller
- * runs it on the lane's queue.
+ * when the plan asks and nothing merged, then what the merge left: a
+ * conflict read as `unresolvedMerge` reads one again later
+ * (`conflictedMerge`). The caller runs it on the lane's queue.
  */
 export async function mergeUpdate(
   jj: Runner,
@@ -391,18 +395,99 @@ export async function mergeUpdate(
         ),
       ),
     }
+  return conflictedMerge(jj, { from, ours, joined, files: conflicted })
+}
+
+/**
+ * What a resolution's prompt is made from, for a merge of `from` into the
+ * lane at `ours` that left `files` conflicted in its working copy: each
+ * file with jj's markers, and the revisions on each side that touched any
+ * of them, `theirs` without the accepted thread commits it `joined`.
+ */
+async function conflictedMerge(
+  jj: Runner,
+  merge: {
+    readonly from: CommitId
+    readonly ours: CommitId
+    readonly joined: readonly CommitId[]
+    readonly files: readonly string[]
+  },
+): Promise<Extract<MergedOf<CommitId>, { readonly kind: "conflicted" }>> {
+  const { from, ours, joined, files } = merge
   const contents: { path: string; content: string }[] = []
-  for (const path of conflicted)
+  for (const path of files)
     contents.push({ path, content: await conflictContent(jj, path) })
   return {
     kind: "conflicted",
     from,
     contents,
-    ours: await revisionsIn(jj, `${from}..${ours}`, conflicted),
+    ours: await revisionsIn(jj, `${from}..${ours}`, files),
     theirs: await revisionsIn(
       jj,
       withoutAcceptedThreadCommits(`${ours}..${from}`, joined),
-      conflicted,
+      files,
     ),
+  }
+}
+
+/**
+ * One merge as a JSON line (`MergeRow`): its commit, its description, and
+ * its parents with theirs, in the order the merge holds them. A `parents()`
+ * revset would list them in no promised order.
+ */
+const UNRESOLVED_MERGE_ROW =
+  '"{\\"commit\\":\\"" ++ commit_id ++ "\\",\\"description\\":" ++ json(description) ++ ' +
+  '",\\"parents\\":[" ++ parents.map(|c| "{\\"commit\\":\\"" ++ c.commit_id() ++ ' +
+  '"\\",\\"description\\":" ++ json(c.description()) ++ "}").join(",") ++ "]}\\n"'
+
+/**
+ * The newest conflicted merge on the lane's line, while its working copy is
+ * still conflicted, as `mergeUpdate` answered it, for the files conflicted
+ * now: a file the agent has resolved since is left out. Found by its
+ * conflict, never a trailer: only a catch-up from accepted work carries
+ * one. The accepted thread commits it joined are the parents of its joins:
+ * the commits under its middle parent that neither side holds. Null when
+ * the copy holds no conflict, or no conflicted merge is on its line.
+ */
+export async function unresolvedMerge(
+  jj: Runner,
+  lane: ThreadId,
+  wipPrefix: string,
+): Promise<
+  | (Extract<MergedOf<CommitId>, { readonly kind: "conflicted" }> & {
+      readonly source: MergeSource
+    })
+  | null
+> {
+  // gather
+  const files = await conflictsIn(jj)
+  if (files.length === 0) return null
+  const ran = await jj([
+    "log",
+    "--ignore-working-copy",
+    "--no-graph",
+    "-r",
+    `latest((::${bookmarkRevset(bookmarkName(lane))}) & merges() & conflicts())`,
+    "-T",
+    UNRESOLVED_MERGE_ROW,
+  ])
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  const [line] = lines(ran.stdout)
+  if (line === undefined) return null
+  // plan
+  const shape = unresolvedMergeShape(JSON.parse(line) as MergeRow, wipPrefix)
+  if (shape === null) return null
+  const { ours, middle, from, source } = shape
+  // gather
+  const joined =
+    middle === null
+      ? []
+      : await readCommits(
+          jj,
+          `parents(::${middle} ~ (::${ours} | ::${from})) & (::${from} ~ ::${ours})`,
+        )
+  return {
+    ...(await conflictedMerge(jj, { from, ours, joined, files })),
+    source,
   }
 }

@@ -14,6 +14,7 @@ import {
 } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import {
+  deleteRecords,
   planHistoryRewrites,
   renamedFields,
   rewriteRecords,
@@ -21,6 +22,7 @@ import {
 
 const NS = "pinetrie.test" as const
 const TO = "pinetrie.moved" as const
+const OTHER = "pinetrie.other" as const
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** A stand-in rewrite: `old` becomes `new`; a record without `old` is left. */
@@ -53,6 +55,21 @@ async function storeWith(
     }))
   applyRecordWrites(s, set(SESSION_TARGET, session))
   applyRecordWrites(r, set({ kind: "root", root: ROOT }, root))
+  // A record of another namespace, which no migration of `NS` touches.
+  applyRecordWrites(s, [
+    {
+      kind: "set",
+      target: SESSION_TARGET,
+      namespace: OTHER,
+      key: "z",
+      value: {},
+    },
+  ])
+  const migrationRun = {
+    exchange,
+    docIds: [SESSION_DOC_ID, rootDocId(ROOT), "pinetrie:places"],
+    hydrated: (id: string) => exchange.whenHydrated(id),
+  }
   const run = (home: "session" | "root", to?: typeof TO) =>
     rewriteRecords({
       name: "test",
@@ -60,16 +77,16 @@ async function storeWith(
       ...(to === undefined ? {} : { to }),
       home,
       rewrite: rename,
-    }).run({
-      exchange,
-      docIds: [SESSION_DOC_ID, rootDocId(ROOT), "pinetrie:places"],
-      hydrated: id => exchange.whenHydrated(id),
-    })
+    }).run(migrationRun)
+  const remove = (home: "session" | "root") =>
+    deleteRecords({ name: "test", namespace: NS, home }).run(migrationRun)
   return {
     run,
+    remove,
     session: () => readNamespace(s, NS),
     root: () => readNamespace(r, NS),
     moved: () => readNamespace(s, TO),
+    other: () => readNamespace(s, OTHER),
   }
 }
 
@@ -104,6 +121,17 @@ describe("rewriteRecords: a namespace's records, each by a pure rewrite", () => 
   test("no step when the old namespace is empty", async () => {
     const store = await storeWith({}, {})
     expect(await store.run("session", TO)).toBeNull()
+  })
+})
+
+describe("deleteRecords: a namespace's records, all gone", () => {
+  test("deleteRecords deletes every record of its namespace in its home, and no other", async () => {
+    const store = await storeWith({ a: { old: 1 }, b: { new: 2 } }, { c: {} })
+    await (await store.remove("session"))?.()
+    expect(store.session()).toEqual({})
+    expect(store.root()).toEqual({ c: {} })
+    expect(store.other()).toEqual({ z: {} })
+    expect(await store.remove("session")).toBeNull()
   })
 })
 

@@ -57,7 +57,7 @@ const strip = (
         at: 10,
       }),
       activity: "idle",
-      asked: null,
+      asking: false,
       base: { kind: "folder" },
       into: { kind: "folder" },
       unfinishedAhead: 0,

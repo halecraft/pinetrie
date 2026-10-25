@@ -131,7 +131,8 @@ about 55 ms (S59).
   thread's nodes would cost part of what skipping saves. So any change to
   those, a column opened or closed included, builds every column's list
   once. `lane` and `joins` are rebuilt on every render of the column and
-  compared by value; `sameData` compares a `Map` by its entries. `forks`
+  compared by value; `sameData` compares a `Map` by its entries and a
+  `Set` by its members. `forks`
   is compared by identity, and `App` keeps it while its data is the same
   (`useSameData`): the rail it comes from is rebuilt on every card's
   change, so another window's typing redrew every list, and the browser
@@ -578,8 +579,9 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   there is more, a ▾ `Menu`), a `StartButton`, its main item and a `Menu`
   of the rest, with no words of its own; each button's class is `add-<key>`.
   The send button is the other `SplitButton` (`.send-root`): while
-  `sendMore` gives an item (the thread conflicts, the box holds text, the
-  card carries no command), its ▾ (`.send-menu`, in `.send-more`) offers
+  `sendMore` gives an item (the thread conflicts, or its agent's question
+  about a conflict stands; the box holds text; the card carries no
+  command), its ▾ (`.send-menu`, in `.send-more`) offers
   `.send-resolve`, which queues the card with the resolving command
   (`queueHere`'s `command`). Its main button keeps `.send`, which the
   dock's ▸ marks.
@@ -1177,8 +1179,15 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).
 - **"Needs you" comes from the host's record** (ADR-0080, ADR-0198): the
-  strip's `needs-you` is the lane's `pinetrie.conflict-ask` record when it
-  is newer than the proposed changes' record.
+  strip's `needs-you` is the lane's `pinetrie.conflict-ask` record while
+  the run it names is the lane's last, as its run-end report says
+  (`askingLanes`): until the lane's next run ends.
+- **"answer the agent" never reaches the wire** (`actOnProposedChanges`,
+  `column.tsx`): the column follows its thread's end and focuses its
+  composer through a handle it holds (`ComposerFocus`, `card-editor.tsx`).
+  Not a focus claim: a claim is read only as its claimer mounts, and this
+  composer is mounted already; read again on every arming, every claimer
+  would redraw with `App`.
 - **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done

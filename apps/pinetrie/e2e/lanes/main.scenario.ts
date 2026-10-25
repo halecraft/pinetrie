@@ -840,19 +840,20 @@ async function mainSection(
     const landPrompt = stored.present
       ? (stored.message as { content?: unknown }).content
       : undefined
-    // A resolution ends as any run: no ask about a conflict.
-    const askedAt =
+    // A resolution ends as any run, and this one asked nothing: no ask
+    // about a conflict names any run of the lane.
+    const askedIn =
       two === undefined
         ? null
-        : (readConflictAsks(wh.session).get(two.name)?.at ?? null)
+        : (readConflictAsks(wh.session).get(two.name)?.run ?? null)
     check(
       "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the proposed changes come back clean",
       landMessage?.text.includes("1 file conflicts") === true &&
         typeof landPrompt === "string" &&
         landPrompt.endsWith(intent) &&
-        askedAt === null &&
+        askedIn === null &&
         clean >= 0,
-      `${JSON.stringify({ landing, askedAt, clean })}`,
+      `${JSON.stringify({ landing, askedIn, clean })}`,
     )
     // The resolution moved the lane: the proposed changes followed it in place,
     // back to a work in progress while the run went on, then described again.

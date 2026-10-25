@@ -17,3 +17,10 @@ test("sameData: a map by its entries, its values by content", () => {
   ).toBe(false)
   expect(sameData(map([]), {})).toBe(false)
 })
+
+test("sameData: a set by its members", () => {
+  expect(sameData(new Set(["a", "b"]), new Set(["b", "a"]))).toBe(true)
+  expect(sameData(new Set(["a"]), new Set(["b"]))).toBe(false)
+  expect(sameData(new Set(["a"]), new Set(["a", "b"]))).toBe(false)
+  expect(sameData(new Set([]), [])).toBe(false)
+})

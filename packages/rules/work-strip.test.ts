@@ -53,7 +53,7 @@ describe("workStripView: the work strip's states", () => {
   const view = (
     o: JjProposedChangesRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
-    asked: number | null = null,
+    asking = false,
     catching: {
       getLatest?: LatestNow
       untraced?: boolean
@@ -65,7 +65,7 @@ describe("workStripView: the work strip's states", () => {
     workStripView({
       proposed: proposedChangesStatus(o),
       activity,
-      asked,
+      asking,
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       unfinishedAhead: 0,
@@ -185,21 +185,21 @@ describe("workStripView: the work strip's states", () => {
     const behind = {
       getLatest: { kind: "brings", move: MOVE, files: 2 },
     } as const
-    expect(at(view(proposed, "idle", null, behind))).toEqual([
+    expect(at(view(proposed, "idle", false, behind))).toEqual([
       "ready",
       ["accept", "split", "update"],
       ["describe"],
     ])
-    expect(at(view(undefined, "idle", null, behind))).toEqual([
+    expect(at(view(undefined, "idle", false, behind))).toEqual([
       "nothing",
       ["update"],
       [],
     ])
-    expect(view(undefined, "idle", null, behind).facts.getLatest).toEqual(
+    expect(view(undefined, "idle", false, behind).facts.getLatest).toEqual(
       behind.getLatest,
     )
     // Running, nothing to catch up with is offered at all.
-    expect(at(view(proposed, "turn", null, behind))).toEqual([
+    expect(at(view(proposed, "turn", false, behind))).toEqual([
       "running",
       [],
       [],
@@ -207,7 +207,7 @@ describe("workStripView: the work strip's states", () => {
   })
   test("catching up that would change nothing is listed, but quiet; one not yet read is not", () => {
     const quiet = (getLatest: LatestNow) =>
-      view(proposed, "idle", null, { getLatest }).quiet
+      view(proposed, "idle", false, { getLatest }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
     expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
     expect(quiet({ kind: "unknown" })).toEqual([])
@@ -216,7 +216,7 @@ describe("workStripView: the work strip's states", () => {
     const gone = workStripView({
       proposed: proposedChangesStatus(undefined),
       activity: "idle",
-      asked: null,
+      asking: false,
       base: {
         kind: "jj",
         base: { kind: "unfinished", bookmark: "wip/a" },
@@ -233,13 +233,13 @@ describe("workStripView: the work strip's states", () => {
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
   test("an untraced thread's proposed changes you edited can be accepted, never rebuilt", () => {
-    const edited = view({ ...proposed, edited: true }, "idle", null, {
+    const edited = view({ ...proposed, edited: true }, "idle", false, {
       untraced: true,
     })
     expect(at(edited)).toEqual(["edited", ["accept", "update"], []])
   })
   test("an untraced thread offers nothing, and catching up beside it, never quiet", () => {
-    const untraced = view(undefined, "idle", null, { untraced: true })
+    const untraced = view(undefined, "idle", false, { untraced: true })
     expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
       "nothing",
       ["update"],
@@ -249,7 +249,7 @@ describe("workStripView: the work strip's states", () => {
     ])
   })
   test("a card bringing the thread up to date, queued on an idle lane: the proposed changes are busy with it", () => {
-    const queued = view(proposed, "idle", null, {
+    const queued = view(proposed, "idle", false, {
       queued: ["get-latest"],
     })
     expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
@@ -258,14 +258,14 @@ describe("workStripView: the work strip's states", () => {
       "get-latest",
     ])
     expect(
-      view(proposed, "turn", null, { queued: ["get-latest"] }).facts.activity,
+      view(proposed, "turn", false, { queued: ["get-latest"] }).facts.activity,
     ).toBe("turn")
   })
   test("a split queued is not a catch-up: the proposed changes stay ready, its split button quiet", () => {
-    const queued = view(proposed, "idle", null, { queued: ["split"] })
+    const queued = view(proposed, "idle", false, { queued: ["split"] })
     expect([queued.state, queued.facts.activity]).toEqual(["ready", "idle"])
     expect(queued.quiet).toContain("split")
-    expect(view(proposed, "idle", null).quiet).not.toContain("split")
+    expect(view(proposed, "idle", false).quiet).not.toContain("split")
   })
   test("latestNow: from the commit a lane last caught up with to the base's now", () => {
     const moved = (...args: Parameters<typeof latestNow>) =>
@@ -418,7 +418,7 @@ describe("workStripView: the work strip's states", () => {
         at: 10,
       }),
       activity: "idle",
-      asked: null,
+      asking: false,
       base: { kind: "folder" },
       parent: null,
       parentRunning: false,
@@ -451,7 +451,7 @@ describe("workStripView: the work strip's states", () => {
     const v = workStripView({
       proposed: proposedChangesStatus(proposed),
       activity: "idle",
-      asked: null,
+      asking: false,
       base: null,
       parent: null,
       parentRunning: false,
@@ -463,10 +463,58 @@ describe("workStripView: the work strip's states", () => {
     })
     expect([v.buttons, v.destinations]).toEqual([["split"], []])
   })
-  test("an ask about a conflict counts only when newer than the proposed changes", () => {
-    expect(view(proposed, "idle", 20).state).toBe("needs-you")
-    expect(view(proposed, "idle", 5).state).toBe("ready")
-    expect(view(proposed, "idle", null).state).toBe("ready")
+  test("an ask about a conflict needs you while it stands", () => {
+    expect(view(proposed, "idle", true).state).toBe("needs-you")
+    expect(view(proposed, "idle", false).state).toBe("ready")
+    // The next run covers it while it runs.
+    expect(view(proposed, "turn", true).state).toBe("running")
+  })
+  test("needs-you offers the answer and accept, and no merge", () => {
+    expect(at(view(proposed, "idle", true))).toEqual([
+      "needs-you",
+      ["answer", "accept"],
+      [],
+    ])
+    // Even when catching up would bring work.
+    expect(
+      at(
+        view(proposed, "idle", true, {
+          getLatest: { kind: "brings", move: MOVE, files: 2 },
+        }),
+      ),
+    ).toEqual(["needs-you", ["answer", "accept"], []])
+  })
+  test("the resolving button is the one conflicts shows, and only there and in needs-you", () => {
+    const conflicted = { ...proposed, conflicts: ["a.txt"] }
+    const v = view(conflicted)
+    expect([v.buttons[0], v.resolvingButton]).toEqual(["update", "update"])
+    expect(view(conflicted, "idle", true).resolvingButton).toBe("update")
+    expect(view(proposed).resolvingButton).toBeNull()
+    expect(view(conflicted, "turn").resolvingButton).toBeNull()
+  })
+  test("a gone WIP has no resolving button", () => {
+    const gone = workStripView({
+      proposed: proposedChangesStatus({ ...proposed, conflicts: ["a.txt"] }),
+      activity: "idle",
+      asking: false,
+      base: {
+        kind: "jj",
+        base: { kind: "unfinished", bookmark: "wip/a" },
+        state: "gone",
+      },
+      parent: null,
+      parentRunning: false,
+      into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
+      unfinishedAhead: 0,
+      getLatest: { kind: "current" },
+      untraced: false,
+      queued: [],
+    })
+    expect([gone.state, gone.buttons, gone.resolvingButton]).toEqual([
+      "conflicts",
+      ["continue"],
+      null,
+    ])
   })
 })
 
@@ -485,11 +533,12 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     o: JjProposedChangesRecord,
     p: ParentNow | null,
     parentRunning = false,
+    asking = false,
   ) =>
     workStripView({
       proposed: proposedChangesStatus(o),
       activity: "idle",
-      asked: null,
+      asking,
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       unfinishedAhead: 0,
@@ -542,6 +591,32 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     expect(
       view({ ...proposed, conflicts: ["a.txt"] }, parent()).buttons,
     ).toEqual(["update"])
+  })
+  test("needs-you resolves as conflicts would", () => {
+    const cases: readonly [JjProposedChangesRecord, ParentNow | null][] = [
+      [fromStart, parent()],
+      [fromStart, parent({ conflicts: ["a.txt"] })],
+      [fromStart, null],
+      [{ ...proposed, conflicts: ["a.txt"] }, parent()],
+    ]
+    expect(
+      cases.map(([o, p]) => [
+        view(o, p).resolvingButton,
+        view(o, p, false, true).resolvingButton,
+      ]),
+    ).toEqual([
+      ["get-latest-from-parent", "get-latest-from-parent"],
+      ["update", "update"],
+      ["update", "update"],
+      ["update", "update"],
+    ])
+    // The parent's catch-up stays in needs-you's menu while it is ahead.
+    const asking = view(fromStart, parent(), false, true)
+    expect([asking.state, asking.buttons, asking.menu]).toEqual([
+      "needs-you",
+      ["answer"],
+      ["get-latest-from-parent"],
+    ])
   })
   test("while the parent is ahead it is in the menu, quiet while it runs", () => {
     expect(view(proposed, parent()).menu).toEqual([

@@ -23,7 +23,8 @@ import type {
   TextPlace,
   ThreadLane,
 } from "@pinetrie/threads"
-import { CardEditor, type Where } from "./card-editor.tsx"
+import type { Ref } from "react"
+import { CardEditor, type ComposerFocus, type Where } from "./card-editor.tsx"
 import { nameFor } from "./presence.tsx"
 import { useOthersTyping } from "./use-presence.ts"
 
@@ -67,10 +68,12 @@ export function Composer(p: {
   readOnly: ReadOnly | null
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   latestSources: LatestSources
-  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  /** What the send button's ▾ resolves with (`stripResolveCommand`); null for none. */
   resolve: CardCommand | null
   /** The column's key when a card may be dropped here (`put-target.ts`). */
   putColumn: string | null
+  /** The column's hold on the box's focus. */
+  focus: Ref<ComposerFocus>
 }) {
   return (
     <form
@@ -100,6 +103,7 @@ export function Composer(p: {
         onIntent={p.onIntent}
         latestSources={p.latestSources}
         resolve={p.resolve}
+        focus={p.focus}
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}

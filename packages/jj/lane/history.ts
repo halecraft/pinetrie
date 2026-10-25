@@ -25,7 +25,7 @@ import {
 import { laneBase } from "./base.ts"
 import { readLaneBookmark } from "./bookmarks.ts"
 import { type LaneMove, planFetch } from "./fetch-plan.ts"
-import { conflictsIn, mergeUpdate } from "./merge.ts"
+import { conflictsIn, mergeUpdate, unresolvedMerge } from "./merge.ts"
 import { bookmarkName, bookmarkRevset } from "./names.ts"
 import { planForkSetup, planMerge, planOldNamesOnDisk } from "./plan.ts"
 import {
@@ -132,6 +132,13 @@ export function jjLaneHistory(input: {
     },
 
     conflicts: () => conflictsIn(jj),
+
+    async unresolvedMerge() {
+      const found = await unresolvedMerge(jj, lane, repoConfig.wipPrefix)
+      return found === null
+        ? null
+        : { ...found, from: pointFromCommit(found.from) }
+    },
 
     // jj's conflicts are markers in the file: resolved by editing it.
     resolve: async () => ({ kind: "refused", why: "markers" }),

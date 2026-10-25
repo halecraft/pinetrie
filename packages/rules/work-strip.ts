@@ -26,9 +26,11 @@ import {
 /**
  * A button beside the proposed changes, or in its menu. `accept` accepts it
  * into its default destination; `accept-into-accepted` into accepted work, from
- * a WIP thread; `continue` moves a thread whose WIP is gone to accepted work.
+ * a WIP thread; `continue` moves a thread whose WIP is gone to accepted work;
+ * `answer` takes you to the thread, to answer the agent's question.
  */
 export type WorkStripButton =
+  | "answer"
   | "accept"
   | "accept-into-accepted"
   | "continue"
@@ -78,8 +80,20 @@ export interface WorkStripView {
   readonly quiet: readonly WorkStripButton[]
   /** Where `accept` (the first) and `accept-into-accepted` (accepted work, from a WIP) go. */
   readonly destinations: readonly AcceptanceDestination[]
+  /**
+   * The button that resolves the conflict with your words, in `conflicts`
+   * and `needs-you`: the send button's ▾ queues its command with your
+   * message. Null in any other state, and for a thread whose WIP is gone.
+   */
+  readonly resolvingButton: ResolvingButton | null
   readonly facts: WorkStripFacts
 }
+
+/** A button that brings the thread up to date, its agent resolving what the merge leaves. */
+type ResolvingButton = Extract<
+  WorkStripButton,
+  "update" | "get-latest-from-parent"
+>
 
 /** What proposed changes' words are made from. */
 interface WorkStripFacts {
@@ -132,9 +146,8 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
 }
 
 /**
- * The proposed changes' state and buttons. `asked` is when the agent last asked
- * about a conflict in its copy (`CONFLICT_ASK`); it asks for you
- * only when newer than the proposed changes. `base` is the lane's
+ * The proposed changes' state and buttons. `asking`: the agent's question
+ * about a conflict in its copy still stands (`askingLanes`). `base` is the lane's
  * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
  * `unfinishedAhead` come from accepted work's record. Jj proposed changes' acceptance
  * is offered only with a destination (`acceptanceDestinations`); a folder
@@ -144,7 +157,7 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
 export function workStripView(input: {
   readonly proposed: ProposedChangesStatus
   readonly activity: Exclude<WorkStripActivity, "get-latest">
-  readonly asked: number | null
+  readonly asking: boolean
   readonly base: FollowedBase | null
   /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
   readonly into: AcceptsInto | null
@@ -163,7 +176,7 @@ export function workStripView(input: {
   /** That thread's agent runs: its copy moves with every turn. */
   readonly parentRunning: boolean
 }): WorkStripView {
-  const { proposed, asked } = input
+  const { proposed, asking } = input
   const activity = workStripActivity(input.activity, input.queued)
   const notYetAccepted =
     proposed.kind === "open" || proposed.kind === "nothing-to-add"
@@ -209,6 +222,11 @@ export function workStripView(input: {
           unfinishedAhead: input.unfinishedAhead,
         })
   const gone = jjBase?.state === "gone"
+  // A conflict that came with the lane's copy, which the parent has since
+  // resolved, is settled by catching up with the parent; any other by
+  // catching up with the base and resolving.
+  const resolver: ResolvingButton =
+    cause === "start" && parentResolves ? "get-latest-from-parent" : "update"
   const integrable = (
     buttons: readonly WorkStripButton[],
   ): readonly WorkStripButton[] =>
@@ -265,14 +283,18 @@ export function workStripView(input: {
       ],
       quiet,
       destinations,
+      resolvingButton:
+        (state === "conflicts" || state === "needs-you") &&
+        !(gone && resolver === "update")
+          ? resolver
+          : null,
       facts,
     }
   }
-  const state = workStripState({ proposed, activity, asked })
+  const state = workStripState({ proposed, activity, asking })
   const [buttons, listed] = stateButtons(state, {
     folder: open?.kind === "folder",
-    cause,
-    parentResolves,
+    resolver,
   })
   return view(state, buttons, listed)
 }
@@ -289,15 +311,15 @@ export type WorkStripState = WorkStripView["state"]
 export function workStripState(input: {
   readonly proposed: ProposedChangesStatus
   readonly activity: WorkStripActivity
-  readonly asked: number | null
+  readonly asking: boolean
 }): WorkStripState {
-  const { proposed, activity, asked } = input
+  const { proposed, activity, asking } = input
   if (activity === "turn") return "running"
   if (activity !== "idle") return "busy"
   if (proposed.kind === "none") return "nothing"
   if (proposed.kind === "accepted") return "accepted"
   const { record } = proposed
-  if (asked !== null && asked > record.at) return "needs-you"
+  if (asking) return "needs-you"
   if (proposed.kind === "nothing-to-add") return "nothing"
   if (record.kind === "jj" && record.edited) return "edited"
   if (record.conflicts.length > 0) return "conflicts"
@@ -324,8 +346,7 @@ function stateButtons(
   open: {
     /** Folder proposed changes: one change, never split. */
     readonly folder: boolean
-    readonly cause: ConflictCause
-    readonly parentResolves: boolean
+    readonly resolver: ResolvingButton
   },
 ): readonly [readonly WorkStripButton[], readonly WorkStripButton[]] {
   switch (state) {
@@ -335,20 +356,16 @@ function stateButtons(
     case "nothing":
     case "accepted":
       return [[], ["update"]]
+    // Nothing merges without your words: the ▾ resolves with them.
     case "needs-you":
-      return [["accept"], ["update"]]
+      return [["answer", "accept"], []]
     case "edited":
       return [["accept", "refresh"], ["update"]]
-    // A conflict that came with the lane's copy, which the parent has since
-    // resolved, is settled by catching up with the parent; any other by
-    // catching up with the base and resolving.
     case "conflicts":
       return [
         open.folder
-          ? ["choose-versions", "update", "accept"]
-          : open.cause === "start" && open.parentResolves
-            ? ["get-latest-from-parent", "accept"]
-            : ["update", "accept"],
+          ? ["choose-versions", open.resolver, "accept"]
+          : [open.resolver, "accept"],
         [],
       ]
     case "ready":

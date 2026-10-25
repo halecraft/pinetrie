@@ -148,7 +148,7 @@ import {
   useSyncExternalStore,
 } from "react"
 import { Button } from "./button.tsx"
-import { NewCardBox } from "./card-editor.tsx"
+import { type ComposerFocus, NewCardBox } from "./card-editor.tsx"
 import { ColumnHandle, ColumnHeadStart, ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { Dock } from "./dock.tsx"
@@ -571,6 +571,7 @@ export function Column(p: ColumnProps) {
       )
     },
   )
+  const composerFocus = useRef<ComposerFocus>(null)
   // While they do, the column does not get shorter at its end.
   const end = useFollow(
     body,
@@ -858,11 +859,16 @@ export function Column(p: ColumnProps) {
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "strip" }))
+  // Answering the agent is yours to write: the thread's end, and your box.
   // Catching up and splitting are a card with the command and no text,
-  // made in the queue: the host
-  // pops it when the lane is free. An acceptance names its destination: the default,
-  // or accepted work.
+  // made in the queue: the host pops it when the lane is free. An
+  // acceptance names its destination: the default, or accepted work.
   const actOnProposedChanges = (button: WorkStripButton) => {
+    if (button === "answer") {
+      end.follow()
+      composerFocus.current?.focus()
+      return
+    }
     const command = buttonCommand(button)
     if (lane.kind !== "lane") return
     if (button === "accept" || button === "accept-into-accepted") {
@@ -1341,6 +1347,7 @@ export function Column(p: ColumnProps) {
                   onTyping={p.onTyping}
                   latestSources={latestSources}
                   resolve={shows.dock.resolve}
+                  focus={composerFocus}
                   putColumn={putColumn}
                   participants={p.participants}
                   agents={agents}

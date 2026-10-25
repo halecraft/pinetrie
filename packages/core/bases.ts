@@ -74,6 +74,13 @@ export const folderCopyReady = (): ReadyCopy => {
 export type LatestFrom = ThreadBase | ParentThread
 
 /**
+ * Where a merge a lane holds came from, as its commits say: the thread's
+ * base, or the thread it branched from, by no name. The commits hold only
+ * the name that thread had then; the document holds its lane and name now.
+ */
+export type MergeSource = ThreadBase | { readonly kind: "parent" }
+
+/**
  * A lane's base, read from its history: the shape once, for the states a
  * port carries (`LaneBase`) and for the commits jj reads in your repo
  * (`LaneBaseOf<CommitId>`).

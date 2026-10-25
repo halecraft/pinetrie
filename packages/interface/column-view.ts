@@ -27,7 +27,6 @@ import {
   baseMovedOn,
   type CardTitleRecord,
   type CommandSummary,
-  type ConflictAskRecord,
   displayName,
   type FocusRecord,
   type IconsRecord,
@@ -134,8 +133,8 @@ export interface WorkFacts {
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it. */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
-  /** Each lane's newest ask about a conflict (`pinetrie.conflict-ask`). */
-  readonly conflictAsks: ReadonlyMap<ThreadId, ConflictAskRecord>
+  /** The lanes whose agent's question about a conflict still stands (`askingLanes`). */
+  readonly asking: ReadonlySet<ThreadId>
   /** Each forked thread's fork, a branch's or a copy's (`CanvasIndex.forkOf`). */
   readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** Each lane of its own's fork: a copy's fork row says when its files were not kept. */
@@ -367,6 +366,8 @@ export interface WorkStrip {
   readonly review: ReviewTarget | null
   /** Where `accept` and `accept-into-accepted` go. */
   readonly destinations: WorkStripView["destinations"]
+  /** The button that resolves the conflict with your words (`WorkStripView.resolvingButton`). */
+  readonly resolvingButton: WorkStripView["resolvingButton"]
 }
 
 export interface ColumnFacts {
@@ -420,7 +421,7 @@ interface DockShows {
   readonly strip: WorkStrip | null
   /** The dock draws them as its changes row: they have something to say or do (`workStripShown`). */
   readonly shown: boolean
-  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  /** What the send button's ▾ resolves with (`stripResolveCommand`); null for none. */
   readonly resolve: CardCommand | null
 }
 
@@ -515,7 +516,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
     dock: {
       strip,
       shown: workStripShown(strip),
-      resolve: resolveCommand(strip),
+      resolve: stripResolveCommand(strip),
     },
     joins: joinsOf(view, stretches, work.names),
     reserve: reserveStep(f),
@@ -552,16 +553,15 @@ const BUTTON_COMMAND = {
 } as const satisfies Partial<Record<WorkStripButton, CardCommand>>
 
 /**
- * What resolves a conflicted strip: its resolving button's command, which
- * the send button's ▾ queues with your message (`sendMore`). Null while it
- * does not conflict.
+ * What resolves a strip's conflict with your words: its resolving button's
+ * command, which the send button's ▾ queues with your message (`sendMore`),
+ * in `conflicts` and `needs-you`. Null with no resolving button.
  */
-export function resolveCommand(strip: WorkStrip | null): CardCommand | null {
-  if (strip?.state !== "conflicts") return null
-  for (const { button } of strip.words.buttons)
-    if (button === "update" || button === "get-latest-from-parent")
-      return buttonCommand(button)
-  return null
+export function stripResolveCommand(
+  strip: WorkStrip | null,
+): CardCommand | null {
+  const button = strip?.resolvingButton ?? null
+  return button === null ? null : buttonCommand(button)
 }
 
 /**
@@ -839,7 +839,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
   const view = workStripView({
     proposed,
     activity: laneActivity(f.index, lane),
-    asked: work.conflictAsks.get(lane.name)?.at ?? null,
+    asking: work.asking.has(lane.name),
     base,
     into:
       project.kind === "folder"
@@ -869,6 +869,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
     waiting: f.acting?.kind === "sent",
     bookmark: view.facts.bookmark,
     destinations: view.destinations,
+    resolvingButton: view.resolvingButton,
     review: proposed.kind === "open" ? proposedReview(proposed.record) : null,
   }
 }
@@ -912,6 +913,7 @@ const BUTTON_LABEL: Record<
   >,
   string
 > = {
+  answer: "answer the agent",
   "choose-versions": "choose versions",
   split: "split into a stack",
   squash: "squash to one",
@@ -993,7 +995,7 @@ export function workStripWords(
           : state === "accepted"
             ? "accepted ✓"
             : state === "needs-you"
-              ? "the agent has a question about your edits · see the thread"
+              ? "the agent has a question about a conflict · answer it in the thread"
               : state === "edited"
                 ? `you edited these changes${conflicts === "" ? "" : ` · ${conflicts}`}`
                 : state === "conflicts"
@@ -1078,6 +1080,13 @@ export function workStripWords(
           title: view.quiet.includes(button)
             ? `${parent ?? "the thread this one branched from"} is working: get its latest when its run ends`
             : `merges ${parent ?? "the thread this one branched from"}'s newest work into this thread's copy`,
+        }
+      case "answer":
+        return {
+          button,
+          label: BUTTON_LABEL[button],
+          title:
+            "the agent asked about the conflict: reply in the thread, or resolve and send",
         }
       case "split":
         // A stale stack is replaced, not split further: the new split takes

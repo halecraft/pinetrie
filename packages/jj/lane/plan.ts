@@ -8,6 +8,8 @@ import {
   type CommitId,
   type ForkStart,
   HOST_WORKING_COPY,
+  type MergeSource,
+  messageBase,
   type PointId,
   shellWord,
   type ThreadId,
@@ -213,6 +215,65 @@ export function planJoins(
           },
         ]
   })
+}
+
+/** A merge as `UNRESOLVED_MERGE_ROW` prints it: its parents in the order they were given. */
+export interface MergeRow {
+  readonly commit: CommitId
+  readonly description: string
+  readonly parents: readonly {
+    readonly commit: CommitId
+    readonly description: string
+  }[]
+}
+
+/** A merge's sides, and where it came from, read from its row (`unresolvedMergeShape`). */
+export interface MergeShape {
+  readonly merge: CommitId
+  /** The lane before the merge: its first parent. */
+  readonly ours: CommitId
+  /** The last join made before it, a parent between the two; null with none. */
+  readonly middle: CommitId | null
+  /** The state merged: its last parent. */
+  readonly from: CommitId
+  readonly source: MergeSource
+}
+
+/**
+ * A merge's sides as `mergeBase` built its parents, `[ours, last join, from]`
+ * (read in order, by the template: a `parents()` revset keeps none), and
+ * where it came from, by its trailers, never its title: the merge's own base
+ * trailer for a catch-up from accepted work (`planMerge`); else a WIP's
+ * trailer on `from`, the copy `planUnfinishedCopy` made, for a WIP update;
+ * else the thread it branched from, whose newest commit is never a bare copy
+ * of a WIP, since a copy is merged in the step that made it. Null for a row
+ * with fewer than two parents: no merge.
+ */
+export function unresolvedMergeShape(
+  row: MergeRow,
+  wipPrefix: string,
+): MergeShape | null {
+  const [first, ...rest] = row.parents
+  const last = rest.at(-1)
+  if (first === undefined || last === undefined) return null
+  const middle = rest.length > 1 ? (rest.at(-2)?.commit ?? null) : null
+  const own = messageBase(row.description, wipPrefix)
+  const copied = messageBase(last.description, wipPrefix)
+  const source: MergeSource =
+    own !== null
+      ? own.kind === "accepted"
+        ? { kind: "accepted" }
+        : { kind: "unfinished", bookmark: own.bookmark }
+      : copied?.kind === "unfinished"
+        ? { kind: "unfinished", bookmark: copied.bookmark }
+        : { kind: "parent" }
+  return {
+    merge: row.commit,
+    ours: first.commit,
+    middle,
+    from: last.commit,
+    source,
+  }
 }
 
 /**

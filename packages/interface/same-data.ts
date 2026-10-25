@@ -8,9 +8,10 @@ const isPlain = (x: object): boolean => {
 }
 
 /**
- * Structural equality of plain objects, arrays, `Map`s and primitives. A
- * map's keys are compared by identity, its values structurally. Anything
- * else, a `Set` or a function, is equal only to itself.
+ * Structural equality of plain objects, arrays, `Map`s, `Set`s and
+ * primitives. A map's keys and a set's members are compared by identity, a
+ * map's values structurally. Anything else, a function, is equal only to
+ * itself.
  */
 export function sameData(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
@@ -26,6 +27,10 @@ export function sameData(a: unknown, b: unknown): boolean {
     for (const [k, v] of a)
       if (!b.has(k) || !sameData(v, b.get(k))) return false
     return true
+  }
+  if (a instanceof Set || b instanceof Set) {
+    if (!(a instanceof Set) || !(b instanceof Set)) return false
+    return a.size === b.size && [...a].every(x => b.has(x))
   }
   if (!isPlain(a) || !isPlain(b)) return false
   const ka = Object.keys(a)

@@ -12,7 +12,6 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import {
-  type ConflictAskRecord,
   proposedChangesStatus,
   type RootRecord,
   type RunEndReport,
@@ -259,14 +258,15 @@ export const STRIP_LEVEL: Readonly<Record<WorkStripState, Level | null>> = {
 }
 
 /**
- * Each lane's work strip state, from its proposed changes and its conflict
- * ask: facts every lane has, held tree or not. Read as idle: a lane that
+ * Each lane's work strip state, from its proposed changes and whether its
+ * agent's question about a conflict stands (`askingLanes`): facts every lane
+ * has, held tree or not. Read as idle: a lane that
  * runs or has cards waiting is `running` before its strip is read
  * (`threadStatus`).
  */
 export const stripStates = (
   proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>,
-  conflictAsks: ReadonlyMap<ThreadId, ConflictAskRecord>,
+  asking: ReadonlySet<ThreadId>,
 ): ReadonlyMap<ThreadId, WorkStripState> =>
   new Map(
     [...proposedByLane].map(([lane, record]) => [
@@ -274,7 +274,7 @@ export const stripStates = (
       workStripState({
         proposed: proposedChangesStatus(record),
         activity: "idle",
-        asked: conflictAsks.get(lane)?.at ?? null,
+        asking: asking.has(lane),
       }),
     ]),
   )

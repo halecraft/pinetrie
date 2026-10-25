@@ -8,8 +8,11 @@ import {
   type BaseMerge,
   type CopyRefusal,
   type EntryId,
+  ERR,
   entryOfMessage,
   firstLine,
+  type LatestFrom,
+  type MergeSource,
   type PointId,
   type ThreadId,
   type WriterId,
@@ -28,7 +31,12 @@ import {
   refusedAnswer,
   type ToolAnswer,
 } from "./agent-commands.ts"
-import { type BaseRecord, latestNow, type ParentNow } from "./base.ts"
+import {
+  type BaseRecord,
+  latestNow,
+  type ParentNow,
+  updateRefusal,
+} from "./base.ts"
 import {
   type Floor,
   type LandMessage,
@@ -57,10 +65,28 @@ export interface Resolution {
 }
 
 /**
+ * The floor a resolution's prompt must fit for a merge from `latest`, whose
+ * wording is part of it; refused when even the smallest prompt would not
+ * fit what a run keeps.
+ */
+function latestResolutionFloor(
+  latest: LatestFrom,
+  resolution: Resolution,
+):
+  | { readonly kind: "refused"; readonly reason: string }
+  | { readonly kind: "floor"; readonly floor: Floor } {
+  const found = resolutionFloor({ ...resolution, latest: latestWords(latest) })
+  return found.kind === "too-large"
+    ? { kind: "refused", reason: unfittableWords(found.tokens, found.budget) }
+    : { kind: "floor", floor: found.floor }
+}
+
+/**
  * What a catch-up may do once its base is known: merge, with the floor its
  * resolution's prompt will fit, or refuse with the lane untouched, when even
- * the smallest prompt would not fit. Decided before the merge, since a merge
- * left without a prompt is one no later catch-up merges again.
+ * the smallest prompt would not fit. Decided before the merge: a merge left
+ * without a prompt is one the agent's `catch_up` never merges again, and
+ * only a card's catch-up re-plans it (`planUnresolvedMerge`).
  */
 export function planGetLatest(
   from: BaseMerge,
@@ -72,16 +98,63 @@ export function planGetLatest(
       readonly from: BaseMerge
       readonly floor: Floor
     } {
-  const found = resolutionFloor({
-    ...resolution,
-    latest: latestWords(mergedFrom(from)),
-  })
-  if (found.kind === "too-large")
-    return {
-      kind: "refused",
-      reason: unfittableWords(found.tokens, found.budget),
-    }
-  return { kind: "merge", from, floor: found.floor }
+  const found = latestResolutionFloor(mergedFrom(from), resolution)
+  return found.kind === "refused"
+    ? found
+    : { kind: "merge", from, floor: found.floor }
+}
+
+/**
+ * A conflicted merge the lane still holds, as its history found it again
+ * (`LaneHistory.unresolvedMerge`, `@pinetrie/lanes`), read by its shape.
+ */
+interface UnresolvedMerge {
+  readonly from: PointId
+  readonly contents: readonly {
+    readonly path: string
+    readonly content: string
+  }[]
+  readonly ours: readonly TouchedRevision[]
+  readonly theirs: readonly TouchedRevision[]
+  readonly source: MergeSource
+}
+
+/**
+ * A conflicted merge the lane still holds, resolved again with nothing
+ * merged: named by where it came from, never by the command that asked, the
+ * thread it branched from by its lane and name now (`parent`), and with the
+ * floor settled for that name. Refused when that thread is no longer known,
+ * or when even the smallest prompt would not fit. Nothing merged, so no
+ * stale outputs went.
+ */
+export function planUnresolvedMerge(input: {
+  readonly merge: UnresolvedMerge
+  readonly parent: ParentNow | null
+  readonly resolution: Resolution
+}):
+  | { readonly kind: "refused"; readonly reason: string }
+  | {
+      readonly kind: "merged"
+      readonly from: LatestFrom
+      readonly facts: SettleFacts
+    } {
+  const { merge, parent } = input
+  const { source, ...facts } = merge
+  const from: LatestFrom | null =
+    source.kind !== "parent"
+      ? source
+      : parent === null
+        ? null
+        : { kind: "parent", lane: parent.lane, name: parent.name }
+  if (from === null)
+    return { kind: "refused", reason: updateRefusal(ERR.PARENT_UNKNOWN) }
+  const found = latestResolutionFloor(from, input.resolution)
+  if (found.kind === "refused") return found
+  return {
+    kind: "merged",
+    from,
+    facts: { kind: "conflicted", ...facts, floor: found.floor, removed: [] },
+  }
 }
 
 /**
@@ -163,13 +236,13 @@ export function planSettle(
   ctx: {
     readonly lane: ThreadId
     readonly by: WriterId
-    readonly from: BaseMerge
+    /** What was merged, which names its side. */
+    readonly from: LatestFrom
     readonly index: TreeIndex
     readonly now: number
   },
 ): Settle {
-  const { lane, by, from } = ctx
-  const upToDate = mergedFrom(from)
+  const { lane, by, from: upToDate } = ctx
   const removals = removalsText(facts.removed)
   switch (facts.kind) {
     case "nothing":
@@ -291,7 +364,8 @@ export type LatestInRunDone =
   | { readonly kind: "nothing" }
   | {
       readonly kind: "merged"
-      readonly from: BaseMerge
+      /** What was merged, as `planSettle` names it. */
+      readonly from: LatestFrom
       readonly facts: SettleFacts
     }
 

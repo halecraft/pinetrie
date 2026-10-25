@@ -81,7 +81,9 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
   type ReactNode,
+  type Ref,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
 } from "react"
@@ -119,6 +121,15 @@ export interface Where {
  * queues the card instead: this client asks the host to, and the host pops it
  * in turn.
  */
+/**
+ * A composer's box, focused on its column's call. Not a focus claim
+ * (`FocusClaim`): a claim is read only as its claimer mounts, and a claimer
+ * that read it again on every arming would redraw every claimer with `App`.
+ */
+export interface ComposerFocus {
+  readonly focus: () => void
+}
+
 export function CardEditor(p: {
   session: SessionClient
   /** The card this edits: your message here (`yourCard`), once it exists. */
@@ -170,8 +181,10 @@ export function CardEditor(p: {
   onAct: (act: ColumnAct) => void
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   latestSources: LatestSources
-  /** What the send button's ▾ resolves with (`resolveCommand`); null for none. */
+  /** What the send button's ▾ resolves with (`stripResolveCommand`); null for none. */
   resolve: CardCommand | null
+  /** Takes focus to the box on its holder's call (`ComposerFocus`). */
+  focus: Ref<ComposerFocus>
 }) {
   const { session, prefill, pending } = p
   const threadIn = useThreadStates()
@@ -325,6 +338,9 @@ export function CardEditor(p: {
   useEffect(() => {
     if (claim({ kind: "column", key: p.how.column })) box.current?.focus()
   }, [])
+  useImperativeHandle(p.focus, () => ({ focus: () => box.current?.focus() }), [
+    box,
+  ])
 
   /**
    * Write into the box as typing would: the element changes, and its `input`

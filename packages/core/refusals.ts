@@ -105,6 +105,11 @@ export const ERR = {
   /** Catching up with the thread it branched from while that thread's agent runs. */
   PARENT_RUNNING: "parent-running",
   /**
+   * Resolving a conflicted merge the lane holds from the thread it branched
+   * from, which the document no longer names.
+   */
+  PARENT_UNKNOWN: "parent-unknown",
+  /**
    * An acceptance that now brings other work than the one it was shown (another
    * ledger), or now conflicts where it did not.
    */

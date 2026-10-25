@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (Duane, 2026-10-05)
 - **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
-- **Evidence:** S21, S85, S92, S99, S103, S104
+- **Evidence:** S21, S85, S92, S99, S103, S104, S347
 - **Amends:**
   - ADR-0033: a resolution ends like any run. `ask_for_guidance` is renamed
     `ask_about_conflict`, and is accepted while jj finds conflicts in the
@@ -22,6 +22,11 @@
     `continue-on-line` stays a person's.
   - ADR-0072: the agent catches up with its parent through `catch_up`, refused
     as the button's command is.
+- **Revised:**
+  - 2026-10-25 (S347): a card's catch-up with nothing new resolves the
+    conflicted merge the lane still holds, named by where that merge came
+    from; the agent's `catch_up` still answers nothing new. "Needs you" offers
+    "answer the agent", and no bare merge.
 - **Amended by:**
   - ADR-0085: the `archive` command is gone; `move-root` and `workflow` change
     the workspace people share in its place.
@@ -181,6 +186,20 @@ Two gaps showed (Duane, 2026-10-05):
     it. Its result's `details` say it asked.
   - **The strip's "needs you" is read from the tree**: the thread's newest
     ask about a conflict, when it is newer than the offer's record.
+    (Revised 2026-10-25: from the host's record of the ask, standing until
+    the lane's next run ends, ADR-0198. Its strip offers "answer the
+    agent", which takes you to the thread's end and your box, and "accept
+    anyway"; nothing there merges without your words.)
+  - **A catch-up with nothing new resolves what the copy still holds**
+    (revised 2026-10-25). A conflicted merge left unresolved in the lane
+    (an ask, a run ended mid-resolution) is never fetched into your repo,
+    so a later card's catch-up finds nothing new. It then plans that
+    merge's resolution again from the merge commit, with nothing merged:
+    the files still conflicted, both sides' reasons and the card's text.
+    The prompt names where the merge came from, read from its trailers,
+    not the command that asked. A merge's parents are read in the order
+    they were given, which only jj's template keeps (S347). The agent's
+    `catch_up` still answers nothing new: its question is about new work.
   - **Conflicts left are the offer's**, built from the lane's tip when the
     run ends (ADR-0072's `conflictCause` reads them there).
   - `landingEnded`, the host's `asked` set, the `pinetrie.landing` record and

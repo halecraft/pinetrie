@@ -17,6 +17,7 @@ import type {
   EntryId,
   ForkStart,
   LaneBase,
+  MergeSource,
   PointId,
   ReadyCopy,
   SnapshotId,
@@ -161,6 +162,12 @@ export type MergedOf<P extends string> =
   | { readonly kind: "refused"; readonly reason: string }
 type Merged = MergedOf<PointId>
 
+/** A conflicted merge on the lane's line, as `merge` answers one, and where it came from. */
+type UnresolvedMergeOf<P extends string> = Extract<
+  MergedOf<P>,
+  { readonly kind: "conflicted" }
+> & { readonly source: MergeSource }
+
 /** What a change to the lane is recorded as: its title and its entry. */
 export interface Edits {
   readonly title: string
@@ -246,6 +253,12 @@ export interface LaneHistory {
   ): Promise<MergeDone>
   /** The files conflicted in the lane's working copy. */
   conflicts(): Promise<readonly string[]>
+  /**
+   * The newest conflicted merge on the lane's line, while the copy is
+   * still conflicted, for the files conflicted now. Null when the copy
+   * holds no conflict, or no conflicted merge is on its line.
+   */
+  unresolvedMerge(): Promise<UnresolvedMergeOf<PointId> | null>
   /** A conflicted `path` closed with `choose`'s version in the lane, by `who`. */
   resolve(
     path: string,

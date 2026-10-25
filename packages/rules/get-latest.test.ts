@@ -2,7 +2,9 @@ import {
   type BaseMerge,
   commitId,
   type DiskPath,
+  ERR,
   entryId,
+  type MergeSource,
   pointId,
   revisionMessage,
   type ThreadName,
@@ -14,14 +16,17 @@ import { fromParents, personMessage } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
 import type { AcceptedRecord } from "./accepted.ts"
 import { getLatestRefusal } from "./agent-commands.ts"
+import { type ParentNow, updateRefusal } from "./base.ts"
 import {
   changeReason,
   planGetLatest,
   planLatestInRun,
   planLatestInRunAnswer,
   planSettle,
+  planUnresolvedMerge,
 } from "./get-latest.ts"
 import type { Floor, PromptBudget } from "./land.ts"
+import { mergedFrom } from "./latest-from.ts"
 import { removalsText, type StaleRemoval } from "./removals.ts"
 import { encodeUpdate } from "./update.ts"
 
@@ -118,7 +123,7 @@ describe("planSettle: what a merge comes to", () => {
   const ctx = {
     lane: LANE,
     by: ADA,
-    from: acceptedFrom,
+    from: mergedFrom(acceptedFrom),
     index: indexTree({}),
     now: 7,
   }
@@ -148,14 +153,12 @@ describe("planSettle: what a merge comes to", () => {
       ),
       merge: MERGE,
     })
-    const unfinished: BaseMerge = {
-      kind: "unfinished",
-      bookmark: "wip/x",
-      commit: commitId(ACCEPTED),
-      under: commitId(OURS),
-      on: OURS,
-    }
-    expect(planSettle(facts, { ...ctx, from: unfinished })).toMatchObject({
+    expect(
+      planSettle(facts, {
+        ...ctx,
+        from: { kind: "unfinished", bookmark: "wip/x" },
+      }),
+    ).toMatchObject({
       message: encodeUpdate(
         {
           lane: LANE,
@@ -267,8 +270,8 @@ describe("planSettle: what a merge comes to", () => {
     expect(content.split("yours b").length).toBe(2)
     expect(content.endsWith("keep both sides")).toBe(true)
   })
-  test("from the thread it branched from: the update and the resolution name it", () => {
-    const parent = parentFrom
+  test("from the thread it branched from: the update and the resolution name it, as the latest-from it is given", () => {
+    const parent = mergedFrom(parentFrom)
     const clean = planSettle(
       {
         kind: "clean",
@@ -292,7 +295,7 @@ describe("planSettle: what a merge comes to", () => {
         contents: [{ path: "a.txt", content: "<<<<<<< a" }],
         ours: [],
         theirs: [],
-        floor: floorFor(parent, ""),
+        floor: floorFor(parentFrom, ""),
         removed: [],
       },
       { ...ctx, from: parent },
@@ -304,6 +307,87 @@ describe("planSettle: what a merge comes to", () => {
     expect(conflicted.message.content).toContain(
       "### theirs: the thread amber-fox",
     )
+  })
+})
+
+describe("planUnresolvedMerge: a merge the lane still holds, resolved again", () => {
+  const P = threadIdFor("p")
+  const merge = (source: MergeSource) => ({
+    from: ACCEPTED,
+    contents: [{ path: "a.txt", content: "<<<<<<< a" }],
+    ours: [],
+    theirs: [{ description: "yours\n", paths: ["a.txt"] }],
+    source,
+  })
+  const parent: ParentNow = {
+    kind: "parent",
+    lane: P,
+    name: "copper-owl" as ThreadName,
+    newest: ACCEPTED,
+    upToDateWith: OURS,
+    conflicts: [],
+  }
+  const roomy = { budget: allowanceOf(100_000), skill: null, intent: "go" }
+  test("an unresolved merge is named by where it came from, not by the command", () => {
+    const named = (source: MergeSource, p: ParentNow | null = parent) => {
+      const planned = planUnresolvedMerge({
+        merge: merge(source),
+        parent: p,
+        resolution: roomy,
+      })
+      return planned.kind === "merged" ? planned.from : planned
+    }
+    expect(named({ kind: "accepted" })).toEqual({ kind: "accepted" })
+    expect(named({ kind: "unfinished", bookmark: "wip/x" })).toEqual({
+      kind: "unfinished",
+      bookmark: "wip/x",
+    })
+    expect(named({ kind: "parent" })).toEqual({
+      kind: "parent",
+      lane: P,
+      name: "copper-owl",
+    })
+    expect(named({ kind: "accepted" }, null)).toEqual({ kind: "accepted" })
+  })
+  test("its facts are the merge's, with the floor for its source and nothing removed", () => {
+    const planned = planUnresolvedMerge({
+      merge: merge({ kind: "parent" }),
+      parent,
+      resolution: roomy,
+    })
+    if (planned.kind !== "merged") throw new Error(planned.kind)
+    const { source: _, ...facts } = merge({ kind: "parent" })
+    if (planned.facts.kind !== "conflicted") throw new Error(planned.facts.kind)
+    const { floor, ...rest } = planned.facts
+    expect(rest).toEqual({ kind: "conflicted", ...facts, removed: [] })
+    expect(floor.latest).toBe(
+      floorFor({ ...parentFrom, lane: P, name: parent.name }, "go").latest,
+    )
+    expect(floor.latest).toContain("copper-owl")
+  })
+  test("a parent's merge with no parent is refused with why", () => {
+    expect(
+      planUnresolvedMerge({
+        merge: merge({ kind: "parent" }),
+        parent: null,
+        resolution: roomy,
+      }),
+    ).toEqual({
+      kind: "refused",
+      reason: updateRefusal(ERR.PARENT_UNKNOWN),
+    })
+  })
+  test("a re-plan too large for a run is refused", () => {
+    const planned = planUnresolvedMerge({
+      merge: merge({ kind: "accepted" }),
+      parent,
+      resolution: {
+        budget: allowanceOf(50),
+        skill: null,
+        intent: "x".repeat(400),
+      },
+    })
+    expect(planned.kind).toBe("refused")
   })
 })
 

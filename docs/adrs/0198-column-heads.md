@@ -25,6 +25,10 @@
   - ADR-0175: the run-end status row shows under the header only while raised;
     read or dismissed, it is in the details, and the dot carries its level.
   - ADR-0177: an unstarted thread's bin takes the fold toggle's place.
+- **Revised:**
+  - 2026-10-25: the conflict ask records the prompt of the run that asked, and
+    stands while that run is the lane's last, as its run-end report names it:
+    a rewrite of the proposed changes no longer ends it.
 - **Amended by:**
   - ADR-0200: the drag handle is the mark and name, not the whole header or
     strip; the status button, not the line, opens the details; a raised
@@ -99,10 +103,15 @@
      follow, not busy, not read past or dismissed. The column draws a
      status that is not raised in its quiet form.
 5. **The host records the conflict ask.** When `ask_about_conflict` asks
-   the person, a rules plan writes the time to a session record keyed by
-   lane, `pinetrie.conflict-ask`. The work strip compares that with its
-   proposed changes, as it compares the tool result's time today, and no
-   longer walks the tree for it; the tool result carries no `asked` fact.
+   the person, a rules plan writes the asking run's prompt to a session
+   record keyed by lane, `pinetrie.conflict-ask`. The ask stands while that
+   run is the lane's last: the lane's run-end report names the same prompt
+   (`askingLanes`). The next run's end replaces the report and ends it,
+   whatever started that run; a rewrite of the proposed changes does not
+   (revised 2026-10-25: it once counted only while newer than the
+   proposed changes' record, which the refresh at every run's end rewrote
+   seconds later). The strip no longer walks the tree for it; the tool
+   result carries no `asked` fact.
 6. **A box anyone may tick, on a thread, note or media column.** It is the
    card's, for everyone, kept as the card moves; on a read-only canvas it
    is drawn and disabled. It means what the person means: the page draws

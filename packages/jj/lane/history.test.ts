@@ -106,7 +106,11 @@ interface JjRigLane extends RigLane {
 }
 
 async function makeRig(): Promise<
-  Omit<HistoryRig, "lane"> & { lane(): Promise<JjRigLane> }
+  Omit<HistoryRig, "lane"> & {
+    lane(): Promise<JjRigLane>
+    /** Your repo's working copy moved onto accepted work, as after a pull. */
+    onAccepted(): Promise<void>
+  }
 > {
   const dir = path.join(top, `rig-${rigs++}`)
   const repoDir = path.join(dir, "yours")
@@ -245,6 +249,11 @@ async function makeRig(): Promise<
       }
     },
 
+    async onAccepted() {
+      const ran = await inRepo(["new", DEFAULT_REPO.acceptedBookmark])
+      if (!ran.ok) throw new Error(describeFailure("jj new", ran))
+    },
+
     fileAt: (point, file) => readRepoFile(inRepo, DEFAULT_REPO, point, file),
 
     isAncestor(lane, a, b) {
@@ -363,3 +372,121 @@ withJjRig(
     })
   },
 )
+
+/** `lane` got the latest from accepted work's `point`, its copy found ready. */
+const getLatest = (lane: JjRigLane, point: PointId) =>
+  lane.withHistory(async h => {
+    const ready = await h.readyToMerge()
+    if (typeof ready === "string") throw new Error(ready)
+    return h.merge(ready, { kind: "accepted", point, mark: false }, null)
+  })
+
+/** What a merge answered, without what follows it. */
+const facts = ({
+  follow: _,
+  ...merged
+}: Awaited<ReturnType<typeof getLatest>>) => merged
+
+withJjRig(
+  "a conflicted catch-up's merge is found again, with its files and both sides",
+  async rig => {
+    const lane = await rig.lane()
+    await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+    await lane.withHistory(h => h.recordTurn(TURN))
+    const merged = await getLatest(
+      lane,
+      await rig.repoOnAccepted({ "a.txt": "one\ntwo (yours)\nthree\n" }),
+    )
+    expect(merged.kind).toBe("conflicted")
+    expect(await lane.withHistory(h => h.unresolvedMerge())).toEqual({
+      ...facts(merged),
+      source: { kind: "accepted" },
+    })
+  },
+)
+
+withJjRig(
+  "a copy whose conflicts are resolved holds no unresolved merge",
+  async rig => {
+    const lane = await rig.lane()
+    await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+    await lane.withHistory(h => h.recordTurn(TURN))
+    await getLatest(
+      lane,
+      await rig.repoOnAccepted({ "a.txt": "one\ntwo (yours)\nthree\n" }),
+    )
+    await lane.write("a.txt", "one\ntwo (both)\nthree\n")
+    await lane.withHistory(h => h.recordTurn(TURN))
+    expect(await lane.withHistory(h => h.unresolvedMerge())).toBeNull()
+  },
+)
+
+withJjRig("only the files still conflicted are re-planned", async rig => {
+  await rig.repoOnAccepted({ "b.txt": "b\n" })
+  const lane = await rig.lane()
+  await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+  await lane.write("b.txt", "b (lane)\n")
+  await lane.withHistory(h => h.recordTurn(TURN))
+  const merged = await getLatest(
+    lane,
+    await rig.repoOnAccepted({
+      "a.txt": "one\ntwo (yours)\nthree\n",
+      "b.txt": "b (yours)\n",
+    }),
+  )
+  if (merged.kind !== "conflicted") throw new Error(merged.kind)
+  expect(merged.contents.map(c => c.path)).toEqual(["a.txt", "b.txt"])
+  await lane.write("b.txt", "b (both)\n")
+  await lane.withHistory(h => h.recordTurn(TURN))
+  const found = await lane.withHistory(h => h.unresolvedMerge())
+  expect(found?.contents.map(c => c.path)).toEqual(["a.txt"])
+  expect(found?.from).toBe(merged.from)
+})
+
+withJjRig(
+  "a merge that joined an accepted thread commit is re-planned with what it joined",
+  async rig => {
+    const lane = await rig.lane()
+    await lane.write("a.txt", "one (lane)\ntwo\nthree\n")
+    await lane.withHistory(h => h.recordTurn(TURN))
+    await rig.accept(lane)
+    await lane.write("a.txt", "one (lane)\ntwo\nthree (lane)\n")
+    await lane.withHistory(h => h.recordTurn(TURN))
+    await rig.onAccepted()
+    const merged = await getLatest(
+      lane,
+      await rig.repoOnAccepted({ "a.txt": "one (lane)\ntwo\nthree (yours)\n" }),
+    )
+    if (merged.kind !== "conflicted") throw new Error(merged.kind)
+    // The accepted thread commit is the lane's own work: not theirs.
+    expect(merged.theirs.map(r => r.description.split("\n")[0])).toEqual([
+      "accepted",
+    ])
+    expect(await lane.withHistory(h => h.unresolvedMerge())).toEqual({
+      ...facts(merged),
+      source: { kind: "accepted" },
+    })
+  },
+)
+
+withJjRig("the newest conflicted merge is the one found", async rig => {
+  const lane = await rig.lane()
+  await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+  await lane.withHistory(h => h.recordTurn(TURN))
+  await getLatest(
+    lane,
+    await rig.repoOnAccepted({ "a.txt": "one\ntwo (yours)\nthree\n" }),
+  )
+  await lane.write("a.txt", "one\ntwo (both)\nthree (lane)\n")
+  await lane.withHistory(h => h.recordTurn(TURN))
+  const second = await getLatest(
+    lane,
+    await rig.repoOnAccepted({
+      "a.txt": "one\ntwo (yours)\nthree (yours)\n",
+    }),
+  )
+  if (second.kind !== "conflicted") throw new Error(second.kind)
+  expect((await lane.withHistory(h => h.unresolvedMerge()))?.from).toBe(
+    second.from,
+  )
+})

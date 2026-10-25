@@ -976,6 +976,33 @@ export const mutations: readonly Mutation[] = [
       "the image sweep keeps what a root's directory record shows, though no root is loaded",
   },
   {
+    name: "a catch-up with nothing new leaves the merge unresolved",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: '          whenNothingNew === "resolve-merge"\n',
+    to: '          whenNothingNew === "never"\n',
+    command: unit,
+    expect:
+      "a card's catch-up with nothing new resolves the merge the lane still holds",
+  },
+  {
+    name: "the agent's catch_up re-plans a resolution",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: '        await resolutionOf(""),\n        "answer-nothing",\n',
+    to: '        await resolutionOf(""),\n        "resolve-merge",\n',
+    command: unit,
+    expect:
+      "the agent's catch_up with nothing new answers nothing new, even with a merge unresolved",
+  },
+  {
+    name: "deleteRecords deletes no record",
+    file: "apps/pinetrie/host/migrations/rewrite.ts",
+    from: "            readNamespace(doc, spec.namespace),\n          ).map(key => ({",
+    to: "            {},\n          ).map(key => ({",
+    command: unit,
+    expect:
+      "deleteRecords deletes every record of its namespace in its home, and no other",
+  },
+  {
     name: "a copy with no conflict is asked about",
     file: "apps/pinetrie/host/work/update.ts",
     from: "      return plan.asked\n",

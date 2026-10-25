@@ -152,7 +152,12 @@ history:
   paths it changed (`recordTurn`); the lane's base (`base`); a state merged
   into the lane, clean, conflicted or nothing (`merge`), or refused with
   words before anything is made (a folder lane's whose base's snapshot is
-  gone; jj's never refuses); the conflicts in the copy (`conflicts`).
+  gone; jj's never refuses); the conflicts in the copy (`conflicts`); and
+  the newest conflicted merge on the lane's line while the copy is still
+  conflicted, as `merge` answered it, with where it came from
+  (`unresolvedMerge`; a folder lane's is always null, its conflicts closed
+  by choosing versions). That one is no law: the history suite's laws are
+  unchanged.
 - **Ancestry, merge bases and diffs are each adapter's own**, computed
   inside it, never a port method: no crossing between an adapter and the
   shared history needs more than an equality test. What a kind does on the

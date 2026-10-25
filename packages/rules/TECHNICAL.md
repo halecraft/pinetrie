@@ -86,7 +86,9 @@ exported only where another package decides with it on its own
   tree; the planners it builds on stay in their modules (ADR-0193).
 - `get-latest.ts`: getting the latest, decided: whether a merge may go
   ahead and the floor its resolution's prompt must fit (`planGetLatest`),
-  what a merge comes to for the thread (`planSettle`), and the agent's
+  a conflicted merge the lane still holds resolved again
+  (`planUnresolvedMerge`), what a merge comes to for the thread
+  (`planSettle`), and the agent's
   `catch_up` in two phases around the merge (`planLatestInRun`, then
   `planLatestInRunAnswer`, which takes the `LatestInRun` only the first
   makes).
@@ -2021,7 +2023,8 @@ commit-message request `request.ts` (`describeRequest`).
 
 - **`workStripState` is the strip's state alone** (ADR-0198), from facts
   every lane has whether or not the tab holds its tree: its proposed
-  changes, what it runs (`workStripActivity`) and its conflict ask. A
+  changes, what it runs (`workStripActivity`) and whether its agent's
+  question about a conflict stands (`askingLanes`). A
   thread's status (`threadStatus`, `@pinetrie/interface`) reads it as the
   strip does, so the two cannot disagree; the strip's buttons follow from
   the state (`stateButtons`), never a second ladder.
@@ -2032,17 +2035,24 @@ commit-message request `request.ts` (`describeRequest`).
   are made from (`WorkStripFacts`: files, size, conflicts, bookmark, `nothingToAdd`, the
   base as `effectiveBase` gives it, getting the latest, untraced, …). It writes
   no words: accepted work and the button labels are the client's (`workStripWords`,
-  `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
-  when newer than the proposed changes. Proposed changes with nothing to add are `nothing`, with no
+  `@pinetrie/interface`, ADR-0040). An ask about a conflict needs you while
+  it stands (`askingLanes`), before any other state of open proposed
+  changes. Proposed changes with nothing to add are `nothing`, with no
   destinations. When getting the latest `brings`, or the thread is untraced,
   getting the latest moves from the menu to the buttons; when it is `current` or
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
   enabled. An untraced thread offers no refresh, squash or split: each
   rebuilds from a start it does not have. A card with the command queued
-  makes the proposed changes busy (`get-latest`). Conflicted proposed changes' getting the latest is the
+  makes the proposed changes busy (`get-latest`). The button that resolves
+  a conflict with your words, `resolvingButton`, is decided once: the
   base's `update` (there is no `resolve`), unless its conflict came with
   its copy (`conflictCause`) and the parent, ahead, holds none of those
-  files conflicted: then `get-latest-from-parent`. While the parent is ahead,
+  files conflicted: then `get-latest-from-parent`. `conflicts` stands it
+  beside the strip (after `choose-versions` for a folder), and the send
+  button's ▾ resolves with it in `conflicts` and `needs-you` alike, so the
+  two cannot drift; a gone WIP has none, its `update` turned `continue`.
+  `needs-you` offers `answer` (the page's own: it takes you to the thread)
+  and `accept`, and no merge without your words. While the parent is ahead,
   `get-latest-from-parent` is in every idle state's menu, quiet while it runs.
 - **Where an acceptance goes is `workStripView`'s `into`** (`AcceptsInto`):
   a `bookmark` asks `acceptanceDestinations` with it; a `folder`
@@ -2499,6 +2509,13 @@ line, never the prompt.
   `Floor`, and `planResolution` requires one, so it always has a message
   within the budget, whatever the estimate does. A floor too large is the
   host's refusal (`planGetLatest`), with the lane untouched.
+- **A merge the lane still holds is named by itself** (`planUnresolvedMerge`):
+  re-planned when a card's catch-up finds nothing new, its "theirs" and its
+  floor come from where the merge came from (`MergeSource`), never from
+  the command that asked; the thread it branched from by its lane and name
+  now (`parentNow`), refused (`parent-unknown`) when the document no longer
+  names one. Nothing merged, so it removed nothing. `planSettle` takes what
+  was merged as a `LatestFrom`, converted once where the merge is planned.
 - **What getting the latest removed has its own slot** (`joined`), under
   `REMOVALS_HEADING`, after the files and before what the person asked,
   which stays last.
@@ -2524,10 +2541,18 @@ Gotchas:
   running lane whose prompt is a land message; ended, it ended as any run
   does. What it left conflicted is the proposed changes', and whether the agent asked
   for you is its lane's `pinetrie.conflict-ask` record (`CONFLICT_ASK`,
-  written by `planConflictAsk` as the host takes an `ask_about_conflict`),
-  which the strip reads as "needs you" while it is newer than the proposed
-  changes' record (ADR-0198). A session record, so a lane whose tree the
-  tab does not hold is judged as one it does.
+  written by `planConflictAsk` as the host takes an `ask_about_conflict`,
+  naming the asking run's prompt). It stands while the lane's run-end
+  report names that prompt (`askingLanes`, ADR-0198): the next run's end
+  replaces the report and ends it, whatever started that run, and a
+  rewrite of the proposed changes does not. A session record, so a lane
+  whose tree the tab does not hold is judged as one it does.
+  Gotchas: the report is written pending before the run's `end-run`
+  (`planRunEnd`, the host's), which is what shows the ask the moment its
+  run ends; moved after, needs-you comes late. A pending report that fails
+  to write (a `failable` step, logged as `run end failed`) hides an ask
+  from that run, and leaves an ask from the run before it standing past
+  this one.
 
 # Agents talking (`relay.ts`, `allowance.ts`, `round.ts`, ADR-0128)
 

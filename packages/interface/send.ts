@@ -304,7 +304,8 @@ interface SendMoreItem extends ButtonWords {
 
 /**
  * The send button's ▾ item, beside `sendButton`: while the thread's changes
- * conflict (`resolve`, `resolveCommand`), your box holds text and your card
+ * conflict, or its agent's question about a conflict stands (`resolve`,
+ * `stripResolveCommand`), your box holds text and your card
  * carries no command of its own, **resolve and send** queues your message
  * with `resolve`, its text the resolution's instructions. Null otherwise: the
  * send button alone, which never resolves.

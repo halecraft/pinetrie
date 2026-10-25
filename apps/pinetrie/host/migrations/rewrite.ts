@@ -182,6 +182,41 @@ export function rewriteRecords(spec: {
 }
 
 /**
+ * A record migration that deletes every record of `namespace` in its home,
+ * the session's document or every root's: for records whose old shape names
+ * nothing the new one could be made from. Over its own output the namespace
+ * is empty, so it plans nothing.
+ */
+export function deleteRecords(spec: {
+  readonly name: string
+  readonly namespace: HostNamespace
+  readonly home: "session" | "root"
+}): RecordMigration {
+  return {
+    name: spec.name,
+    async run(input) {
+      const planned = (await recordDocs(input, spec.home)).flatMap(
+        ({ doc, target }) => {
+          const writes: readonly ValueWrite[] = Object.keys(
+            readNamespace(doc, spec.namespace),
+          ).map(key => ({
+            kind: "delete",
+            target,
+            namespace: spec.namespace,
+            key,
+          }))
+          return writes.length === 0 ? [] : [{ doc, writes }]
+        },
+      )
+      if (planned.length === 0) return null
+      return async () => {
+        for (const { doc, writes } of planned) applyRecordWrites(doc, writes)
+      }
+    },
+  }
+}
+
+/**
  * Each stored row whose message is a history message of `customType`, its
  * `details` as `rewrite` gives them: null for none it changes. `content`,
  * what the model read, is never rewritten.

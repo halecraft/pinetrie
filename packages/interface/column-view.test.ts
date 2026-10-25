@@ -56,7 +56,7 @@ import {
   pinnedMarkers,
   pinnedStatus,
   promptParent,
-  resolveCommand,
+  stripResolveCommand,
   textTokens,
   type WorkFacts,
   type WorkStrip,
@@ -204,7 +204,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   bases: new Map(),
   forks: new Map(),
   laneForks: new Map(),
-  conflictAsks: new Map(),
+  asking: new Set(),
   setup: null,
   allowances: new Map(),
   states: new Map(),
@@ -1008,6 +1008,43 @@ describe("columnView: the work strip", () => {
     })
     expect(dock(null)).toMatchObject({ shown: false, resolve: null })
   })
+  test("the send button's ▾ resolves in needs-you, and its line asks for your answer", () => {
+    const conflicted: JjProposedChangesRecord = {
+      kind: "jj",
+      lane: B,
+      size: 1,
+      stale: false,
+      files: ["a.txt"],
+      conflicts: ["a.txt"],
+      startConflicts: [],
+      workingCopyEdits: [],
+      described: true,
+      edited: false,
+      bookmark: "pinetrie-proposed/copper-owl",
+      acceptedAs: null,
+      commits: [commitId("c1")],
+      ledger: null,
+      at: 1,
+    }
+    const { dock } = columnView(
+      own({
+        work: work({
+          lanes: new Map([[B, record(B, true)]]),
+          proposedByLane: new Map([[B, conflicted]]),
+          asking: new Set([B]),
+        }),
+      }),
+    )
+    expect(dock.resolve).toBe("get-latest")
+    expect(dock.strip?.state).toBe("needs-you")
+    expect(dock.strip?.words.line).toBe(
+      "the agent has a question about a conflict · answer it in the thread",
+    )
+    expect(dock.strip?.words.buttons[0]).toMatchObject({
+      button: "answer",
+      label: "answer the agent",
+    })
+  })
   test("a lane with no copy of its own has no strip", () => {
     const shows = columnView(
       facts(1, {
@@ -1024,6 +1061,7 @@ describe("the dock's changes row", () => {
     state: WorkStrip["state"],
     buttons: readonly WorkStripButton[],
     note: string | null = null,
+    resolvingButton: WorkStrip["resolvingButton"] = null,
   ): WorkStrip => ({
     state,
     words: {
@@ -1037,6 +1075,7 @@ describe("the dock's changes row", () => {
     bookmark: null,
     review: null,
     destinations: [],
+    resolvingButton,
   })
   test("is drawn while it says something: never for nothing to accept with no button and no note", () => {
     expect(workStripShown(null)).toBe(false)
@@ -1055,12 +1094,21 @@ describe("the dock's changes row", () => {
     expect(buttonCommand("accept")).toBeNull()
   })
   test("a conflict resolves by its resolving button's command, the parent's when it came with the copy; nothing else resolves", () => {
-    expect(resolveCommand(strip("conflicts", ["update"]))).toBe("get-latest")
-    expect(resolveCommand(strip("conflicts", ["get-latest-from-parent"]))).toBe(
-      "get-latest-from-parent",
-    )
-    expect(resolveCommand(strip("ready", ["update"]))).toBeNull()
-    expect(resolveCommand(null)).toBeNull()
+    expect(
+      stripResolveCommand(strip("conflicts", ["update"], null, "update")),
+    ).toBe("get-latest")
+    expect(
+      stripResolveCommand(
+        strip(
+          "conflicts",
+          ["get-latest-from-parent"],
+          null,
+          "get-latest-from-parent",
+        ),
+      ),
+    ).toBe("get-latest-from-parent")
+    expect(stripResolveCommand(strip("ready", ["update"]))).toBeNull()
+    expect(stripResolveCommand(null)).toBeNull()
   })
 })
 
@@ -1114,7 +1162,7 @@ describe("workStripWords", () => {
       workStripView({
         proposed: proposedChangesStatus(o),
         activity,
-        asked: null,
+        asking: false,
         base,
         into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
         unfinishedAhead: 2,
@@ -1261,7 +1309,7 @@ describe("workStripWords", () => {
           at: 10,
         }),
         activity: "idle",
-        asked: null,
+        asking: false,
         base: { kind: "folder" },
         into: { kind: "folder" },
         unfinishedAhead: 0,

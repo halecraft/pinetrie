@@ -19,6 +19,7 @@ test("sameProps: a value prop by content, an identity prop only itself", () => {
   expect(same(p(1), p(1))).toBe(true)
   expect(same(p(1), p(2))).toBe(false)
   expect(same(p(1), p(1, { on: () => {} }))).toBe(false)
-  // A Set is not plain data: equal only to itself, even compared by value.
-  expect(same(p(1), p(1, { seen: new Set(seen) }))).toBe(false)
+  // A Set compared by value is equal by its members.
+  expect(same(p(1), p(1, { seen: new Set(seen) }))).toBe(true)
+  expect(same(p(1), p(1, { seen: new Set(["b"]) }))).toBe(false)
 })

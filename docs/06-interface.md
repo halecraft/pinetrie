@@ -838,6 +838,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the strip shows the new proposed changes. A rebase onto moved accepted work, or your
   own edit of the proposed changes, is still the proposed changes you saw, and is accepted. Proposed changes that conflict are never accepted into accepted work; their button is
   **get the latest from accepted work and resolve**: the agent resolves what the merge leaves.
+  When accepted work brings nothing new, it resolves the conflicted merge
+  the thread's copy still holds, named by where that merge came from
+  (ADR-0080): a merge left unresolved, as when the agent asked about it,
+  is never in your repo, so the strip's conflict may be one the copy
+  already holds.
   While they conflict and your box holds text, the send button has a ▾
   whose **resolve and send** queues your message with that command, so the
   agent resolves with what you wrote; **send** always sends. Proposed changes whose
@@ -892,8 +897,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   write as its brief", its button reads "split", and while it waits the
   strip's **split** is greyed out. The agent can ask for a split too.
 - **The agent asks about a conflict** with `ask_about_conflict`: the strip
-  then says "the agent has a question about your edits · see the thread"
-  until the proposed changes change.
+  then says "the agent has a question about a conflict · answer it in the
+  thread" until the thread's next run ends, whatever starts it (ADR-0198).
+  Its first button is **answer the agent**, which scrolls the column to
+  the thread's end and puts the caret in your box; **accept anyway**
+  stays. Nothing there merges without your words: the send button's ▾
+  offers **resolve and send**, the same command the conflict's button
+  queues, with what you wrote as the agent's instructions.
 - **A branch from a conflicted copy is warned** (ADR-0072): when the next
   send would start a thread on its own copy cloned from a commit with
   conflicts, the line under the box says "starts from a copy with an

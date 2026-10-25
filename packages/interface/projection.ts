@@ -56,16 +56,17 @@ import {
   readTraces,
   readWorkflow,
 } from "@pinetrie/reads"
-import type {
-  BashOutputRecord,
-  CardHistoryRecord,
-  CardTitleRecord,
-  DigestRecord,
-  MarkRecord,
-  RunEndReportRecord,
-  SeatRecord,
-  TraceRecord,
-  Workflow,
+import {
+  askingLanes,
+  type BashOutputRecord,
+  type CardHistoryRecord,
+  type CardTitleRecord,
+  type DigestRecord,
+  type MarkRecord,
+  type RunEndReportRecord,
+  type SeatRecord,
+  type TraceRecord,
+  type Workflow,
 } from "@pinetrie/rules"
 import {
   type LiveDocHandle,
@@ -198,6 +199,7 @@ function readFacts(view: HeldView): SessionFacts {
   const index = readHeldIndex(roots)
   const activity = roots.flatMap(root => readAgentActivity({ doc: root, live }))
   const cardTitles = readCardTitles(doc)
+  const runEndReports = readRunEndReports(doc)
   return {
     index,
     asks: indexAsks(index),
@@ -211,7 +213,7 @@ function readFacts(view: HeldView): SessionFacts {
     marks: readMarks(doc),
     cardTitles,
     threads: readThreads(doc),
-    runEndReports: readRunEndReports(doc),
+    runEndReports,
     histories: readCardHistories(doc),
     traces: readTraces(doc),
     workFacts: {
@@ -228,7 +230,7 @@ function readFacts(view: HeldView): SessionFacts {
       access: readAccess(doc),
       accepted: readAccepted(doc),
       bases: readBases(doc),
-      conflictAsks: readConflictAsks(doc),
+      asking: askingLanes(readConflictAsks(doc), runEndReports),
       laneForks: readLaneForks(doc),
       allowances: readAllowances(doc),
       setup: readSetup(doc),

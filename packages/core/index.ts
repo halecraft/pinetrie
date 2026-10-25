@@ -23,6 +23,7 @@ export {
   folderCopyReady,
   type LaneBase,
   type LatestFrom,
+  type MergeSource,
   type ParentThread,
   type PointId,
   planCopyReady,

@@ -1,6 +1,8 @@
 import {
   commitId,
+  ERR,
   entryId,
+  type MergeSource,
   planCopyReady,
   pointId,
   rootIdFor,
@@ -17,6 +19,7 @@ import {
   removalsText,
   type Settle,
   setRecord,
+  updateRefusal,
 } from "@pinetrie/rules"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { GET_LATEST_TOOL } from "@pinetrie/threads"
@@ -241,16 +244,19 @@ test("prepareUpdate on a lane whose start the machine holds answers start-held, 
 describe("askedAboutConflict", () => {
   /**
    * Updates whose lane's history answers with `conflicted` files, the lane
-   * its own or not, its run prompted by `role`.
+   * its own or not, its run prompted by a person's message unless not
+   * `prompted`.
    */
   const updatesWith = (
     conflicted: readonly string[],
     own = true,
-    role = "person",
+    prompted = true,
   ) => {
     const b = basics()
-    writeEntry(b.root, row("p-1", null, { role, content: "go" }))
-    writeLaneTip(b.root, LANE, entryId("p-1"))
+    if (prompted) {
+      writeEntry(b.root, row("p-1", null, storedMessage("go")))
+      writeLaneTip(b.root, LANE, entryId("p-1"))
+    }
     const asked: string[] = []
     const history = record<LaneHistory>({
       conflicts: async () => {
@@ -275,13 +281,10 @@ describe("askedAboutConflict", () => {
     return { updates, asked, b }
   }
 
-  test("taken while jj finds a conflict in the lane's copy, whatever started the run", async () => {
-    for (const role of ["person", "land", "stack"])
-      expect(
-        await updatesWith(["a.txt"], true, role).updates.askedAboutConflict(
-          LANE,
-        ),
-      ).toBe(true)
+  test("taken while jj finds a conflict in the lane's copy", async () => {
+    expect(await updatesWith(["a.txt"]).updates.askedAboutConflict(LANE)).toBe(
+      true,
+    )
   })
 
   test("refused with no conflict, and for a lane that works directly, which jj is never asked about", async () => {
@@ -293,13 +296,19 @@ describe("askedAboutConflict", () => {
     expect(direct.asked).toEqual([])
   })
 
-  test("a taken ask is recorded for its lane at the host's clock", async () => {
+  test("a taken ask is recorded with its run's prompt", async () => {
     const { updates, b } = updatesWith(["a.txt"])
     await updates.askedAboutConflict(LANE)
     expect(readConflictAsks(b.session).get(LANE)).toEqual({
       lane: LANE,
-      at: b.now(),
+      run: entryId("p-1"),
     })
+  })
+
+  test("an ask with no run to name is not recorded", async () => {
+    const { updates, b } = updatesWith(["a.txt"], true, false)
+    expect(await updates.askedAboutConflict(LANE)).toBe(false)
+    expect(readConflictAsks(b.session).size).toBe(0)
   })
 })
 
@@ -418,5 +427,151 @@ describe("getLatestInRun", () => {
       text: getLatestRefusal("off-line"),
     })
     expect(asked).toEqual(["readyToMerge"])
+  })
+})
+
+describe("a catch-up that finds nothing new, with a merge the lane still holds", () => {
+  const UNRESOLVED = {
+    kind: "conflicted",
+    from: ACCEPTED,
+    contents: [{ path: "a.txt", content: "<<<<<<< a" }],
+    ours: [],
+    theirs: [],
+  } as const
+  /**
+   * Updates over a lane whose catch-up brings nothing new, and whose history
+   * holds a conflicted merge from `source`; `asked` names each port called.
+   */
+  const updatesWith = (source: MergeSource) => {
+    const b = basics()
+    putLane(b, LANE, entryId("a-1"))
+    writeEntry(b.root, row("p-1", null, storedMessage("go", { author: ADA })))
+    writeEntry(
+      b.root,
+      row("a-1", "p-1", {
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "c0", name: GET_LATEST_TOOL, arguments: {} },
+        ],
+      }),
+    )
+    writeLaneTip(b.root, LANE, entryId("a-1"))
+    putValue(
+      b,
+      setRecord(BASE, {
+        kind: "jj",
+        lane: LANE,
+        base: { kind: "accepted" },
+        start: commitId("l1"),
+        state: "ok",
+        getLatest: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
+        untraced: [],
+        work: "some",
+      }),
+    )
+    putValue(
+      b,
+      setRecord(ACCEPTED_RECORD, {
+        kind: "jj",
+        acceptedBookmark: "pinetrie-accepted",
+        wipPrefix: "wip/",
+        publish: "main",
+        published: { commit: null, behind: 0, ahead: 0 },
+        commit: commitId("l2"),
+        heads: { current: null, proposed: "x" },
+        log: { current: null, proposed: "x" },
+        unfinishedWork: [],
+        workingCopy: {
+          behind: 0,
+          ahead: 0,
+          getLatest: null,
+          conflicts: { commits: 0, files: [] },
+        },
+        publishCatchesUp: true,
+      }),
+    )
+    const asked: string[] = []
+    const history = record<LaneHistory>({
+      readyToMerge: async () =>
+        planCopyReady({
+          parents: [commitId("b")],
+          bookmark: commitId("b"),
+          descends: false,
+        }),
+      base: async () => null,
+      merge: async () => {
+        asked.push("merge")
+        return { kind: "nothing", ours: ACCEPTED, mark: null, follow: null }
+      },
+      unresolvedMerge: async () => {
+        asked.push("unresolvedMerge")
+        return { ...UNRESOLVED, source }
+      },
+    }).port
+    const updates = createUpdates({
+      basics: b,
+      setup: { ready: { image: "img" } as Ready },
+      destination: record<Parameters<typeof createUpdates>[0]["destination"]>({
+        baseNow: async () => ({
+          state: "ok",
+          acceptedPoint: ACCEPTED,
+          unfinishedNow: null,
+        }),
+      }).port,
+      registry: registryWith(history),
+      piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>({
+        skill: async () => null,
+      }).port,
+      containers: record<Parameters<typeof createUpdates>[0]["containers"]>({
+        startForUpdate: async () => "started",
+        runEnded: () => {},
+      }).port,
+      records: record<Parameters<typeof createUpdates>[0]["records"]>().port,
+      writeRevision: async () => {},
+      snapshots: memorySnapshotIndex(),
+      snapshotSkipped: () => {},
+    })
+    const card = () =>
+      updates.prepareUpdate(
+        {
+          name: LANE,
+          append: async () => {
+            asked.push("append")
+            return { kind: "appended", id: entryId("e") }
+          },
+        },
+        ADA,
+        "keep both",
+        "get-latest",
+        "send",
+      )
+    return { updates, asked, card }
+  }
+
+  test("a card's catch-up with nothing new resolves the merge the lane still holds", async () => {
+    const { asked, card } = updatesWith({ kind: "accepted" })
+    const prepared = await card()
+    if (prepared.kind !== "conflicted") throw new Error(prepared.kind)
+    expect(prepared.message.content).toContain("a.txt")
+    expect(prepared.message.content.endsWith("keep both")).toBe(true)
+    expect(asked).toEqual(["merge", "unresolvedMerge"])
+  })
+
+  test("the agent's catch_up with nothing new answers nothing new, even with a merge unresolved", async () => {
+    const { updates, asked } = updatesWith({ kind: "accepted" })
+    expect(await updates.getLatestInRun(LANE, "base")).toMatchObject({
+      isError: true,
+      text: getLatestRefusal("nothing-new"),
+    })
+    expect(asked).toEqual(["merge"])
+  })
+
+  test("a parent's unresolved merge asks the document for the parent", async () => {
+    // The lane branched from no thread the document knows.
+    const prepared = await updatesWith({ kind: "parent" }).card()
+    expect(prepared).toEqual({
+      kind: "refused",
+      reason: updateRefusal(ERR.PARENT_UNKNOWN),
+    })
   })
 })

@@ -20,6 +20,7 @@ import {
   planMerge,
   planOldNamesOnDisk,
   planTurnCommit,
+  unresolvedMergeShape,
 } from "./plan.ts"
 
 const LANE = threadIdFor("1")
@@ -331,4 +332,108 @@ test("the base's scratch lane has no bookmark: a bookmark is a thread's lane's",
   expect(bookmarkName(baseLane("0123456789abcdef"))).toBe(
     "pinetrie/base-scratch-0123456789abcdef",
   )
+})
+
+describe("unresolvedMergeShape: a merge's sides and where it came from", () => {
+  const OURS = commitId("o1")
+  const JOIN = commitId("j1")
+  const FROM = commitId("f1")
+  const M = commitId("m1")
+  const row = (
+    description: string,
+    parents: readonly [string, string][],
+  ): Parameters<typeof unresolvedMergeShape>[0] => ({
+    commit: M,
+    description,
+    parents: parents.map(([commit, d]) => ({
+      commit: commitId(commit),
+      description: d,
+    })),
+  })
+  test("ours is the first parent and from the last", () => {
+    expect(
+      unresolvedMergeShape(
+        row("catch up: amber-fox", [
+          ["o1", "turn"],
+          ["f1", "their turn"],
+        ]),
+        "wip/",
+      ),
+    ).toEqual({
+      merge: M,
+      ours: OURS,
+      middle: null,
+      from: FROM,
+      source: { kind: "parent" },
+    })
+  })
+  test("a middle parent is the join commit", () => {
+    expect(
+      unresolvedMergeShape(
+        row("catch up: amber-fox", [
+          ["o1", "turn"],
+          ["j1", "join: a holds b"],
+          ["f1", "their turn"],
+        ]),
+        "wip/",
+      ),
+    ).toMatchObject({ ours: OURS, middle: JOIN, from: FROM })
+  })
+  test("a merge's own base trailer names its source", () => {
+    const shape = unresolvedMergeShape(
+      row(
+        baseMessage("catch up: accepted work", {
+          kind: "accepted",
+          commit: FROM,
+        }),
+        [
+          ["o1", "turn"],
+          ["f1", "accepted"],
+        ],
+      ),
+      "wip/",
+    )
+    expect(shape?.source).toEqual({ kind: "accepted" })
+  })
+  test("a WIP copy's trailer on the last parent names the WIP", () => {
+    const shape = unresolvedMergeShape(
+      row("update: wip/search", [
+        ["o1", "turn"],
+        [
+          "f1",
+          baseMessage("copy of wip/search", {
+            kind: "unfinished",
+            bookmark: "wip/search",
+            commit: C1,
+          }),
+        ],
+      ]),
+      "wip/",
+    )
+    expect(shape?.source).toEqual({
+      kind: "unfinished",
+      bookmark: "wip/search",
+    })
+  })
+  test("no trailer is the parent", () => {
+    const shape = unresolvedMergeShape(
+      row("catch up: amber-fox", [
+        ["o1", "turn"],
+        [
+          "f1",
+          baseMessage("catch up: accepted work", {
+            kind: "accepted",
+            commit: C2,
+          }),
+        ],
+      ]),
+      "wip/",
+    )
+    expect(shape?.source).toEqual({ kind: "parent" })
+  })
+  test("a row with one parent is no merge", () => {
+    expect(
+      unresolvedMergeShape(row("turn", [["o1", "turn"]]), "wip/"),
+    ).toBeNull()
+  })
 })

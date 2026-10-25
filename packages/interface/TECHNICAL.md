@@ -1391,7 +1391,11 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 - `dock` (`DockShows`), what the dock does: the work strip (`strip`), whether
   it is drawn (`shown`, `workStripShown`: never for nothing to accept with
   no button and no note), and what resolves its conflict (`resolve`,
-  `resolveCommand`), which the send button's ▾ offers (`sendMore`);
+  `stripResolveCommand`: the command of the strip's `resolvingButton`,
+  in `conflicts` and `needs-you` alike, never read from the buttons
+  drawn), which the send button's ▾ offers (`sendMore`). `needs-you`'s
+  `answer` ("answer the agent") queues nothing: `buttonCommand` has no
+  command for it, and the column acts on it alone;
 - what the column does apart from both: where lanes start on its path
   (`joins`), the name it reserves, and its parent.
 

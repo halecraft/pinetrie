@@ -26,16 +26,19 @@ import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
 import {
   readAccepted,
   readBases,
+  readLatestPrompt,
   readNames,
   readRevisions,
   readRunAuthor,
   readRunning,
+  readThreadName,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
   getLatestRefusal,
   type LandMessage,
   type LatestInRunDone,
+  mergedFrom,
   type ParentNow,
   parentNow,
   planConflictAsk,
@@ -44,6 +47,7 @@ import {
   planLatestInRunAnswer,
   planParentUpdate,
   planSettle,
+  planUnresolvedMerge,
   planUpdateFrom,
   type Resolution,
   type Settle,
@@ -149,8 +153,11 @@ export interface Updates {
    * there; with `get-latest-from-parent`, the newest commit of the thread it
    * branched from. Clean: the update is appended to the thread, through
    * `handle`. Conflicted: the land message for the resolution run, with
-   * `intent` (the card's text) after the conflicts. Nothing new: nothing to do
-   * but what the merge's adapter does after a move to accepted work. Refused, with the lane untouched,
+   * `intent` (the card's text) after the conflicts. Nothing new: the
+   * resolution of the conflicted merge the lane still holds, as for a
+   * conflicted merge, named by where that merge came from; with none,
+   * nothing to do but what the merge's adapter does after a move to
+   * accepted work. Refused, with the lane untouched,
    * when even the smallest resolution prompt would not fit. The lane is stopped
    * after, unless a run follows (`follows`). Its caller holds a step of the
    * documents' keeper, so a lane whose start the machine holds is not
@@ -281,11 +288,19 @@ export function createUpdates(deps: {
    * the parent, from the document), the plan with the floor its
    * resolution's prompt must fit (`planGetLatest`), and, unless it is refused
    * or has nothing to merge, the edits committed and the merge.
+   *
+   * A merge that brings nothing new, with `whenNothingNew` at
+   * `resolve-merge`, resolves the conflicted merge the lane still holds
+   * instead (`unresolvedMerge`, `planUnresolvedMerge`), named by where that
+   * merge came from. A WIP base whose commit is unchanged answers nothing
+   * before any merge (`planUpdateFrom`): the lane's copy then holds no new
+   * catch-up merge to resolve.
    */
   const updateOnQueue = (
     lane: ThreadId,
     command: GetLatestCommand,
     resolution: Resolution,
+    whenNothingNew: "resolve-merge" | "answer-nothing",
   ) =>
     registry.withHistory(
       lane,
@@ -315,6 +330,26 @@ export function createUpdates(deps: {
           await editsOf(lane),
         )
         if (merged.kind === "refused") return refused(merged.reason)
+        if (
+          merged.kind === "nothing" &&
+          merged.mark === null &&
+          whenNothingNew === "resolve-merge"
+        ) {
+          const unresolved = await h.unresolvedMerge()
+          if (unresolved !== null) {
+            const again = planUnresolvedMerge({
+              merge: unresolved,
+              parent:
+                unresolved.source.kind === "parent"
+                  ? (await parentOf(lane)).now
+                  : null,
+              resolution,
+            })
+            return again.kind === "refused"
+              ? refused(again.reason)
+              : { ...again, follow }
+          }
+        }
         // The merge may have changed what a recipe read: its outputs go
         // before anything snapshots the disk, a catch_up's turn included,
         // and what went is kept for the message. A failed removal tells
@@ -328,7 +363,7 @@ export function createUpdates(deps: {
           merged.kind === "conflicted"
             ? { ...merged, floor: getLatest.floor, removed }
             : { ...merged, removed }
-        return { kind: "merged", from, facts, follow }
+        return { kind: "merged", from: mergedFrom(from), facts, follow }
       },
     )
 
@@ -360,7 +395,19 @@ export function createUpdates(deps: {
     async askedAboutConflict(lane) {
       if (!registry.isOwn(lane)) return false
       const conflicts = await registry.withHistory(lane, h => h.conflicts())
-      const plan = planConflictAsk(lane, conflicts, basics.now())
+      // The run's prompt, as its end will name it in the run-end report.
+      const run = await (async () => {
+        await using held = basics.leases.lane(lane)
+        const doc = held === null ? null : await held.ready
+        return doc === null ? null : readLatestPrompt(doc, lane)
+      })()
+      if (run === null) {
+        basics.log(
+          `[host] ${readThreadName(docs.session, lane)}: an ask about a conflict found no run to name`,
+        )
+        return false
+      }
+      const plan = planConflictAsk(lane, conflicts, run.id)
       await deps.records.writeValues(plan.writes)
       return plan.asked
     },
@@ -389,6 +436,7 @@ export function createUpdates(deps: {
         lane,
         call.command,
         await resolutionOf(""),
+        "answer-nothing",
       )
       if (done.kind === "merged") done.follow?.()
       return planLatestInRunAnswer(call, done, {
@@ -413,6 +461,7 @@ export function createUpdates(deps: {
             lane,
             command,
             await resolutionOf(intent),
+            "resolve-merge",
           )
           if (done.kind === "copy") return refused(getLatestRefusal(done.why))
           if (done.kind !== "merged") return done

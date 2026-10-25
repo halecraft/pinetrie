@@ -605,6 +605,48 @@ export const mutations: readonly Mutation[] = [
     expect: "the whole life of a lane",
   },
   {
+    name: "the merge's sides are swapped",
+    file: "packages/jj/lane/plan.ts",
+    from: "    ours: first.commit,\n    middle,\n    from: last.commit,\n",
+    to: "    ours: last.commit,\n    middle,\n    from: first.commit,\n",
+    command: unit,
+    expect: "ours is the first parent and from the last",
+  },
+  {
+    name: "every merge reads as accepted work",
+    file: "packages/jj/lane/plan.ts",
+    from: "  const own = messageBase(row.description, wipPrefix)",
+    to: '  const own = { kind: "accepted" }',
+    command: unit,
+    expect: "no trailer is the parent",
+  },
+  {
+    name: "a resolved copy still re-plans its merge",
+    file: "packages/jj/lane/merge.ts",
+    from: "  const files = await conflictsIn(jj)\n  if (files.length === 0) return null\n",
+    to: "  const files = await conflictsIn(jj)\n",
+    command: portSuite,
+    expect: "a copy whose conflicts are resolved holds no unresolved merge",
+  },
+  {
+    name: "the join commit is taken for the joined",
+    file: "packages/jj/lane/merge.ts",
+    from: "      : await readCommits(\n          jj,\n          `parents(::${middle} ~ (::${ours} | ::${from})) & (::${from} ~ ::${ours})`,\n        )",
+    to: "      : [middle]",
+    command: portSuite,
+    expect:
+      "a merge that joined an accepted thread commit is re-planned with what it joined",
+  },
+  {
+    name: "an unresolved merge is never found",
+    file: "packages/jj/lane/merge.ts",
+    from: "  const [line] = lines(ran.stdout)",
+    to: '  const [line] = lines("")',
+    command: portSuite,
+    expect:
+      "a conflicted catch-up's merge is found again, with its files and both sides",
+  },
+  {
     name: "an update merges without the joins",
     file: "packages/jj/lane/merge.ts",
     from: "  const parents = [ours, ...(last === null ? [] : [last]), from]",

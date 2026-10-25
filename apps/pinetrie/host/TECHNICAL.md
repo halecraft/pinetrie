@@ -641,6 +641,9 @@ reading the store once, planning once, then acting:
     split of the same statements marking no stderr (`bashOutputNow`); a
     value without the old `statements` moves as stored. The old shape no
     longer decodes.
+  - `0032-conflict-ask-run` deletes every stored `CONFLICT_ASK` record
+    (`deleteRecords`): an ask now names the run that asked, which the old
+    record, a time, never kept. The old shape no longer decodes.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
@@ -650,7 +653,9 @@ reading the store once, planning once, then acting:
   fact card still queued, whose fact is stored as JSON. Given a `to`, it moves every record there, rewritten or as
   stored, and deletes it from the old namespace in the same batch, so no
   run leaves a record in both, and over its own output the old namespace is
-  empty. A migration names an old spelling or word on purpose, so its file
+  empty. `deleteRecords` deletes every record of a namespace instead, for
+  an old shape that names nothing the new one could be made from. A
+  migration names an old spelling or word on purpose, so its file
   and its test are in `OLD_SHAPES` (`scripts/sources.ts`), which the words
   and tag checks both read.
 - **A migration that only reshapes one kind of history message** is a pure
@@ -1840,7 +1845,7 @@ adapter's.
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its plan's steps ran (a start's says so: its `dataRoot`). After a host's start there is no last run's lane until a run ends |
 | `turns.ts` | pi's `turnDone`, in two phases (`@pinetrie/rules`' `planTurn`, from the tree; then `planTurnRevision`, which takes the `TurnToCommit` only `planTurn` makes): the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd` over `@pinetrie/rules`' `planForkEnd`) |
-| `update.ts` | an update (`withLaneStarted`: the lane's start that refuses when held, `startForUpdate`, a held one answering `Prepared`'s `start-held` with nothing merged or stopped; then one queued step, `@pinetrie/rules`' `planGetLatest` and `planSettle`, then `applySettle`, which fires the merge's `follow` after `recordUpdate`), whose message says what the merge's stale outputs removed; `getLatestInRun`, the agent's `catch_up`, in two phases around the merge (`planLatestInRun`, then `planLatestInRunAnswer`, which takes the `LatestInRun` only the first makes); `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
+| `update.ts` | an update (`withLaneStarted`: the lane's start that refuses when held, `startForUpdate`, a held one answering `Prepared`'s `start-held` with nothing merged or stopped; then one queued step, `@pinetrie/rules`' `planGetLatest` and `planSettle`, then `applySettle`, which fires the merge's `follow` after `recordUpdate`), whose message says what the merge's stale outputs removed; `getLatestInRun`, the agent's `catch_up`, in two phases around the merge (`planLatestInRun`, then `planLatestInRunAnswer`, which takes the `LatestInRun` only the first makes); `askedAboutConflict`, which asks the lane's history for conflicts in its copy and records the ask with the run's prompt (`readLatestPrompt`, the lookup a run's end names its report by), recording nothing with no run to name; a card's catch-up whose merge finds nothing new resolves the conflicted merge the lane still holds instead (`updateOnQueue`'s `whenNothingNew`, the history's `unresolvedMerge`, then `planUnresolvedMerge`, the parent read from the document for a merge from it), while the agent's `catch_up` answers nothing new |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`); an archive's entries' snapshots marked to delete, never deleted here (`UpkeepAsks`: the disk upkeep deletes them, so a crash leaves them marked, never lost track of), and a restore's lanes' marks undone, each a step on the machine manager's keeper |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
@@ -1999,7 +2004,9 @@ adapter's.
   (`planCopyReady`), since the merge lands at the lane's bookmark.
 - **`ask_about_conflict` is taken while jj finds a conflict** in the lane's
   copy (`askedAboutConflict`, on the lane's queue), in any run: never from
-  a revision record, which can be late (S104).
+  a revision record, which can be late (S104). It is recorded with the
+  run's prompt, read as `ended` reads it (`readLatestPrompt`), so it
+  stands until the lane's run-end report names another run.
 - **A split reads its skill before `beforeRun`**, so nothing between the
   lane's start and its run can fail. It is a card's command (ADR-0080),
   popped when the thread is free, its card's text the split's brief.

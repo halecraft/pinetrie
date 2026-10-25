@@ -327,6 +327,7 @@ type UpdateRefusal =
   | typeof ERR.BASE_GONE
   | typeof ERR.NO_PARENT
   | typeof ERR.PARENT_RUNNING
+  | typeof ERR.PARENT_UNKNOWN
 
 /**
  * Why an update was refused, worded once: the agent reads it in
@@ -342,6 +343,8 @@ export function updateRefusal(code: UpdateRefusal): string {
       return "this thread did not branch from another thread's copy"
     case ERR.PARENT_RUNNING:
       return "the thread this one branched from is working: get its latest when its run ends"
+    case ERR.PARENT_UNKNOWN:
+      return "this thread's copy holds a conflicted merge from a thread it no longer knows: ask its agent to resolve it"
   }
 }
 

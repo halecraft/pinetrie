@@ -1,31 +1,81 @@
-import { threadIdFor } from "@pinetrie/core"
+import { entryId, type ThreadId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { CONFLICT_ASK, planConflictAsk } from "./conflict-ask.ts"
+import {
+  askingLanes,
+  CONFLICT_ASK,
+  type ConflictAskRecord,
+  planConflictAsk,
+} from "./conflict-ask.ts"
 import { setRecord } from "./records.ts"
+import {
+  pendingRunEndReport,
+  type RunEndReportRecord,
+} from "./run-end-report.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
+const OTHER = threadIdFor("fedcba9876543210")
+const RUN = entryId("e-run")
+const NEXT = entryId("e-next")
 
 describe("planConflictAsk", () => {
-  test("a copy with a conflict is asked about, and the ask recorded at now", () => {
-    expect(planConflictAsk(LANE, ["a.txt"], 7)).toEqual({
+  test("a copy with a conflict is asked about, and the ask names its run", () => {
+    expect(planConflictAsk(LANE, ["a.txt"], RUN)).toEqual({
       asked: true,
-      writes: [setRecord(CONFLICT_ASK, { lane: LANE, at: 7 })],
+      writes: [setRecord(CONFLICT_ASK, { lane: LANE, run: RUN })],
     })
   })
 
   test("a copy with no conflict asks nothing and records nothing", () => {
-    expect(planConflictAsk(LANE, [], 7)).toEqual({ asked: false, writes: [] })
+    expect(planConflictAsk(LANE, [], RUN)).toEqual({
+      asked: false,
+      writes: [],
+    })
   })
 
   test("the record decodes as it was written", () => {
-    const [write] = planConflictAsk(LANE, ["a.txt"], 7).writes
+    const [write] = planConflictAsk(LANE, ["a.txt"], RUN).writes
     expect(
       write?.kind === "set"
         ? CONFLICT_ASK.decode(write.value, write.key)
         : undefined,
-    ).toEqual({
-      lane: LANE,
-      at: 7,
-    })
+    ).toEqual({ lane: LANE, run: RUN })
+  })
+})
+
+describe("askingLanes", () => {
+  const asks = (
+    ...records: ConflictAskRecord[]
+  ): ReadonlyMap<ThreadId, ConflictAskRecord> =>
+    new Map(records.map(r => [r.lane, r]))
+  const reports = (
+    ...records: RunEndReportRecord[]
+  ): ReadonlyMap<ThreadId, RunEndReportRecord> =>
+    new Map(records.map(r => [r.lane, r]))
+
+  test("an ask stands while the lane's last run is the one that asked", () => {
+    expect(
+      askingLanes(
+        asks({ lane: LANE, run: RUN }),
+        reports(pendingRunEndReport(LANE, RUN, entryId("e-end"))),
+      ),
+    ).toEqual(new Set([LANE]))
+  })
+
+  test("a later run's report ends the ask", () => {
+    expect(
+      askingLanes(
+        asks({ lane: LANE, run: RUN }),
+        reports(pendingRunEndReport(LANE, NEXT, entryId("e-end"))),
+      ),
+    ).toEqual(new Set())
+  })
+
+  test("a lane with no report is not asking", () => {
+    expect(
+      askingLanes(
+        asks({ lane: LANE, run: RUN }),
+        reports(pendingRunEndReport(OTHER, RUN, entryId("e-end"))),
+      ),
+    ).toEqual(new Set())
   })
 })
