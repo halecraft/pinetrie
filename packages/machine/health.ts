@@ -7,6 +7,7 @@ import {
   assertNever,
   boundReading,
   type HeldLane,
+  limitSubjectKey,
   type MachineCause,
   type MachineCauseKind,
   type MachineHealth,
@@ -29,7 +30,7 @@ import {
 import type { CauseLimitEvent } from "./measurements.ts"
 import type { Rung } from "./rung.ts"
 import type { MachineSample } from "./sample.ts"
-import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
+import type { StoreSettings } from "./store-settings.ts"
 import { plannedStoreSize } from "./store-size.ts"
 
 /** Metadata's share used, with no room to grow it, at which it is full. */
@@ -123,9 +124,7 @@ const causeKey = (cause: MachineCause): string => {
     case "service-oom-killed":
       return `${cause.kind}:${cause.service}`
     case "cgroup-at-limit":
-      return cause.subject.kind === "lane"
-        ? `${cause.kind}:lane:${cause.subject.lane}`
-        : `${cause.kind}:service:${cause.subject.service}`
+      return `${cause.kind}:${limitSubjectKey(cause.subject)}`
     default:
       return cause.kind
   }
@@ -165,20 +164,20 @@ function roomReadings(
       ["metadata-full", UNMEASURED],
     ]
   const { unallocated } = store
-  const bounds = storeBounds(store.size)
+  const [lowBound, spentBound] = storeBounds(store.size)
   // Planned from what the sample read: btrfs's chunks stand for what the
   // disk holds, and the store's filesystem for the volume holding it.
   const grows =
     (plannedStoreSize(sample, settings, capabilities) ?? store.size) >
     store.size
-  const spent = levelReading(unallocated, bounds.spent, {
+  const spent = levelReading(unallocated, spentBound, {
     kind: "room-spent",
     unallocated,
   })
-  const low = levelReading(unallocated, bounds.low, {
+  const low = levelReading(unallocated, lowBound, {
     kind: "room-low",
     unallocated,
-    minimum: minimumUnallocated(store.size),
+    minimum: lowBound.acts,
     grows,
   })
   const { used, total } = store.metadata
@@ -230,7 +229,7 @@ function upkeepReadings(
             value: {
               kind: "room-unrecoverable",
               unallocated: store.unallocated,
-              minimum: minimumUnallocated(store.size),
+              minimum: storeBounds(store.size)[0].acts,
               isRepaired: capabilities.repairDisk,
             },
           }

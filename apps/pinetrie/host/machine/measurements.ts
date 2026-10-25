@@ -17,6 +17,7 @@ import {
   LANE_TREATMENTS,
   type LaneTreatment,
   type LimitSubject,
+  limitSubjectKey,
   MACHINE_SERVICES,
   type MachineHistory,
   type MachineLately,
@@ -82,20 +83,6 @@ type EventColumns = [
   number | null,
 ]
 
-/** A cgroup at its limit's `subject`: `lane:<id>`, `service:<name>` or `own`. */
-function limitSubjectText(subject: LimitSubject): string {
-  switch (subject.kind) {
-    case "lane":
-      return `lane:${subject.lane}`
-    case "service":
-      return `service:${subject.service}`
-    case "own":
-      return "own"
-    default:
-      return assertNever(subject)
-  }
-}
-
 /** A stored `subject` as the cgroup it names; null for one this version cannot read. */
 function limitSubjectFromText(text: unknown): LimitSubject | null {
   if (text === "own") return { kind: "own" }
@@ -143,7 +130,7 @@ function eventRow(e: EventMeasured): EventColumns {
         e.ms,
       ]
     case "cgroup-at-limit":
-      return [tag, limitSubjectText(e.subject), e.maxHits, e.highHits, null]
+      return [tag, limitSubjectKey(e.subject), e.maxHits, e.highHits, null]
     default:
       return assertNever(e)
   }

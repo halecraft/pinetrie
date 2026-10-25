@@ -210,6 +210,7 @@ export {
   LANE_TREATMENTS,
   type LaneTreatment,
   type LimitSubject,
+  limitSubjectKey,
   MACHINE_SERVICES,
   MACHINE_STATES,
   type MachineCause,

@@ -106,7 +106,7 @@
     of text naming a thing, with nothing to say what is normal. A verdict
     comes first; four vitals each judge their reading as normal, near or
     acting against bounds `@pinetrie/machine` makes from the planners' own
-    numbers (`actingBounds`, from `RUNG_BOUNDS` and the store's and the
+    numbers (`bounds.ts`, from `RUNG_BOUNDS` and the store's and the
     filesystem's thresholds), by one judge in core (`boundReading`) that the
     health's level causes and the rungs call too, so the page never calls near
     what the planners do not act on, and says pine·trie acts only while the

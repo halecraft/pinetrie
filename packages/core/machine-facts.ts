@@ -14,7 +14,6 @@ import type {
   LimitSubject,
   MachineHealth,
   MachineService,
-  MemorySource,
   Pressure,
 } from "./machine.ts"
 import type { ThreadName } from "./thread-names.ts"
@@ -195,7 +194,6 @@ export interface MachineSampled {
   readonly memory: {
     readonly totalBytes: number
     readonly availableBytes: number
-    readonly source: MemorySource
     /** Memory's rung, 0 to 5: 2 holds new runs' starts, 3 pauses threads; 1, 4 and 5 are measured, never acted on. */
     readonly rung: number
     /** In available bytes, the first reached first. */

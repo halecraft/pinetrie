@@ -49,7 +49,6 @@ const sampled: MachineSampled = {
   memory: {
     totalBytes: 16 * GiB,
     availableBytes: 2 * GiB,
-    source: "whole-machine",
     rung: 2,
     bounds: memoryBounds,
     pressure: {

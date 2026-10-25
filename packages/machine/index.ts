@@ -1,7 +1,13 @@
 // machine — every decision about the machine lanes run on, and none of its
 // I/O: the host hands it ports (`TECHNICAL.md`).
 
-export { type ActingBounds, actingBounds, ROOM_SPENT } from "./bounds.ts"
+export {
+  filesystemBound,
+  memoryBounds,
+  PRESSURE_BOUNDS,
+  ROOM_SPENT,
+  storeBounds,
+} from "./bounds.ts"
 export {
   planStoreCapabilities,
   type StoreCapabilities,

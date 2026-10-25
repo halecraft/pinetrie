@@ -17,13 +17,16 @@ import type {
   ThreadName,
 } from "@pinetrie/core"
 import {
-  actingBounds,
+  filesystemBound,
   type MachineReading,
+  memoryBounds,
+  PRESSURE_BOUNDS,
   type ReadingPlanned,
   type SnapshotReads,
   type StoreSettings,
   type StoreTarget,
   snapshotsByLane,
+  storeBounds,
   WAITING,
 } from "@pinetrie/machine"
 import { readNames } from "@pinetrie/reads"
@@ -177,7 +180,6 @@ export function planMachineFacts(g: MachineGathered): MachineFacts {
     }
   })
   const { store, filesystem } = sample
-  const bounds = actingBounds(sample, g.settings)
   const { scope } = reading
   return {
     health: reading.health,
@@ -186,9 +188,8 @@ export function planMachineFacts(g: MachineGathered): MachineFacts {
       memory: {
         totalBytes: sample.machine.memoryTotal,
         availableBytes: sample.machine.memoryAvailable,
-        source: sample.machine.source,
         rung: reading.rung,
-        bounds: bounds.memory,
+        bounds: memoryBounds(sample.machine.memoryTotal),
         pressure:
           scope.kind === "unmeasured"
             ? unreadable("the kernel keeps no pressure stall information")
@@ -196,27 +197,27 @@ export function planMachineFacts(g: MachineGathered): MachineFacts {
                 kind: "read",
                 ...scope.pressure,
                 scope: scope.kind,
-                bounds: bounds.pressure,
+                bounds: PRESSURE_BOUNDS,
               },
       },
       store:
-        store === null || bounds.store === null
+        store === null
           ? unreadable("its btrfs counters could not be read")
           : {
               kind: "read",
               sizeBytes: store.size,
               unallocatedBytes: store.unallocated,
               maxBytes: g.settings.max,
-              bounds: bounds.store,
+              bounds: storeBounds(store.size),
             },
       filesystem:
-        filesystem === null || bounds.filesystem === null
+        filesystem === null
           ? unreadable("its free space could not be read")
           : {
               kind: "read",
               sizeBytes: filesystem.size,
               freeBytes: filesystem.free,
-              bounds: bounds.filesystem,
+              bounds: [filesystemBound(g.settings, filesystem.size)],
             },
       lanes,
       services: sample.services,

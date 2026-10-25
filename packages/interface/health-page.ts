@@ -9,9 +9,9 @@ import {
   type ActingBound,
   assertNever,
   boundReading,
-  type Containment,
   type EventMeasured,
   type HistoryMinute,
+  limitSubjectKey,
   type MachineAction,
   type MachineCause,
   type MachineCauseKind,
@@ -97,8 +97,7 @@ export interface VitalView {
 export interface ThreadRow extends MachineLane {
   /** The board's move of its canvas to the archive; null where none is offered. */
   readonly archive: Pick<ThreadMove, "busy" | "drops" | "intent"> | null
-  /** A cause that names its lane: killed for memory, or at its limit. */
-  readonly trouble: MachineCause | null
+  readonly trouble: LaneTrouble | null
   readonly bar: BarView | null
   readonly series: SeriesView | null
 }
@@ -135,7 +134,6 @@ export type HealthPageView =
       /** Held first, then by name. */
       readonly threads: readonly ThreadRow[]
       readonly services: readonly ServiceRow[]
-      readonly containment: Containment | null
       readonly vmMemoryCeilingBytes: number | null
       /** The services' floor this host asks for; null where it keeps none. */
       readonly servicesFloorBytes: number | null
@@ -356,13 +354,18 @@ function vitalsView(
   }
 }
 
-/** The cause that names a lane, if any: killed for memory, or stuck at its limit. */
+/** A cause that names a lane: a command in it killed for memory, or it stuck at its limit. */
+export type LaneTrouble = Extract<
+  MachineCause,
+  { readonly kind: "lane-oom-killed" | "cgroup-at-limit" }
+>
+
 const laneTrouble = (
   lane: ThreadId,
   causes: readonly MachineCause[],
-): MachineCause | null =>
+): LaneTrouble | null =>
   causes.find(
-    c =>
+    (c): c is LaneTrouble =>
       (c.kind === "lane-oom-killed" && c.lane === lane) ||
       (c.kind === "cgroup-at-limit" &&
         c.subject.kind === "lane" &&
@@ -421,7 +424,7 @@ function happenedKey(l: MachineLately): string | null {
     case "service-oom-killed":
       return `${event.kind}:${event.service}`
     case "cgroup-at-limit":
-      return `${event.kind}:${event.subject.kind === "lane" ? event.subject.lane : event.subject.kind === "service" ? event.subject.service : "own"}`
+      return `${event.kind}:${limitSubjectKey(event.subject)}`
     default:
       return assertNever(event)
   }
@@ -582,7 +585,6 @@ export function healthPageView(
     vitals: vitalsView(sampled, causes),
     threads,
     services: (sampled?.services ?? []).map(s => serviceRow(s, causes)),
-    containment: sampled?.containment ?? null,
     vmMemoryCeilingBytes: facts.vmMemoryCeilingBytes,
     servicesFloorBytes: facts.servicesFloorBytes,
     isOomdManagingLanes: facts.isOomdManagingLanes,

@@ -2,6 +2,7 @@
 // `@pinetrie/machine` plans, `@pinetrie/rules` stores as `pinetrie.machine`,
 // and `@pinetrie/interface` words.
 
+import { assertNever } from "./errors.ts"
 import type { ThreadId } from "./ids.ts"
 
 export const MACHINE_STATES = ["neutral", "amber", "red"] as const
@@ -99,6 +100,24 @@ export type LimitSubject =
  * whose limit is the machine's shortage, which memory's rung names already.
  */
 export type CauseLimitSubject = Exclude<LimitSubject, { readonly kind: "own" }>
+
+/**
+ * A cgroup's identity as text: `lane:<id>`, `service:<name>` or `own`. The
+ * measurements store it as an event's `subject`, so a row kept last week
+ * decodes only while this text stays as it is.
+ */
+export function limitSubjectKey(subject: LimitSubject): string {
+  switch (subject.kind) {
+    case "lane":
+      return `lane:${subject.lane}`
+    case "service":
+      return `service:${subject.service}`
+    case "own":
+      return "own"
+    default:
+      return assertNever(subject)
+  }
+}
 
 export const MACHINE_SERVICES = ["disks", "privileged", "observer"] as const
 

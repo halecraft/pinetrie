@@ -28,6 +28,7 @@ import type {
   HappenedRow,
   HappenedTone,
   HealthPageView,
+  LaneTrouble,
   SeriesView,
   ServiceRow,
   ThreadRow,
@@ -471,10 +472,10 @@ function vitalText(
   }
 }
 
-const THREAD_TROUBLE_LABEL = {
+const THREAD_TROUBLE_LABEL: Readonly<Record<LaneTrouble["kind"], string>> = {
   "lane-oom-killed": "killed for memory",
   "cgroup-at-limit": "at its memory limit",
-} as const
+}
 
 function threadText(
   row: ThreadRow,
@@ -489,8 +490,7 @@ function threadText(
   const held = treatmentWords({ kind: row.treatment })
   const { trouble } = row
   const state =
-    trouble !== null &&
-    (trouble.kind === "lane-oom-killed" || trouble.kind === "cgroup-at-limit")
+    trouble !== null
       ? {
           label: THREAD_TROUBLE_LABEL[trouble.kind],
           title: causeWords(trouble, nameOf, 0).sentence,
@@ -678,7 +678,8 @@ function safeguards(view: Extract<HealthPageView, { kind: "machine" }>): {
   readonly summary: string
   readonly items: readonly SafeguardText[]
 } {
-  const { containment, servicesFloorBytes, isOomdManagingLanes } = view
+  const { servicesFloorBytes, isOomdManagingLanes } = view
+  const containment = view.sampled?.containment ?? null
   const oomd: readonly SafeguardText[] = isOomdManagingLanes
     ? [
         {

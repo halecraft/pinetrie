@@ -16,7 +16,7 @@ and the words share one.
 | `freshness.ts` | whether the reading is fresh, in ticks of the sample timer (`FreshnessState`, `nextTickFreshness`, `sampleEndFreshness`, `READING_OVERDUE_AFTER_TICKS`) |
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`), each lane's kept ones and their cost (`snapshotsByLane`), and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
-| `bounds.ts` | the bounds a sample is judged by (`actingBounds`, `memoryBounds`, `PRESSURE_BOUNDS`, `storeBounds`, `filesystemBound`), and the store's numbers they hold (`ROOM_SPENT`, `ROOM_SPENT_CLEAR`, `CLEAR_MARGIN`) |
+| `bounds.ts` | the bounds a sample is judged by, each vital's first reached first (`memoryBounds`, `PRESSURE_BOUNDS`, `storeBounds`, `filesystemBound`), and the store's numbers they hold (`ROOM_SPENT`, `ROOM_SPENT_CLEAR`, `CLEAR_MARGIN`) |
 | `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it; `planOverdueHealth`, once the reading is overdue |
 | `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
@@ -48,7 +48,7 @@ and the words share one.
   the Health page too; its near is a level's between. A rung is not one
   bound (it enters on any and clears only on all), so `planRung` keeps
   its table and reads each bound through the same judge. The host serves
-  `actingBounds` with each reading, so what the page calls near cannot
+  the same bounds with each reading, so what the page calls near cannot
   drift from what the planners act on.
 - **What the host follows of its rows is one pure step** (`nextFollowed`):
   a sample moves memory's rung's changes and its minute, a lane's row is

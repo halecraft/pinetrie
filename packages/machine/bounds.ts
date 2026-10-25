@@ -6,7 +6,6 @@
 
 import type { ActingBound } from "@pinetrie/core"
 import { RUNG_BOUNDS } from "./rung.ts"
-import type { MachineSample } from "./sample.ts"
 import {
   leaveFreeBytes,
   minimumUnallocated,
@@ -54,28 +53,25 @@ export const PRESSURE_BOUNDS: readonly ActingBound[] = [
   },
 ]
 
-/** The store's, in unallocated bytes of a store of `size`. */
+/** The store's, in unallocated bytes of a store of `size`: low, then spent, the first reached first. */
 export const storeBounds = (
   size: number,
-): {
-  readonly low: ActingBound
-  readonly spent: ActingBound
-} => {
+): readonly [low: ActingBound, spent: ActingBound] => {
   const minimum = minimumUnallocated(size)
-  return {
-    low: {
+  return [
+    {
       worse: "below",
       acts: minimum,
       clears: minimum * CLEAR_MARGIN,
       does: "delete-snapshots",
     },
-    spent: {
+    {
       worse: "below",
       acts: ROOM_SPENT,
       clears: ROOM_SPENT_CLEAR,
       does: "writes-may-fail",
     },
-  }
+  ]
 }
 
 /** The filesystem's holding the store, in free bytes of one of `size`. */
@@ -89,28 +85,5 @@ export const filesystemBound = (
     acts: leaveFree,
     clears: leaveFree * CLEAR_MARGIN,
     does: "stop-growing",
-  }
-}
-
-/** Every bound a sample is judged by, each vital's first reached first; null where its reading was not taken. */
-export interface ActingBounds {
-  readonly memory: readonly ActingBound[]
-  readonly pressure: readonly ActingBound[]
-  readonly store: readonly ActingBound[] | null
-  readonly filesystem: readonly ActingBound[] | null
-}
-
-export function actingBounds(
-  sample: MachineSample,
-  settings: Pick<StoreSettings, "leaveFree">,
-): ActingBounds {
-  const { store, filesystem } = sample
-  const room = store === null ? null : storeBounds(store.size)
-  return {
-    memory: memoryBounds(sample.machine.memoryTotal),
-    pressure: PRESSURE_BOUNDS,
-    store: room === null ? null : [room.low, room.spent],
-    filesystem:
-      filesystem === null ? null : [filesystemBound(settings, filesystem.size)],
   }
 }
