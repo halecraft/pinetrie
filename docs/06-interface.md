@@ -1269,9 +1269,16 @@ The rail is E; the column is T. Seeing both at once is the product.
   shows the output whole and says why in one line ("Not split by
   statement: its output wasn't a pipe."); nothing it shows is ever split
   wrongly. A single statement's output is shown as any call's.
-- **What a command wrote to stderr has its own colour**, in its summary and
-  its detail, once the call has returned; what the model reads is the
-  same text, unmarked.
+- **A line a command wrote to stderr has a bar in its margin**, in its
+  summary and its detail, once the call has returned: a shape, so it reads
+  without telling colours apart, and it leaves the program's own colours
+  as they are. What the model reads is the same text, unmarked.
+- **A command's output keeps its program's colours** (ADR-0214): what a
+  test runner prints in green, red or dim is drawn so, in the summary, the
+  detail and under each statement, while it runs and after. The 16 basic
+  colours follow the page's light or dark theme; any other is drawn as the
+  program wrote it. No escape code ever shows as text, the agent reads the
+  output without them, and a message's copy pastes it plain.
 - **In story, a row says what its call is for** (ADR-0173): `shell`, `edit`
   and `write` calls carry an intent, the model's few plain words ("Run the
   unit tests"), and a story row leads with it where the command would be,

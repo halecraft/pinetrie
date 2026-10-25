@@ -42,7 +42,7 @@ tests import as `@pinetrie/threads/fixtures`.
 | `mentions.ts` | who a message names and compels (`address`), what a relay between agents carries, a person's display name |
 | `access.ts` | the owner's answers to a lane's use of their ssh identity |
 | `work.ts` | where a lane works: its revisions and disk above an entry |
-| `live.ts`, `edits.ts`, `tools.ts` | what a turn streams; a text's edits; the tools |
+| `live.ts`, `edits.ts`, `tools.ts` | what a turn streams; a text's edits; the tools, and which of them write a terminal's output (`isTerminalOutputTool`, ADR-0214), the one rule the model's edge, a row and a copy ask |
 
 ## Card ids (`card-ids.ts`, `kinds.ts`)
 

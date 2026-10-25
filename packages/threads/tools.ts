@@ -77,6 +77,19 @@ export function knownToolId(name: string): ToolId | undefined {
   return TOOL_IDS.find(id => id === name)
 }
 
+/**
+ * The tools whose result is a terminal's output, its SGR kept: the model
+ * reads it without (`@pinetrie/pi`), and a row and a copy decide by it
+ * (`@pinetrie/interface`), so the three cannot disagree.
+ */
+const TERMINAL_OUTPUT_TOOLS: ReadonlySet<ToolId> = new Set([BASH_TOOL])
+
+/** Whether a tool's result is a terminal's output, styled by its SGR. */
+export const isTerminalOutputTool = (name: string): boolean => {
+  const id = knownToolId(name)
+  return id !== undefined && TERMINAL_OUTPUT_TOOLS.has(id)
+}
+
 /** A call's argument `key`, when it is a non-empty string. */
 const field = (args: unknown, key: string): string | undefined => {
   if (typeof args !== "object" || args === null) return undefined

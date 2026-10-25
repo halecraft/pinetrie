@@ -367,10 +367,21 @@ defines, which would draw nothing (S277).
   - `--highlight`: a search's match.
   - `--command`: a command's name.
   - `--danger` and `--danger-soft`: a stop or a deletion.
-  - `--stderr`: what a command wrote to stderr, on its output's `--sunk`;
-    not a failure's red, since stderr is often progress or a warning.
+  - `--stderr`: the margin bar of a line a command wrote to stderr, on its
+    output's `--sunk`; not a failure's red, since stderr is often progress
+    or a warning.
     `colors.test.ts` holds it at 4.5:1 or more on `--sunk`.
   - `--ok` and `--ok-soft`: a success or an addition.
+- **A terminal's 16 basic colours are `--ansi-0` to `--ansi-15`**
+  (ADR-0214), drawn by `output-style.ts` for a command's output. Their
+  hues are the roles' own (red `--danger`'s, green `--ok`'s, yellow
+  `--caution`'s, blue `--accent`'s, magenta `--command`'s), darkened on
+  the light page where `--sunk`, the output's ground, needs it; "white" is
+  the strongest text and "black" the faintest that reads. `colors.test.ts`
+  holds each at 4.5:1 or more on `--sunk`, on both pages. The page's code
+  writes no colour of its own (`colors.test.ts`), but for
+  `output-style.ts` (`PROGRAM_COLOURS`): a command's 256-colour and RGB
+  output is the program's colour, drawn as written on either page.
 - **A tint is a mix, not a literal.** A blue band, an amber fill or a
   hue's line is `color-mix(in srgb, var(--hue) p%, var(--page))`, so it
   follows both the hue and the page. A colour that only fades is mixed
@@ -948,17 +959,28 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.tool-line`, which undoes the line's hanging indent, so the next
   statement's gap still comes after it, and the row's own `.tool-output`
   is then empty, not drawn.
-- **Output is drawn by `OutputRuns`**: a run that came through stderr is a
-  `span.tool-stderr` in `--stderr`, the rest plain text, in the body's
-  `pre` and in each statement's. A detail that shows a command's output
-  whole says why in `div.tool-undivided`, between the command and the
-  output, in `--text-muted`.
+- **Output is drawn by `OutputLines`** (ADR-0214), in the body's `pre` and
+  in each statement's: each line a block `span.tool-out-line`, an empty one
+  keeping its height, each run in the style it was written in. A run whose
+  style sets nothing is bare text, any other a `<span>` with the inline CSS
+  `outputRunStyle` (`output-style.ts`) gives. A basic colour is
+  `var(--ansi-N)` and follows the theme; the 256-colour cube, its greys and
+  an RGB colour are the program's own and are drawn as written, as a
+  terminal draws them. Inverse swaps the colours, `--sunk` and `--text`
+  standing in for one unset; dim is an opacity. A line any of whose runs
+  came through stderr carries `data-stderr`: a 3px bar in `--stderr` in
+  the output's left padding, a shape that reads without telling colours
+  apart, and that leaves the program's colours as they are. `ToolRow`
+  memoises `rowOutput`, which reads the text, so a live call's 10Hz
+  redraw reads only new text. A detail that shows a command's output whole
+  says why in `div.tool-undivided`, between the command and the output, in
+  `--text-muted`.
 - **A row is its summary or its detail** (`RowMemory.open`, `data-open`).
   The summary shows the command's first 5 lines and the output's last 5
   (`headLines`, `tailLines`), as written: the command is cut after its
   layout, so it keeps it. A line over `LINE_LENGTH` (160) characters ends
   in "…". The detail shows both whole; an output over `SHOWN` (20,000)
-  characters keeps its end (`wholeOutput`). Neither scrolls inside the row.
+  characters keeps its end (`detailOutput`). Neither scrolls inside the row.
   The toggle names what the summary hides (`moreWords`: "+3 lines · +335
   lines of output", "whole lines", "full size"), or says "less"; a row
   that hides nothing has none. Only the toggle toggles, so the command

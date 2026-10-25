@@ -880,8 +880,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the cards go at the end of each request",
     file: "packages/pi/agent.ts",
-    from: "  return convertToLlm(withMessageImages(messages, found))",
-    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pinetrie.pinned"\n  return convertToLlm(withMessageImages([...messages.filter(m => !cards(m)), ...messages.filter(cards)], found))',
+    from: "  return convertToLlm(withMessageImages(plainBashResults(messages), found))",
+    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pinetrie.pinned"\n  return convertToLlm(withMessageImages(plainBashResults([...messages.filter(m => !cards(m)), ...messages.filter(cards)]), found))',
     command: unit,
     expect: "an edited card keeps the cache",
   },
@@ -1454,5 +1454,30 @@ export const mutations: readonly Mutation[] = [
     to: "    return bytes.length",
     command: unit,
     expect: "a character split across chunks, and across pipes, reads whole",
+  },
+  // ── a bash result's escape sequences ──
+  {
+    name: "the capture drops an SGR's ESC as pi does",
+    file: "packages/pi/shell-capture.ts",
+    from: "const kept = (text: string): string => sgrOnlyText(text, sanitizeBinaryOutput)",
+    to: "const kept = (text: string): string => sanitizeBinaryOutput(text)",
+    command: unit,
+    expect: "a result keeps an SGR, and drops any other escape sequence whole",
+  },
+  {
+    name: "every tool's result reaches the model without its escapes",
+    file: "packages/pi/bash-tool.ts",
+    from: '    m.role === "toolResult" && isTerminalOutputTool(m.toolName)',
+    to: '    m.role === "toolResult"',
+    command: unit,
+    expect: "and any other tool's as stored",
+  },
+  {
+    name: "a request's history keeps a bash result's escapes",
+    file: "packages/pi/agent.ts",
+    from: "withMessageImages(plainBashResults(messages), found)",
+    to: "withMessageImages(messages, found)",
+    command: unit,
+    expect: "the model reads a bash result without its escape sequences",
   },
 ]

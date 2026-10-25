@@ -19,7 +19,7 @@ import {
   type MessageAct,
   type MessageTools,
   NO_MEMORY,
-  type OutputRun,
+  type OutputLine,
   opens,
   pinnedMarkerWords,
   plural,
@@ -54,6 +54,7 @@ import { COPIED, useCopy } from "./copy.ts"
 import { CopyIcon } from "./icons.tsx"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
+import { outputRunStyle } from "./output-style.ts"
 import { useTrackColors } from "./palette-context.ts"
 import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
@@ -442,13 +443,13 @@ function ToolRow({
               key={i}
             >
               <Runs runs={line.runs} />
-              {line.outputs.map((runs, j) => (
+              {line.outputs.map((lines, j) => (
                 <pre
                   className="tool-output tool-statement-output"
                   // biome-ignore lint/suspicious/noArrayIndexKey: a line's outputs are its statements', in order
                   key={j}
                 >
-                  <OutputRuns runs={runs} />
+                  <OutputLines lines={lines} />
                 </pre>
               ))}
             </div>
@@ -473,9 +474,9 @@ function ToolRow({
           ))}
         </div>
       ) : (
-        body.runs.length > 0 && (
+        body.lines.length > 0 && (
           <pre className="tool-output">
-            <OutputRuns runs={body.runs} />
+            <OutputLines lines={body.lines} />
           </pre>
         )
       )}
@@ -490,20 +491,6 @@ function ToolRow({
         </Button>
       )}
     </div>
-  )
-}
-
-/** A command's output, what it wrote to stderr drawn apart. */
-function OutputRuns({ runs }: { runs: readonly OutputRun[] }) {
-  return runs.map((run, i) =>
-    run.stderr ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: a view's runs are fixed for it, and never reordered
-      <span className="tool-stderr" key={i}>
-        {run.text}
-      </span>
-    ) : (
-      run.text
-    ),
   )
 }
 
@@ -538,6 +525,36 @@ function Runs({ runs }: { runs: readonly Run[] }) {
       </span>
     ),
   )
+}
+
+/**
+ * An output's lines, each a `span.tool-out-line`, its runs in the style each
+ * was written in (`outputRunStyle`): a run that sets none is bare text. A
+ * line any of whose runs came through stderr carries `data-stderr`, which
+ * draws a bar in its margin: a shape, not only a colour, so it reads
+ * without telling colours apart.
+ */
+function OutputLines({ lines }: { lines: readonly OutputLine[] }) {
+  return lines.map((line, i) => (
+    <span
+      className="tool-out-line"
+      data-stderr={line.some(run => run.stderr) || undefined}
+      // biome-ignore lint/suspicious/noArrayIndexKey: an output's lines are fixed for its view, and never reordered
+      key={i}
+    >
+      {line.map((run, j) => {
+        const css = outputRunStyle(run.style)
+        return css === undefined ? (
+          run.text
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a line's runs are fixed for its view, and never reordered
+          <span key={j} style={css}>
+            {run.text}
+          </span>
+        )
+      })}
+    </span>
+  ))
 }
 
 /**

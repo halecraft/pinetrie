@@ -13,6 +13,10 @@
   - ADR-0135: the observer also tags every task with the statement it was
     started in, and attributes each byte of a run's output pipes to its
     writer's tag; it still stops no call.
+- **Amended by:**
+  - ADR-0214: the `bash` result's text differs from pi's tool's on escape
+    sequences: an SGR is kept, any other dropped whole; a line with stderr is
+    marked by a bar in its margin, not a colour.
 
 **Context.**
 

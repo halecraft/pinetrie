@@ -3,12 +3,15 @@
 Shell source as structure (ADR-0114, S138): a command's text in runs by role
 (command, option, string, variable, operator, redirect, keyword, comment,
 plain), a one-line command laid out to a width, and its top-level
-statements: where each lies, and the lines a reader sees each begin on. It knows nothing of
+statements: where each lies, and the lines a reader sees each begin on.
+And a terminal's output as structure (ADR-0214): its escape sequences read,
+its SGR styles as values, its text in runs by style. It knows nothing of
 tool calls: `@pinetrie/interface` decides which call reads as shell, and
-`@pinetrie/web` colours the roles. It declares only `unbash`, and only
-interface, `@pinetrie/pi` (whose `bash` tool counts a call's statements)
-and the app (whose observer suite runs the statements' fixture) declare it
-(`workspace.test.ts`). No DOM and no Node:
+`@pinetrie/threads` which writes a terminal's output; `@pinetrie/web`
+colours the roles and draws the styles. It declares only `unbash`, and only
+interface, `@pinetrie/pi` (whose `bash` tool counts a call's statements and
+keeps its output's SGR) and the app (whose observer suite runs the
+statements' fixture) declare it (`workspace.test.ts`). No DOM and no Node:
 `tsconfig.pure.json` checks it with `lib: ["ESNext"]`, no ambient types and
 only the globals `pure-globals.d.ts` declares.
 
@@ -87,7 +90,38 @@ read by its characters: a `#` starting a word begins a comment, a keyword
 (`do`, `done`, `then`…) is a keyword, and `&|;(){}!` (and a `$` opening a
 substitution) are operators.
 
+## A terminal's output (`terminal.ts`, ADR-0214, S342)
+
+One regex, `ESCAPE_SEQUENCE`, splits text into pieces: text, an SGR, or any
+other escape sequence. `sgrOnlyText`, `plainText` and `styledRuns` are each a
+fold over those pieces, so what counts as a sequence is decided once for
+keeping, dropping and styling.
+
+- **`sgrOnlyText` keeps an SGR as written and drops any other sequence
+  whole**: an erase, a cursor move, a private mode (`ESC[>4;2m` is not SGR),
+  an OSC hyperlink or title, a charset. Its `sanitize` (pi's
+  `sanitizeBinaryOutput`) sees only the text between sequences, so the
+  control bytes it drops can never include an SGR's ESC.
+- **A sequence the text ends inside of is dropped**: a live view cut
+  between two chunks would otherwise show the cut sequence's parameters
+  until the next view.
+- **The 8-bit C1 forms are text**, as pi's sanitiser leaves them.
+- **`styledRuns` keeps a style across lines, and never joins two runs**: a
+  run is the text between two sequences, and its `at` is where it starts in
+  the text read, escape sequences counted, so a range of that text (a
+  record's stderr, `@pinetrie/interface`) cuts it exactly. An empty
+  parameter is 0, a reset; an unknown code changes nothing; `38`
+  and `48` take their colour's fields in both the `;` and the `:` forms,
+  even when the colour is out of range.
+- **A palette colour is a `PaletteIndex`**, made only by `paletteIndex`,
+  which returns null outside 0 to 255, so a client's lookup needs no range
+  check.
+
 ## Gotchas
+
+- **`ESCAPE_SEQUENCE`'s alternatives are tried in order.** The cut-sequence
+  alternative must come before the catch-all, which would otherwise read a
+  cut CSI's `ESC [` as a whole sequence and leave its parameters as text.
 
 - **unbash computes some children on first read**, as getters on its node
   classes (`parts`, `script`, `elements`, `index`, `value`, `expression`,

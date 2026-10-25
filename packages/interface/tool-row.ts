@@ -1,6 +1,13 @@
 // interface/tool-row — what a tool call's row shows: what the call touched
-// (`rowSummary`), and how much of it and of what it returned the row draws
-// (`rowView`).
+// (`rowSummary`), its output as lines of runs (`rowOutput`), and how much of
+// each the row draws (`rowView`).
+//
+// An output is read before the view: a terminal tool's SGR becomes a style
+// on each run (`@pinetrie/shell`), and the stderr its record names marks the
+// runs it covers, both by offset in the text as stored. `rowView` only cuts
+// lines, counts only what is visible, and never sees an escape. A client
+// draws a style and a mark its own way: the page as CSS and a margin bar, a
+// terminal as SGR again.
 //
 // A row is its summary or its detail. The summary shows the command's first
 // SUMMARY_LINES lines and the output's last, so the live output and the result
@@ -11,9 +18,18 @@
 
 import type { ImageRef, TextRange } from "@pinetrie/core"
 import type { BashOutputRecord, UndividedWhy } from "@pinetrie/rules"
-import { readShell, type ShellRole, type ShownStatement } from "@pinetrie/shell"
+import {
+  PLAIN_STYLE,
+  readShell,
+  type ShellRole,
+  type ShownStatement,
+  type StyledRun,
+  styledRuns,
+  type TerminalStyle,
+} from "@pinetrie/shell"
 import {
   BASH_TOOL,
+  isTerminalOutputTool,
   knownToolId,
   type StreamId,
   streamStart,
@@ -26,6 +42,13 @@ import { elapsed, plural } from "./counts.ts"
 import { markedParts } from "./marked-parts.ts"
 import { toolWord } from "./tool-words.ts"
 import { undividedWords } from "./undivided-words.ts"
+
+// What a client draws an output's styles by; the page does not declare the shell.
+export type {
+  PaletteIndex,
+  TerminalColor,
+  TerminalStyle,
+} from "@pinetrie/shell"
 
 /** How long a call's output streams before its row is ringed and timed. */
 export const REVEAL_MS = 500
@@ -87,10 +110,10 @@ export function runningFor(
   return { words: elapsed(ran), next: 1000 - (ran % 1000) }
 }
 
-/** What a run of a command is, for the page to colour. Only a shell command has runs other than plain. */
+/** What a run of a command is, for a client to colour by. Only a shell command has runs other than plain. */
 type RunRole = ShellRole
 
-/** Some of a command's text, and what it is. */
+/** Some of a command's text, and what it is. An output's runs are `OutputRun`s. */
 export interface Run {
   readonly text: string
   readonly role: RunRole
@@ -179,36 +202,28 @@ export const SHOWN = 20_000
 /** The tallest image a summary draws at its own size, in CSS px: 10rem, as `.tool-images[data-thumb]` caps it. */
 const THUMB_HEIGHT = 160
 
-/** Some of a command's output, and whether it came through stderr. */
-export interface OutputRun {
+/** Some of a command's output: the style it was written in, and whether it came through stderr. */
+interface OutputRun {
   readonly text: string
+  readonly style: TerminalStyle
   readonly stderr: boolean
 }
 
-/** How the line helpers make and merge runs of one kind, a command's or an output's. */
-interface RunKind<R extends { readonly text: string }> {
-  /** A run of no role: a break, or the "…" of a cut line. */
-  readonly plain: (text: string) => R
-  /** Whether two runs draw alike, so they can be one. */
-  readonly alike: (a: R, b: R) => boolean
+/** A line of a call's output, its break left out. */
+export type OutputLine = readonly OutputRun[]
+
+/** What ends a line cut at LINE_LENGTH, in a command and in an output. */
+const COMMAND_ELLIPSIS: Run = { text: "…", role: "plain" }
+const OUTPUT_ELLIPSIS: OutputRun = {
+  text: "…",
+  style: PLAIN_STYLE,
+  stderr: false,
 }
 
-const COMMAND_RUNS: RunKind<Run> = {
-  plain: text => ({ text, role: "plain" }),
-  alike: (a, b) => a.role === b.role,
-}
-
-const OUTPUT_RUNS: RunKind<OutputRun> = {
-  plain: text => ({ text, stderr: false }),
-  alike: (a, b) => a.stderr === b.stderr,
-}
-
-type Line<R> = readonly R[]
-
-/** Runs as lines as written; a run across a break is split, each part keeping its kind. A final break ends a line, and starts none. */
+/** Runs as lines as written; a run across a break is split, each part keeping its look. A final break ends a line, and starts none. */
 function linesOf<R extends { readonly text: string }>(
   runs: readonly R[],
-): Line<R>[] {
+): R[][] {
   const lines: R[][] = [[]]
   for (const run of runs) {
     const parts = run.text.split("\n")
@@ -221,11 +236,11 @@ function linesOf<R extends { readonly text: string }>(
   return lines.length === 1 && lines[0]?.length === 0 ? [] : lines
 }
 
-/** One line, cut at LINE_LENGTH with "…". */
+/** One line, cut at LINE_LENGTH with `ellipsis`. */
 function cutLine<R extends { readonly text: string }>(
-  kind: RunKind<R>,
-  line: Line<R>,
-): Line<R> {
+  line: readonly R[],
+  ellipsis: R,
+): readonly R[] {
   if (lengthOf(line) <= LINE_LENGTH) return line
   const out: R[] = []
   let left = LINE_LENGTH
@@ -236,34 +251,15 @@ function cutLine<R extends { readonly text: string }>(
     )
     left -= run.text.length
   }
-  return [...out, kind.plain("…")]
+  return [...out, ellipsis]
 }
 
-const lengthOf = (line: Line<{ readonly text: string }>) =>
+const lengthOf = (line: readonly { readonly text: string }[]) =>
   line.reduce((n, r) => n + r.text.length, 0)
-
-/** Lines joined back into runs, a plain break between each, and a run following one drawn alike merged into it. */
-function joinLines<R extends { readonly text: string }>(
-  kind: RunKind<R>,
-  lines: readonly Line<R>[],
-): R[] {
-  const out: R[] = []
-  const add = (run: R) => {
-    const last = out.at(-1)
-    if (last !== undefined && kind.alike(last, run))
-      out[out.length - 1] = { ...last, text: last.text + run.text }
-    else out.push(run)
-  }
-  lines.forEach((line, i) => {
-    if (i > 0) add(kind.plain("\n"))
-    for (const run of line) add(run)
-  })
-  return out
-}
 
 /** Some of a text's lines, and what the cut hides. */
 interface Cut<R> {
-  readonly runs: readonly R[]
+  readonly lines: readonly (readonly R[])[]
   /** Lines left out. */
   readonly hidden: number
   /** A line shown was cut at LINE_LENGTH. */
@@ -272,15 +268,12 @@ interface Cut<R> {
 
 /** Some of `all`'s lines, each cut at LINE_LENGTH, and what the cut leaves out. */
 function cutOf<R extends { readonly text: string }>(
-  kind: RunKind<R>,
-  all: readonly Line<R>[],
-  lines: readonly Line<R>[],
+  all: readonly (readonly R[])[],
+  lines: readonly (readonly R[])[],
+  ellipsis: R,
 ): Cut<R> {
   return {
-    runs: joinLines(
-      kind,
-      lines.map(l => cutLine(kind, l)),
-    ),
+    lines: lines.map(l => cutLine(l, ellipsis)),
     hidden: all.length - lines.length,
     cut: lines.some(l => lengthOf(l) > LINE_LENGTH),
   }
@@ -289,50 +282,92 @@ function cutOf<R extends { readonly text: string }>(
 /** The first SUMMARY_LINES lines of a command's runs as written, each cut at LINE_LENGTH. */
 export function headLines(runs: readonly Run[]): Cut<Run> {
   const lines = linesOf(runs)
-  return cutOf(COMMAND_RUNS, lines, lines.slice(0, SUMMARY_LINES))
+  return cutOf(lines, lines.slice(0, SUMMARY_LINES), COMMAND_ELLIPSIS)
 }
 
-/** The last SUMMARY_LINES lines of an output's runs as written, each cut at LINE_LENGTH. */
-export function tailLines(runs: readonly OutputRun[]): Cut<OutputRun> {
-  const lines = linesOf(runs)
-  return cutOf(OUTPUT_RUNS, lines, lines.slice(-SUMMARY_LINES))
+/** The last SUMMARY_LINES lines of an output, each cut at LINE_LENGTH. */
+export function tailLines(lines: readonly OutputLine[]): Cut<OutputRun> {
+  return cutOf(lines, lines.slice(-SUMMARY_LINES), OUTPUT_ELLIPSIS)
+}
+
+/** One line of pine·trie's own words among an output's lines. */
+const plainLine = (text: string): OutputLine => [
+  { text, style: PLAIN_STYLE, stderr: false },
+]
+
+/**
+ * A run cut at the stderr ranges of the text it was read from: each part
+ * marked when it lies in one. `run.at` places it, so a range counts the
+ * escape sequences before it as the stored ranges do.
+ */
+const markedRuns = (
+  run: StyledRun,
+  stderr: readonly TextRange[],
+): readonly OutputRun[] =>
+  markedParts(
+    run.text,
+    stderr
+      .filter(r => r.to > run.at && r.from < run.at + run.text.length)
+      .map(r => ({ from: r.from - run.at, to: r.to - run.at })),
+  ).map(p => ({ text: p.text, style: run.style, stderr: p.marked }))
+
+/**
+ * A call's text as lines of runs: styled by its SGR when its tool writes a
+ * terminal's output, plain as written otherwise, and marked where `stderr`
+ * covers it. A range past the text is clipped: a result's text is its
+ * output and then pi's notes, never stderr.
+ */
+export function outputLines(
+  text: string,
+  stderr: readonly TextRange[],
+  terminal: boolean,
+): readonly OutputLine[] {
+  const runs: readonly StyledRun[] = terminal
+    ? styledRuns(text)
+    : [{ text, style: PLAIN_STYLE, at: 0 }]
+  return linesOf(runs.flatMap(run => markedRuns(run, stderr)))
 }
 
 /**
- * A text as output runs, cut at its stderr ranges. A range past the text is
- * clipped: a result's text is its output and then pi's notes, never stderr.
+ * The detail's output: whole, or its last SHOWN characters (a break between
+ * lines counts as one) after a line counting the rest, the first line kept
+ * cut at its start.
  */
-export const outputRuns = (
-  text: string,
-  stderr: readonly TextRange[],
-): readonly OutputRun[] =>
-  markedParts(text, stderr).map(p => ({ text: p.text, stderr: p.marked }))
-
-const plainOutput = OUTPUT_RUNS.plain
-
-/** The detail's output: whole, or its last SHOWN characters after a line counting the rest. */
-export function wholeOutput(runs: readonly OutputRun[]): readonly OutputRun[] {
-  const length = runs.reduce((n, r) => n + r.text.length, 0)
-  if (length <= SHOWN) return runs
-  let skip = length - SHOWN
-  const kept: OutputRun[] = []
-  for (const run of runs) {
-    if (skip >= run.text.length) {
-      skip -= run.text.length
-      continue
+export function detailOutput(
+  lines: readonly OutputLine[],
+): readonly OutputLine[] {
+  const total = lines.reduce((n, l) => n + lengthOf(l), 0) + lines.length - 1
+  if (total <= SHOWN) return lines
+  let left = total - SHOWN
+  const kept: OutputLine[] = []
+  for (const line of lines) {
+    const length = lengthOf(line)
+    if (left > length) left -= length + 1
+    else {
+      kept.push(left > 0 ? dropStart(line, left) : line)
+      left = 0
     }
-    kept.push(skip > 0 ? { ...run, text: run.text.slice(skip) } : run)
-    skip = 0
   }
-  return [
-    plainOutput(`… ${plural(length - SHOWN, "earlier character")}\n`),
-    ...kept,
-  ]
+  return [plainLine(`… ${plural(total - SHOWN, "earlier character")}`), ...kept]
 }
 
-/** What a row's body draws: its output's text, or its images. */
+/** A line without its first `n` characters. */
+function dropStart(line: OutputLine, n: number): OutputLine {
+  const out: OutputRun[] = []
+  let left = n
+  for (const run of line) {
+    if (left >= run.text.length) left -= run.text.length
+    else {
+      out.push(left === 0 ? run : { ...run, text: run.text.slice(left) })
+      left = 0
+    }
+  }
+  return out
+}
+
+/** What a row's body draws: its output's lines, or its images. */
 type RowBody =
-  | { readonly kind: "text"; readonly runs: readonly OutputRun[] }
+  | { readonly kind: "text"; readonly lines: readonly OutputLine[] }
   | {
       readonly kind: "images"
       readonly images: readonly ImageRef[]
@@ -347,20 +382,18 @@ export interface CommandLine {
   /** It begins a top-level statement other than the command's first: the row sets it apart. */
   readonly startsStatement: boolean
   /**
-   * The output of each statement that ends on it, in order, drawn under it:
-   * in the detail of a call split by statement alone. A statement that
-   * printed nothing has none.
+   * The output of each statement that ends on it, in order, each by line,
+   * drawn under it: in the detail of a call split by statement alone. A
+   * statement that printed nothing has none.
    */
-  readonly outputs: readonly (readonly OutputRun[])[]
+  readonly outputs: readonly (readonly OutputLine[])[]
 }
 
-/** A statement's output, as a split call's row reads it. */
+/** A statement's output, as a split call's row reads it: its SGR and stderr read. */
 interface StatementOutput {
-  readonly text: string
+  readonly lines: readonly OutputLine[]
   /** Lines were left out of its start. */
   readonly truncated: boolean
-  /** What it wrote to stderr, in `text`. */
-  readonly stderr: readonly TextRange[]
 }
 
 /**
@@ -372,10 +405,8 @@ export type RowSplit = readonly StatementOutput[]
 
 /** A call's output as its row reads it. */
 interface RowOutput {
-  /** The result's text, or the live stream's. */
-  readonly text: string
-  /** What it wrote to stderr, in `text`; none while the call runs. */
-  readonly stderr: readonly TextRange[]
+  /** The result's text, or the live stream's, as lines; stderr marked once the call has returned. */
+  readonly lines: readonly OutputLine[]
   readonly split: RowSplit | null
   /** Why its stored record says it is shown whole; null otherwise. */
   readonly whyUndivided: UndividedWhy | null
@@ -384,7 +415,9 @@ interface RowOutput {
 /**
  * A call's output, from its result and its stored record once it has a
  * result, else from its live streams: `streamed` is its own, `liveTexts`
- * its statements' by ordinal, for a command of `statementCount`.
+ * its statements' by ordinal, for a command of `statementCount`. Read here,
+ * once, before any cut (`outputLines`), so a style set above a cut line
+ * still holds below it.
  */
 export function rowOutput(
   call: ToolCall,
@@ -393,26 +426,30 @@ export function rowOutput(
   liveTexts: Readonly<Record<number, string>>,
   statementCount: number,
 ): RowOutput {
+  const terminal = isTerminalOutputTool(call.name)
   if (call.result === undefined)
     return {
-      text: streamed,
-      stderr: [],
+      lines: outputLines(streamed, [], terminal),
       split: liveRowSplit(liveTexts, statementCount),
       whyUndivided: null,
     }
   const verdict = stored?.verdict
   return {
-    text: call.result.text,
-    stderr: stored?.stderr ?? [],
-    split: verdict?.kind === "split" ? verdict.statements : null,
+    lines: outputLines(call.result.text, stored?.stderr ?? [], terminal),
+    split:
+      verdict?.kind === "split"
+        ? verdict.statements.map(s => ({
+            lines: outputLines(s.text, s.stderr, true),
+            truncated: s.truncated,
+          }))
+        : null,
     whyUndivided: verdict?.kind === "undivided" ? verdict.why : null,
   }
 }
 
 /** Output with nothing known of it but its text: a call that is not `bash`, or has no record. */
 export const plainRowOutput = (text: string): RowOutput => ({
-  text,
-  stderr: [],
+  lines: outputLines(text, [], false),
   split: null,
   whyUndivided: null,
 })
@@ -450,9 +487,8 @@ export function liveRowSplit(
   if (ordinals.length === 0 || ordinals.some(n => !(n >= 1 && n <= count)))
     return null
   return Array.from({ length: count }, (_, i) => ({
-    text: texts[i + 1] ?? "",
+    lines: outputLines(texts[i + 1] ?? "", [], true),
     truncated: false,
-    stderr: [],
   }))
 }
 
@@ -460,11 +496,8 @@ export function liveRowSplit(
 export const EARLIER_LINES = "… earlier lines left out"
 
 /** A statement's output as drawn: its end, after a line saying its start was left out. */
-const statementRuns = (o: StatementOutput): readonly OutputRun[] =>
-  wholeOutput([
-    ...(o.truncated ? [plainOutput(`${EARLIER_LINES}\n`)] : []),
-    ...outputRuns(o.text, o.stderr),
-  ])
+const statementLines = (o: StatementOutput): readonly OutputLine[] =>
+  detailOutput(o.truncated ? [plainLine(EARLIER_LINES), ...o.lines] : o.lines)
 
 /** Everything a row draws but its tag and status. */
 interface RowView {
@@ -535,19 +568,20 @@ export function rowView(
   // A split for another count of statements is not this command's.
   const byStatement =
     inDetail && split !== null && split.length === summary.statements.length
-  const outputsOf = (line: number): readonly (readonly OutputRun[])[] =>
+  const outputsOf = (line: number): readonly (readonly OutputLine[])[] =>
     byStatement
       ? summary.statements.flatMap((st, i) => {
           const own = split[i]
-          return st.last === line && own !== undefined && own.text !== ""
-            ? [statementRuns(own)]
+          return st.last === line && own !== undefined && own.lines.length > 0
+            ? [statementLines(own)]
             : []
         })
       : []
-  const runs = outputRuns(output.text, output.stderr)
   const head = headLines(summary.whole)
-  const tail =
-    body.kind === "text" ? tailLines(runs) : { runs: [], hidden: 0, cut: false }
+  const tail: Cut<OutputRun> =
+    body.kind === "text"
+      ? tailLines(output.lines)
+      : { lines: [], hidden: 0, cut: false }
   const tall =
     body.kind === "images" && body.images.some(i => i.height > THUMB_HEIGHT)
   const hidden: Hidden = {
@@ -559,7 +593,7 @@ export function rowView(
   return {
     head: byIntent ? lead.intent : null,
     caption: byIntent ? null : (summary.intent ?? null),
-    command: linesOf(open ? summary.whole : byIntent ? [] : head.runs).map(
+    command: (open ? linesOf(summary.whole) : byIntent ? [] : head.lines).map(
       (runs, i) => ({
         runs,
         startsStatement: summary.starts.includes(i),
@@ -572,7 +606,11 @@ export function rowView(
         : {
             kind: "text",
             // Split by statement, the output is under its statements.
-            runs: byStatement ? [] : open ? wholeOutput(runs) : tail.runs,
+            lines: byStatement
+              ? []
+              : open
+                ? detailOutput(output.lines)
+                : tail.lines,
           },
     undividedNote:
       inDetail && output.whyUndivided !== null

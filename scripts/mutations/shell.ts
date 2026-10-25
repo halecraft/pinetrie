@@ -6,6 +6,7 @@ const layout = "packages/shell/layout.ts"
 const spans = "packages/shell/spans.ts"
 const statements = "packages/shell/statements.ts"
 const nodes = "packages/shell/nodes.ts"
+const terminal = "packages/shell/terminal.ts"
 
 export const mutations: readonly Mutation[] = [
   // ── statements in a shown text ──
@@ -145,5 +146,63 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "string marks",
+  },
+  // ── a terminal's output ──
+  {
+    name: "an SGR is dropped as any other sequence",
+    file: terminal,
+    from: '  match[3] === "m" && match[2] === "" && /^[\\d;:]*$/.test(match[1] ?? "")',
+    to: '  false && /^[\\d;:]*$/.test(match[1] ?? "")',
+    command: unit,
+    expect: "keeps an SGR as written",
+  },
+  {
+    name: "a cut sequence is read after the catch-all",
+    file: terminal,
+    from: String.raw`|\u001b(?:\[[\x30-\x3f]*[\x20-\x2f]*|[\]P^_X][^\u0007\u001b]*)?$|\u001b[\x20-\x2f]*[\x30-\x7e]/g`,
+    to: String.raw`|\u001b[\x20-\x2f]*[\x30-\x7e]|\u001b(?:\[[\x30-\x3f]*[\x20-\x2f]*|[\]P^_X][^\u0007\u001b]*)?$/g`,
+    command: unit,
+    expect: "drops a sequence the text ends inside of",
+  },
+  {
+    name: "the whole output is sanitized, SGR among it",
+    file: terminal,
+    from: '    else if (piece.kind === "sgr") out += piece.source\n  return out',
+    to: '    else if (piece.kind === "sgr") out += piece.source\n  return sanitize(out)',
+    command: unit,
+    expect: "sanitizes only the text between sequences",
+  },
+  {
+    name: "a bright colour is read as its basic one",
+    file: terminal,
+    from: "BASIC[code - 90 + 8]",
+    to: "BASIC[code - 90]",
+    command: unit,
+    expect: "ESC[0m then ESC[91m",
+  },
+  {
+    name: "an extended colour's fields are read as codes too",
+    file: terminal,
+    from: "      if (!colon) i += took\n",
+    to: "",
+    command: unit,
+    expect: "ESC[0m then ESC[38;5;1m",
+  },
+  {
+    name: "a palette index past 255 is taken",
+    file: terminal,
+    from: "n <= 255 ? (n as PaletteIndex)",
+    to: "n <= 256 ? (n as PaletteIndex)",
+    command: unit,
+    expect: "paletteIndex takes 0 to 255",
+  },
+  {
+    name: "a styled run forgets where it starts",
+    file: terminal,
+    from: "      runs.push({ text: piece.text, style, at: piece.at })",
+    to: "      runs.push({ text: piece.text, style, at: 0 })",
+    command: unit,
+    expect:
+      "splits text at each sequence, each run at its offset in the text read",
   },
 ]

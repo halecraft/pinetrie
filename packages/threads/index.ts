@@ -305,6 +305,7 @@ export {
   GET_LATEST_TOOL,
   GREP_TOOL,
   INTENT_FIELD,
+  isTerminalOutputTool,
   knownToolId,
   LEAVE_TOOL,
   PROPOSE_TOOL,

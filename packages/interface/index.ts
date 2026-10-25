@@ -729,7 +729,8 @@ export {
   callMark,
   callStatus,
   NO_MEMORY,
-  type OutputRun,
+  type OutputLine,
+  type PaletteIndex,
   REVEAL_MS,
   type RowMemory,
   type Run,
@@ -738,6 +739,8 @@ export {
   rowSummary,
   rowView,
   runningFor,
+  type TerminalColor,
+  type TerminalStyle,
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, callPurpose, toolWord } from "./tool-words.ts"

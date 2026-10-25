@@ -303,6 +303,7 @@ export interface ToolCall {
 
 /** A tool's result. */
 export interface ToolResult {
+  /** As stored: a terminal tool's (`isTerminalOutputTool`) keeps its output's SGR, which a row draws and the model never reads. */
   readonly text: string
   readonly isError: boolean
   /** The images it returned, stored as blobs. */

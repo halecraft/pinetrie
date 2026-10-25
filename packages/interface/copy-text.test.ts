@@ -118,3 +118,17 @@ test("an output with more backtick runs than a call takes arguments still copies
     ),
   ).toBe(`\`ran x\`\n\n\`\`\`\n${output}\n\`\`\``)
 })
+
+test("a bash output is copied without its escape sequences, a read file as stored", () => {
+  const styled = "\u001b[32mok\u001b[0m"
+  expect(
+    copyText(
+      reply("", [
+        { id: "a", name: "bash", subject: "x", result: done(styled) },
+        { id: "b", name: "read", subject: "f", result: done(styled) },
+      ]),
+    ),
+  ).toBe(
+    `\`ran x\`\n\n\`\`\`\nok\n\`\`\`\n\n\`read f\`\n\n\`\`\`\n${styled}\n\`\`\``,
+  )
+})

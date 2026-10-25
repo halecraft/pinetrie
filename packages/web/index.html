@@ -53,8 +53,32 @@
         --danger-soft: light-dark(#7d393c, #e89a9a);
         --ok: light-dark(#037030, #7bd88f);
         --ok-soft: light-dark(#2a552c, #a8d8a8);
-        /* What a command wrote to stderr, on its output's --sunk: not a
-           failure's red, since stderr is often progress or a warning. */
+        /* A terminal's 16 basic colours, as a command's output names them by
+           number (`output-style.ts`), each at least 4.5:1 on `--sunk`, the
+           output's ground (`colors.test.ts`). The hues are the roles' own:
+           red is --danger's, green --ok's, yellow --caution's, blue
+           --accent's, magenta --command's, darkened on the light page where
+           --sunk needs it. "White" is the strongest text and "black" the
+           faintest that still reads, so neither vanishes on either page. */
+        --ansi-0: light-dark(#23272c, #7c8490);
+        --ansi-1: light-dark(#ab4c48, #f28b82);
+        --ansi-2: light-dark(#037030, #7bd88f);
+        --ansi-3: light-dark(#8a6222, #d0a15f);
+        --ansi-4: light-dark(#456baa, #8ab4f8);
+        --ansi-5: light-dark(#7c53a3, #d2a8ff);
+        --ansi-6: light-dark(#1b6f78, #76d9e6);
+        --ansi-7: light-dark(#424a56, #c9d1d9);
+        --ansi-8: light-dark(#5b6370, #8b93a1);
+        --ansi-9: light-dark(#a8322b, #ffaba3);
+        --ansi-10: light-dark(#1a6b33, #a6f0b5);
+        --ansi-11: light-dark(#765e00, #f2c94c);
+        --ansi-12: light-dark(#216dba, #58a6ff);
+        --ansi-13: light-dark(#7b57b7, #b392f0);
+        --ansi-14: light-dark(#0e6f78, #a5ecf5);
+        --ansi-15: light-dark(#13161c, #ffffff);
+        /* The bar in the margin of a line a command wrote to stderr, on its
+           output's --sunk: not a failure's red, since stderr is often
+           progress or a warning; the bar's shape says it, not its colour. */
         --stderr: light-dark(#a3502e, #eea27c);
         /* The same on both pages: the action's fill and the white on it, an
            image's checker, and a branch not yet started. */
@@ -868,7 +892,8 @@
         font-variant-numeric: tabular-nums; }
       .tool[data-status="ok"] .tool-status { color: var(--ok); }
       .tool[data-status="error"] .tool-status { color: var(--danger); }
-      /* Its last lines, or all of them: never a scroll of its own. */
+      /* Its last lines, or all of them: never a scroll of its own. A
+         terminal tool's runs carry their styles inline (`OutputLines`). */
       .tool-output { clear: both; margin: var(--space-4) 0 0; padding: var(--space-5);
         background: var(--sunk); border: 1px solid var(--edge); white-space: pre-wrap;
         overflow-wrap: anywhere; font-size: var(--font-sm); }
@@ -878,8 +903,12 @@
          still comes after it. */
       .tool-statement-output { margin: var(--space-2) 0 var(--space-4); text-indent: 0;
         color: var(--text); }
-      /* What a command wrote to stderr, in its output (`OutputRun`). */
-      .tool-stderr { color: var(--stderr); }
+      /* An output's line (`OutputLines`): a block, so a line it wrote to
+         stderr has a bar in the output's left padding, which says so by its
+         shape as well as its colour. An empty line keeps its height. */
+      .tool-out-line { display: block; min-height: 1lh; }
+      .tool-out-line[data-stderr] { margin-left: calc(-1 * var(--space-5));
+        padding-left: calc(var(--space-5) - 3px); border-left: 3px solid var(--stderr); }
       /* Why a detail shows a command's output whole, not by statement. */
       .tool-undivided { margin: var(--space-4) 0 0; font-size: var(--font-sm); color: var(--text-muted); }
       /* A result's images, in place of its text (`toolBody`). A tall one is a

@@ -4,8 +4,12 @@
 //
 // Its view is pi's bash tool's: the output decoded as UTF-8, sanitised and
 // cut to its tail by pi's own exported functions, with pi's running counts
-// of bytes and lines. A character split across chunks is held until its last
-// byte arrives, in the order the chunks came, whichever pipe each is from.
+// of bytes and lines, but for escape sequences: an SGR is kept for the row
+// to style its text by, and any other is dropped whole, where pi's
+// sanitising drops only its ESC. The model reads none (`plainBashResults`).
+// A character split across chunks is held until its last byte arrives, in
+// the order the chunks came, whichever pipe each is from. The limits count
+// an SGR's bytes, as pi counts every byte it read.
 // Beside pi's view, the capture keeps which pipe each character came from,
 // and gives the view's stderr as ranges of its text, never for the model.
 
@@ -18,6 +22,7 @@ import {
   utf8ByteLength,
 } from "@earendil-works/pi-agent-core"
 import type { OutputFd, TextRange } from "@pinetrie/core"
+import { sgrOnlyText } from "@pinetrie/shell"
 
 /** How much of the output a view keeps: its last lines and bytes. */
 export interface CaptureLimits {
@@ -123,7 +128,7 @@ export const captureView = (state: CaptureState): CaptureView => {
   const totalLines = linesOf(state)
   const truncated = state.totalBytes > maxBytes || totalLines > maxLines
   const { content, ...truncation } = retained
-  const text = sanitizeBinaryOutput(content)
+  const text = kept(content)
   // A cut view drops the buffer's final newline with the lines before it.
   const start =
     state.buffer.length -
@@ -197,11 +202,17 @@ const lastBytes = (text: string, maxBytes: number): string => {
 }
 
 /**
+ * Text as a view keeps it: its SGR kept for the row, any other escape
+ * sequence dropped whole, and pi's sanitiser run only between them.
+ */
+const kept = (text: string): string => sgrOnlyText(text, sanitizeBinaryOutput)
+
+/**
  * The stderr ranges of a view whose unsanitised text is `content`, at
- * `start` in the buffer: each stretch sanitised on its own, which pi's
+ * `start` in the buffer: each stretch kept on its own, which pi's
  * sanitising allows, as it deletes single code units. Empty when the
- * stretches do not rebuild `text` exactly, so a mark never moves a
- * character.
+ * stretches do not rebuild `text` exactly (a sequence across a change of
+ * pipe can make them differ), so a mark never moves a character.
  */
 function viewStderr(
   state: CaptureState,
@@ -218,7 +229,7 @@ function viewStderr(
     const to = Math.min(at + stretch.length, start + content.length)
     at += stretch.length
     if (to <= from) continue
-    const part = sanitizeBinaryOutput(state.buffer.slice(from, to))
+    const part = kept(state.buffer.slice(from, to))
     if (stretch.fd === "stderr" && part !== "") {
       const last = ranges.at(-1)
       if (last !== undefined && last.to === rebuilt.length)

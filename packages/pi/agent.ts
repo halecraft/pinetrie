@@ -33,6 +33,7 @@ import {
   type ScratchDocHandle,
 } from "@pinetrie/schema"
 import { type StreamEvent, TOOL_IDS } from "@pinetrie/threads"
+import { plainBashResults } from "./bash-tool.ts"
 import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
 import { NO_MODEL_STAND_IN } from "./config.ts"
@@ -133,9 +134,10 @@ export interface CreateAgentOptions {
 
 /**
  * What the model reads: pi's own conversion, after each chat's images are
- * attached. Read from the store for every request, uncached.
+ * attached and each terminal tool's result without its escape sequences
+ * (`plainBashResults`). Read from the store for every request, uncached.
  */
-function providerMessages(
+export function providerMessages(
   messages: AgentMessage[],
   blobs: Pick<BlobStore, "get">,
 ): ReturnType<typeof convertToLlm> {
@@ -156,7 +158,7 @@ function providerMessages(
           ]
     }),
   )
-  return convertToLlm(withMessageImages(messages, found))
+  return convertToLlm(withMessageImages(plainBashResults(messages), found))
 }
 
 /** The pi stack over one root's session. */

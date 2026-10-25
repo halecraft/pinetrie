@@ -1631,8 +1631,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a result's text is never drawn",
     file: "packages/interface/tool-row.ts",
-    from: "    text: call.result.text,\n",
-    to: "    text: streamed,\n",
+    from: "    lines: outputLines(call.result.text, stored?.stderr ?? [], terminal),\n",
+    to: "    lines: outputLines(streamed, stored?.stderr ?? [], terminal),\n",
     suite: "browser",
     scenario: "tools",
     expect:

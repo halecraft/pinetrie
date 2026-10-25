@@ -84,10 +84,19 @@ test("a cut view whose output ends in a newline keeps stderr on its own text", (
 test("a control character pi removes shrinks the stderr range with it", () => {
   const view = viewOf([
     { fd: "stdout", bytes: text("a") },
-    { fd: "stderr", bytes: text("b\x1b[0mc") },
+    { fd: "stderr", bytes: text("b\x01c") },
   ])
-  expect(view.text).toBe("ab[0mc")
-  expect(stderrOf(view)).toEqual(["b[0mc"])
+  expect(view.text).toBe("abc")
+  expect(stderrOf(view)).toEqual(["bc"])
+})
+
+test("an SGR written to stderr stays in its range, and another sequence leaves it whole", () => {
+  const view = viewOf([
+    { fd: "stdout", bytes: text("a") },
+    { fd: "stderr", bytes: text("b\x1b[31mc\x1b[2Kd") },
+  ])
+  expect(view.text).toBe("ab\x1b[31mcd")
+  expect(stderrOf(view)).toEqual(["b\x1b[31mcd"])
 })
 
 test("a character split across two stderr chunks is marked whole", () => {

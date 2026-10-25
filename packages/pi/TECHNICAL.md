@@ -935,7 +935,12 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
   `bash-tool.test.ts` holds them equal to `createBashTool`'s, and the result
   text equal to pi's tool's over `NodeExecutionEnv` on 17 commands,
   timeout and abort among them, so a pi upgrade that changes its own shows
-  there, for us to decide. Its updates are pi's: the view at most every
+  there, for us to decide. Escape sequences are the one difference
+  (ADR-0214): pi leaves each without its ESC, as text; ours keeps an SGR and
+  drops any other whole. The limits count an SGR's bytes, as pi counts
+  every byte it read, so a heavily coloured output is cut sooner than its
+  visible text would be, and its "Showing lines …" note can differ from
+  pi's. Its updates are pi's: the view at most every
   100 ms, and a `checkpoint` every 2 s, so a running call's output so far
   survives in `pi.pending.tool_output`. `bashResult` words the result as
   pi does: the tail, then "Showing lines … Full output: <file>" when cut,
@@ -943,9 +948,18 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
 - **One capture, `shell-capture.ts`**, makes what the model reads, from the
   chunks in the order the lane read them, both pipes through one decoder,
   built on pi's exported `truncateTail`, `sanitizeBinaryOutput` and
-  `utf8ByteLength`. Each statement's view is the same capture, over that
+  `utf8ByteLength`. Its text is `sgrOnlyText` (`@pinetrie/shell`) around
+  pi's sanitiser: an SGR kept for the row, any other sequence dropped
+  whole, the sanitiser run only between them. Each statement's view is the same capture, over that
   statement's bytes. `BASH_LIMITS` is the one value for when output is cut:
   the capture, the spill's counts and the stored split all take it.
+- **The model reads a `bash` result without escapes** (ADR-0214, S342).
+  `providerMessages` (`agent.ts`), which builds every model request, runs
+  `plainBashResults` first: each result whose tool `isTerminalOutputTool`
+  (`@pinetrie/threads`) loses every escape sequence, an interrupted call's
+  too, since pi's synthetic result keeps its `toolName`. Any other tool's
+  result is read as stored. The stored result, its stream and its split
+  keep the SGR for the row.
 - **The capture keeps each character's pipe, for the row alone**: its
   buffer's stretches by pipe (`streams`), trimmed with it, give the view's
   stderr as `TextRange`s of its text (`CaptureView.stderr`). The model's
@@ -955,9 +969,10 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
     joins what it keeps without it, so a cut view starts one code unit
     earlier in the buffer than its length says.
   - pi's sanitising deletes single code units, so each stretch is
-    sanitised on its own; the stretches must then rebuild the view's text
-    exactly, or the view has no ranges. A wrong belief about pi's cut
-    costs the marks, never a character.
+    sanitised on its own, through the same `sgrOnlyText` as the whole view;
+    the stretches must then rebuild the view's text exactly, or the view
+    has no ranges. A wrong belief about pi's cut, or an escape sequence
+    split across a change of pipe, costs the marks, never a character.
   - A character split across chunks takes the pipe of the chunk that
     completes it.
 - **The command runs through `ToolContext.shell`** (`laneShell`,
@@ -1330,6 +1345,11 @@ conformance stayed green, which is why they ran first.
   entry's `content`, never drawn in from the other root at each request
   (S144). `run` writes it first in `before`, so the cards entry stays the
   prompt's parent.
+- **Gotcha: compaction's summariser reads a `bash` result's SGR.** Its
+  `convertToLlm` is pi's own, not `toProviderMessages`, so
+  `plainBashResults` never runs on what it summarises (S342). It costs
+  tokens and harms nothing; dropping them there would mean running our
+  own `compact` for every compaction.
 
 ### Requests outside every thread (`PiSetup.complete`, ADR-0105, ADR-0106, ADR-0074)
 

@@ -1,6 +1,8 @@
 // interface/copy-text — what a message's copy puts on the clipboard, as markdown.
 
+import { plainText } from "@pinetrie/shell"
 import {
+  isTerminalOutputTool,
   type ToolCall,
   type TranscriptMessage,
   transcriptCalls,
@@ -13,8 +15,10 @@ export const COPY_MESSAGE = "copy this message"
 /**
  * A message as markdown: its text as stored, then each tool call it made, in
  * order. A call is its tool's word and all it touched, in code (`callLabel`),
- * then its result's text, whole, in a fenced block. A call still running has no result yet, and a result's
- * images are left out. Empty for a message with neither text nor calls.
+ * then its result's text, whole, in a fenced block: a terminal tool's
+ * without its escape sequences, as its row draws it. A call still running
+ * has no result yet, and a result's images are left out. Empty for a
+ * message with neither text nor calls.
  */
 export function copyText(node: TranscriptMessage): string {
   return [node.text, ...transcriptCalls(node).map(callText)]
@@ -25,7 +29,8 @@ export function copyText(node: TranscriptMessage): string {
 function callText(call: ToolCall): string {
   const label = callLabel(call, "whole")
   const head = label.includes("\n") ? fenced(label) : inlineCode(label)
-  const result = call.result?.text ?? ""
+  const stored = call.result?.text ?? ""
+  const result = isTerminalOutputTool(call.name) ? plainText(stored) : stored
   return result === "" ? head : `${head}\n\n${fenced(result)}`
 }
 

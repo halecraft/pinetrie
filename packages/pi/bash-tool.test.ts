@@ -1,11 +1,14 @@
 // pine·trie's `bash` tool against pi's: the same tool to the model, and the
-// same result text on the same commands. A deliberate change to either
+// same result text on the same commands, but for escape sequences, which pi
+// leaves as text without their ESC: ours keeps an SGR for the row and drops
+// any other whole, and the model reads none. A deliberate change to either
 // shows here, for us to decide.
 
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  type AgentMessage,
   BACKGROUND_CONTEXT,
   createBashTool,
 } from "@earendil-works/pi-agent-core"
@@ -19,7 +22,12 @@ import {
 } from "@pinetrie/core"
 import type { BashOutputRecord } from "@pinetrie/rules"
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { bashResult, bashTool, callFlush } from "./bash-tool.ts"
+import {
+  bashResult,
+  bashTool,
+  callFlush,
+  plainBashResults,
+} from "./bash-tool.ts"
 import {
   type LaneChannel,
   laneShell,
@@ -134,7 +142,7 @@ const CASES: readonly {
   },
   {
     name: "control bytes",
-    command: "printf '\\x00\\x01\\x1b[31mred\\x7f\\r\\n'",
+    command: "printf '\\x00\\x01red\\x7f\\r\\n'",
   },
   { name: "invalid UTF-8", command: "printf '\\xff\\xfe abc \\xc3\\x28\\n'" },
   {
@@ -169,6 +177,38 @@ test.each(CASES)("its result is pi's bash tool's: $name", async c => {
     c.abortAfterMs,
   )
   expect(named(ours)).toBe(named(pis))
+})
+
+const escapes =
+  "printf '\\x00\\x1b[1;31mred\\x1b[0m \\x1b[2Kline\\x1b]8;;http://x\\x07link\\x1b]8;;\\x07\\n'"
+
+test("a result keeps an SGR, and drops any other escape sequence whole", async () => {
+  const ours = await resultOf(
+    bashTool(),
+    { shell: localShell() } satisfies Pick<ToolContext, "shell">,
+    { command: escapes },
+  )
+  expect(ours).toBe("\x1b[1;31mred\x1b[0m linelink\n")
+})
+
+test("the model reads a bash result without its escape sequences, and any other tool's as stored", () => {
+  const result = (toolName: string, text: string): AgentMessage => ({
+    role: "toolResult",
+    toolCallId: "c",
+    toolName,
+    content: [{ type: "text", text }],
+    isError: false,
+    timestamp: 0,
+  })
+  expect(
+    plainBashResults([
+      result("bash", "\x1b[31mred\x1b[0m\n"),
+      result("read", "\x1b[31mred\n"),
+    ]).map(m => (m.role === "toolResult" ? m.content : [])),
+  ).toEqual([
+    [{ type: "text", text: "red\n" }],
+    [{ type: "text", text: "\x1b[31mred\n" }],
+  ])
 })
 
 const cut = (totalLines: number, outputLines: number) => {

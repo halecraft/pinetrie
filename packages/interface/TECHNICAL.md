@@ -1199,14 +1199,14 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   printed, or for an ordinal the command lacks), with no stderr. The page
   gathers what it reads and calls `rowOutput`; it decides nothing about
   splits.
-- **Output is drawn as runs** (`OutputRun`: its text, and whether it came
-  through stderr), cut at the record's ranges by `outputRuns`
-  (`markedParts`). A range past the text is clipped: a result's text is
-  its output and then pi's notes, which are never stderr. The line helpers
-  (`headLines`, `tailLines`) are generic over a run's kind (`RunKind`: how
-  it makes a plain run, and which runs merge), so a command's `Run`s and
-  an output's `OutputRun`s share them; `wholeOutput` cuts runs, keeping a
-  mark on what is left of a cut one.
+- **Output is drawn as lines of runs** (`OutputRun`: its text, its style,
+  and whether it came through stderr), cut at the record's ranges with
+  `markedParts` (`outputLines`, below). A range past the text is clipped: a
+  result's text is its output and then pi's notes, which are never stderr.
+  The line helpers (`headLines`, `tailLines`) are generic over a run's
+  shape, sharing only the "…" a cut line ends with, so a command's `Run`s
+  and an output's `OutputRun`s share them; `detailOutput` cuts lines,
+  keeping a style and a mark on what is left of a cut run.
 - **A `bash` call's detail shows each statement's output under it**
   (ADR-0204), from a `RowSplit`, which only what the host wrote of a
   verified split makes, and only for a command `isSplittable` (a shell
@@ -1226,6 +1226,28 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   and the summary is the same with a reason or without, so a row keeps its
   height. `undividedWords` (`undivided-words.ts`) words each reason in one
   line, exhaustive over `UndividedWhy`.
+- **A call's output is read before the view, into lines of runs**
+  (ADR-0214). `rowOutput` reads the result's or the stream's text, and each
+  stored or live statement's, with `outputLines`: a terminal tool's
+  (`isTerminalOutputTool`, `@pinetrie/threads`) styled by its SGR
+  (`@pinetrie/shell`), any other's plain, and each run marked where the
+  record's stderr ranges cover it. A range counts the stored text's escape
+  sequences, and each styled run carries where it starts in that text
+  (`StyledRun.at`), so a range cuts runs exactly. `rowView` takes lines and
+  only cuts them, so it never sees an escape:
+  - the read comes before every cut, so a colour set above a hidden line
+    still holds in the summary's tail;
+  - `LINE_LENGTH` and `SHOWN` count visible characters (`detailOutput`
+    keeps an output's end, a break between lines counting one);
+  - the body and each statement's output are lines, as the command is
+    (`CommandLine`), so no runs are joined back and interface never
+    compares two runs.
+
+  A client draws an `OutputRun`'s style and its stderr its own way: the
+  page as CSS and a margin bar (`packages/web/TECHNICAL.md`), a terminal
+  as SGR again. `tool-row.ts` re-exports the style's types, since the page
+  does not declare the shell. A copy (`copyText`) drops a terminal tool's
+  escapes as the row does.
 - **`liveWork` takes a call's own stream, of its whole output**, never a
   statement's (`tools`), and keeps a call's statement streams apart, by
   ordinal (`statements`); `callStatementStreams` and `callBashOutputs` give

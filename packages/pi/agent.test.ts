@@ -53,7 +53,7 @@ import {
 import { NOBODY } from "@pinetrie/threads"
 import { cardIdFor } from "@pinetrie/threads/fixtures"
 import { describe, expect, test } from "vitest"
-import { type CreateAgentOptions, newId } from "./agent.ts"
+import { type CreateAgentOptions, newId, providerMessages } from "./agent.ts"
 import { NO_RESOURCES } from "./config.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
@@ -697,4 +697,23 @@ describe("agents talking", () => {
     expect(seen.at(-2)).toBe(heard.content)
     expect(seen.at(-1)).toBe(relay.content)
   })
+})
+
+test("the model reads a bash result without its escape sequences", () => {
+  const read = providerMessages(
+    [
+      {
+        role: "toolResult",
+        toolCallId: "c",
+        toolName: "bash",
+        content: [{ type: "text", text: "\u001b[1;32mok\u001b[0m\n" }],
+        isError: false,
+        timestamp: 0,
+      },
+    ],
+    { get: () => undefined },
+  )
+  expect(read.map(m => (m.role === "toolResult" ? m.content : []))).toEqual([
+    [{ type: "text", text: "ok\n" }],
+  ])
 })

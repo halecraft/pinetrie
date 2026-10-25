@@ -906,4 +906,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each gone one passed over, to the next above",
   },
+  // ── tools ──
+  {
+    name: "every tool's result is a terminal's output",
+    file: "packages/threads/tools.ts",
+    from: "  return id !== undefined && TERMINAL_OUTPUT_TOOLS.has(id)",
+    to: "  return id !== undefined",
+    command: unit,
+    expect: "only bash's result is a terminal's output",
+  },
 ]

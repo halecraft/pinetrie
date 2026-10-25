@@ -37,6 +37,14 @@ test("a slot's colour is the stylesheet's for it", () => {
   expect(slotColor("pending")).toBe("var(--slot-pending)")
 })
 
+/**
+ * Modules that draw colours a program wrote, not the page's own: a
+ * command's 256-colour and RGB output stays as the program wrote it on
+ * either page, as a terminal draws it. Its 16 basic colours are still the
+ * stylesheet's.
+ */
+const PROGRAM_COLOURS = ["output-style.ts"]
+
 // A colour written in code would stay as it is on a page with other colours.
 test("the page's code writes no colour of its own, only the stylesheet's", () => {
   const dir = new URL(".", import.meta.url)
@@ -44,6 +52,7 @@ test("the page's code writes no colour of its own, only the stylesheet's", () =>
     /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\((?![^)]*var\()/i
   const written = readdirSync(dir)
     .filter(f => /\.tsx?$/.test(f) && !f.endsWith(".test.ts"))
+    .filter(f => !PROGRAM_COLOURS.includes(f))
     .filter(f => colour.test(readFileSync(new URL(f, dir), "utf8")))
   expect(written).toEqual([])
 })
@@ -108,7 +117,17 @@ describe.each(SCHEMES)("on a %s page", scheme => {
     )
   })
 
-  test("a command's stderr reads on its output, at 4.5:1 or more on --sunk", () => {
+  test.each(Array.from({ length: 16 }, (_, n) => n))(
+    "a terminal's colour %i reads on a tool's output: 4.5:1 or more on --sunk",
+    n => {
+      const sunk = named("sunk", scheme)
+      const color = named(`ansi-${n}`, scheme)
+      expect([sunk, color]).not.toContain("")
+      expect(contrast(color, sunk)).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
+  test("a command's stderr bar reads on its output, at 4.5:1 or more on --sunk", () => {
     expect(
       contrast(named("stderr", scheme), named("sunk", scheme)),
     ).toBeGreaterThanOrEqual(4.5)

@@ -1,4 +1,4 @@
-import { type ImageRef, isSha256 } from "@pinetrie/core"
+import { type ImageRef, isSha256, type TextRange } from "@pinetrie/core"
 import type { BashOutputRecord } from "@pinetrie/rules"
 import { streamId, type ToolCall, type ToolResult } from "@pinetrie/threads"
 import { describe, expect, test } from "vitest"
@@ -7,14 +7,15 @@ import {
   callBashOutputs,
   callMark,
   callStatus,
+  detailOutput,
   EARLIER_LINES,
   headLines,
   LINE_LENGTH,
   liveRowSplit,
   moreWords,
   NO_MEMORY,
-  type OutputRun,
-  outputRuns,
+  type OutputLine,
+  outputLines,
   plainRowOutput,
   type RowSplit,
   type Run,
@@ -26,17 +27,26 @@ import {
   SHOWN,
   tailLines,
   toolBody,
-  wholeOutput,
 } from "./tool-row.ts"
 
-const text = (runs: readonly (Run | OutputRun)[] | undefined) =>
+const text = (runs: readonly { readonly text: string }[] | undefined) =>
   runs?.map(r => r.text).join("")
-const output = (t: string): OutputRun[] => [{ text: t, stderr: false }]
-/** A text body, as `rowView` draws it, from its runs' text. */
-const bodyText = (body: { kind: string; runs?: readonly OutputRun[] }) =>
-  body.kind === "text" ? text(body.runs ?? []) : null
+/** Lines' text, a break between each. */
+const textOf = (lines: readonly (readonly { readonly text: string }[])[]) =>
+  lines.map(l => text(l)).join("\n")
+/** A `bash` output as its row reads it, marked where `stderr` covers it. */
+const bashOut = (t: string, stderr: readonly TextRange[] = []) =>
+  outputLines(t, stderr, true)
+/** Each line's runs as their text and stderr mark. */
+const marks = (lines: readonly OutputLine[]) =>
+  lines.map(l => l.map(r => [r.text, r.stderr]))
+/** A text body, as `rowView` draws it, from its lines' text. */
+const bodyText = (body: { kind: string; lines?: readonly OutputLine[] }) =>
+  body.kind === "text" ? textOf(body.lines ?? []) : null
 const lineText = (lines: readonly CommandLine[]) =>
-  lines.map(l => text(l.runs)).join("\n")
+  textOf(lines.map(l => l.runs))
+/** The colour SGR 31 sets, as the shell reads it; read in a test, so a broken read fails only that test. */
+const red = () => bashOut("\u001b[31mx")[0]?.[0]?.style.fg
 const plain = (t: string): Run[] => [{ text: t, role: "plain" }]
 const numbered = (n: number) =>
   Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n")
@@ -90,7 +100,9 @@ test("a call's status: running without a result, failed by its result's error; a
 describe("headLines and tailLines", () => {
   test("a text of five lines or fewer is shown whole", () => {
     expect(headLines(plain(numbered(3)))).toEqual({
-      runs: plain(numbered(3)),
+      lines: numbered(3)
+        .split("\n")
+        .map(t => plain(t)),
       hidden: 0,
       cut: false,
     })
@@ -98,24 +110,24 @@ describe("headLines and tailLines", () => {
 
   test("the head is the first five lines, the tail the last five, and each counts the rest", () => {
     const head = headLines(plain(numbered(8)))
-    expect(text(head.runs)).toBe(numbered(5))
+    expect(textOf(head.lines)).toBe(numbered(5))
     expect(head.hidden).toBe(3)
-    const tail = tailLines(output(numbered(8)))
-    expect(text(tail.runs)).toBe("line 4\nline 5\nline 6\nline 7\nline 8")
+    const tail = tailLines(bashOut(numbered(8)))
+    expect(textOf(tail.lines)).toBe("line 4\nline 5\nline 6\nline 7\nline 8")
     expect(tail.hidden).toBe(3)
   })
 
   test("a final line break starts no line, and an empty text has none", () => {
-    expect(tailLines(output(`${numbered(5)}\n`))).toMatchObject({ hidden: 0 })
-    expect(text(tailLines(output(`${numbered(6)}\n`)).runs)).toBe(
+    expect(tailLines(bashOut(`${numbered(5)}\n`))).toMatchObject({ hidden: 0 })
+    expect(textOf(tailLines(bashOut(`${numbered(6)}\n`)).lines)).toBe(
       "line 2\nline 3\nline 4\nline 5\nline 6",
     )
-    expect(tailLines(output(""))).toEqual({ runs: [], hidden: 0, cut: false })
+    expect(tailLines(bashOut(""))).toEqual({ lines: [], hidden: 0, cut: false })
   })
 
   test("pi's status after a blank line is the tail's end", () => {
     const failed = `${numbered(10)}\n\nCommand exited with code 1`
-    expect(text(tailLines(output(failed)).runs)).toBe(
+    expect(textOf(tailLines(bashOut(failed)).lines)).toBe(
       "line 8\nline 9\nline 10\n\nCommand exited with code 1",
     )
   })
@@ -126,55 +138,104 @@ describe("headLines and tailLines", () => {
       { text: "\na\nb\nc\nd\ne\nEOF", role: "string" },
     ]
     const head = headLines(runs)
-    expect(head.runs).toEqual([
-      { text: "cat <<'EOF'", role: "command" },
-      { text: "\n", role: "plain" },
-      { text: "a", role: "string" },
-      { text: "\n", role: "plain" },
-      { text: "b", role: "string" },
-      { text: "\n", role: "plain" },
-      { text: "c", role: "string" },
-      { text: "\n", role: "plain" },
-      { text: "d", role: "string" },
+    expect(head.lines).toEqual([
+      [{ text: "cat <<'EOF'", role: "command" }],
+      [{ text: "a", role: "string" }],
+      [{ text: "b", role: "string" }],
+      [{ text: "c", role: "string" }],
+      [{ text: "d", role: "string" }],
     ])
     expect(head.hidden).toBe(2)
   })
 
   test("a long line is cut at LINE_LENGTH, with …", () => {
     const head = headLines(plain(`${"x".repeat(400)}\nshort`))
-    expect(text(head.runs)).toBe(`${"x".repeat(LINE_LENGTH)}…\nshort`)
+    expect(textOf(head.lines)).toBe(`${"x".repeat(LINE_LENGTH)}…\nshort`)
     expect(head.cut).toBe(true)
+  })
+
+  test("an output's line is cut by its visible characters, not its escapes", () => {
+    const sgr = "\u001b[31m".repeat(100)
+    const tail = tailLines(bashOut(`${sgr}${"x".repeat(LINE_LENGTH)}`))
+    expect(tail).toMatchObject({ cut: false, hidden: 0 })
+    expect(textOf(tail.lines)).toBe("x".repeat(LINE_LENGTH))
   })
 })
 
 test("the detail's output is whole, or its end after a count of what it leaves out", () => {
-  expect(text(wholeOutput(output("short")))).toBe("short")
+  expect(textOf(detailOutput(bashOut("short")))).toBe("short")
   const long = `${"a".repeat(10)}${"b".repeat(SHOWN)}`
-  expect(text(wholeOutput(output(long)))).toBe(
+  expect(textOf(detailOutput(bashOut(long)))).toBe(
     `… 10 earlier characters\n${"b".repeat(SHOWN)}`,
+  )
+  const lines = `a\n${"b".repeat(SHOWN - 1)}\nc`
+  expect(textOf(detailOutput(bashOut(lines)))).toBe(
+    `… 3 earlier characters\n${"b".repeat(SHOWN - 2)}\nc`,
   )
 })
 
 test("the detail's output cut through a stderr run keeps the mark on what is left", () => {
-  const cut = wholeOutput(
+  const cut = detailOutput(
     // 12 of stderr, then stdout: the cut drops the first 10.
-    outputRuns(`${"e".repeat(12)}${"o".repeat(SHOWN - 2)}`, [
-      { from: 0, to: 12 },
-    ]),
+    bashOut(`${"e".repeat(12)}${"o".repeat(SHOWN - 2)}`, [{ from: 0, to: 12 }]),
   )
-  expect(cut.filter(r => r.stderr).map(r => r.text)).toEqual(["ee"])
-  expect(cut[0]).toEqual({ text: "… 10 earlier characters\n", stderr: false })
+  expect(cut[1]?.filter(r => r.stderr).map(r => r.text)).toEqual(["ee"])
+  expect(marks(cut.slice(0, 1))).toEqual([[["… 10 earlier characters", false]]])
+})
+
+test("the detail's cut output keeps its styles", () => {
+  const kept = detailOutput(bashOut(`\u001b[31m${"a".repeat(SHOWN + 5)}`))
+  expect(kept[1]?.[0]?.style.fg).toEqual(red())
 })
 
 test("a result's notes after its output are never stderr", () => {
-  const runs = outputRuns("err\n\nCommand exited with code 1", [
+  const lines = bashOut("err\n\nCommand exited with code 1", [
     { from: 0, to: 4 },
     { from: 40, to: 50 },
   ])
-  expect(runs).toEqual([
-    { text: "err\n", stderr: true },
-    { text: "\nCommand exited with code 1", stderr: false },
+  expect(marks(lines)).toEqual([
+    [["err", true]],
+    [],
+    [["Command exited with code 1", false]],
   ])
+})
+
+describe("outputLines", () => {
+  test("a bash output is lines of styled runs, a style kept across a break", () => {
+    const lines = bashOut("\u001b[31ma\nb\u001b[0m c\n")
+    expect(lines.map(l => l.map(r => [r.text, r.style.fg]))).toEqual([
+      [["a", red()]],
+      [
+        ["b", red()],
+        [" c", null],
+      ],
+    ])
+  })
+
+  test("any other tool's output is plain lines, its escapes as text", () => {
+    const lines = outputLines("\u001b[31ma\n", [], false)
+    expect(lines.map(l => l.map(r => [r.text, r.style.fg]))).toEqual([
+      [["\u001b[31ma", null]],
+    ])
+  })
+
+  test("a stderr range counts the escape sequences before it, and cuts a styled run", () => {
+    // ESC[31m is 5 code units, ESC[0m 4: "b" is at 6, "c" at 11.
+    const lines = bashOut("\u001b[31mab\u001b[0mcd", [{ from: 6, to: 12 }])
+    expect(lines.map(l => l.map(r => [r.text, r.stderr, r.style.fg]))).toEqual([
+      [
+        ["a", false, red()],
+        ["b", true, red()],
+        ["c", true, null],
+        ["d", false, null],
+      ],
+    ])
+  })
+
+  test("a bash row's summary keeps a colour set on a hidden line", () => {
+    const tail = tailLines(bashOut(`\u001b[31m${numbered(8)}`))
+    expect(tail.lines.at(-1)?.[0]?.style.fg).toEqual(red())
+  })
 })
 
 describe("moreWords", () => {
@@ -425,9 +486,9 @@ describe("a row's detail by statement", () => {
   const TEXT = { kind: "text" } as const
   const COMMAND = { kind: "command" } as const
   const out = (...texts: string[]): RowSplit =>
-    texts.map(text => ({ text, truncated: false, stderr: [] }))
+    texts.map(text => ({ lines: bashOut(text), truncated: false }))
   const outputs = (lines: readonly CommandLine[]) =>
-    lines.map(l => [text(l.runs), l.outputs.map(o => text(o))])
+    lines.map(l => [text(l.runs), l.outputs.map(textOf)])
   const command = "echo a\nif true\nthen echo b\nfi\ntrue"
 
   test("each statement's output is under the line it ends on, and the body has none", () => {
@@ -439,10 +500,10 @@ describe("a row's detail by statement", () => {
       true,
     )
     expect(outputs(view.command)).toEqual([
-      ["echo a", ["a\n"]],
+      ["echo a", ["a"]],
       ["if true", []],
       ["then echo b", []],
-      ["fi", ["b\n"]],
+      ["fi", ["b"]],
       ["true", []],
     ])
     expect(bodyText(view.body)).toBe("")
@@ -456,7 +517,7 @@ describe("a row's detail by statement", () => {
       TEXT,
       true,
     )
-    expect(view.command[0]?.outputs.map(o => text(o))).toEqual(["a\n", "b\n"])
+    expect(view.command[0]?.outputs.map(textOf)).toEqual(["a", "b"])
   })
 
   test("the summary of a split call is as any call's", () => {
@@ -492,17 +553,19 @@ describe("a row's detail by statement", () => {
       {
         ...plainRowOutput("a\nb\n"),
         split: [
-          { text: "a\n", truncated: true, stderr: [] },
-          { text: "b\n", truncated: false, stderr: [] },
+          { lines: bashOut("\u001b[31ma\n"), truncated: true },
+          { lines: bashOut("b\n"), truncated: false },
         ],
       },
       TEXT,
       true,
     )
-    expect(view.command[0]?.outputs.map(o => text(o))).toEqual([
-      `${EARLIER_LINES}\na\n`,
-      "b\n",
+    const [first, second] = view.command[0]?.outputs ?? []
+    expect([textOf(first ?? []), textOf(second ?? [])]).toEqual([
+      `${EARLIER_LINES}\na`,
+      "b",
     ])
+    expect(first?.map(l => l[0]?.style.fg)).toEqual([null, red()])
   })
 
   test("a statement's stderr is marked under its line", () => {
@@ -512,16 +575,16 @@ describe("a row's detail by statement", () => {
       {
         ...plainRowOutput("a\ne\n"),
         split: [
-          { text: "a\n", truncated: false, stderr: [] },
-          { text: "e\n", truncated: false, stderr: [{ from: 0, to: 2 }] },
+          { lines: bashOut("a\n"), truncated: false },
+          { lines: bashOut("e\n", [{ from: 0, to: 2 }]), truncated: false },
         ],
       },
       TEXT,
       true,
     )
-    expect(view.command[0]?.outputs).toEqual([
-      [{ text: "a\n", stderr: false }],
-      [{ text: "e\n", stderr: true }],
+    expect(view.command[0]?.outputs.map(marks)).toEqual([
+      [[["a", false]]],
+      [[["e", true]]],
     ])
   })
 
@@ -534,13 +597,15 @@ describe("a row's detail by statement", () => {
       true,
     )
     expect(view.command[0]?.outputs).toEqual([])
-    expect(bodyText(view.body)).toBe("a\n")
+    expect(bodyText(view.body)).toBe("a")
   })
 
   test("a running call splits once a statement has printed, for its command's statements only", () => {
     expect(liveRowSplit({}, 3)).toBe(null)
     expect(liveRowSplit({ 4: "x" }, 3)).toBe(null)
-    expect(liveRowSplit({ 2: "b" }, 3)).toEqual(out("", "b", ""))
+    expect(liveRowSplit({ 2: "\u001b[31mb" }, 3)).toEqual(
+      out("", "\u001b[31mb", ""),
+    )
   })
 
   test("a message takes its own calls' records", () => {
@@ -575,7 +640,7 @@ describe("a row's output", () => {
   const SPLIT = record({
     kind: "split",
     statements: [
-      { text: "a\n", truncated: false, stderr: [] },
+      { text: "\u001b[31ma\n", truncated: false, stderr: [] },
       { text: "b\n", truncated: false, stderr: [] },
     ],
   })
@@ -587,19 +652,20 @@ describe("a row's output", () => {
     expect(
       rowOutput(bash("echo a; echo b", "a\nb\n"), "", SPLIT, { 1: "x" }, 2),
     ).toEqual({
-      text: "a\nb\n",
-      stderr: [{ from: 0, to: 2 }],
-      split: SPLIT.verdict.kind === "split" ? SPLIT.verdict.statements : null,
+      lines: bashOut("a\nb\n", [{ from: 0, to: 2 }]),
+      split: [
+        { lines: bashOut("\u001b[31ma\n"), truncated: false },
+        { lines: bashOut("b\n"), truncated: false },
+      ],
       whyUndivided: null,
     })
     expect(
       rowOutput(bash("echo a; echo b"), "a\n", SPLIT, { 1: "a\n" }, 2),
     ).toEqual({
-      text: "a\n",
-      stderr: [],
+      lines: bashOut("a\n"),
       split: [
-        { text: "a\n", truncated: false, stderr: [] },
-        { text: "", truncated: false, stderr: [] },
+        { lines: bashOut("a\n"), truncated: false },
+        { lines: [], truncated: false },
       ],
       whyUndivided: null,
     })
@@ -647,16 +713,51 @@ describe("a row's output", () => {
     const view = rowView(
       rowSummary(bash("echo e >&2; echo o")),
       COMMAND,
-      { ...plainRowOutput("e\no\n"), stderr: [{ from: 0, to: 2 }] },
+      {
+        ...plainRowOutput(""),
+        lines: bashOut("e\no\n", [{ from: 0, to: 2 }]),
+      },
       TEXT,
       true,
     )
-    expect(view.body).toEqual({
-      kind: "text",
-      runs: [
-        { text: "e\n", stderr: true },
-        { text: "o\n", stderr: false },
-      ],
-    })
+    expect(view.body.kind === "text" && marks(view.body.lines)).toEqual([
+      [["e", true]],
+      [["o", false]],
+    ])
   })
+})
+
+test("a stored split reads its record's statements, styled", () => {
+  const call: ToolCall = {
+    id: "c",
+    name: "bash",
+    subject: "echo a; echo b",
+    result: { text: "a\nb\n", isError: false, images: [] },
+  }
+  const stored = {
+    call: "c",
+    verdict: {
+      kind: "split",
+      statements: [
+        { text: "\u001b[31ma", truncated: true, stderr: [] },
+        { text: "b", truncated: false, stderr: [] },
+      ],
+    },
+    stderr: [],
+  } as unknown as BashOutputRecord
+  const split = rowOutput(call, "", stored, {}, 2).split
+  expect(split?.[0]?.lines[0]?.[0]?.style.fg).toEqual(red())
+  expect(split?.[0]?.truncated).toBe(true)
+})
+
+test("a call of a tool that writes no terminal output keeps its escapes as text", () => {
+  const call: ToolCall = {
+    id: "c",
+    name: "read",
+    subject: "f",
+    result: { text: "\u001b[31ma", isError: false, images: [] },
+  }
+  expect(textOf(rowOutput(call, "", undefined, {}, 0).lines)).toBe(
+    "\u001b[31ma",
+  )
 })

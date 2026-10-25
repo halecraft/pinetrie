@@ -6,12 +6,22 @@
 // one capture (`shell-capture.ts`) makes what the model reads from them.
 // Its join (`statement-join.ts`) splits the same chunks by the statement
 // that wrote them, for the call's row, never for the model. pi's own `exec`
-// keeps serving the other tools.
+// keeps serving the other tools. Its result keeps the output's SGR for the
+// row; the model reads it without (`plainBashResults`).
 
-import { type Context, formatSize } from "@earendil-works/pi-agent-core"
+import {
+  type AgentMessage,
+  type Context,
+  formatSize,
+} from "@earendil-works/pi-agent-core"
 import { assertNever, type ThreadId } from "@pinetrie/core"
 import type { BashOutputRecord, CallFlush } from "@pinetrie/rules"
-import { BASH_TOOL, type StreamEvent } from "@pinetrie/threads"
+import { plainText } from "@pinetrie/shell"
+import {
+  BASH_TOOL,
+  isTerminalOutputTool,
+  type StreamEvent,
+} from "@pinetrie/threads"
 import { Type } from "typebox"
 import type { ShellSettled } from "./lane-env.ts"
 import type { ShellEnd } from "./lane-protocol.ts"
@@ -47,7 +57,10 @@ export interface BashDetails {
   readonly fullOutputPath: string | undefined
 }
 
-/** What the model reads of a call, worded as pi's bash tool words it. */
+/**
+ * A call's result, worded as pi's bash tool words it: stored as it is, its
+ * output's SGR kept, and read by the model through `plainBashResults`.
+ */
 export interface BashResult {
   /** Whether the call succeeded: a failed one is thrown, as pi's tool throws it. */
   readonly ok: boolean
@@ -98,6 +111,24 @@ export function bashResult(
     }
   return { ok: true, text: text || "(no output)", details }
 }
+
+/**
+ * What the model reads of a history: the text of each result whose tool
+ * writes a terminal's output (`isTerminalOutputTool`) without its escape
+ * sequences, which only its row draws. Any other tool's result is read as
+ * stored: a file `read` returns holds what the file holds.
+ */
+export const plainBashResults = (messages: AgentMessage[]): AgentMessage[] =>
+  messages.map(m =>
+    m.role === "toolResult" && isTerminalOutputTool(m.toolName)
+      ? {
+          ...m,
+          content: m.content.map(c =>
+            c.type === "text" ? { ...c, text: plainText(c.text) } : c,
+          ),
+        }
+      : m,
+  )
 
 /** pi's checks of a timeout, worded as pi words them. */
 function checkedTimeout(timeout: number | undefined): void {

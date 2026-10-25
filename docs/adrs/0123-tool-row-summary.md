@@ -16,6 +16,7 @@
     command is in its detail.
   - ADR-0204: a row's output is shown under the statement that wrote it, when
     its bytes are attributed; undivided otherwise.
+  - ADR-0214: a row's output is drawn in the styles its program wrote it in.
 
 Restates what ADR-0049 decided of the floor and of a column's and a row's
 memory across an unmount, which stand. What changes is how much of a row

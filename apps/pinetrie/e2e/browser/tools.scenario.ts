@@ -1022,9 +1022,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // A split call's detail draws each statement's output under its
-        // line, stderr's in its own colour, and nothing under one that
-        // printed nothing. Six statements: more than the summary's five
-        // lines, so its toggle opens the detail.
+        // line, stderr's lines with a bar in their margin, and nothing
+        // under one that printed nothing. Six statements: more than the
+        // summary's five lines, so its toggle opens the detail.
         {
           const SPLIT = [
             "echo alpha",
@@ -1073,14 +1073,58 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             JSON.stringify(under),
           )
           const marked = await row.evaluate(d =>
-            [...d.querySelectorAll(".tool-statement-output .tool-stderr")].map(
-              o => (o.textContent ?? "").trim(),
-            ),
+            [
+              ...d.querySelectorAll(
+                ".tool-statement-output .tool-out-line[data-stderr]",
+              ),
+            ].map(o => (o.textContent ?? "").trim()),
           )
           check(
             "a split call's detail draws what a statement wrote to stderr, and only that, as stderr",
             JSON.stringify(marked) === JSON.stringify(["beta"]),
             JSON.stringify(marked),
+          )
+        }
+
+        // A command that colours its output: its row draws the colour from
+        // the stylesheet's palette, and never an escape as text.
+        {
+          script.use([
+            {
+              tool: "bash",
+              args: { command: "printf '\\033[31mred\\033[0m plain\\n'" },
+            },
+            { text: "coloured" },
+          ])
+          await sayToEnd("colour it")
+          const row = tp
+            .locator(`${col(0)} .tool[data-tool="bash"][data-status="ok"]`)
+            .filter({ hasText: "printf" })
+            .last()
+          const drawn = await row
+            .locator(".tool-output")
+            .evaluate(out => {
+              const probe = document.createElement("span")
+              probe.style.color = "var(--ansi-1)"
+              out.append(probe)
+              const want = getComputedStyle(probe).color
+              probe.remove()
+              const span = out.querySelector(".tool-out-line span")
+              return {
+                text: out.textContent,
+                red: span?.textContent ?? null,
+                color: span === null ? null : getComputedStyle(span).color,
+                want,
+              }
+            })
+            .catch(() => null)
+          check(
+            "a command's coloured output is drawn in its colour, its escapes never as text",
+            drawn !== null &&
+              drawn.text === "red plain" &&
+              drawn.red === "red" &&
+              drawn.color === drawn.want,
+            JSON.stringify(drawn),
           )
         }
 

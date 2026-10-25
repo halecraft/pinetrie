@@ -9,8 +9,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command's stderr is drawn as stdout",
     file: "packages/web/message.tsx",
-    from: "    run.stderr ? (\n",
-    to: "    false ? (\n",
+    from: "      data-stderr={line.some(run => run.stderr) || undefined}\n",
+    to: "      data-stderr={undefined}\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -19,8 +19,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split row's detail draws no statement's output",
     file: "packages/web/message.tsx",
-    from: "              {line.outputs.map((runs, j) => (\n",
-    to: "              {line.outputs.slice(0, 0).map((runs, j) => (\n",
+    from: "              {line.outputs.map((lines, j) => (\n",
+    to: "              {line.outputs.slice(0, 0).map((lines, j) => (\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -529,5 +529,40 @@ export const mutations: readonly Mutation[] = [
     to: '    "@pinetrie/protocol": "workspace:*",\n    "@pinetrie/rules": "workspace:*",\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
     expect: "the page declares neither rules nor reads",
+  },
+  // ── a terminal's output ──
+  {
+    name: "inverse keeps the colours where they are",
+    file: "packages/web/output-style.ts",
+    from: "  const [color, backgroundColor] = style.inverse\n",
+    to: "  const [color, backgroundColor] = false\n",
+    command: unit,
+    expect: "inverse swaps the colours",
+  },
+  {
+    name: "the cube's blue is read from its green",
+    file: "packages/web/output-style.ts",
+    from: "    level(i % 6),\n",
+    to: "    level(Math.floor(i / 6) % 6),\n",
+    command: unit,
+    expect: "palette colour 17 is",
+  },
+  {
+    name: "a terminal colour is the output's ground",
+    file: "packages/web/index.html",
+    from: "        --ansi-8: light-dark(#5b6370, #8b93a1);",
+    to: "        --ansi-8: light-dark(#5b6370, #11141a);",
+    command: unit,
+    expect: "a terminal's colour 8 reads on a tool's output",
+  },
+  {
+    name: "an output's styled run is drawn as bare text",
+    file: "packages/web/message.tsx",
+    from: "        return css === undefined ? (\n",
+    to: "        return true ? (\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a command's coloured output is drawn in its colour, its escapes never as text",
   },
 ]
