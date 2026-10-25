@@ -18,15 +18,11 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
-import { decodeWith } from "./decode.ts"
+import { choiceSchema, decodeWith } from "./decode.ts"
 import { proposedChangesStatus } from "./proposed.ts"
 
 const MediaSideSchema = Type.Object({
-  content: Type.Union([
-    Type.Literal("text"),
-    Type.Literal("binary"),
-    ...IMAGE_MIMES.map(m => Type.Literal(m)),
-  ]),
+  content: choiceSchema(["text", "binary", ...IMAGE_MIMES]),
   size: Type.Integer({ minimum: 0 }),
 })
 

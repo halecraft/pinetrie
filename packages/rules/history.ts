@@ -53,6 +53,8 @@ export function historyMessage<T extends string, S extends TSchema>(
       details: d,
       timestamp,
     }),
+    // The guard has checked it; TypeBox cannot resolve `Static` of a schema
+    // still generic in `S`, so its narrowing is lost here.
     decode: message =>
       isWellFormed(schema, message)
         ? (message as unknown as { readonly details: Static<S> }).details
