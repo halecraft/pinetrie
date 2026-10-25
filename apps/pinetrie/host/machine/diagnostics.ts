@@ -1,16 +1,16 @@
-// host/machine/diagnostics — the Machine page's Copy diagnostics: one text
+// host/machine/diagnostics — the Health page's Copy diagnostics: one text
 // of the page's words, the measurements' last rows under the export's own
 // heading, and, on the Mac, the tails of the lane VM's logs. The host keeps
 // no log of its own: its terminal holds it.
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import type { MachinePageFacts } from "@pinetrie/core"
+import type { MachineFacts } from "@pinetrie/core"
 import {
-  type MachinePageView,
-  machinePageLines,
-  machinePageView,
-  machinePageWords,
+  diagnosticLines,
+  type HealthPageView,
+  healthPageView,
+  healthPageWords,
 } from "@pinetrie/interface"
 import { readVmLogTail, type VmLog } from "@pinetrie/vm"
 import {
@@ -51,7 +51,7 @@ export function newestRows(
 }
 
 export function diagnosticsText(
-  view: MachinePageView,
+  view: HealthPageView,
   measured: {
     /** The export's heading line: what was measured on, the host's version among it. */
     readonly heading: string
@@ -61,7 +61,7 @@ export function diagnosticsText(
   logTails: readonly LogTail[],
 ): string {
   return [
-    ...machinePageLines(machinePageWords(view)),
+    ...diagnosticLines(healthPageWords(view)),
     "",
     "Measurements:",
     measured.heading,
@@ -91,11 +91,12 @@ const VM_LOGS: readonly VmLog[] = ["console.log", "launcher.log"]
 
 /** The diagnostics now: the page's facts as words, a day of measurements, and on the Mac the VM's logs. */
 export async function gatherDiagnostics(deps: {
-  readonly facts: () => MachinePageFacts | null
+  readonly facts: () => MachineFacts | null
   readonly measurements: Pick<HostMeasurements, "exportRows">
   readonly measuredOn: () => MeasuredOn
   /** The lane VM's state directory, where its logs are; null where lanes run on no VM. */
   readonly vmStateDir: string | null
+  readonly now: () => number
 }): Promise<string> {
   const { vmStateDir } = deps
   const logTails =
@@ -108,7 +109,7 @@ export async function gatherDiagnostics(deps: {
           })),
         )
   return diagnosticsText(
-    machinePageView(deps.facts(), () => null),
+    healthPageView(deps.facts(), () => null, deps.now()),
     {
       heading: measurementsHeading(deps.measuredOn(), 1),
       rows: deps.measurements.exportRows(1),

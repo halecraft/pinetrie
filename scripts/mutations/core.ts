@@ -8,6 +8,25 @@ const trailers = "packages/core/trailers.ts"
 const snapshots = "packages/core/snapshots.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a reading against a bound ──
+  {
+    name: "near is judged against where pine·trie acts",
+    file: "packages/core/machine-facts.ts",
+    from: '  return isPast(bound.acts) ? "over" : isPast(bound.clears) ? "near" : "clear"\n',
+    to: '  return isPast(bound.acts) ? "over" : isPast(bound.acts) ? "near" : "clear"\n',
+    command: unit,
+    expect:
+      "a reading is over past acts, near until past clears, and clear beyond, on its worse side",
+  },
+  {
+    name: "every bound is read as running low",
+    file: "packages/core/machine-facts.ts",
+    from: '    bound.worse === "below" ? value < limit : value > limit\n',
+    to: "    value < limit\n",
+    command: unit,
+    expect:
+      "a reading is over past acts, near until past clears, and clear beyond, on its worse side",
+  },
   {
     name: "snapshotOwner takes a folder state's name for an entry",
     file: snapshots,

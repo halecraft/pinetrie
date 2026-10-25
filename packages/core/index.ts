@@ -225,19 +225,27 @@ export {
   UNSAMPLED_REASONS,
 } from "./machine.ts"
 export {
+  type ActingBound,
+  type BoundAction,
+  type BoundSide,
+  boundReading,
   type EventMeasured,
+  HISTORY_MINUTES,
+  type HistoryMinute,
   MACHINE_SAMPLE_MS,
   type MachineAction,
+  type MachineFacts,
+  type MachineHistory,
+  type MachineKind,
+  type MachineLane,
   type MachineLately,
-  type MachinePageFacts,
-  type MachinePageLane,
-  type MachinePageSampled,
+  type MachineSampled,
   type Measured,
   REPAIR_STEPS,
   type RepairStep,
   type ServiceReading,
   TIMED_PROGRAMS,
-} from "./machine-page.ts"
+} from "./machine-facts.ts"
 export {
   type Attribution,
   decodeOutputEvent,

@@ -540,10 +540,15 @@ export function createMachineManager<Held, LauncherHeld>(deps: {
     ]
     if (result.kind === "sampled") limitsBefore = result.sample
     if (events.length > 0) record(() => deps.measurements.recordEvents(events))
-    const sampled = result.kind === "sampled" ? result.sample : lastRead?.sample
-    if (sampled !== undefined) {
+    // A failed sample shows the last one read, and what its pressure said.
+    const shown =
+      result.kind === "sampled" && gathered !== null
+        ? { sample: result.sample, scope: gathered.scope }
+        : lastRead
+    if (shown !== null) {
       lastRead = {
-        sample: sampled,
+        sample: shown.sample,
+        scope: shown.scope,
         health: planned.health,
         rung: memoryShort.rung,
         held: treatments.held,

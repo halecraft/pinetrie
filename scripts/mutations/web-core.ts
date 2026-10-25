@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/web-core"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a series' line joins across a minute with nothing read",
+    file: "packages/web-core/sparkline.ts",
+    from: "    const run = points[i - 1] === null || i === 0 ? null : runs.at(-1)\n",
+    to: "    const run = i === 0 ? null : runs.at(-1)\n",
+    command: unit,
+    expect:
+      "a minute with nothing read breaks the line, and a point alone is a dot",
+  },
+  {
     name: "a fold's box lands at the toggle's row",
     file: "packages/web-core/fold-motion.ts",
     from: "    ? centred(wide.box, geometry.boxTop, geometry.boxHeight)\n",

@@ -720,7 +720,7 @@ pending.
   carry the `pinetrie.machine` value (`SessionFacts.machine`), and
   `machineStatus` decides what the footer draws: the state, and its words
   (`machineWords`), which are its title and the host's log line alike, and
-  its name, those words and that it opens the Machine page. They name the worst cause and count the rest;
+  its name, those words and that it opens the Health page. They name the worst cause and count the rest;
   one `switch` over core's `MachineCause` with `assertNever`, so a cause
   added there fails the type check here until it is worded. Before a host
   wrote it, or on a host with no lanes, it is neutral and says the host
@@ -1749,25 +1749,48 @@ composer*).
   that asks no agent ignores it. A run refused at the host could not reach
   its author, since the host answers `started` before pi admits the run.
 
-## The Machine page (`machine-page.ts`, ADR-0210)
+## The Health page (`health-page.ts`, `health-words.ts`, ADR-0210)
 
-- **`machinePageView` decides the page** from the host's facts (core's
-  `MachinePageFacts`, served at `/machine`; null where the host reads no
-  machine) and the board's archive move for each lane's canvas: Now is
-  the health's causes, worst first; Threads, held lanes first, then by
-  name; an action only where the facts carry it, so a host without the
+- **`healthPageView` decides the page** from the host's facts (core's
+  `MachineFacts`, served at `/machine`; null where the host reads no
+  machine), the board's archive move for each lane's canvas, and the time
+  now: the verdict, the health's causes worst first; four vitals (memory,
+  its pressure, the lanes' disk, the disk holding them); the threads, held
+  lanes first, then by name; what happened, folded; and the details. An
+  action shows only where the facts carry it, so a host without the
   repair's controls is never offered Repair again, and Archive only where
   the board offers the canvas the archive. A lane is worded by its
   thread's name, never its id: the facts carry `ThreadName | null`, and a
   thread not named yet reads so.
-- **`machinePageWords` is the one wording of the page**, for the page and
-  the host's diagnostics (`machinePageLines`, the page as plain text)
-  alike. It reuses `causeWords` for Now, `treatmentWords` for a lane, and
-  `sizeWords` for every size; each cause's what pine·trie does and what you
-  can do, and each event, are a `switch` with `assertNever`, so a cause or
-  an event added to core fails the type check here until it is worded. A
-  reading not taken reads "not read: <why>" and is marked `unreadable`,
-  never a 0.
+- **A vital is judged by `vitalStatus`, and only by it.** Acting only
+  while the health carries its cause: `VITAL_CAUSES` places every cause
+  kind on a vital or none, a `Record` over core's kinds, so a cause added
+  there fails the type check here until it is placed. Near is core's
+  `boundReading`, the planners' own judge, past a bound's `clears` with no
+  cause in force; a reading over a bound with no cause reads near too,
+  since a level enters only after samples running, and the page never
+  says pine·trie acts before the footer does. The pressure acts with
+  memory only past its own bound, and a stall inside one thread's own
+  limit (`contained`) is the thread's, never near: no rung reads it. A
+  reading not taken is `not-read` with its why, never a 0.
+- **A bar and a series are any client's** (`BarView`, `SeriesView`): what
+  is used, 0 to 1, each bound's mark and the first's near zone; each
+  minute scaled to a top, the bounds' lines, and, for the pressure alone,
+  the minutes a thread's own stall marks. A terminal would draw them in
+  blocks; the browser's geometry is web-core's (`sparkPath`).
+- **What happened folds repeats in a row** (`foldRepeats`): neighbours of
+  one key, the kind and its subject, fold into the newest, keeping a
+  count, the longest time and the sums of counts and bytes; treatments,
+  the rung's and the repair's moves never fold. The strip spans the last
+  day, or from the oldest row where the host's cap cut it.
+- **`healthPageWords` is the one wording of the page**, for the page and
+  the host's diagnostics alike: `diagnosticLines` joins its lines from the
+  words the page draws, so no fact is worded twice. It reuses
+  `causeWords` (each cause's title and sentence), `treatmentWords` (a
+  held lane's label and sentence), `sizeWords` and `percentWords`; each
+  cause's what pine·trie does and what you can do, each bound's action,
+  and each event are a `switch` or a `Record` over core's kinds, so one
+  added there fails the type check here until it is worded.
 - **Ask an agent about this** is a `new-canvas` intent whose prefill is
   `@agent ` and the diagnostics (`machineAskPrefill`), not blank, so the
   composer holds them unsent; a new canvas leaves the page as any does.

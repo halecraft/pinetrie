@@ -1,6 +1,7 @@
-// e2e/browser/machine-page — the Machine page over a host whose lane runs:
-// the footer's glyph opens it, a running lane is named by its thread, and
-// Copy diagnostics copies one text that says which host it came from.
+// e2e/browser/health-page — the Health page over a host whose lane runs:
+// the footer's glyph opens it, a running lane is named by its thread, the
+// memory's last hour reaches it from the host's samples, and Copy
+// diagnostics copies one text that says which host it came from.
 
 import { isThreadId } from "@pinetrie/core"
 import { thisInstall } from "@pinetrie/install"
@@ -27,7 +28,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     model: { kind: "scripted", script },
   })
   const { host } = section
-  const held = newGate("machine-page")
+  const held = newGate("health-page")
   let lane: string | null = null
   try {
     const context = await browser.newContext()
@@ -59,7 +60,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // 1. The footer's glyph opens the page.
     await page.click("footer button.machine-status")
     const opened = await page
-      .waitForFunction(() => location.hash === "#machine", undefined, {
+      .waitForFunction(() => location.hash === "#health", undefined, {
         timeout: 10_000,
       })
       .then(
@@ -67,8 +68,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         () => false,
       )
     check(
-      "the footer's machine status opens the Machine page",
-      opened && (await page.$(".machine-page")) !== null,
+      "the footer's machine status opens the Health page",
+      opened && (await page.$(".health-page")) !== null,
       await page.evaluate(() => location.hash),
     )
 
@@ -82,7 +83,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       lane !== null && isThreadId(lane)
         ? (readNames(host.session).get(lane) ?? null)
         : null
-    const row = `.machine-threads li[data-lane="${lane ?? ""}"]`
+    const row = `[data-role="thread"][data-lane="${lane ?? ""}"]`
     const rowText = await page
       .waitForFunction(
         ([sel, want]) =>
@@ -96,15 +97,34 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         () => page.textContent(row).catch(() => null),
       )
     check(
-      "the Machine page names each lane by its thread",
+      "the Health page names each lane by its thread",
       named >= 0 && name !== null && (rowText ?? "").startsWith(name),
       `${name ?? "unnamed"}: ${rowText ?? "no row"}`,
     )
 
-    // 3. Copy diagnostics copies one text, holding the host's version.
+    // 3. The memory's last hour, followed by the host from its samples.
+    const graph = '[data-role="vital"][data-vital="memory"] .sparkline'
+    const points = await page
+      .waitForFunction(
+        sel =>
+          Number(document.querySelector(sel)?.getAttribute("data-points")) >= 1,
+        graph,
+        { timeout: 30_000 },
+      )
+      .then(
+        () => page.getAttribute(graph, "data-points"),
+        () => page.getAttribute(graph, "data-points").catch(() => null),
+      )
+    check(
+      "the Health page draws the memory's last hour",
+      Number(points) >= 1,
+      `${points ?? "no graph"} minutes drawn`,
+    )
+
+    // 4. Copy diagnostics copies one text, holding the host's version.
     const version = await hostVersion(thisInstall.root)
     await page.evaluate(() => navigator.clipboard.writeText(""))
-    await page.click(".machine-copy")
+    await page.click(".health-copy")
     let copied = ""
     await waitFor(async () => {
       copied = await page

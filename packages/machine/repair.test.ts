@@ -1,6 +1,6 @@
 import fc from "fast-check"
 import { describe, expect, test } from "vitest"
-import { ROOM_SPENT, ROOM_SPENT_CLEAR } from "./health.ts"
+import { ROOM_SPENT, ROOM_SPENT_CLEAR } from "./bounds.ts"
 import {
   decodeRepairState,
   encodeRepairState,

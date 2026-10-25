@@ -21,7 +21,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a host started after another's shutdown serves the same project: the last let go of its lanes",
   },
-  // ── the Machine page's reads ──
+  // ── the Health page's reads ──
   {
     name: "a host in a lane keeps the machine's reclaim as its own",
     file: "apps/pinetrie/host/machine/sensor.ts",
@@ -40,18 +40,10 @@ export const mutations: readonly Mutation[] = [
       "each kind of row is kept in its table, stamped with the host's clock, and exported naming it",
   },
   {
-    name: "the rung changes at every sample",
-    file: "apps/pinetrie/host/machine/measurements.ts",
-    from: "before === undefined || before.rung === s.rung",
-    to: "before === undefined",
-    command: unit,
-    expect: "the rung changes only between consecutive samples that differ",
-  },
-  {
     name: "Lately holds the shadow decisions",
     file: "apps/pinetrie/host/machine/measurements.ts",
-    from: "WHERE kind IN ('treatment', 'repair') ORDER BY at DESC",
-    to: "ORDER BY at DESC",
+    from: "WHERE kind IN ('treatment', 'repair') AND at >= ? ORDER BY at DESC",
+    to: "WHERE at >= ? ORDER BY at DESC",
     command: unit,
     expect: "shadow decisions newer than what happened crowd none of it out",
   },
@@ -79,15 +71,24 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "the newest rows are chosen by their time",
   },
-  // ── the Machine page's reads, in the browser suite ──
+  // ── the Health page's reads, in the browser suite ──
   {
-    name: "the Machine page is served no facts",
+    name: "the Health page is served no facts",
     file: "apps/pinetrie/host/http.ts",
     from: 'machineResponse("facts", JSON.stringify(input.machine.facts()))',
     to: 'machineResponse("facts", JSON.stringify(null))',
     suite: "browser",
-    scenario: "machine-page",
-    expect: "the Machine page names each lane by its thread",
+    scenario: "health-page",
+    expect: "the Health page names each lane by its thread",
+  },
+  {
+    name: "the Health page is served no hour",
+    file: "apps/pinetrie/host/machine/page.ts",
+    from: "      history: runningHistory(g.history, new Set(sample.lanesRunning)),\n",
+    to: "      history: { minutes: [] },\n",
+    suite: "browser",
+    scenario: "health-page",
+    expect: "the Health page draws the memory's last hour",
   },
   {
     name: "the diagnostics' heading leaves out the host's version",
@@ -95,7 +96,7 @@ export const mutations: readonly Mutation[] = [
     from: "    version: await hostVersion(install.root),\n",
     to: "    version: null,\n",
     suite: "browser",
-    scenario: "machine-page",
+    scenario: "health-page",
     expect: "Copy diagnostics copies the page's words and the host's version",
   },
   // ── a run the last host left open ──

@@ -9,18 +9,18 @@ import {
 describe("accountView", () => {
   const inventory = { count: 1, open: false }
   test.each([
-    [false, 0, ["profile", "setup", "machine", "sign-out"], null],
-    [false, 4, ["profile", "setup", "machine", "sign-out"], null],
+    [false, 0, ["profile", "setup", "health", "sign-out"], null],
+    [false, 4, ["profile", "setup", "health", "sign-out"], null],
     [
       true,
       0,
-      ["inbox", "inventory", "profile", "setup", "machine", "sign-out"],
+      ["inbox", "inventory", "profile", "setup", "health", "sign-out"],
       null,
     ],
     [
       true,
       4,
-      ["inbox", "inventory", "profile", "setup", "machine", "sign-out"],
+      ["inbox", "inventory", "profile", "setup", "health", "sign-out"],
       4,
     ],
   ])("folded %s, %i needing you", (folded, badge, kinds, onAvatar) => {

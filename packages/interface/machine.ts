@@ -34,8 +34,9 @@ export function sizeWords(bytes: number): string {
   return `${shown} ${UNITS[unit]}`
 }
 
-/** A share of 100, as a percentage with no decimals. */
-const percentWords = (share: number) => `${Math.round(share)}%`
+/** A share of 100 as a percentage, with one decimal under 10 as `sizeWords` has (`0.5%`, `12%`). */
+export const percentWords = (share: number): string =>
+  `${share < 10 ? share.toFixed(1).replace(/\.0$/, "") : Math.round(share)}%`
 
 /** A service, as the subject of a clause. */
 export function serviceWords(service: MachineService): string {
@@ -116,8 +117,66 @@ export const vmStartWaitWords = (isRepairing: boolean): string =>
     ? "waiting for the lane VM: another host is repairing its disk"
     : "waiting for the lane VM: another host is starting it"
 
-/** One cause, as a clause; `held` counts the lanes held for memory. */
-export function causeWords(
+/** A cause in a few words, as a heading: what it is, never what to do. */
+function causeTitle(cause: MachineCause): string {
+  switch (cause.kind) {
+    case "room-low":
+      return "The lanes' disk is low"
+    case "room-spent":
+      return "The lanes' disk is full"
+    case "metadata-full":
+      return "The lanes' disk has no room for more files"
+    case "filesystem-low":
+      return "The disk holding the lanes is low"
+    case "memory-short":
+      return "Memory is short"
+    case "lane-oom-killed":
+      return "A command was killed for memory"
+    case "service-oom-killed":
+      return "A service was killed for memory"
+    case "cgroup-at-limit":
+      return "Stuck at a memory limit"
+    case "host-stalls":
+      return "The host stalled"
+    case "freeing-room":
+      return "Freeing room on the lanes' disk"
+    case "room-unrecoverable":
+      return "The lanes' disk is low, and nothing may be deleted"
+    case "disk-being-repaired":
+      return "Repairing the lane VM's disk"
+    case "disk-repair-failed":
+      return "The lane VM's disk could not be repaired"
+    case "snapshot-skipped":
+      return "A snapshot was not recorded"
+    case "unsampled":
+      switch (cause.reason) {
+        case "waiting":
+          return "Waiting for the first reading"
+        case "stopped":
+          return "The host has stopped"
+        case "failed":
+          return "The machine could not be read"
+        case "overdue":
+          return "The machine has not been read for a while"
+        default:
+          return assertNever(cause.reason)
+      }
+    default:
+      return assertNever(cause)
+  }
+}
+
+/** One cause: its title, and its sentence, a clause; `held` counts the lanes held for memory. */
+export const causeWords = (
+  cause: MachineCause,
+  nameOf: (lane: ThreadId) => string,
+  held: number,
+): { readonly title: string; readonly sentence: string } => ({
+  title: causeTitle(cause),
+  sentence: causeSentence(cause, nameOf, held),
+})
+
+function causeSentence(
   cause: MachineCause,
   nameOf: (lane: ThreadId) => string,
   held: number,
@@ -194,20 +253,34 @@ export function machineWords(
   const heldForMemory = health.treatments.filter(
     t => t.treatment.kind !== "waiting-for-repair",
   ).length
-  return `The machine lanes run on: ${how}${causeWords(worst, nameOf, heldForMemory)}${more}`
+  return `The machine lanes run on: ${how}${causeWords(worst, nameOf, heldForMemory).sentence}${more}`
 }
 
-/** Why a held lane waits, as its column says it; null for one not held. */
-export function treatmentWords(treatment: LaneTreatment): string | null {
+/**
+ * How a held lane waits: a label, as a table's cell says it, and a
+ * sentence, as its column says it; null for one not held.
+ */
+export function treatmentWords(
+  treatment: LaneTreatment,
+): { readonly label: string; readonly sentence: string } | null {
   switch (treatment.kind) {
     case "normal":
       return null
     case "waiting-to-start":
-      return "waits for room on the machine to start"
+      return {
+        label: "waits to start",
+        sentence: "waits for room on the machine to start",
+      }
     case "paused":
-      return "paused for memory: its next tool call waits for room"
+      return {
+        label: "paused",
+        sentence: "paused for memory: its next tool call waits for room",
+      }
     case "waiting-for-repair":
-      return "waits while the lane VM's disk is repaired"
+      return {
+        label: "waits for repair",
+        sentence: "waits while the lane VM's disk is repaired",
+      }
     default:
       return assertNever(treatment.kind)
   }
@@ -220,7 +293,7 @@ export function heldLaneTreatments(
   return new Map((health?.treatments ?? []).map(t => [t.lane, t.treatment]))
 }
 
-/** What the footer's status draws: its state's mark, its words, and its name, which says it opens the Machine page. */
+/** What the footer's status draws: its state's mark, its words, and its name, which says it opens the Health page. */
 export interface MachineStatusView {
   readonly state: MachineState
   readonly text: string
@@ -228,7 +301,7 @@ export interface MachineStatusView {
 }
 
 /** The footer's status's name: its words, and where pressing it goes. */
-const statusName = (text: string) => `${text}. Open the Machine page`
+const statusName = (text: string) => `${text}. Open the Health page`
 
 /**
  * The footer's status. Before a host wrote the machine's health, or where

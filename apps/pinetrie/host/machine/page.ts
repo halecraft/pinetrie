@@ -1,21 +1,24 @@
-// host/machine/page — what the Machine page is served (`GET /machine`): the
-// manager's latest reading, what happened lately, each lane's snapshots and
-// thread, and the actions this host can take, planned from what was
-// gathered. It takes no sample: the page shows the last.
+// host/machine/page — the machine's facts the Health page is served (`GET
+// /machine`): the manager's latest reading against the bounds pine·trie
+// acts at, its last hour, what happened in the last day, each lane's
+// snapshots and thread, and the actions this host can take, planned from
+// what was gathered. It takes no sample: the page shows the last.
 
 import os from "node:os"
 import type {
   MachineAction,
+  MachineFacts,
+  MachineHistory,
+  MachineKind,
+  MachineLane,
   MachineLately,
-  MachinePageFacts,
-  MachinePageLane,
+  MemorySource,
   ThreadId,
   ThreadName,
 } from "@pinetrie/core"
 import {
-  leaveFreeBytes,
+  actingBounds,
   type MachineReading,
-  minimumUnallocated,
   type ReadingPlanned,
   type SnapshotReads,
   type StoreSettings,
@@ -28,16 +31,22 @@ import type { SessionDocHandle } from "@pinetrie/schema"
 import { vmMemoryCeiling } from "@pinetrie/vm"
 import { type HostMeasurements, RECENT_EVENTS_SHOWN } from "./measurements.ts"
 
-/** What the page's facts are planned from, gathered. */
-export interface MachinePageGathered {
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** What the machine's facts are planned from, gathered. */
+export interface MachineGathered {
   readonly reading: MachineReading | null
+  readonly history: MachineHistory
   readonly lately: readonly MachineLately[]
+  readonly latelyCapped: boolean
   readonly snapshots: ReadonlyMap<
     ThreadId,
     { readonly count: number; readonly bytes: number }
   >
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly settings: Pick<StoreSettings, "max" | "leaveFree">
+  readonly target: StoreTarget
+  readonly memorySource: MemorySource
   /** The lane VM's memory ceiling; null where lanes run on no VM. */
   readonly vmMemoryCeilingBytes: number | null
   /** The services' floor this host asks for; null where it keeps none. */
@@ -91,14 +100,46 @@ function latelyLanes(l: MachineLately): readonly ThreadId[] {
   return []
 }
 
-export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
+/** What the machine is, from where its lanes run and whose memory is read. */
+export const machineKind = (
+  target: StoreTarget,
+  source: MemorySource,
+): MachineKind =>
+  source === "own-cgroup"
+    ? "own-cgroup"
+    : target === "lane-vm"
+      ? "lane-vm"
+      : "linux-host"
+
+/** The served hour, each minute holding only the lanes running now. */
+const runningHistory = (
+  history: MachineHistory,
+  running: ReadonlySet<ThreadId>,
+): MachineHistory => ({
+  minutes: history.minutes.map(m =>
+    m === null
+      ? null
+      : {
+          ...m,
+          laneBytes: Object.fromEntries(
+            Object.entries(m.laneBytes).filter(([lane]) =>
+              running.has(lane as ThreadId),
+            ),
+          ),
+        },
+  ),
+})
+
+export function planMachineFacts(g: MachineGathered): MachineFacts {
   const reading = shownReading(g.reading)
   const mentioned = new Set(g.lately.flatMap(latelyLanes))
   const common = {
+    machineKind: machineKind(g.target, g.memorySource),
     vmMemoryCeilingBytes: g.vmMemoryCeilingBytes,
     servicesFloorBytes: g.servicesFloorBytes,
     isOomdManagingLanes: g.isOomdManagingLanes,
     lately: g.lately,
+    latelyCapped: g.latelyCapped,
     names: [...mentioned].flatMap(lane => {
       const name = g.names.get(lane)
       return name === undefined ? [] : [{ lane, name }]
@@ -116,7 +157,7 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
   const treatmentByLane = new Map(
     reading.held.map(h => [h.lane, h.treatment.kind]),
   )
-  const lanes = sample.lanesRunning.map((lane): MachinePageLane => {
+  const lanes = sample.lanesRunning.map((lane): MachineLane => {
     const memory = memoryByLane.get(lane)
     return {
       lane,
@@ -136,7 +177,8 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
     }
   })
   const { store, filesystem } = sample
-  const pressure = sample.machine.pressure
+  const bounds = actingBounds(sample, g.settings)
+  const { scope } = reading
   return {
     health: reading.health,
     reading: {
@@ -145,57 +187,74 @@ export function planMachinePage(g: MachinePageGathered): MachinePageFacts {
         totalBytes: sample.machine.memoryTotal,
         availableBytes: sample.machine.memoryAvailable,
         source: sample.machine.source,
-        pressure:
-          pressure === null
-            ? unreadable("the kernel keeps no pressure stall information")
-            : { kind: "read", ...pressure },
         rung: reading.rung,
+        bounds: bounds.memory,
+        pressure:
+          scope.kind === "unmeasured"
+            ? unreadable("the kernel keeps no pressure stall information")
+            : {
+                kind: "read",
+                ...scope.pressure,
+                scope: scope.kind,
+                bounds: bounds.pressure,
+              },
       },
       store:
-        store === null
+        store === null || bounds.store === null
           ? unreadable("its btrfs counters could not be read")
           : {
               kind: "read",
               sizeBytes: store.size,
               unallocatedBytes: store.unallocated,
-              minimumBytes: minimumUnallocated(store.size),
               maxBytes: g.settings.max,
+              bounds: bounds.store,
             },
       filesystem:
-        filesystem === null
+        filesystem === null || bounds.filesystem === null
           ? unreadable("its free space could not be read")
           : {
               kind: "read",
               sizeBytes: filesystem.size,
               freeBytes: filesystem.free,
-              leaveFreeBytes: leaveFreeBytes(g.settings, filesystem.size),
+              bounds: bounds.filesystem,
             },
       lanes,
       services: sample.services,
       containment: sample.containment,
+      history: runningHistory(g.history, new Set(sample.lanesRunning)),
     },
     ...common,
   }
 }
 
-/** The page's facts now, gathered from what the host holds: no sample is taken, nothing awaited. */
-export function machinePageFacts(deps: {
+/** The machine's facts now, gathered from what the host holds: no sample is taken, nothing awaited. */
+export function machineFacts(deps: {
   readonly reading: () => MachineReading | null
   readonly repairs: boolean
-  readonly measurements: Pick<HostMeasurements, "recentRows">
+  readonly measurements: Pick<HostMeasurements, "recentRows" | "lastHour">
   readonly snapshots: SnapshotReads
   readonly session: SessionDocHandle
   readonly settings: Pick<StoreSettings, "max" | "leaveFree">
   readonly target: StoreTarget
+  readonly memorySource: MemorySource
   readonly servicesFloorBytes: number | null
   readonly isOomdManagingLanes: boolean
-}): MachinePageFacts {
-  return planMachinePage({
+  readonly now: () => number
+}): MachineFacts {
+  const lately = deps.measurements.recentRows({
+    since: deps.now() - DAY_MS,
+    cap: RECENT_EVENTS_SHOWN,
+  })
+  return planMachineFacts({
     reading: deps.reading(),
-    lately: deps.measurements.recentRows(RECENT_EVENTS_SHOWN),
+    history: deps.measurements.lastHour(),
+    lately: lately.rows,
+    latelyCapped: lately.isCapped,
     snapshots: snapshotsByLane(deps.snapshots.rows()),
     names: readNames(deps.session),
     settings: deps.settings,
+    target: deps.target,
+    memorySource: deps.memorySource,
     vmMemoryCeilingBytes:
       deps.target === "lane-vm" ? vmMemoryCeiling(os.totalmem()) : null,
     servicesFloorBytes: deps.servicesFloorBytes,

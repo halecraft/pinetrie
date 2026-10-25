@@ -16,6 +16,7 @@ and the words share one.
 | `freshness.ts` | whether the reading is fresh, in ticks of the sample timer (`FreshnessState`, `nextTickFreshness`, `sampleEndFreshness`, `READING_OVERDUE_AFTER_TICKS`) |
 | `snapshot-index.ts` | the host's index of a project's entry snapshots as rows (`SnapshotRow`, `RowState`), each lane's kept ones and their cost (`snapshotsByLane`), and three ports: `SnapshotReads`, `SnapshotTaking`, `SnapshotIndex` |
 | `store-settings.ts` | `StoreSettings`, `LeaveFree`, `LEAVE_FREE_DEFAULT`, `leaveFreeBytes`, `minimumUnallocated` |
+| `bounds.ts` | the bounds a sample is judged by (`actingBounds`, `memoryBounds`, `PRESSURE_BOUNDS`, `storeBounds`, `filesystemBound`), and the store's numbers they hold (`ROOM_SPENT`, `ROOM_SPENT_CLEAR`, `CLEAR_MARGIN`) |
 | `health.ts` | `planHealth` and its state (`HealthPlanState`): the causes, their thresholds, the state; memory short as `MemoryShort` adds it; `planOverdueHealth`, once the reading is overdue |
 | `hysteresis.ts` | a level's and an event's count from sample to sample (`nextLevelState`, `nextEventState`, `ENTER_AFTER`, `LEAVE_AFTER`), shared by the causes and the rungs |
 | `rung.ts` | memory's rung (`Rung`), its bounds (`RUNG_BOUNDS`) and `planRung` |
@@ -24,7 +25,7 @@ and the words share one.
 | `recorded-loads.ts` | test support: two loads recorded in a spike VM (S335), a cgroup at its limit and the machine short, sample by sample |
 | `importance.ts` | which lanes matter most (`rankLanes`) |
 | `treatments.ts` | each lane's treatment (`planTreatments`, `Treatments`), what each allows (`ACTIVITIES_ALLOWED`), the shadow decisions of the rungs not built |
-| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`, `limitEvents`), the counters' rises (`counterRise`, `reclaimRise`), a command's program (`commandProgram`), and the numbers in force the export names (`numbersInForce`) |
+| `measurements.ts` | the measurements' rows (`SampleMeasured`, `LaneMeasured`, `DecisionMeasured`; core's `EventMeasured`, and a sample's events as rows, `causeEvents`, `limitEvents`), the counters' rises (`counterRise`, `reclaimRise`), a command's program (`commandProgram`), the numbers in force the export names (`numbersInForce`), and what the host follows of the rows it keeps (`FollowedSamples`, `nextFollowed`, `rungChanges`, `nextHistory`, `trimFollowed`, `lastHourHistory`) |
 | `manager.ts` | `createMachineManager`: gather, plan, write, and the disk upkeep's steps, on a keeper of its own; `MANAGE_MODES` |
 | `store.ts` | what the upkeep reads and does: `StoreListed`, `StoreControls`, `StoreRecords` |
 | `retention.ts` | the table of owners' rules (`RETENTION`), the listing split by owner (`partitionByOwner`), the entry rule (`planEntryRetention`) and what it never takes (`isProtected`, `newestByLane`) |
@@ -36,6 +37,27 @@ and the words share one.
 | `repair-steps.ts` | the one executor of a repair's states (`runRepairSteps`), through the host's `RepairControls` |
 
 ## Rules
+
+- **One judge, and one maker of the bounds it judges by** (`bounds.ts`).
+  A bound is made from the numbers the planners act at, never a copy of
+  one: the store's room and the filesystem's free space are the ones
+  `health.ts` judges its level causes by (`levelReading`), and memory's
+  and pressure's are read from `RUNG_BOUNDS`. The judge is core's
+  `boundReading` (over past `acts`, near until past `clears`, strictly),
+  which the rungs' bounds and the health's level causes both call, and
+  the Health page too; its near is a level's between. A rung is not one
+  bound (it enters on any and clears only on all), so `planRung` keeps
+  its table and reads each bound through the same judge. The host serves
+  `actingBounds` with each reading, so what the page calls near cannot
+  drift from what the planners act on.
+- **What the host follows of its rows is one pure step** (`nextFollowed`):
+  a sample moves memory's rung's changes and its minute, a lane's row is
+  carried into the minutes it wrote no row in, and a minute an hour
+  before the newest goes. The host folds the rows it kept through the
+  same step at its start, so the hour read back is the one followed. A
+  minute keeps its least memory and its most pressure among stalls that
+  were the machine's: a thread's own stall (`contained`) only marks it,
+  since no rung reads it.
 
 - **Of memory's ladder, rungs 2 and 3 act; 1, 4 and 5 are measured**
   (ADR-0212). The rung (`planRung`) is the highest of five levels, each
@@ -313,7 +335,7 @@ and the words share one.
   read is `interrupted`: unsure, it holds no lane, says nothing, and the
   triggers are read afresh.
 - **What leaves `failed`, besides, is a person asking** (`askRepairAgain`,
-  the Machine page's Repair again): the next sample's repair step asks the
+  the Health page's Repair again): the next sample's repair step asks the
   reducer with `retry-asked`, which moves `failed` to `detected` with
   the trigger `asked-again`, whatever the disk could grow to, and from
   any other state changes nothing; so the command needs no check of its
@@ -351,10 +373,12 @@ and the words share one.
   host's close. After it, the upkeep's last word is dropped, being of the
   disk before it.
 - **The latest reading is kept as a sample's step ends**
-  (`latestReading`): the last sample that read, with the health, the rung,
-  the lanes held and the repair's facts planned in that step or a later
-  failed one; null before a sample has read; overdue, that reading under
-  the overdue health, holding nothing. The Machine page reads it,
+  (`latestReading`): the last sample that read, with what its pressure
+  said (`scope`, its `PressureScope`, so the page shows a thread's own
+  stall as the thread's), the health, the rung, the lanes held and the
+  repair's facts planned in that step or a later failed one; null before a
+  sample has read; overdue, that reading under the overdue health,
+  holding nothing. The Health page reads it,
   and never asks for a sample: every threshold counts samples, so a
   watched host must not sample faster.
 - **Services' memory is read as lanes' is**: each lanehost role's and the

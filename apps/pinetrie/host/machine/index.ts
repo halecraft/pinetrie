@@ -68,7 +68,7 @@ export interface MachineWatch {
   readonly waitUntilAllowed: MachineManager["waitUntilAllowed"]
   /** Whether a lane's treatment allows an activity now: `waitUntilAllowed`'s first check. */
   readonly isLaneActivityAllowed: MachineManager["isLaneActivityAllowed"]
-  /** What the Machine page shows: the manager's last reading. */
+  /** What the Health page shows: the manager's last reading. */
   readonly latestReading: MachineManager["latestReading"]
   /** Whether this host holds the lane VM's repair's controls: it manages, and the disk can be repaired. */
   readonly repairs: boolean

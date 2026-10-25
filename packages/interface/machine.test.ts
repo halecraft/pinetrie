@@ -192,9 +192,18 @@ describe("memory held", () => {
       treatmentWords({ kind: "waiting-for-repair" }),
     ]).toEqual([
       null,
-      "waits for room on the machine to start",
-      "paused for memory: its next tool call waits for room",
-      "waits while the lane VM's disk is repaired",
+      {
+        label: "waits to start",
+        sentence: "waits for room on the machine to start",
+      },
+      {
+        label: "paused",
+        sentence: "paused for memory: its next tool call waits for room",
+      },
+      {
+        label: "waits for repair",
+        sentence: "waits while the lane VM's disk is repaired",
+      },
     ])
   })
 })

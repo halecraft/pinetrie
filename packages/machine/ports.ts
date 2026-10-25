@@ -112,7 +112,7 @@ export interface MachineManager {
   sampleTick(): void
   /**
    * The last sample with what was planned from it, as its step ended: what
-   * the Machine page shows. Null before a sample has read; a failed sample
+   * the Health page shows. Null before a sample has read; a failed sample
    * keeps the last that read, with the health planned since; overdue, the
    * last that read under the overdue health.
    */

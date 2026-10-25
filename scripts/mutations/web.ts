@@ -16,21 +16,21 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a split call's detail shows each statement's output under its line, and none under one that printed nothing",
   },
-  // ── the Machine page, in the browser suite ──
+  // ── the Health page, in the browser suite ──
   {
     name: "the footer's status opens no page",
     file: "packages/web/footer.tsx",
-    from: 'onOpen={() => onIntent({ kind: "page", to: "machine" })}',
+    from: 'onOpen={() => onIntent({ kind: "page", to: "health" })}',
     to: "onOpen={() => {}}",
     suite: "browser",
-    scenario: "machine-page",
-    expect: "the footer's machine status opens the Machine page",
+    scenario: "health-page",
+    expect: "the footer's machine status opens the Health page",
   },
   // ── the machine's status, in the browser suite ──
   {
     name: "the footer leaves out the machine's status",
     file: "packages/web/footer.tsx",
-    from: '        <MachineStatus\n          onOpen={() => onIntent({ kind: "page", to: "machine" })}\n          view={machine}\n        />\n',
+    from: '        <MachineStatus\n          onOpen={() => onIntent({ kind: "page", to: "health" })}\n          view={machine}\n        />\n',
     to: "",
     suite: "browser",
     scenario: "tools",

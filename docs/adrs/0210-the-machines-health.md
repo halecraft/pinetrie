@@ -4,7 +4,9 @@
 - **Area:** `docs/06-interface.md`, `packages/vm/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
   `packages/machine/TECHNICAL.md`, `packages/lanehost/TECHNICAL.md`,
-  `packages/core/TECHNICAL.md`, `packages/lock/TECHNICAL.md`
+  `packages/core/TECHNICAL.md`, `packages/lock/TECHNICAL.md`,
+  `packages/interface/TECHNICAL.md`, `packages/web/TECHNICAL.md`,
+  `packages/web-core/TECHNICAL.md`
 - **Evidence:** S307, S308, S309, S310, S311, S312, S313, S314, S315, S316,
   S317, S318, S319, S320, S321, S322, S323, S324, S326, S340
 - **Revised:**
@@ -99,6 +101,25 @@
     applies none, so its inner lanes are held only by the nested lane's own
     limits. On a Linux host where systemd-oomd manages rootless Docker's
     containers, the page says it may stop lanes outside pine·trie.
+  - 2026-10-25: the Machine page is the **Health page** (`#health`, the
+    account menu's **Health**), after the person's review that it was a wall
+    of text naming a thing, with nothing to say what is normal. A verdict
+    comes first; four vitals each judge their reading as normal, near or
+    acting against bounds `@pinetrie/machine` makes from the planners' own
+    numbers (`actingBounds`, from `RUNG_BOUNDS` and the store's and the
+    filesystem's thresholds), by one judge in core (`boundReading`) that the
+    health's level causes and the rungs call too, so the page never calls near
+    what the planners do not act on, and says pine·trie acts only while the
+    footer carries its cause. The page reads an hour's history, a point a
+    minute, which the host follows in memory from the measurements it keeps
+    (the samples, their scopes and the lanes' rows), read once at its start
+    and stepped as each row is recorded by the same pure step: the page still
+    makes no sample, nor changes the cadence. The pressure's history and its
+    status count only the stalls the machine's own reclaim says are the
+    machine's; a thread's own reads as the thread's. What happened is the last
+    day's, at most a cap, repeats in a row folded. Threads are a table with
+    each lane's hour, and the services, safeguards and settings fold away
+    under the details.
 - **Amended by:**
   - ADR-0211: `@pinetrie/lock` gains a macOS backend and a wait, and takes the
     host's own locks too.

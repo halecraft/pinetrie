@@ -133,7 +133,7 @@ import {
   type MeasuredOn,
   memoryMachineMeasurements,
 } from "./machine/measurements.ts"
-import { machinePageFacts } from "./machine/page.ts"
+import { machineFacts } from "./machine/page.ts"
 import { createStoreRecords } from "./machine/records.ts"
 import { createShellCalls } from "./machine/shell-calls.ts"
 import {
@@ -1248,6 +1248,7 @@ async function openHost(
       memoryLimits: reach?.memoryLimits() ?? null,
       containerLimits: reach?.containerLimits ?? null,
       servicesFloorBytes: reach?.containmentAsked.servicesFloor ?? null,
+      leaveFree: storeSettings(settled).leaveFree,
     }),
     isOomdManagingLanes: reach?.isOomdManagingLanes ?? false,
   }
@@ -1262,10 +1263,10 @@ async function openHost(
           : (reading.last?.sample ?? null)
     return { ...measuredFixed, containment: sampled?.containment ?? null }
   }
-  const machinePage = () =>
+  const machineFactsNow = () =>
     machine === null
       ? null
-      : machinePageFacts({
+      : machineFacts({
           reading: machine.latestReading,
           repairs: machine.repairs,
           measurements: opened.measurements,
@@ -1273,8 +1274,10 @@ async function openHost(
           session,
           settings: storeSettings(settled),
           target: machine.target,
+          memorySource: reach?.memorySource ?? "whole-machine",
           servicesFloorBytes: reach?.containmentAsked.servicesFloor ?? null,
           isOomdManagingLanes: reach?.isOomdManagingLanes ?? false,
+          now: Date.now,
         })
   const server = await startHttp({
     port,
@@ -1287,16 +1290,17 @@ async function openHost(
     page,
     measurements: { store: opened.measurements, measuredOn },
     machine: {
-      facts: machinePage,
+      facts: machineFactsNow,
       diagnostics: () =>
         gatherDiagnostics({
-          facts: machinePage,
+          facts: machineFactsNow,
           measurements: opened.measurements,
           measuredOn,
           vmStateDir:
             found?.kind === "found" && found.machine.target === "lane-vm"
               ? found.machine.storeVolume
               : null,
+          now: Date.now,
         }),
     },
     log,

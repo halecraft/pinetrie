@@ -2,10 +2,10 @@
 // client names one in its URL's hash, and leaves it in the browser's history,
 // is web-core's (`page-url.ts`).
 
-/** A page that covers the stage: your profile, what the host read of its config, a folder project's history, and the machine lanes run on. */
-export type PageName = "profile" | "setup" | "history" | "machine"
+/** A page that covers the stage: your profile, what the host read of its config, a folder project's history, and how the machine lanes run on is doing. */
+export type PageName = "profile" | "setup" | "history" | "health"
 
-const PAGES: readonly PageName[] = ["profile", "setup", "history", "machine"]
+const PAGES: readonly PageName[] = ["profile", "setup", "history", "health"]
 
 /** Whether `name` names a page. */
 export const isPage = (name: string): name is PageName =>
@@ -21,7 +21,7 @@ const TITLES: Readonly<Record<PageName, string>> = {
   profile: "Profile",
   setup: "Setup",
   history: "History",
-  machine: "Machine",
+  health: "Health",
 }
 
 /** What a way back says: a page's, and the account menu's from the inbox. */

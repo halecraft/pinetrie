@@ -35,7 +35,7 @@ test("the machine's measurements are a GET of the days kept, or fewer; any other
   expect(at("POST", "/machine/measurements")).toEqual({ kind: "bad" })
 })
 
-test("the Machine page's facts and its diagnostics are each a GET; any other ask of them is bad", () => {
+test("the Health page's facts and its diagnostics are each a GET; any other ask of them is bad", () => {
   expect(at("GET", "/machine")).toEqual({ kind: "machine" })
   expect(at("GET", "/machine/diagnostics")).toEqual({
     kind: "machine-diagnostics",

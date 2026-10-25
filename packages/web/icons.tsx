@@ -48,6 +48,13 @@ export const InventoryIcon = ({ way }: { way?: "take" | "put" }) => (
  * red a disc with a bar, so a state is told by its shape as well as its
  * colour.
  */
+/** Each machine state, as the stylesheet names it (`data-health`): what it does to work, never a colour. */
+export const HEALTH = {
+  neutral: "keeping-up",
+  amber: "slowed",
+  red: "stopped",
+} as const
+
 export const MachineIcon = ({
   state,
 }: {

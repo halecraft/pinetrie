@@ -4,7 +4,9 @@
 // or shadow decision, and the events no decision holds (`EventMeasured`),
 // each row a value built here from what was planned; the host's store
 // stamps its time. No command's arguments or output is kept: only its
-// program.
+// program. And what the host follows of the rows it keeps (`nextFollowed`):
+// memory's rung's changes and the last hour by minute, one step for a row
+// read back at the start and a row just recorded alike.
 
 import {
   assertNever,
@@ -12,22 +14,22 @@ import {
   type CgroupLimitHits,
   type EventMeasured,
   type HeldLane,
+  HISTORY_MINUTES,
+  type HistoryMinute,
   type LaneTreatment,
   MACHINE_SAMPLE_MS,
   type MachineCause,
+  type MachineHistory,
+  type MachineLately,
   type MachineReclaim,
   type MachineService,
   type MemoryCounters,
   type MemorySource,
   type ThreadId,
 } from "@pinetrie/core"
+import { CLEAR_MARGIN, ROOM_SPENT, ROOM_SPENT_CLEAR } from "./bounds.ts"
 import { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
-import {
-  METADATA_CLEAR,
-  METADATA_FULL,
-  ROOM_SPENT,
-  ROOM_SPENT_CLEAR,
-} from "./health.ts"
+import { METADATA_CLEAR, METADATA_FULL } from "./health.ts"
 import { ENTER_AFTER, LEAVE_AFTER } from "./hysteresis.ts"
 import type { ManageMode } from "./manager.ts"
 import type { PressureScope } from "./pressure-scope.ts"
@@ -35,6 +37,7 @@ import type { RepairState } from "./repair.ts"
 import { RUNG_BOUNDS, type Rung } from "./rung.ts"
 import type { LaneSample, MachineSample } from "./sample.ts"
 import {
+  type LeaveFree,
   MINIMUM_UNALLOCATED_FLOOR,
   MINIMUM_UNALLOCATED_PERCENT,
 } from "./store-settings.ts"
@@ -318,8 +321,9 @@ export interface ContainerLimitsInForce {
  * Every number the host decides memory and room by, read from the
  * constants themselves so a tuned one shows in the next export, with the
  * sample's interval, the overdue bound, the containers' memory limits and
- * each kind's other limits this host runs with, and the services' floor it
- * asks for. Each is null on a host that has none.
+ * each kind's other limits this host runs with, the services' floor it
+ * asks for, and the free space it leaves on the filesystem holding the
+ * store. Each is null on a host that has none.
  */
 export function numbersInForce(inForce: {
   readonly sampleEveryMs: number
@@ -329,6 +333,7 @@ export function numbersInForce(inForce: {
     Record<"lane" | MachineService, ContainerLimitsInForce>
   > | null
   readonly servicesFloorBytes: number | null
+  readonly leaveFree: readonly LeaveFree[]
 }) {
   return {
     RUNG_BOUNDS,
@@ -340,6 +345,7 @@ export function numbersInForce(inForce: {
     sampleEveryMs: inForce.sampleEveryMs,
     ROOM_SPENT,
     ROOM_SPENT_CLEAR,
+    CLEAR_MARGIN,
     METADATA_FULL,
     METADATA_CLEAR,
     MINIMUM_UNALLOCATED_PERCENT,
@@ -347,6 +353,7 @@ export function numbersInForce(inForce: {
     memoryLimits: inForce.memoryLimits,
     containerLimits: inForce.containerLimits,
     servicesFloorBytes: inForce.servicesFloorBytes,
+    leaveFree: inForce.leaveFree,
   }
 }
 
@@ -405,4 +412,182 @@ export function treatmentChanges(
     const to = kindIn(after, lane)
     return from === to ? [] : [{ lane, from, to }]
   })
+}
+
+type RungChange = Extract<MachineLately, { kind: "rung" }>
+
+/** Memory's rung as followed: the last read, and each change, oldest first. */
+export interface FollowedRungs {
+  readonly last: number | null
+  readonly changes: readonly RungChange[]
+}
+
+const RUNGS_NONE: FollowedRungs = { last: null, changes: [] }
+
+/** The rungs after one sample's: a change only where it differs from the last. */
+function nextRungs(
+  rungs: FollowedRungs,
+  at: number,
+  rung: number,
+): FollowedRungs {
+  if (rungs.last === null || rungs.last === rung)
+    return { ...rungs, last: rung }
+  return {
+    last: rung,
+    changes: [
+      ...rungs.changes,
+      { at, kind: "rung", from: rungs.last, to: rung },
+    ],
+  }
+}
+
+/** Each change of memory's rung between consecutive samples, oldest first. */
+export const rungChanges = (
+  samples: readonly { readonly at: number; readonly rung: number }[],
+): FollowedRungs =>
+  samples.reduce((r, s) => nextRungs(r, s.at, s.rung), RUNGS_NONE)
+
+/** One kept row the history reads, stamped with the host's clock. */
+export type FollowedRow =
+  | {
+      readonly kind: "sample"
+      readonly at: number
+      readonly rung: number
+      readonly memoryAvailable: number
+      readonly fullAvg10: number | null
+      readonly scope: PressureScope["kind"]
+    }
+  | {
+      readonly kind: "lane"
+      readonly at: number
+      readonly lane: ThreadId
+      readonly currentBytes: number
+    }
+
+/** The last hour by minute, and each lane's last memory, carried into a minute it wrote no row in. */
+export interface FollowedHistory {
+  /** By minute since the epoch; at most `HISTORY_MINUTES`, the newest the latest sample's. */
+  readonly minutes: ReadonlyMap<number, HistoryMinute>
+  readonly laneBytes: ReadonlyMap<ThreadId, number>
+}
+
+const HISTORY_NONE: FollowedHistory = {
+  minutes: new Map(),
+  laneBytes: new Map(),
+}
+
+/** What the host follows of its samples: memory's rung's changes, and the last hour. */
+export interface FollowedSamples {
+  readonly rungs: FollowedRungs
+  readonly history: FollowedHistory
+}
+
+export const FOLLOWED_NONE: FollowedSamples = {
+  rungs: RUNGS_NONE,
+  history: HISTORY_NONE,
+}
+
+const MINUTE_MS = 60_000
+const minuteOf = (at: number) => Math.floor(at / MINUTE_MS)
+
+/** The larger of two lanes' maps, lane by lane. */
+const laneMost = (
+  a: Readonly<Record<ThreadId, number>>,
+  b: ReadonlyMap<ThreadId, number>,
+): Readonly<Record<ThreadId, number>> => {
+  const most: Record<ThreadId, number> = { ...a }
+  for (const [lane, bytes] of b) most[lane] = Math.max(most[lane] ?? 0, bytes)
+  return most
+}
+
+/**
+ * The history after one row. A sample folds into its minute: its least
+ * memory, its most pressure where the stall was the machine's (a stall
+ * inside one thread's own limit only marks the minute), and every lane's
+ * carried memory. A lane's row is carried, and raises its minute where the
+ * minute is open. A minute `HISTORY_MINUTES` before the newest goes; a row
+ * older than that is too old to keep.
+ */
+export function nextHistory(
+  history: FollowedHistory,
+  row: FollowedRow,
+): FollowedHistory {
+  const minute = minuteOf(row.at)
+  const newest = Math.max(minute, ...history.minutes.keys())
+  if (minute <= newest - HISTORY_MINUTES) return history
+  if (row.kind === "lane") {
+    const laneBytes = new Map(history.laneBytes).set(row.lane, row.currentBytes)
+    const open = history.minutes.get(minute)
+    if (open === undefined) return { ...history, laneBytes }
+    const raised = laneMost(
+      open.laneBytes,
+      new Map([[row.lane, row.currentBytes]]),
+    )
+    return {
+      minutes: new Map(history.minutes).set(minute, {
+        ...open,
+        laneBytes: raised,
+      }),
+      laneBytes,
+    }
+  }
+  const was = history.minutes.get(minute)
+  const isMachineStall = row.scope === "machine" && row.fullAvg10 !== null
+  const machinePressureFull = isMachineStall
+    ? Math.max(was?.machinePressureFull ?? 0, row.fullAvg10 ?? 0)
+    : (was?.machinePressureFull ?? null)
+  const folded: HistoryMinute = {
+    memoryAvailableBytes: Math.min(
+      was?.memoryAvailableBytes ?? row.memoryAvailable,
+      row.memoryAvailable,
+    ),
+    machinePressureFull,
+    isContainedStall:
+      (was?.isContainedStall ?? false) ||
+      (row.scope === "contained" && (row.fullAvg10 ?? 0) > 0),
+    laneBytes: laneMost(was?.laneBytes ?? {}, history.laneBytes),
+  }
+  const minutes = new Map(
+    [...history.minutes].filter(([m]) => m > newest - HISTORY_MINUTES),
+  ).set(minute, folded)
+  return { ...history, minutes }
+}
+
+/** What the host follows after one row: a sample moves the rung and the history; a lane's row, the history. */
+export const nextFollowed = (
+  followed: FollowedSamples,
+  row: FollowedRow,
+): FollowedSamples => ({
+  rungs:
+    row.kind === "sample"
+      ? nextRungs(followed.rungs, row.at, row.rung)
+      : followed.rungs,
+  history: nextHistory(followed.history, row),
+})
+
+/** What is followed once the rows before `before` are trimmed: the rung's older changes go; the history keeps only its hour anyway. */
+export const trimFollowed = (
+  followed: FollowedSamples,
+  before: number,
+): FollowedSamples => ({
+  ...followed,
+  rungs: {
+    ...followed.rungs,
+    changes: followed.rungs.changes.filter(c => c.at >= before),
+  },
+})
+
+/**
+ * The served hour: `HISTORY_MINUTES` minutes ending at the newest, oldest
+ * first, null for a minute no sample fell in; empty before any sample.
+ */
+export function lastHourHistory(history: FollowedHistory): MachineHistory {
+  if (history.minutes.size === 0) return { minutes: [] }
+  const newest = Math.max(...history.minutes.keys())
+  return {
+    minutes: Array.from(
+      { length: HISTORY_MINUTES },
+      (_, i) => history.minutes.get(newest - HISTORY_MINUTES + 1 + i) ?? null,
+    ),
+  }
 }

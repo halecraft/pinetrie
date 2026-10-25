@@ -289,6 +289,20 @@ export { columnForeign, columnReadOnly } from "./foreign-column.ts"
 export { gridKeyAct } from "./grid-keys.ts"
 export type { GridView } from "./grid-view.ts"
 export {
+  type BarView,
+  type HealthPageView,
+  healthPageView,
+  type SeriesView,
+} from "./health-page.ts"
+export {
+  diagnosticLines,
+  type HealthPageText,
+  healthPageWords,
+  machineAskPrefill,
+  notRefreshedWords,
+  type VitalText,
+} from "./health-words.ts"
+export {
   directoryRootEntries,
   inventoryThreads,
   planHeldRoots,
@@ -447,15 +461,6 @@ export {
   treatmentWords,
   vmStartWaitWords,
 } from "./machine.ts"
-export {
-  type MachineLine,
-  type MachinePageView,
-  type MachineThreadLine,
-  machineAskPrefill,
-  machinePageLines,
-  machinePageView,
-  machinePageWords,
-} from "./machine-page.ts"
 export {
   addCommentWords,
   COMMENT,

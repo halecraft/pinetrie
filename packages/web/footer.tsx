@@ -25,7 +25,7 @@ import { hashOfPage, type Theme } from "@pinetrie/web-core"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
 import { Button, IconButton } from "./button.tsx"
-import { MachineIcon } from "./icons.tsx"
+import { HEALTH, MachineIcon } from "./icons.tsx"
 import { InboxMenu, type InboxMenuProps } from "./inbox-menu.tsx"
 import {
   InventoryToggle,
@@ -99,7 +99,7 @@ export function Footer({
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
         <MachineStatus
-          onOpen={() => onIntent({ kind: "page", to: "machine" })}
+          onOpen={() => onIntent({ kind: "page", to: "health" })}
           view={machine}
         />
         <HistoryLink accepted={line} />
@@ -109,15 +109,8 @@ export function Footer({
   )
 }
 
-/** Each state, as the stylesheet names it: what it does to work. */
-const HEALTH = {
-  neutral: "keeping-up",
-  amber: "slowed",
-  red: "stopped",
-} as const
-
 /**
- * The machine's health, a button that opens the Machine page: its words are
+ * The machine's health, a button that opens the Health page: its words are
  * its title, and its name says where it goes.
  */
 function MachineStatus({

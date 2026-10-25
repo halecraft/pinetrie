@@ -16,7 +16,7 @@ import {
 import {
   type BlobStore,
   errorText,
-  type MachinePageFacts,
+  type MachineFacts,
   type Sha256,
 } from "@pinetrie/core"
 import type { ReviewAsk } from "@pinetrie/rules"
@@ -85,9 +85,9 @@ export async function startHttp(input: {
     /** Read at each export: the containment it names is the latest sample's. */
     readonly measuredOn: () => MeasuredOn
   }
-  /** The Machine page's reads: its facts, null where the host reads no machine; and its diagnostics' text. */
+  /** The Health page's reads: its facts, null where the host reads no machine; and its diagnostics' text. */
   readonly machine: {
-    readonly facts: () => MachinePageFacts | null
+    readonly facts: () => MachineFacts | null
     readonly diagnostics: () => Promise<string>
   }
   readonly log: (message: string) => void

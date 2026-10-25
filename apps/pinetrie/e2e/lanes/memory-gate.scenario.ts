@@ -175,7 +175,7 @@ async function memoryGateSection(
     check(
       "a paused lane's column says why it waits",
       treatment !== null &&
-        treatmentWords(treatment) ===
+        treatmentWords(treatment)?.sentence ===
           "paused for memory: its next tool call waits for room",
       `${treatment?.kind ?? "none"}`,
     )

@@ -158,8 +158,8 @@ While the page syncs, "syncing…" leads its right end.
   panel is open); choosing **Inbox** shows the inbox's sections in the same
   menu, under **← back**. Then **Profile**, which opens your profile page
   (Pages, below), **Setup**, which opens what the host read of its config
-  (Pages, below), **Machine**, which opens the machine lanes run on (Pages,
-  below), and **Sign in as someone else**, which forgets who this
+  (Pages, below), **Health**, which opens how the machine lanes run on is
+  doing (Pages, below), and **Sign in as someone else**, which forgets who this
   device says you are and asks again (ADR-0037).
 - **Your inbox** (ADR-0030, ADR-0077, ADR-0091), beside you: one menu of
   what needs you, its trigger a tray icon named **Inbox** and what needs
@@ -228,7 +228,7 @@ While the page syncs, "syncing…" leads its right end.
   cause that slows no work says so without "work is slowed" ("a turn's
   snapshot could not be recorded: branching at it starts from the turn
   before"). Its accessible name is its title and where it goes: it is a
-  button that opens the Machine page (Pages, below). The host plans it from samples every few seconds, each cause
+  button that opens the Health page (Pages, below). The host plans it from samples every few seconds, each cause
   entering and leaving by counts of samples so it does not flap, and writes
   it only when it changes, at its start and at its stop, so no tab reads a
   stopped host's (`packages/machine/TECHNICAL.md`).
@@ -318,52 +318,74 @@ nothing; Ctrl+Shift+L still folds the sidebar.
     folder, then every command.
   - **Context files**: the files the model is given, `AGENTS.md` and the
     like: pine·trie's own and those inside the project.
-- **Machine** (ADR-0210), from the same menu, under **Setup**, and from
-  the footer's machine glyph: the machine lanes run on, as the host last
-  sampled it, asked for again at each sample while the page shows (it
-  never makes the host sample sooner). Every reading pine·trie could not
-  take says why ("not read: the host outside this lane runs it"), never
-  0; before the first sample, each section waits for it. With no sample
-  ended for a while, the page shows the last numbers read under that
-  cause, and no lane held.
-  - **Now**: each cause the glyph would name, worst first, with what
-    pine·trie is doing about it ("it holds new runs' starts until there is
-    room") and what you can do ("archive the canvases you are done with:
-    their snapshots are deleted; or raise `lanes.store.max`"). A service's
-    or a thread's lane stuck at its own memory limit for samples running is
-    a cause of its own, amber, named by its service or its thread ("the
-    file observer is stuck at its memory limit", "foggy-garnet is stuck at
-    its memory limit", ADR-0212): it holds nothing, since holding lanes
-    cannot relieve a stall inside one cgroup's limit, and only a stall the
-    machine's own reclaim says is the machine's moves memory's rung.
-  - **Threads**: each running lane by its thread's name, held lanes
-    first: its memory against its limit, its own and its cache, its
-    snapshots and their estimated size, and how it is held. A row opens
-    its thread's canvas; **Archive** beside it, where the board offers its
-    canvas the archive, asks first, saying what the upkeep then frees and
-    what it withdraws, and is disabled with why while the canvas is busy.
-  - **Machine**: memory available of its total and the memory rung; the
-    pressure; the lanes' disk against what pine·trie keeps and its
-    largest size ("38 GB unallocated of 400 GB; pine·trie keeps 40 GB at
-    least"); your disk against what pine·trie leaves free of it; on the
-    Mac, "the lane VM may use up to 8 GB of your Mac's memory".
-  - **Host**: lanehost's disk and privileged services and the file
-    observer, each against its limit; what the kernel holds the
+- **Health** (ADR-0210), from the same menu, under **Setup**, and from
+  the footer's machine glyph (`#health`): how the machine lanes run on is
+  doing, as the host last sampled it, asked for again at each sample
+  while the page shows (it never makes the host sample sooner); a failed
+  ask keeps the last facts and says "not refreshed" and why. Under its
+  heading, a line names the machine and its sizes ("The lane VM on your
+  Mac, where your threads' commands run · 12 GB memory · 400 GB disk";
+  on Linux "This computer…"; a host in a lane, "This lane's share of its
+  machine…"). Every reading pine·trie could not take says why ("not
+  read: the host outside this lane runs it"), never 0; before the first
+  sample, each waits for it. With no sample ended for a while, the page
+  shows the last numbers read under that cause, and no lane held.
+  - **The verdict** comes first: the footer's own glyph, a short title
+    ("Memory is short", or "Everything keeps up"), the worst cause's
+    sentence, what pine·trie does about it ("pine·trie holds new runs'
+    starts until there is room") and what you can do; the other causes
+    under it; **Ask an agent** and **Copy diagnostics** beside it, quiet
+    while nothing is wrong. A service's or a thread's lane stuck at its
+    own memory limit for samples running is a cause of its own, amber,
+    named by its service or its thread (ADR-0212): it holds nothing, since
+    holding lanes cannot relieve a stall inside one cgroup's limit, and
+    only a stall the machine's own reclaim says is the machine's moves
+    memory's rung.
+  - **Vitals**: four tiles, memory, memory pressure, the lanes' disk and
+    your disk (on the Mac, "Your Mac's disk"), each a large number, what
+    it is out of, a status in words (**Normal**; **Near limit**, past
+    where pine·trie would stop acting, with no cause in force; **Short**,
+    **High**, **Low**, **Full** or **Repairing** while a cause of it is in
+    force; **A thread's own**, a stall inside one thread's limit, which no
+    rung reads; **Not read**), a bar marked where pine·trie acts, and a
+    note: what happens at the mark ("new runs wait below 1.2 GB"), how far
+    a near reading is from it ("the lanes' disk stops growing below 93 GB:
+    9 GB away"), or what pine·trie does now. Memory and its pressure add
+    the last hour, a point a minute, the bounds dashed across it; the
+    pressure's draws only the machine's stalls, a thread's own marked
+    apart. The marks are the planners' own bounds, so the page never calls
+    near what they do not act on, nor says pine·trie acts before the
+    footer does.
+  - **Threads**: a table of each running lane by its thread's name, held
+    lanes first: its memory against its limit with its cache, its last
+    hour, its snapshots and their estimated size, and its state
+    ("running", "paused", "killed for memory"), the column's own sentence
+    as its title. A name opens its thread's canvas; **Archive…** beside
+    it, where the board offers its canvas the archive, asks first, saying
+    what the upkeep then frees and what it withdraws, and is disabled with
+    why while the canvas is busy.
+  - **What happened**: a strip of the last day's marks, trouble apart from
+    what pine·trie did, above the list, newest first, each "2 min ago"
+    within the day: a lane held or let go, memory's rung moving, the
+    disk's repair moving, a command or a service killed for memory, old
+    snapshots deleted, the host stalling, a slow step or `jj` command, a
+    repair asked for again. Repeats in a row are one line ("the host
+    stalled 3 times, the longest for 1.4 seconds").
+  - **Details**, each folded under a summary: pine·trie's own services
+    (lanehost's disk and privileged services and the file observer, each
+    against its limit); the safeguards, what the kernel holds the
     containers to, read back from their cgroups, never from Docker's
-    answer ("each lane is held to its process limit, the services to
-    theirs and to their CPU share, and the services are protected up to
-    1.4 GB of memory; the kernel is set to stop a lane before a service
-    when memory runs out (set, not read back)"), on Linux the services'
-    memory having no floor, or which control did not take ("not every
-    limit took: the services' memory floor did not read back as set";
-    in a nested lane, "this lane's Docker has no cgroup controllers:
-    nothing is contained here", ADR-0210); and on a Linux host where
-    systemd-oomd manages rootless Docker's containers, "systemd-oomd may
-    stop these lanes under memory pressure, outside pine·trie".
-  - **Lately**: newest first, what happened: a lane held or let go,
-    memory's rung moving, the disk's repair moving, a command or a service
-    killed for memory, old snapshots deleted, the host stalling, a slow
-    step or `jj` command, a repair asked for again.
+    answer, as a checklist ("each lane is held to its process limit", "the
+    services are protected up to 1.4 GB of memory", "the kernel is set to
+    stop a lane before a service when memory runs out (set, not read
+    back)"), or which control did not take ("not every limit took: the
+    services' memory floor did not read back as set"; in a nested lane,
+    "this lane's Docker has no cgroup controllers: nothing is contained
+    here"), and on a Linux host where systemd-oomd manages rootless
+    Docker's containers, "systemd-oomd may stop these lanes under memory
+    pressure, outside pine·trie"; and the settings the bounds come from
+    (the lane VM's memory, `lanes.store.max`, what the lanes' disk keeps
+    free, `lanes.store.leaveFree`).
   - **Repair again**, only where this host may repair the lane VM's disk
     and its last repair failed: it asks first, saying what it costs
     ("every running thread on every host waits while the lane VM is
@@ -1744,7 +1766,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
-- **What the Machine page cannot do yet** (ADR-0210): restart the lane
+- **What the Health page cannot do yet** (ADR-0210): restart the lane
   VM, and a red cause that needs a choice in the inbox's **Needs you**.
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file. Threads from any root, note columns and media columns (ADR-0182)

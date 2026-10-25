@@ -1,6 +1,6 @@
 // host/routes — what the host does with a request or an upgrade, pure:
 // admission first (admission.ts), then which requests it answers itself: an
-// image blob, a review's read, or the machine's (the Machine page's facts,
+// image blob, a review's read, or the machine's (the Health page's facts,
 // its diagnostics, the measurements' export). Everything else is the page's:
 // Vite's, or a file of the built page (`planPageRequest`). `http.ts` carries
 // each plan out.
@@ -16,9 +16,9 @@ export type Route =
   | { readonly kind: "review"; readonly ask: ReviewAsk }
   /** The machine's measurements of the last `days` days, as JSON lines. */
   | { readonly kind: "measurements"; readonly days: number }
-  /** The Machine page's facts, as JSON. */
+  /** The Health page's facts, as JSON. */
   | { readonly kind: "machine" }
-  /** The Machine page's diagnostics, as text. */
+  /** The Health page's diagnostics, as text. */
   | { readonly kind: "machine-diagnostics" }
   | { readonly kind: "bad" }
   | { readonly kind: "other" }

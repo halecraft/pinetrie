@@ -177,7 +177,7 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   joins the running VM, and every host on it shares the floor of whichever
   started it; a changed floor applies from the VM's next start (an idle
   stop, or a changed launcher or image), as the data disk's growth does.
-  The Machine page says so when the floor read back is not this host's.
+  The Health page says so when the floor read back is not this host's.
 - **Disks are attached with synchronization `fsync`, caching `cached`.**
   Apple's defaults, `full` and `automatic`, made every `docker run` about
   500 ms (S129). The host decides them (`LAUNCHER_DISKS`, `plan.ts`) and
@@ -321,7 +321,7 @@ When a host repairs is `@pinetrie/machine`'s; this is the boot and its locks.
   `data disk full` there fails the lease as `DiskFullAtBoot`, its lease
   closed, for the host's repair.
 - **The VM's logs grow for as long as its state directory lives**
-  (`console.log`, `launcher.log`): the Machine page's diagnostics read
+  (`console.log`, `launcher.log`): the Health page's diagnostics read
   their tails (`readVmLogTail`) from the last 64 KiB only, the line the
   read cut into dropped. The start's read of the console stays whole.
 - **A repair with no room to grow still repacks**, which may itself fail

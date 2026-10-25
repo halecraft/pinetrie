@@ -153,3 +153,9 @@ this host (the page's origin) and names the text pasted, `\r\n` taken as
   root (`themeAttribute`), so the stylesheet's `color-scheme: light dark`
   follows the browser. Its words, and the account menu's heading over
   them, are `themeWords` and `THEME_HEADING`.
+- **A series' geometry** (`sparkline.ts`, `sparkPath`): interface's
+  `SeriesView` points, 0 to 1, in an SVG's own units. A null point is a
+  minute with nothing read, and the line breaks there rather than joining
+  across it; a point alone is a dot, so a host a minute old still draws.
+  The page draws each run's path and its fill from its own first x
+  (`packages/web/TECHNICAL.md`, "Pages").

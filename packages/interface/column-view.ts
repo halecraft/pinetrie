@@ -245,7 +245,7 @@ interface ThreadFacts {
  */
 export type HeadLine =
   | { readonly kind: "status"; readonly status: ColumnStatus }
-  /** Its lane is held, for memory or a repair: why, as `treatmentWords` says it. */
+  /** Its lane is held, for memory or a repair: why, as `treatmentWords`' sentence says it. */
   | { readonly kind: "held"; readonly words: string }
   | { readonly kind: "about"; readonly about: ThreadAbout }
   | { readonly kind: "none" }
@@ -262,7 +262,7 @@ export function headLine(
 ): HeadLine {
   if (status !== null && !status.quiet) return { kind: "status", status }
   const held = treatment === null ? null : treatmentWords(treatment)
-  if (held !== null) return { kind: "held", words: held }
+  if (held !== null) return { kind: "held", words: held.sentence }
   return about === null ? { kind: "none" } : { kind: "about", about }
 }
 

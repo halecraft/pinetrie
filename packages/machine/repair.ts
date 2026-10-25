@@ -5,13 +5,13 @@
 // records stops every host's repair, and a host's start does not pass it.
 
 import type { MachineCause } from "@pinetrie/core"
-import { ROOM_SPENT, ROOM_SPENT_CLEAR } from "./health.ts"
+import { ROOM_SPENT, ROOM_SPENT_CLEAR } from "./bounds.ts"
 import type { MachineSample } from "./sample.ts"
 
 export type RepairTrigger =
   | "room-spent-and-nothing-to-delete"
   | "disk-full-at-boot"
-  /** A person asked, from the Machine page, for a failed repair to run again. */
+  /** A person asked, from the Health page, for a failed repair to run again. */
   | "asked-again"
 
 /** What the reducer keeps of a repair boot's report: the host maps the VM's into it. */

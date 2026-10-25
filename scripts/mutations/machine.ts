@@ -4,6 +4,41 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/machine"]
 
 export const mutations: readonly Mutation[] = [
+  // ── the bounds pine·trie acts at, and the samples followed ──
+  {
+    name: "the rung changes at every sample",
+    file: "packages/machine/measurements.ts",
+    from: "  if (rungs.last === null || rungs.last === rung)",
+    to: "  if (rungs.last === null)",
+    command: unit,
+    expect: "the rung changes only between consecutive samples that differ",
+  },
+  {
+    name: "memory's first bound is read from the wrong rung",
+    file: "packages/machine/bounds.ts",
+    from: "    acts: RUNG_BOUNDS[2].enter.availableShareBelow * total,\n",
+    to: "    acts: RUNG_BOUNDS[3].enter.availableShareBelow * total,\n",
+    command: unit,
+    expect:
+      "memory's bounds are the rungs' available shares of the total, and pressure's their full stalls",
+  },
+  {
+    name: "a minute keeps its most memory, not its least",
+    file: "packages/machine/measurements.ts",
+    from: "    memoryAvailableBytes: Math.min(\n",
+    to: "    memoryAvailableBytes: Math.max(\n",
+    command: unit,
+    expect: "a minute keeps its least memory and its most machine pressure",
+  },
+  {
+    name: "a thread's own stall counts as the machine's pressure",
+    file: "packages/machine/measurements.ts",
+    from: '  const isMachineStall = row.scope === "machine" && row.fullAvg10 !== null\n',
+    to: "  const isMachineStall = row.fullAvg10 !== null\n",
+    command: unit,
+    expect:
+      "a stall inside one thread's own limit adds no pressure, and marks its minute",
+  },
   // ── what the measurements keep ──
   {
     name: "a cgroup at its limit keeps no high",
@@ -31,7 +66,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the numbers in force name the overdue bound's constant and the bound a host set",
   },
-  // ── what the Machine page reads ──
+  // ── what the Health page reads ──
   {
     name: "a lane's snapshots count every row, not only those kept",
     file: "packages/machine/snapshot-index.ts",
@@ -52,8 +87,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the latest reading keeps the first sample, not the last",
     file: "packages/machine/manager.ts",
-    from: 'const sampled = result.kind === "sampled" ? result.sample : lastRead?.sample',
-    to: 'const sampled = lastRead?.sample ?? (result.kind === "sampled" ? result.sample : undefined)',
+    from: "    if (shown !== null) {\n",
+    to: "    if (shown !== null && lastRead === null) {\n",
     command: unit,
     expect:
       "the latest reading is none before a sample, then the last sample with what was planned from it",

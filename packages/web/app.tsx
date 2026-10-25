@@ -212,10 +212,10 @@ import { useFileDropGuard } from "./file-drop.ts"
 import { type FocusContext, focusFacts } from "./focus.ts"
 import { FocusClaim } from "./focus-claim.ts"
 import { Footer } from "./footer.tsx"
+import { HealthPage } from "./health-page.tsx"
 import { HistoryPage } from "./history-page.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
-import { MachinePage } from "./machine-page.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -1988,8 +1988,8 @@ export function App({
                   view={setupView(workFacts.setup, workFacts.commands)}
                 />
               )}
-              {page === "machine" && (
-                <MachinePage
+              {page === "health" && (
+                <HealthPage
                   archiveMove={lane => {
                     const canvas = canvasOfThread.get(lane)
                     const head =

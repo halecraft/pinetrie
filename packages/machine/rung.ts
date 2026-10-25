@@ -4,6 +4,7 @@
 // planned and measured, never done. Each rung is a level with the
 // hysteresis the health value's causes have.
 
+import { type BoundSide, boundReading } from "@pinetrie/core"
 import {
   type LevelReading,
   nextLevelState,
@@ -72,20 +73,26 @@ export interface RungPlanState {
 
 export const FIRST_RUNG_STATE: RungPlanState = { rung: 0, levels: new Map() }
 
-type BoundReading = "over" | "between" | "clear" | "unmeasured"
-
-/** One bound read: `over` past `enter`, `clear` past `clear`, between them else. */
-const boundReading = (
+/**
+ * One bound of a rung read: unmeasured where its value or the bound is
+ * missing, else core's judge, its near being the level's between.
+ */
+const rungBoundReading = (
   value: number | null,
   enter: number | undefined,
   clear: number | undefined,
-  rising: boolean,
-): BoundReading => {
+  worse: BoundSide,
+): "over" | "between" | "clear" | "unmeasured" => {
   if (value === null || enter === undefined || clear === undefined)
     return "unmeasured"
-  if (rising ? value > enter : value < enter) return "over"
-  if (rising ? value < clear : value > clear) return "clear"
-  return "between"
+  // `does` is only the page's words: no judge reads it.
+  const read = boundReading(value, {
+    worse,
+    acts: enter,
+    clears: clear,
+    does: "hold-starts",
+  })
+  return read === "near" ? "between" : read
 }
 
 /**
@@ -105,23 +112,23 @@ function rungReading(
   const pressure = scope.kind === "machine" ? scope.pressure : null
   const share = memoryTotal > 0 ? memoryAvailable / memoryTotal : null
   const readings = [
-    boundReading(
+    rungBoundReading(
       pressure?.someAvg10 ?? null,
       enter.someAvg10,
       clear.someAvg10,
-      true,
+      "above",
     ),
-    boundReading(
+    rungBoundReading(
       pressure?.fullAvg10 ?? null,
       enter.fullAvg10,
       clear.fullAvg10,
-      true,
+      "above",
     ),
-    boundReading(
+    rungBoundReading(
       share,
       enter.availableShareBelow,
       clear.availableShareAbove,
-      false,
+      "below",
     ),
   ].filter(r => r !== "unmeasured")
   if (readings.length === 0) return { kind: "unmeasured" }

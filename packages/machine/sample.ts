@@ -17,6 +17,7 @@ import type {
   StoreRoom,
   ThreadId,
 } from "@pinetrie/core"
+import type { PressureScope } from "./pressure-scope.ts"
 import type { RepairFacts } from "./repair.ts"
 import type { Rung } from "./rung.ts"
 
@@ -81,6 +82,8 @@ export interface MachineSample {
 /** The last sample that read, and what the step that took it, or a later one, planned. */
 export interface ReadingPlanned {
   readonly sample: MachineSample
+  /** What its pressure says, as its rung read it. */
+  readonly scope: PressureScope
   readonly health: MachineHealth
   readonly rung: Rung
   /** The lanes held as last applied: memory's, or every lane while a repair runs. */
@@ -89,7 +92,7 @@ export interface ReadingPlanned {
 }
 
 /**
- * What the Machine page shows: fresh, as the last sample planned it; or
+ * What the Health page shows: fresh, as the last sample planned it; or
  * overdue, no sample having ended for the bound, its health saying so and
  * holding nothing, with the last reading kept (null before any read).
  */

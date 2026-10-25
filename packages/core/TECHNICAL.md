@@ -83,7 +83,7 @@ A type lives in the highest package that all its users can import
 | `folder.ts`, `runs.ts`, `output.ts`, `images.ts` | a folder project's history; what a command did to a disk; what a `bash` call wrote, by statement; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
 | `size.ts`, `machine.ts` | a size, read (`parseSize`); the machine's health (`MachineHealth`, `MachineCause`) and what lanehost reads of it (`Pressure`, `CgroupMemory`, `StoreRoom`), which `@pinetrie/machine` plans from, rules stores and interface words |
-| `machine-page.ts` | what the host serves the Machine page (`MachinePageFacts`): a reading or why not (`Measured`), each lane, each service (`ServiceReading`), what happened (`MachineLately`, `EventMeasured`), the actions this host can take (`MachineAction`), and the sample's cadence the page asks at (`MACHINE_SAMPLE_MS`) |
+| `machine-facts.ts` | what the host serves at `GET /machine` (`MachineFacts`): what the machine is (`MachineKind`), a reading or why not (`Measured`), each against the bounds pine·trie acts at (`ActingBound`, its worse side and what it does), the last hour by minute (`MachineHistory`, `HISTORY_MINUTES`), each lane, each service (`ServiceReading`), what happened (`MachineLately`, `EventMeasured`), the actions this host can take (`MachineAction`), and the sample's cadence the Health page asks at (`MACHINE_SAMPLE_MS`); and `boundReading`, the one judge of a reading against a bound (over, near or clear, strictly), which `@pinetrie/machine`'s health and rungs and the Health page all call |
 
 ## Output apart from runs (`output.ts`)
 

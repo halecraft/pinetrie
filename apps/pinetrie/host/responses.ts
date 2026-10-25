@@ -111,7 +111,7 @@ const BLOB_KIND = (mime: BlobMime): BytesKind =>
 
 /**
  * The machine's reads, each of the moment it is asked, so never stored: the
- * measurements' export (JSON lines), the Machine page's facts (JSON), its
+ * measurements' export (JSON lines), the Health page's facts (JSON), its
  * diagnostics (text).
  */
 export const machineResponse = (

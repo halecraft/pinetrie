@@ -312,15 +312,16 @@ bar, each column's matches, and the rail's marks.
 
 ## The machine's status (`footer.tsx`, `icons.tsx`, ADR-0210)
 
-- **A button to the Machine page:** an `IconButton` titled by
+- **A button to the Health page:** an `IconButton` titled by
   `machineStatus`' words, its name those words and where it goes
-  (`MachineStatusView.name`); pressing it opens `#machine`. Never a badge,
+  (`MachineStatusView.name`); pressing it opens `#health`. Never a badge,
   never moving.
 - **Shape and colour, never colour alone:** `MachineIcon` is a machine,
   with a triangle at its corner when amber and a barred disc when red. The
   stylesheet names a state by what it does to work (`data-health`:
-  `keeping-up`, `slowed`, `stopped`), the footer's grey, `--caution` and
-  `--danger`: a state's own name would read as a colour literal to
+  `keeping-up`, `slowed`, `stopped`, from `icons.tsx`' `HEALTH`, which
+  the Health page's verdict reads too), the footer's grey, `--caution`
+  and `--danger`: a state's own name would read as a colour literal to
   `stylesheet.test.ts`.
 
 ## The page's colours (`index.html`, ADR-0081, ADR-0195, ADR-0196)
@@ -1876,8 +1877,8 @@ A page covers the stage: the profile, the setup page
 (`setup-page.tsx`, ADR-0146), which draws `setupView` from the account
 menu's **Setup**, and a folder project's history (`history-page.tsx`,
 ADR-0165), which draws `historyView` from the footer's **history** link,
-and the Machine page (`machine-page.tsx`, ADR-0210), from the account
-menu's **Machine** and the footer's machine status.
+and the Health page (`health-page.tsx`, ADR-0210), from the account
+menu's **Health** and the footer's machine status.
 An entry's review opens in place (a `ReviewPane`), fetched only then; a
 restore opens its preview, which says the folder holds the version when
 its review is empty, and offers no restore then. Which pages there are, and
@@ -1885,12 +1886,23 @@ their words, are interface's `page.ts`; a page's hash, and how leaving
 treats the history, web-core's `page-url.ts`. The composer's "See Setup" link is a
 plain `#setup` anchor: `usePage` hears the hash change.
 
-- **The Machine page asks for its facts at the sample's cadence**
+- **The Health page asks for its facts at the sample's cadence**
   (`MACHINE_SAMPLE_MS`, core's, the host's sample's), from the moment it
   mounts until it unmounts, which aborts a fetch in flight: each answer
-  replaces the last, and the page never asks the host to sample. It draws
-  `machinePageWords(machinePageView(facts, archiveMove))` and nothing of
-  its own: an action shows only where the facts carry it, and asks first
+  replaces the last, and the page never asks the host to sample. A failed
+  ask keeps the last facts on the page, and its header says it was not
+  refreshed and why (`notRefreshedWords`); the time an answer arrived is
+  the view's now, so how long ago and the strip move with each answer. It
+  draws `healthPageWords(healthPageView(facts, archiveMove, now))` and
+  nothing of its own: a bar is a `div` with `role="meter"`, since a
+  `<meter>` draws neither the bounds' marks nor the near zone; a series
+  is `Sparkline`, its path web-core's `sparkPath`, its strokes
+  `vector-effect: non-scaling-stroke` in an SVG that stretches to its box,
+  carrying `data-points` for the browser suite; a status is a word and a
+  `data-status` or `data-tone` the stylesheet colours, never a colour
+  alone. The vitals are four across or two, never three over one, and a
+  narrow page drops the threads' graph and snapshots columns (container
+  queries on `.health-page`). An action shows only where the facts carry it, and asks first
   in place (`Confirmed`), its words the view's. Archive is the board's
   own move of the lane's canvas (its thread card head's `closes` move),
   sent as any move is; Repair again is the `repair-again` command, a

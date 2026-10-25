@@ -1698,23 +1698,130 @@
       .setup-page dd span { color: var(--text-faint); font-size: var(--font-sm); }
       .setup-model[data-none="true"], .setup-refusals li { color: var(--attention); }
       .setup-hint { color: var(--text-faint); }
-      /* The Machine page: the machine lanes run on, and what can be done. */
-      .machine-page h2 { margin: var(--space-10) 0 var(--space-5); font-size: var(--font-md); color: var(--text-faint);
+      /* The Health page: the verdict, the vitals against where pine·trie
+         acts, the threads, what happened and the details. A status is a
+         word and a colour, never a colour alone; its colour comes from what
+         it says (data-status, data-tone, data-mark), never from a name. */
+      .page[data-page="health"] .page-body { max-width: 56rem; }
+      .health-page { container-type: inline-size; }
+      .health-page h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-5);
+        margin: var(--space-11) 0 var(--space-6); font-size: var(--font-md); color: var(--text-faint);
         text-transform: uppercase; letter-spacing: .04em; }
-      .machine-page p, .machine-page li { color: var(--text-dim); font-size: var(--font-lg); }
-      .machine-lines { margin: 0; padding-left: var(--space-9); }
-      .machine-lines li { padding: var(--space-2) 0; overflow-wrap: anywhere; }
-      .machine-lines li[data-unreadable="true"] { color: var(--text-faint); font-style: italic; }
-      .machine-page .machine-doing, .machine-page .machine-you-can { margin: var(--space-1) 0 0; font-size: var(--font-md); }
-      .machine-page .machine-you-can { color: var(--text-muted); }
-      .machine-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
-      .machine-page .machine-thread { text-align: left; white-space: normal; }
-      .machine-thread:hover { text-decoration: underline; }
-      .machine-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+      .health-page h2 small, .health-page summary small { color: var(--text-quiet); font-size: var(--font-md);
+        font-weight: 400; text-transform: none; letter-spacing: 0; }
+      .health-page p { margin: 0; color: var(--text-dim); font-size: var(--font-lg); }
+      .health-of { color: var(--text-faint); font-size: var(--font-md); font-weight: 400; }
+      .health-machine { display: flex; flex-wrap: wrap; gap: var(--space-6); justify-content: space-between; }
+      .health-page .health-machine { color: var(--text-faint); font-size: var(--font-md); }
+      .health-live { color: var(--text-quiet); }
+      .health-live::before { content: "●"; margin-right: var(--space-3); color: var(--ok); }
+      .health-live[data-failed="true"] { color: var(--attention); }
+      .health-live[data-failed="true"]::before { color: var(--caution); }
+      .health-verdict { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-3) var(--space-8);
+        align-items: start; margin-top: var(--space-9); padding: var(--space-8) var(--space-9);
+        border: 1px solid var(--edge); border-left: 4px solid var(--text-quiet); border-radius: 8px;
+        background: var(--panel); }
+      .health-verdict[data-health="keeping-up"] { border-left-color: var(--ok); }
+      .health-verdict[data-health="slowed"] { border-left-color: var(--caution); }
+      .health-verdict[data-health="stopped"] { border-left-color: var(--danger); }
+      .health-verdict > .icon { width: 1.5rem; height: 1.5rem; margin-top: var(--space-1); color: var(--ok); }
+      .health-verdict[data-health="slowed"] > .icon { color: var(--caution); }
+      .health-verdict[data-health="stopped"] > .icon { color: var(--danger); }
+      .health-page .health-verdict-title { color: var(--text-bright); font-size: var(--font-2xl); font-weight: 600; }
+      .health-verdict p + p { margin-top: var(--space-2); font-size: var(--font-md); }
+      .health-page .health-you-can { color: var(--text-muted); }
+      .health-more { margin: var(--space-4) 0 0; padding-left: var(--space-9); color: var(--text-muted);
+        font-size: var(--font-md); }
+      .health-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); justify-content: flex-end; }
+      @container (max-width: 34rem) {
+        .health-verdict { grid-template-columns: auto 1fr; }
+        .health-actions { grid-column: 1 / -1; justify-content: flex-start; }
+        .health-hour, .health-snapshots { display: none; }
+        .health-events li { grid-template-columns: 1fr; gap: 0; }
+      }
+      /* Four across, or two: never three over one. */
+      .health-vitals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); }
+      @container (min-width: 46rem) { .health-vitals { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+      @container (max-width: 24rem) { .health-vitals { grid-template-columns: 1fr; } }
+      .health-vital { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-7);
+        border: 1px solid var(--edge); border-radius: 8px; background: var(--panel); }
+      .health-vital-head { display: flex; justify-content: space-between; gap: var(--space-4);
+        color: var(--text-muted); font-size: var(--font-md); }
+      .health-page .health-vital-number { color: var(--text-bright); font-size: 1.4rem; font-weight: 600; }
+      .health-page .health-note { color: var(--text-faint); font-size: var(--font-sm); }
+      .health-vital[data-status="near"] .health-note,
+      .health-vital[data-status="acting"] .health-note { color: var(--attention); }
+      .health-pill { flex: none; padding: 0 var(--space-5); border-radius: 999px; font-size: var(--font-xs);
+        font-weight: 600; color: var(--text-faint); background: var(--raised); }
+      .health-pill[data-status="normal"] { color: var(--ok); background: oklch(from var(--ok) l c h / .12); }
+      .health-pill[data-status="near"] { color: var(--caution); background: oklch(from var(--caution) l c h / .14); }
+      .health-pill[data-status="acting"] { color: var(--danger); background: oklch(from var(--danger) l c h / .14); }
+      .health-bar { position: relative; height: .5rem; border-radius: 4px; background: var(--line); }
+      .health-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); }
+      .health-bar-fill[data-part="1"] { background: oklch(from var(--accent) l c h / .45); }
+      .health-bar-near { position: absolute; top: 0; bottom: 0;
+        background: repeating-linear-gradient(135deg, oklch(from var(--caution) l c h / .35) 0 3px, transparent 3px 6px); }
+      .health-bar-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--caution); }
+      .health-bar-mark[data-worst="true"] { background: var(--danger); }
+      .sparkline { display: block; width: 100%; height: 2.4rem; overflow: visible; }
+      .sparkline path { vector-effect: non-scaling-stroke; fill: none; }
+      .sparkline-line { stroke: var(--accent); stroke-width: 1.5; }
+      .sparkline-fill { stroke: none; }
+      .sparkline .sparkline-fill { fill: oklch(from var(--accent) l c h / .15); }
+      .sparkline-dot { stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+      .sparkline-bound { stroke: var(--caution); stroke-width: 1; stroke-dasharray: 3 3; }
+      .sparkline-contained { stroke: var(--text-quiet); stroke-width: 2; }
+      .health-table-wrap { overflow-x: auto; }
+      .health-table { width: 100%; border-collapse: collapse; font-size: var(--font-md); color: var(--text-dim);
+        border: 1px solid var(--edge); border-radius: 8px; background: var(--panel); }
+      .health-table th { padding: var(--space-5) var(--space-7); border-bottom: 1px solid var(--edge);
+        color: var(--text-faint); font-weight: 500; text-align: left; }
+      .health-table td { padding: var(--space-6) var(--space-7); border-bottom: 1px solid var(--edge); vertical-align: middle; }
+      .health-table tr:last-child td { border-bottom: 0; }
+      .health-table .health-bar { width: 9rem; margin-top: var(--space-3); }
+      .health-table .sparkline { width: 7rem; height: 1.5rem; }
+      .health-table tr[data-unreadable="true"] td { color: var(--text-faint); font-style: italic; }
+      .health-page .health-thread { padding: 0; color: var(--accent); text-align: left; white-space: normal; }
+      .health-thread:hover { text-decoration: underline; }
+      .health-state { white-space: nowrap; color: var(--ok); }
+      .health-state::before { content: "● "; }
+      .health-state[data-tone="held"] { color: var(--caution); }
+      .health-state[data-tone="trouble"] { color: var(--danger); }
+      .health-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
         margin: var(--space-2) 0 0; padding: 0; border: 0; }
-      .machine-confirm legend { float: left; padding: 0; color: var(--attention); }
-      .machine-lately time { color: var(--text-faint); font-size: var(--font-sm); }
-      .machine-diagnostics pre { max-height: 20rem; overflow: auto; font-size: var(--font-sm); }
+      .health-confirm legend { float: left; padding: 0; color: var(--attention); }
+      .health-strip { position: relative; height: 1.8rem; border: 1px solid var(--edge); border-radius: 8px;
+        background: var(--panel); }
+      .health-strip-mark { position: absolute; top: .4rem; bottom: .4rem; width: 3px; margin-left: -1.5px;
+        border-radius: 2px; background: var(--text-quiet); }
+      .health-strip-mark[data-tone="trouble"] { background: var(--caution); }
+      .health-events { margin: var(--space-6) 0 0; padding: 0; list-style: none; }
+      .health-events li { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-6);
+        padding: var(--space-3) 0; border-bottom: 1px dashed var(--line); color: var(--text-dim);
+        font-size: var(--font-md); overflow-wrap: anywhere; }
+      .health-events li[data-tone="trouble"] span::before { content: "◆ "; color: var(--caution); }
+      .health-events time { color: var(--text-faint); font-size: var(--font-sm); }
+      .health-details details { margin-top: var(--space-5); padding: var(--space-6) var(--space-8);
+        border: 1px solid var(--edge); border-radius: 8px; background: var(--panel); }
+      .health-details summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-md); }
+      .health-service { display: grid; grid-template-columns: 13rem 1fr 9rem; gap: var(--space-6); align-items: center;
+        padding: var(--space-3) 0; color: var(--text-dim); font-size: var(--font-md); }
+      .health-service .health-of { text-align: right; }
+      .health-service[data-at-limit="true"] .health-bar-fill { background: var(--danger); }
+      .health-service[data-unreadable="true"] { color: var(--text-faint); font-style: italic; }
+      .health-safeguards { margin: var(--space-5) 0 0; padding: 0; list-style: none; color: var(--text-dim);
+        font-size: var(--font-md); }
+      .health-safeguards li { padding: var(--space-2) 0; }
+      .health-safeguards li::before { content: "✓"; display: inline-block; width: 1.2rem; color: var(--ok); }
+      .health-safeguards li[data-mark="set"]::before { content: "○"; color: var(--text-faint); }
+      .health-safeguards li[data-mark="outside"]::before { content: "!"; color: var(--caution); }
+      .health-safeguards li[data-mark="missing"]::before { content: "✗"; color: var(--danger); }
+      .health-settings { margin: var(--space-5) 0 0; }
+      .health-settings > div { display: grid; grid-template-columns: 13rem 1fr; gap: var(--space-6);
+        padding: var(--space-2) 0; font-size: var(--font-md); }
+      .health-settings dt { color: var(--text-faint); }
+      .health-settings dd { margin: 0; color: var(--text-dim); }
+      .health-diagnostics pre { max-height: 20rem; overflow: auto; font-size: var(--font-sm); }
       .composer-setup { color: var(--attention); font-size: var(--font-md); }
 
       /* The sidebar folded (ADR-0088), after the rules these refine: your pip

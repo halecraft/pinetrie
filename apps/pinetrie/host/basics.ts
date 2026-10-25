@@ -32,7 +32,7 @@ export interface Basics {
    */
   readonly places: PlacesDocHandle
   readonly log: (message: string) => void
-  /** Kept in the machine's measurements, for the Machine page's Lately; one that cannot be written is logged. */
+  /** Kept in the machine's measurements, for the Health page's What happened; one that cannot be written is logged. */
   readonly recordEvent: (event: EventMeasured) => void
   readonly newId: () => string
   readonly now: () => number

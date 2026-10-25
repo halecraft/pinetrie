@@ -5,14 +5,49 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
-  // ── the Machine page ──
+  // ── the Health page ──
   {
     name: "an archive is offered that the facts do not carry",
-    file: "packages/interface/machine-page.ts",
+    file: "packages/interface/health-page.ts",
     from: 'const archives = facts.actions.some(a => a.kind === "archive")',
     to: "const archives = true",
     command: unit,
     expect: "only the actions the facts carry are offered",
+  },
+  {
+    name: "a vital acts whenever a reading passes a bound",
+    file: "packages/interface/health-page.ts",
+    from: '  if (cause !== undefined) return { kind: "acting", cause }\n',
+    to: '  if (cause !== undefined || bounds.some(b => boundReading(reading, b) === "over")) return { kind: "acting", cause: cause ?? { kind: "unsampled", reason: "waiting", error: null } }\n',
+    command: unit,
+    expect:
+      "a vital acts only while its cause is in force, and is near past its clearing bound",
+  },
+  {
+    name: "a vital is near only past where pine·trie acts",
+    file: "packages/interface/health-page.ts",
+    from: '  const reached = bounds.find(b => boundReading(reading, b) !== "clear")\n',
+    to: '  const reached = bounds.find(b => boundReading(reading, b) === "over")\n',
+    command: unit,
+    expect:
+      "a vital acts only while its cause is in force, and is near past its clearing bound",
+  },
+  {
+    name: "a thread's own stall reads as the machine's",
+    file: "packages/interface/health-page.ts",
+    from: '    if (isContained) return { kind: "contained" }\n',
+    to: "",
+    command: unit,
+    expect: "a stall inside a thread's own limit is the thread's, never near",
+  },
+  {
+    name: "kills in different threads fold together",
+    file: "packages/interface/health-page.ts",
+    from: "      return `${event.kind}:${event.lane}`\n",
+    to: "      return event.kind\n",
+    command: unit,
+    expect:
+      "repeats in a row fold into one, with a count and the longest time, and other subjects never fold",
   },
   // ── a row's detail by statement ──
   {
@@ -5078,18 +5113,18 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a Docker with no cgroup driver is worded as a control missed",
-    file: "packages/interface/machine-page.ts",
-    from: '          return "this lane\'s Docker has no cgroup controllers: nothing is contained here"\n',
-    to: '          return "not every limit took"\n',
+    file: "packages/interface/health-words.ts",
+    from: '                text: "this lane\'s Docker has no cgroup controllers: nothing is contained here",\n',
+    to: '                text: "not every limit took",\n',
     command: unit,
     expect:
-      "the host says what is contained, the floor it protects, and the OOM priority as set, not read",
+      "the safeguards say what is contained, the floor it protects, and the OOM priority as set, not read",
   },
   {
     name: "systemd-oomd is never named",
-    file: "packages/interface/machine-page.ts",
-    from: "    ...(view.isOomdManagingLanes\n",
-    to: "    ...(false\n",
+    file: "packages/interface/health-words.ts",
+    from: "  const oomd: readonly SafeguardText[] = isOomdManagingLanes\n",
+    to: "  const oomd: readonly SafeguardText[] = false\n",
     command: unit,
     expect: "a host whose lanes systemd-oomd manages says so",
   },

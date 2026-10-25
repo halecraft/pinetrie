@@ -1,14 +1,14 @@
 // e2e/lanes/machine-boundary — the machine's boundary, in a lane VM of the
 // scenario's own, built from this checkout's launcher and image: the
 // kernel holds the observer and a lane to their kinds' process limits and
-// CPU weights, and the services' parent to its floor, as the Machine page
+// CPU weights, and the services' parent to its floor, as the Health page
 // says; then a lane thrashing at its own memory limit is a cause naming its
 // thread, while the gate, reading no machine-wide reclaim, holds nothing.
 
 import { rmSync } from "node:fs"
 import {
   type Containment,
-  type MachinePageFacts,
+  type MachineFacts,
   ROOT,
   type ThreadId,
 } from "@pinetrie/core"
@@ -93,12 +93,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     let lane: ThreadId | undefined
     try {
       const { host, script, user } = h
-      const facts = async (): Promise<MachinePageFacts | null> => {
+      const facts = async (): Promise<MachineFacts | null> => {
         const answered = await fetch(new URL("/machine", host.httpUrl)).catch(
           () => null,
         )
         return answered?.ok === true
-          ? ((await answered.json()) as MachinePageFacts | null)
+          ? ((await answered.json()) as MachineFacts | null)
           : null
       }
 

@@ -11,7 +11,6 @@ import {
   MEASUREMENTS_KEPT_DAYS,
   measurementsHeading,
   memoryMachineMeasurements,
-  rungChanges,
   sqliteMachineMeasurements,
 } from "./measurements.ts"
 
@@ -231,13 +230,23 @@ test("what happened lately is newest first across decisions, events and the rung
       memoryAvailable: 1,
     },
   ])
-  expect(m.recentRows(10)).toEqual([
-    { at: 5000, kind: "repair", from: "failed", to: "detected" },
-    { at: 4000, kind: "event", event: { kind: "host-stalled", ms: 1200 } },
-    { at: 3000, kind: "rung", from: 0, to: 3 },
-    { at: 2000, kind: "treatment", lane, from: "normal", to: "paused" },
+  expect(m.recentRows({ since: 0, cap: 10 })).toEqual({
+    rows: [
+      { at: 5000, kind: "repair", from: "failed", to: "detected" },
+      { at: 4000, kind: "event", event: { kind: "host-stalled", ms: 1200 } },
+      { at: 3000, kind: "rung", from: 0, to: 3 },
+      { at: 2000, kind: "treatment", lane, from: "normal", to: "paused" },
+    ],
+    isCapped: false,
+  })
+  const capped = m.recentRows({ since: 0, cap: 2 })
+  expect([capped.rows.map(r => r.at), capped.isCapped]).toEqual([
+    [5000, 4000],
+    true,
   ])
-  expect(m.recentRows(2).map(r => r.at)).toEqual([5000, 4000])
+  expect(m.recentRows({ since: 3500, cap: 10 }).rows.map(r => r.at)).toEqual([
+    5000, 4000,
+  ])
 })
 
 test("the rung's changes are read from the samples a store already keeps", () => {
@@ -247,24 +256,36 @@ test("the rung's changes are read from the samples a store already keeps", () =>
   now = 2000
   const again = sqliteMachineMeasurements(db, () => now)
   again.recordSample({ ...sample, rung: 2 })
-  expect(again.recentRows(5)).toEqual([
+  expect(again.recentRows({ since: 0, cap: 5 }).rows).toEqual([
     { at: 2000, kind: "rung", from: 1, to: 2 },
   ])
 })
 
-test("the rung changes only between consecutive samples that differ", () => {
-  expect(
-    rungChanges([
-      { at: 1, rung: 0 },
-      { at: 2, rung: 0 },
-      { at: 3, rung: 2 },
-      { at: 4, rung: 2 },
-      { at: 5, rung: 1 },
-    ]),
-  ).toEqual([
-    { at: 3, kind: "rung", from: 0, to: 2 },
-    { at: 5, kind: "rung", from: 2, to: 1 },
-  ])
+test("the last hour read back from a store is the one followed as it was recorded", () => {
+  const db = new DatabaseSync(":memory:")
+  let now = 10 * 60_000
+  const first = sqliteMachineMeasurements(db, () => now)
+  for (const [at, available, scope] of [
+    [10, 900, "machine"],
+    [10.5, 400, "contained"],
+    [12, 700, "machine"],
+  ] as const) {
+    now = at * 60_000
+    first.recordSample({ ...sample, memoryAvailable: available, scope })
+    first.recordLaneSamples([
+      {
+        lane,
+        anonMiB: 1,
+        fileMiB: 1,
+        currentMiB: available / 100,
+        limitMiB: null,
+        program: null,
+      },
+    ])
+  }
+  const again = sqliteMachineMeasurements(db, () => now)
+  expect(again.lastHour()).toEqual(first.lastHour())
+  expect(first.lastHour().minutes.filter(m => m !== null)).toHaveLength(2)
 })
 
 test("shadow decisions newer than what happened crowd none of it out of Lately", () => {
@@ -289,7 +310,7 @@ test("shadow decisions newer than what happened crowd none of it out of Lately",
       memoryAvailable: 1,
     })),
   )
-  expect(m.recentRows(2)).toEqual([
+  expect(m.recentRows({ since: 0, cap: 2 }).rows).toEqual([
     { at: 1000, kind: "treatment", lane, from: "normal", to: "paused" },
   ])
 })
@@ -326,6 +347,7 @@ test("the export's first line names the numbers in force, as their modules have 
       },
     },
     servicesFloorBytes: 1_400_000_000,
+    leaveFree: [],
   })
   const heading = JSON.parse(
     measurementsHeading(

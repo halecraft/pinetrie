@@ -4,31 +4,42 @@
 // `MEASUREMENTS_KEPT_DAYS`, and exported as JSON lines under a first line
 // naming what they were measured on and the numbers in force. No planner
 // reads the time: it is for tuning the memory rungs later, from what was
-// kept, and for the Machine page's Lately, decoded here (`recentRows`).
+// kept, and for the Health page: what happened, decoded here
+// (`recentRows`), and the last hour, followed (`lastHour`).
 
 import { DatabaseSync, type SQLInputValue } from "node:sqlite"
 import {
   assertNever,
   type Containment,
   type EventMeasured,
+  HISTORY_MINUTES,
   isThreadId,
   LANE_TREATMENTS,
   type LaneTreatment,
   type LimitSubject,
   MACHINE_SERVICES,
+  type MachineHistory,
   type MachineLately,
   type MemorySource,
   REPAIR_STEPS,
   type RepairStep,
   TIMED_PROGRAMS,
 } from "@pinetrie/core"
-import type {
-  DecisionMeasured,
-  LaneMeasured,
-  MachineMeasurements,
-  NumbersInForce,
-  SampleMeasured,
-  StoreTarget,
+import {
+  type DecisionMeasured,
+  FOLLOWED_NONE,
+  type FollowedRow,
+  type FollowedSamples,
+  type LaneMeasured,
+  lastHourHistory,
+  type MachineMeasurements,
+  type NumbersInForce,
+  nextFollowed,
+  nextHistory,
+  rungChanges,
+  type SampleMeasured,
+  type StoreTarget,
+  trimFollowed,
 } from "@pinetrie/machine"
 import type { ShellCallEnded } from "./shell-calls.ts"
 
@@ -47,8 +58,8 @@ const TABLES = {
   scopes: "pinetrie_machine_scopes",
 } as const
 
-/** How many of what happened the Machine page shows, newest first. */
-export const RECENT_EVENTS_SHOWN = 50
+/** At most how many of the last day's happenings the Health page is served, newest first. */
+export const RECENT_EVENTS_SHOWN = 200
 
 /** Each event's stored kind: a kind added without one does not type-check. */
 const EVENT_TAGS = {
@@ -214,18 +225,6 @@ export function decisionLately(
   return null
 }
 
-/** Each change of memory's rung between consecutive samples, oldest first. */
-export function rungChanges(
-  samples: readonly { readonly at: number; readonly rung: number }[],
-): readonly Extract<MachineLately, { kind: "rung" }>[] {
-  return samples.flatMap((s, i) => {
-    const before = samples[i - 1]
-    return before === undefined || before.rung === s.rung
-      ? []
-      : [{ at: s.at, kind: "rung" as const, from: before.rung, to: s.rung }]
-  })
-}
-
 /** What the measurements were measured on: the export's first line, with its days. */
 export interface MeasuredOn {
   /** The install's version; null where it could not be read. */
@@ -249,10 +248,50 @@ export interface HostMeasurements extends MachineMeasurements {
   /** Every row of the last `days` days, each a JSON line naming its table, oldest first within each: the lines under `measurementsHeading`'s. */
   exportRows(days: number): readonly string[]
   /**
-   * The newest `limit` of what happened, newest first: treatments changed,
-   * the repair's moves, the events, and memory's rung's changes.
+   * What happened since `since`, newest first, at most `cap`: treatments
+   * changed, the repair's moves, the events, and memory's rung's changes;
+   * `isCapped` where the cap left some out.
    */
-  recentRows(limit: number): readonly MachineLately[]
+  recentRows(window: { readonly since: number; readonly cap: number }): {
+    readonly rows: readonly MachineLately[]
+    readonly isCapped: boolean
+  }
+  /** The last hour, a minute a row, as followed from the samples kept and recorded. */
+  lastHour(): MachineHistory
+}
+
+const MINUTE_MS = 60_000
+const MiB = 1024 ** 2
+const SCOPES: readonly FollowedSampleScope[] = [
+  "machine",
+  "contained",
+  "unmeasured",
+]
+type FollowedSampleScope = Extract<FollowedRow, { kind: "sample" }>["scope"]
+
+/** A kept sample, joined with its scope, as the history reads it; null for a row this version cannot read. */
+function sampleRow(row: Record<string, unknown>): FollowedRow | null {
+  const { at, rung, memory_available: available, full_avg10: full } = row
+  if (!isNumber(at) || !isNumber(rung) || !isNumber(available)) return null
+  return {
+    kind: "sample",
+    at,
+    rung,
+    memoryAvailable: available,
+    fullAvg10: isNumber(full) ? full : null,
+    scope: isOneOf(SCOPES, row.scope) ? row.scope : "unmeasured",
+  }
+}
+
+/** A kept lane's row as the history reads it; null for a row this version cannot read. */
+function laneRow(row: Record<string, unknown>): FollowedRow | null {
+  const { at, lane, current_mib: mib } = row
+  return isNumber(at) &&
+    isNumber(mib) &&
+    typeof lane === "string" &&
+    isThreadId(lane)
+    ? { kind: "lane", at, lane, currentBytes: mib * MiB }
+    : null
 }
 
 /** The measurements over `db`, the store's connection; their tables made if missing. `now` stamps each row. */
@@ -345,19 +384,44 @@ export function sqliteMachineMeasurements(
   )
   const insertScope = db.prepare(`INSERT INTO ${TABLES.scopes} VALUES (?, ?)`)
   const recentDecisions = db.prepare(
-    `SELECT * FROM ${TABLES.decisions} WHERE kind IN ('treatment', 'repair') ORDER BY at DESC LIMIT ?`,
+    `SELECT * FROM ${TABLES.decisions} WHERE kind IN ('treatment', 'repair') AND at >= ? ORDER BY at DESC LIMIT ?`,
   )
   const recentEvents = db.prepare(
-    `SELECT * FROM ${TABLES.events} ORDER BY at DESC LIMIT ?`,
+    `SELECT * FROM ${TABLES.events} WHERE at >= ? ORDER BY at DESC LIMIT ?`,
   )
-  // The rung's changes, read once from the samples kept and then followed
-  // as each is recorded: a read of every sample at each of the page's asks
-  // would hold the host's thread for tens of ms.
-  const kept = db
+  // What is followed, read once from the rows kept: every sample's rung,
+  // and the last hour's samples and lanes, each lane's newest row before it
+  // first so a lane quiet for the hour still carries its memory. A read of
+  // every sample at each of the page's asks would hold the host's thread
+  // for tens of ms.
+  const hourAgo = now() - HISTORY_MINUTES * MINUTE_MS
+  const keptRungs = db
     .prepare(`SELECT at, rung FROM ${TABLES.samples} ORDER BY at`)
     .all() as { at: number; rung: number }[]
-  let rungs = [...rungChanges(kept)]
-  let lastRung = kept.at(-1)?.rung ?? null
+  const lanesBefore = db
+    .prepare(
+      `SELECT MAX(at) AS at, lane, current_mib FROM ${TABLES["lane-samples"]} WHERE at < ? GROUP BY lane`,
+    )
+    .all(hourAgo)
+  const lanesHour = db
+    .prepare(
+      `SELECT at, lane, current_mib FROM ${TABLES["lane-samples"]} WHERE at >= ?`,
+    )
+    .all(hourAgo)
+  const samplesHour = db
+    .prepare(
+      `SELECT s.at, s.rung, s.memory_available, s.full_avg10, c.scope FROM ${TABLES.samples} s LEFT JOIN ${TABLES.scopes} c ON c.at = s.at WHERE s.at >= ?`,
+    )
+    .all(hourAgo)
+  const hourRows = [...samplesHour.map(sampleRow), ...lanesHour.map(laneRow)]
+    .filter(r => r !== null)
+    .sort((a, b) => a.at - b.at)
+  let followed: FollowedSamples = {
+    rungs: rungChanges(keptRungs),
+    history: [...lanesBefore.map(laneRow), ...hourRows]
+      .filter(r => r !== null)
+      .reduce(nextHistory, FOLLOWED_NONE.history),
+  }
   const trims = Object.values(TABLES).map(t =>
     db.prepare(`DELETE FROM ${t} WHERE at < ?`),
   )
@@ -386,9 +450,6 @@ export function sqliteMachineMeasurements(
     recordSample(row: SampleMeasured) {
       const { since, reclaim } = row
       const at = now()
-      if (lastRung !== null && lastRung !== row.rung)
-        rungs.push({ at, kind: "rung", from: lastRung, to: row.rung })
-      lastRung = row.rung
       insertSample.run(
         at,
         row.rung,
@@ -412,10 +473,18 @@ export function sqliteMachineMeasurements(
           reclaim.scannedByKswapd,
         )
       insertScope.run(at, row.scope)
+      followed = nextFollowed(followed, {
+        kind: "sample",
+        at,
+        rung: row.rung,
+        memoryAvailable: row.memoryAvailable,
+        fullAvg10: row.fullAvg10,
+        scope: row.scope,
+      })
     },
     recordLaneSamples(rows: readonly LaneMeasured[]) {
       const at = now()
-      for (const l of rows)
+      for (const l of rows) {
         insertLane.run(
           at,
           l.lane,
@@ -425,6 +494,13 @@ export function sqliteMachineMeasurements(
           l.limitMiB,
           l.program,
         )
+        followed = nextFollowed(followed, {
+          kind: "lane",
+          at,
+          lane: l.lane,
+          currentBytes: l.currentMiB * MiB,
+        })
+      }
     },
     recordDecisions(rows: readonly DecisionMeasured[]) {
       const at = now()
@@ -446,23 +522,28 @@ export function sqliteMachineMeasurements(
     trim() {
       const before = now() - MEASUREMENTS_KEPT_DAYS * DAY_MS
       for (const t of trims) t.run(before)
-      rungs = rungs.filter(r => r.at >= before)
+      followed = trimFollowed(followed, before)
     },
-    recentRows(limit) {
-      const decisions = recentDecisions.all(limit).flatMap(r => {
+    recentRows({ since, cap }) {
+      // One more than the cap of each, so a cut is seen.
+      const limit = cap + 1
+      const decisions = recentDecisions.all(since, limit).flatMap(r => {
         const lately = decisionLately(r)
         return lately === null ? [] : [lately]
       })
-      const events = recentEvents.all(limit).flatMap(r => {
+      const events = recentEvents.all(since, limit).flatMap(r => {
         const event = eventFromRow(r)
         return event === null || !isNumber(r.at)
           ? []
           : [{ at: r.at, kind: "event" as const, event }]
       })
-      return [...decisions, ...events, ...rungs.slice(-limit)]
-        .sort((a, b) => b.at - a.at)
-        .slice(0, limit)
+      const rungs = followed.rungs.changes.filter(r => r.at >= since)
+      const rows = [...decisions, ...events, ...rungs.slice(-limit)].sort(
+        (a, b) => b.at - a.at,
+      )
+      return { rows: rows.slice(0, cap), isCapped: rows.length > cap }
     },
+    lastHour: () => lastHourHistory(followed.history),
     exportRows(days) {
       const since = now() - days * DAY_MS
       return reads.flatMap(([table, read]) =>

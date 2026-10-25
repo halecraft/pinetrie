@@ -1,6 +1,7 @@
 // machine — every decision about the machine lanes run on, and none of its
 // I/O: the host hands it ports (`TECHNICAL.md`).
 
+export { type ActingBounds, actingBounds, ROOM_SPENT } from "./bounds.ts"
 export {
   planStoreCapabilities,
   type StoreCapabilities,
@@ -8,7 +9,7 @@ export {
 } from "./capabilities.ts"
 export { type ContainerWanted, planContainment } from "./containment.ts"
 export { READING_OVERDUE_AFTER_TICKS } from "./freshness.ts"
-export { ROOM_SPENT, WAITING } from "./health.ts"
+export { WAITING } from "./health.ts"
 export { type LaneImportance, rankLanes } from "./importance.ts"
 export {
   createMachineManager,
@@ -20,11 +21,19 @@ export {
   causeEvents,
   commandProgram,
   type DecisionMeasured,
+  FOLLOWED_NONE,
+  type FollowedRow,
+  type FollowedSamples,
   type LaneMeasured,
+  lastHourHistory,
   type MemoryLimits,
   type NumbersInForce,
+  nextFollowed,
+  nextHistory,
   numbersInForce,
+  rungChanges,
   type SampleMeasured,
+  trimFollowed,
 } from "./measurements.ts"
 export type {
   HealthSink,
@@ -34,6 +43,7 @@ export type {
   MachineSensor,
   RepairControls,
 } from "./ports.ts"
+export type { PressureScope } from "./pressure-scope.ts"
 export {
   encodeRepairState,
   isRepairRunning,

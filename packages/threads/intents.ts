@@ -400,7 +400,7 @@ export type Intent =
    */
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
   /**
-   * Run the lane VM's failed disk repair again (the Machine page's Repair
+   * Run the lane VM's failed disk repair again (the Health page's Repair
    * again): a host without the repair's controls has no such command.
    */
   | { readonly kind: "repair-again" }

@@ -57,6 +57,7 @@ export {
 } from "./picture-crop.ts"
 export { type BoxPlacement, placeBox } from "./popover-place.ts"
 export { type ScreenMemory, screenMemory } from "./screen-memory.ts"
+export { sparkPath } from "./sparkline.ts"
 export {
   THEME_HEADING,
   THEMES,

@@ -6,7 +6,12 @@ import {
   type ReadingPlanned,
 } from "@pinetrie/machine"
 import { describe, expect, test } from "vitest"
-import { machineActions, planMachinePage } from "./page.ts"
+import {
+  type MachineGathered,
+  machineActions,
+  machineKind,
+  planMachineFacts,
+} from "./page.ts"
 
 const GiB = 1024 ** 3
 const [a, b] = [threadIdFor("t-a"), threadIdFor("t-b")]
@@ -53,27 +58,41 @@ const sample: MachineSample = {
 const reading: MachineReading & { readonly kind: "fresh" } = {
   kind: "fresh",
   sample,
+  scope: { kind: "contained", pressure: { someAvg10: 30, fullAvg10: 20 } },
   health: { state: "amber", causes: [], treatments: [] },
   rung: 2,
   held: [{ lane: b, treatment: { kind: "waiting-to-start" } }],
   repair: { lockHeld: false, state: { kind: "idle" } },
 }
 
-const gathered = {
+const minute = (laneBytes: Record<string, number>) => ({
+  memoryAvailableBytes: 6 * GiB,
+  machinePressureFull: null,
+  isContainedStall: false,
+  laneBytes,
+})
+
+const gathered: MachineGathered = {
   reading,
+  history: {
+    minutes: [null, minute({ [a]: GiB, [threadIdFor("t-gone")]: GiB })],
+  },
   lately: [],
+  latelyCapped: false,
   snapshots: new Map([[a, { count: 3, bytes: 300 }]]),
   names: new Map([[a, named]]),
   settings: { max: 200 * GiB, leaveFree: LEAVE_FREE_DEFAULT },
+  target: "lane-vm",
+  memorySource: "whole-machine",
   vmMemoryCeilingBytes: 8 * GiB,
   servicesFloorBytes: GiB,
   isOomdManagingLanes: false,
   repairs: false,
 }
 
-describe("the Machine page's facts", () => {
+describe("the machine's facts", () => {
   test("before a sample, the page is unsampled, waiting", () => {
-    const facts = planMachinePage({ ...gathered, reading: null })
+    const facts = planMachineFacts({ ...gathered, reading: null })
     expect([facts.reading, facts.health.causes[0]?.kind]).toEqual([
       { kind: "unsampled" },
       "unsampled",
@@ -81,7 +100,7 @@ describe("the Machine page's facts", () => {
   })
 
   test("each running lane is its thread's name, its treatment, its memory or why not, and its snapshots", () => {
-    const facts = planMachinePage(gathered)
+    const facts = planMachineFacts(gathered)
     expect(facts.reading.kind === "sampled" && facts.reading.lanes).toEqual([
       {
         lane: a,
@@ -107,7 +126,7 @@ describe("the Machine page's facts", () => {
   })
 
   test("a lane Lately names, at its limit or killed, carries its thread's name", () => {
-    const facts = planMachinePage({
+    const facts = planMachineFacts({
       ...gathered,
       names: new Map([
         [a, named],
@@ -134,7 +153,7 @@ describe("the Machine page's facts", () => {
   })
 
   test("the page carries the sample's containment, the floor asked and whether systemd-oomd manages the lanes", () => {
-    const facts = planMachinePage(gathered)
+    const facts = planMachineFacts(gathered)
     expect([
       facts.reading.kind === "sampled" && facts.reading.containment,
       facts.servicesFloorBytes,
@@ -142,26 +161,58 @@ describe("the Machine page's facts", () => {
     ]).toEqual([{ kind: "contained" }, GiB, false])
   })
 
-  test("the store is against its floor and its setting, and what was not read says why", () => {
-    const facts = planMachinePage(gathered)
+  test("the store is against its bounds and its setting, and what was not read says why", () => {
+    const facts = planMachineFacts(gathered)
     if (facts.reading.kind !== "sampled") throw new Error("unsampled")
+    const { store } = facts.reading
     expect([
-      facts.reading.store,
+      store.kind === "read" && [store.unallocatedBytes, store.maxBytes],
+      store.kind === "read" && store.bounds.map(b => [b.acts, b.does]),
       facts.reading.filesystem.kind,
-      facts.reading.memory.pressure.kind,
       facts.vmMemoryCeilingBytes,
     ]).toEqual([
-      {
-        kind: "read",
-        sizeBytes: 100 * GiB,
-        unallocatedBytes: 30 * GiB,
-        minimumBytes: 10 * GiB,
-        maxBytes: 200 * GiB,
-      },
-      "unreadable",
+      [30 * GiB, 200 * GiB],
+      [
+        [10 * GiB, "delete-snapshots"],
+        [GiB, "writes-may-fail"],
+      ],
       "unreadable",
       8 * GiB,
     ])
+  })
+
+  test("the pressure is the reading's scope's, with no scope read as unreadable", () => {
+    const pressure = (scope: ReadingPlanned["scope"]) => {
+      const facts = planMachineFacts({
+        ...gathered,
+        reading: { ...reading, scope },
+      })
+      return facts.reading.kind === "sampled" && facts.reading.memory.pressure
+    }
+    expect(pressure(reading.scope)).toMatchObject({
+      kind: "read",
+      fullAvg10: 20,
+      scope: "contained",
+    })
+    expect(pressure({ kind: "unmeasured" })).toMatchObject({
+      kind: "unreadable",
+    })
+  })
+
+  test("the hour holds only the lanes running now", () => {
+    const facts = planMachineFacts(gathered)
+    expect(
+      facts.reading.kind === "sampled" &&
+        facts.reading.history.minutes.map(m => m?.laneBytes ?? null),
+    ).toEqual([null, { [a]: GiB }])
+  })
+
+  test("the machine is the lane VM, a Linux host, or a host's own lane", () => {
+    expect([
+      machineKind("lane-vm", "whole-machine"),
+      machineKind("docker-host", "whole-machine"),
+      machineKind("docker-host", "own-cgroup"),
+    ]).toEqual(["lane-vm", "linux-host", "own-cgroup"])
   })
 })
 

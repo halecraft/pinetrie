@@ -2,14 +2,23 @@
 // counts samples, never time: the lane VM runs after the Mac's own work, so
 // a sample may come late, and a count stays what it means.
 
-import type {
-  HeldLane,
-  MachineCause,
-  MachineCauseKind,
-  MachineHealth,
-  MachineState,
-  ThreadId,
+import {
+  type ActingBound,
+  assertNever,
+  boundReading,
+  type HeldLane,
+  type MachineCause,
+  type MachineCauseKind,
+  type MachineHealth,
+  type MachineState,
+  type ThreadId,
 } from "@pinetrie/core"
+import {
+  filesystemBound,
+  ROOM_SPENT,
+  ROOM_SPENT_CLEAR,
+  storeBounds,
+} from "./bounds.ts"
 import type { StoreCapabilities } from "./capabilities.ts"
 import {
   type LevelReading,
@@ -20,21 +29,9 @@ import {
 import type { CauseLimitEvent } from "./measurements.ts"
 import type { Rung } from "./rung.ts"
 import type { MachineSample } from "./sample.ts"
-import {
-  leaveFreeBytes,
-  minimumUnallocated,
-  type StoreSettings,
-} from "./store-settings.ts"
+import { minimumUnallocated, type StoreSettings } from "./store-settings.ts"
 import { plannedStoreSize } from "./store-size.ts"
 
-const GiB = 1024 ** 3
-
-/** Unallocated space below which the store is spent: a write may fail. */
-export const ROOM_SPENT = GiB
-/** Unallocated space the store must regain before it is no longer spent. */
-export const ROOM_SPENT_CLEAR = 2 * GiB
-/** A low store, or filesystem, is clear again only this far above its threshold. */
-const CLEAR_MARGIN = 1.1
 /** Metadata's share used, with no room to grow it, at which it is full. */
 export const METADATA_FULL = 0.95
 export const METADATA_CLEAR = 0.9
@@ -136,6 +133,25 @@ const causeKey = (cause: MachineCause): string => {
 
 const UNMEASURED: CauseReading = { kind: "unmeasured" }
 
+/** A level cause read against its bound: over past `acts`, between until past `clears`. */
+function levelReading(
+  value: number,
+  bound: ActingBound,
+  cause: MachineCause,
+): CauseReading {
+  const read = boundReading(value, bound)
+  switch (read) {
+    case "over":
+      return { kind: "over", value: cause }
+    case "near":
+      return { kind: "between", value: cause }
+    case "clear":
+      return { kind: "clear" }
+    default:
+      return assertNever(read)
+  }
+}
+
 function roomReadings(
   sample: MachineSample,
   settings: Pick<StoreSettings, "leaveFree" | "max">,
@@ -149,30 +165,22 @@ function roomReadings(
       ["metadata-full", UNMEASURED],
     ]
   const { unallocated } = store
-  const minimum = minimumUnallocated(store.size)
+  const bounds = storeBounds(store.size)
   // Planned from what the sample read: btrfs's chunks stand for what the
   // disk holds, and the store's filesystem for the volume holding it.
   const grows =
     (plannedStoreSize(sample, settings, capabilities) ?? store.size) >
     store.size
-  const spent: CauseReading =
-    unallocated < ROOM_SPENT
-      ? { kind: "over", value: { kind: "room-spent", unallocated } }
-      : unallocated < ROOM_SPENT_CLEAR
-        ? { kind: "between", value: { kind: "room-spent", unallocated } }
-        : { kind: "clear" }
-  const low: CauseReading =
-    unallocated < minimum
-      ? {
-          kind: "over",
-          value: { kind: "room-low", unallocated, minimum, grows },
-        }
-      : unallocated < minimum * CLEAR_MARGIN
-        ? {
-            kind: "between",
-            value: { kind: "room-low", unallocated, minimum, grows },
-          }
-        : { kind: "clear" }
+  const spent = levelReading(unallocated, bounds.spent, {
+    kind: "room-spent",
+    unallocated,
+  })
+  const low = levelReading(unallocated, bounds.low, {
+    kind: "room-low",
+    unallocated,
+    minimum: minimumUnallocated(store.size),
+    grows,
+  })
   const { used, total } = store.metadata
   const metadata = { kind: "metadata-full", used, total } as const
   const full: CauseReading =
@@ -196,13 +204,12 @@ function filesystemReading(
 ): CauseReading {
   if (sample.filesystem === null) return UNMEASURED
   const { free, size } = sample.filesystem
-  const leaveFree = leaveFreeBytes(settings, size)
-  const cause = { kind: "filesystem-low", free, leaveFree } as const
-  return free < leaveFree
-    ? { kind: "over", value: cause }
-    : free < leaveFree * CLEAR_MARGIN
-      ? { kind: "between", value: cause }
-      : { kind: "clear" }
+  const bound = filesystemBound(settings, size)
+  return levelReading(free, bound, {
+    kind: "filesystem-low",
+    free,
+    leaveFree: bound.acts,
+  })
 }
 
 /**
