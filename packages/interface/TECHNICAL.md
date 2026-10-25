@@ -1347,8 +1347,9 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   (`isQueuedMessage`, `cardFitsPlace(card, "trash")`).
 - **Entries by keys** (`onEntryKey`, `Column`): while focus is in a
   column's messages and in no text box, they are a grid one cell wide,
-  read by `gridKeyAct` (`comments: true`): `j` and `k` select (a click
-  selects too), Enter opens or shuts the selected entry's margin, Escape
+  read by `gridKeyAct` (`comments: true`): `j` and `k` select and scroll
+  the entry into view (a click selects too, and scrolls nothing:
+  `packages/web-core/TECHNICAL.md`), Enter opens or shuts the selected entry's margin, Escape
   shuts it, `c` comments, and Cmd+C with nothing selected in the text
   takes a reference to the selected entry. The selection is the column's
   view state, marked `data-selected` on its message.

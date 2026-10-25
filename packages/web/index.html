@@ -1087,9 +1087,19 @@
       .margin-foot { display: flex; gap: var(--space-8); font-size: var(--font-md); }
       .margin-foot button { padding: 0; color: var(--text-faint); }
       .margin-foot button:hover { color: var(--text-soft); }
-      /* The entry the column's keys select (`j`, `k`). */
+      /* The entry the column's keys select (`j`, `k`). A tint, not a line: a
+         line at its left edge covers its first letters and crosses a running
+         command's ring, and the column's lines already mean an ask, a stream
+         or a quote. Shadows take no layout, so selecting moves no text; the
+         second reaches the right gutter as far as a tool row does (`.tool`'s
+         margin), and the tint is opaque so where they overlap shows no seam.
+         Fainter while focus is outside the column, where its keys do nothing. */
       .column-content:focus { outline: none; }
-      .msg[data-selected] { box-shadow: inset 2px 0 0 var(--accent); }
+      .msg[data-selected] { --selection: color-mix(in srgb, var(--accent) 5%, var(--page));
+        background: var(--selection); border-radius: var(--radius-sm);
+        box-shadow: 0 0 0 var(--space-6) var(--selection), var(--space-9) 0 0 var(--space-6) var(--selection); }
+      .column-content:focus-within .msg[data-selected] {
+        --selection: color-mix(in srgb, var(--accent) 10%, var(--page)); }
       .notes-empty { font-size: var(--font-sm); color: var(--text-quiet); }
       /* A media column (ADR-0182): its images at the column's width, each
          at its stored size so its box is held before its bytes load; two

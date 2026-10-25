@@ -131,6 +131,7 @@ import {
 import {
   behind,
   columnSpot,
+  entryRevealScroll,
   keepSpot,
   type ScreenMemory,
   type SeenEnd,
@@ -428,8 +429,7 @@ export function Column(p: ColumnProps) {
     ],
   )
   // The selected entry is marked where it is drawn, again as the messages
-  // are drawn anew; the selection's change alone brings it into view, so the
-  // reader's own scrolling is left alone.
+  // are drawn anew.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `view` redraws the messages the mark is on
   useLayoutEffect(() => {
     const el = content.current
@@ -442,12 +442,17 @@ export function Column(p: ColumnProps) {
       "",
     )
   }, [selected, view])
-  useLayoutEffect(() => {
-    if (selected === null) return
-    content.current
-      ?.querySelector(`.msg[data-entry="${selected}"]`)
-      ?.scrollIntoView({ block: "nearest" })
-  }, [selected])
+  // Only keys scroll to the entry they select: a click selects one already
+  // in view, and scrolling then would move the text under the pointer.
+  const revealEntry = (entry: EntryId) => {
+    const scroller = body.current
+    const msg = scroller?.querySelector(`.msg[data-entry="${entry}"]`)
+    if (!scroller || !msg) return
+    scroller.scrollTop += entryRevealScroll(
+      msg.getBoundingClientRect(),
+      scroller.getBoundingClientRect(),
+    )
+  }
   /**
    * The column's messages as a grid one cell wide, while focus is
    * in it and in no text box: `j` and `k` select, Enter opens the selected
@@ -477,9 +482,13 @@ export function Column(p: ColumnProps) {
     if (step === null) return
     e.preventDefault()
     switch (step.kind) {
-      case "select":
-        setSelected(ids[step.cell] ?? null)
+      case "select": {
+        const next = ids[step.cell]
+        if (next === undefined) return
+        setSelected(next)
+        revealEntry(next)
         return
+      }
       case "open":
         setOpenMargin(openMargin === entry ? null : entry)
         return

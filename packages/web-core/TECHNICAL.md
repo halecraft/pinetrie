@@ -137,6 +137,14 @@ this host (the page's origin) and names the text pasted, `\r\n` taken as
   **the ask at a column's top is found** (`ask-bar.ts`) from what the page
   measures: `packages/web/TECHNICAL.md` states each rule beside the hook
   that measures for it.
+- **Keys scroll to the entry they select; a click scrolls nothing**
+  (`entry-reveal.ts`, `entryRevealScroll`). An entry the keys select comes
+  into view top first, and one taller than the view shows its top. The
+  browser's `scrollIntoView({ block: "nearest" })` does neither: it lines
+  up a tall entry's bottom when its top is above the view, and scrolls a
+  clicked entry that runs past the view's foot. A click selects an entry already under the pointer, and a
+  scroll then would move the text the reader just clicked (`Column`,
+  `packages/web/column.tsx`).
 - **The inventory panel docks** left, centre or right, the nearest third to
   where its frame is dropped (`inventory-dock.ts`, `snappedDock`), kept per
   device (`dockCodec`).

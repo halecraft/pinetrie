@@ -565,6 +565,59 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       }
 
+      // ── a click selects an entry where it is; keys bring theirs into view ──
+      // A message whose top alone shows at the column's foot: a click on it
+      // must not scroll, as the text under the pointer would move; `j` then
+      // selects the message below it, out of view, and must bring it in.
+      {
+        const size = page.viewportSize()
+        if (size !== null) await page.setViewportSize({ ...size, height: 400 })
+        const peek = await page.$eval(`${col(0)} ${msg(FOR_ADA)}`, m => {
+          const body = m.closest(".column-body")
+          if (body === null) return null
+          body.scrollTop +=
+            m.getBoundingClientRect().top -
+            (body.getBoundingClientRect().bottom - 14)
+          const r = m.getBoundingClientRect()
+          const shown = body.getBoundingClientRect()
+          return {
+            x: r.left + 20,
+            y: r.top + 6,
+            peeks: r.top < shown.bottom && r.bottom > shown.bottom,
+            scrollTop: body.scrollTop,
+          }
+        })
+        if (peek !== null) await page.mouse.click(peek.x, peek.y)
+        const clicked = await page.$eval(`${col(0)} ${msg(FOR_ADA)}`, m => ({
+          selected: m.hasAttribute("data-selected"),
+          scrollTop: m.closest(".column-body")?.scrollTop ?? -1,
+        }))
+        check(
+          "a click selects the entry under it and scrolls nothing",
+          peek?.peeks &&
+            clicked.selected &&
+            clicked.scrollTop === peek.scrollTop,
+          `peeks: ${peek?.peeks}, selected: ${clicked.selected}, scrollTop ${peek?.scrollTop} → ${clicked.scrollTop}`,
+        )
+        await page.keyboard.press("j")
+        const keyed = await page.$eval(`${col(0)} .column-body`, body => {
+          const m = body.querySelector<HTMLElement>(".msg[data-selected]")
+          if (m === null) return null
+          const r = m.getBoundingClientRect()
+          const shown = body.getBoundingClientRect()
+          return {
+            text: m.textContent ?? "",
+            inView: r.top >= shown.top && r.top < shown.bottom,
+          }
+        })
+        if (size !== null) await page.setViewportSize(size)
+        check(
+          "`j` selects the entry below and brings its top into view",
+          keyed !== null && !keyed.text.includes(FOR_ADA) && keyed.inView,
+          JSON.stringify(keyed),
+        )
+      }
+
       // ── → opens a branch beside its parent, and it follows its branch ──────
       // The → sits in the column's right padding, all but a pixel outside its
       // message, and a hidden → takes no hover. A pointer that overshoots into

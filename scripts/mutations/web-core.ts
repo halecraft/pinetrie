@@ -268,6 +268,22 @@ export const mutations: readonly Mutation[] = [
     expect: "grows faster nearer the edge",
   },
   {
+    name: "keys scroll a tall entry past its top to show its bottom",
+    file: "packages/web-core/entry-reveal.ts",
+    from: "    return Math.min(entry.bottom - view.bottom, entry.top - view.top)",
+    to: "    return entry.bottom - view.bottom",
+    command: unit,
+    expect: "scrolls only to its top",
+  },
+  {
+    name: "keys leave an entry above the view unseen",
+    file: "packages/web-core/entry-reveal.ts",
+    from: "  if (entry.top < view.top) return entry.top - view.top\n",
+    to: "",
+    command: unit,
+    expect: "scrolls up to its top",
+  },
+  {
     name: "leaving a page loaded from its URL goes back out of pine·trie",
     file: "packages/web-core/page-url.ts",
     from: '    ? "back"\n    : "replace"',

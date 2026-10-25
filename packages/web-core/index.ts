@@ -26,6 +26,7 @@ export {
   sourceOfElement,
 } from "./drag.ts"
 export { edgeScroll } from "./edge-scroll.ts"
+export { entryRevealScroll } from "./entry-reveal.ts"
 export {
   type FoldMotion,
   type FoldScene,

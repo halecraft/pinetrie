@@ -565,4 +565,22 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a command's coloured output is drawn in its colour, its escapes never as text",
   },
+  {
+    name: "a click scrolls to the entry it selects",
+    file: "packages/web/column.tsx",
+    from: "                    if (entry !== undefined) setSelected(entry)\n",
+    to: "                    if (entry !== undefined) {\n                      setSelected(entry)\n                      revealEntry(entry)\n                    }\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "a click selects the entry under it and scrolls nothing",
+  },
+  {
+    name: "keys select an entry out of view and leave it there",
+    file: "packages/web/column.tsx",
+    from: "        setSelected(next)\n        revealEntry(next)\n",
+    to: "        setSelected(next)\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "`j` selects the entry below and brings its top into view",
+  },
 ]
