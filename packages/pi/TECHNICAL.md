@@ -1001,7 +1001,11 @@ pi's `exec` keeps serving `grep`, `find` and the file tools.
     cannot be made, the call runs on Node's sockets, which the observer
     sees no byte of; its start says so (`output: "sockets"`, beside the
     run's number), and its join is undivided as `no-pipes` before any
-    chunk, never left to read as `count-mismatch`;
+    chunk, never left to read as `count-mismatch`. The FIFOs are Linux's,
+    as the helper is: on the Mac a FIFO's reader is never woken (kqueue)
+    by one write larger than its 8 KiB buffer, so such a call never ends;
+    the tests of a large write and of `/proc`'s descriptors carry the
+    `linux` tag;
   - each read is one update, `{ fd, bytes }`, never split or joined: one
     message per read keeps the count low, as the channel carries bytes as
     base64 in JSON;

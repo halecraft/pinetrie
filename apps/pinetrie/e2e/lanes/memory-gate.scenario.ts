@@ -35,13 +35,19 @@ export const scenario: Scenario = {
   run: ({ check }, { lanes }) => memoryGateSection(check, lanes),
 }
 
-/** Every pressure the sensor reports, and how many samples it has given. */
+/** Every pressure the sensor reports, how many samples it has given, and how many of them were pressed. */
 interface Pressed {
   fullAvg10: number
   samples: number
+  pressedSamples: number
 }
 
-/** The host's own sensor, its lanes real, its pressure `pressed`'s and its memory all available. */
+/**
+ * The host's own sensor, its lanes real, its pressure `pressed`'s and its
+ * memory all available. A pressed sample's reclaim rises as well: on a
+ * whole-machine read (the Mac's lane VM, a Linux host) pressure without
+ * the machine's own reclaim is a cgroup's, which holds nothing.
+ */
 const pressedSensor =
   (pressed: Pressed) =>
   (own: MachineSensor): MachineSensor => ({
@@ -49,12 +55,21 @@ const pressedSensor =
       const sample = await own.sample()
       pressed.samples++
       const { fullAvg10 } = pressed
+      if (fullAvg10 > 0) pressed.pressedSamples++
+      const { reclaim } = sample.machine
       return {
         ...sample,
         machine: {
           ...sample.machine,
           memoryAvailable: sample.machine.memoryTotal,
           pressure: { someAvg10: fullAvg10, fullAvg10 },
+          reclaim:
+            reclaim === null
+              ? null
+              : {
+                  ...reclaim,
+                  allocStalls: reclaim.allocStalls + pressed.pressedSamples,
+                },
         },
       }
     },
@@ -64,7 +79,7 @@ async function memoryGateSection(
   check: Checks["check"],
   lanes: LaneHosts,
 ): Promise<void> {
-  const pressed: Pressed = { fullAvg10: 0, samples: 0 }
+  const pressed: Pressed = { fullAvg10: 0, samples: 0, pressedSamples: 0 }
   const h = await lanes.sectionHost({
     files: {
       "a.txt": "a\n",

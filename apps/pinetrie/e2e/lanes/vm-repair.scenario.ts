@@ -14,7 +14,6 @@ import os from "node:os"
 import path from "node:path"
 import { servicesFloorBytes } from "@pinetrie/docker"
 import {
-  LEAVE_FREE_DEFAULT,
   planStoreCapabilities,
   planStoreSize,
   type RepairState,
@@ -95,13 +94,15 @@ async function run(check: Checks["check"]): Promise<void> {
     log(`[scenario] ${filled.trim()}`)
     await ensureRepairBoot(stateDir)
 
-    // The host's controls, growing the disk as a host's start would.
+    // The host's controls, growing the disk as a host's start would, leaving
+    // none of the person's volume free: the default's (a tenth of it, or
+    // 50 GiB) would let a fuller volume grow nothing, and the disk is sparse.
     const controls = laneVmRepairControls({
       stateDir,
       growData: facts =>
         planStoreSize(
           facts,
-          { max: null, leaveFree: LEAVE_FREE_DEFAULT },
+          { max: null, leaveFree: [] },
           planStoreCapabilities("lane-vm"),
         ),
       log,

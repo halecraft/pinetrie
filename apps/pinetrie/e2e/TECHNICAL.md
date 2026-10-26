@@ -49,7 +49,9 @@ suite's own helpers are beside its scenarios:
   container fills and the host's repair controls repair: a fresh disk
   cannot hold the default image lanehost runs from, so the repair is run by
   `runRepairSteps` directly, its triggers and holds being the machine
-  package's, unit-tested; and a kept disk would grow at every run.
+  package's, unit-tested; and a kept disk would grow at every run. Its
+  growth leaves none of the person's volume free (`leaveFree` empty), so
+  the repair does not depend on how full the Mac's disk is.
 - **A failure a check is about is caught into the check.** A mutation is
   killed only when its expected check fails (`scripts/mutate.ts`); a
   thrown error is not one. `vm-image` catches a failed build and a failed

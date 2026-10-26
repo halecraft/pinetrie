@@ -59,7 +59,11 @@ async function shell(
   return { end, updates, started, piped }
 }
 
-test("each pipe's chunks join to exactly the bytes written to it", async () => {
+// Linux only, as the helper is: on the Mac a FIFO's reader is never woken by
+// one write larger than its 8 KiB buffer, so the call never ends.
+test("each pipe's chunks join to exactly the bytes written to it", {
+  tags: ["linux"],
+}, async () => {
   const out = Buffer.from(
     Array.from({ length: 70_000 }, (_, i) =>
       i % 97 === 0 ? 10 : (i * 37) % 256,
@@ -96,7 +100,9 @@ test("where its pipes cannot be made, a call runs on sockets, its output whole, 
   expect(r.piped("stderr").toString()).toBe("err\n")
 })
 
-test("a call leaves no descriptor of its pipes open in the helper", async () => {
+test("a call leaves no descriptor of its pipes open in the helper", {
+  tags: ["linux"],
+}, async () => {
   const open = async () => (await readdir("/proc/self/fd")).length
   await shell("true")
   const before = await open()
