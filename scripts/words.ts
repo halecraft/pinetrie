@@ -66,8 +66,9 @@ export function identifierNames(file: string, text: string): readonly string[] {
 export function retiredNames(
   source: Source,
   retired: readonly string[],
+  oldShapes: readonly string[] = OLD_SHAPES,
 ): readonly string[] {
-  if (OLD_SHAPES.includes(source.file)) return []
+  if (oldShapes.includes(source.file)) return []
   const lower = retired.map(w => w.toLowerCase())
   return identifierNames(source.file, source.text)
     .filter(name => !KEPT_NAMES.includes(name))

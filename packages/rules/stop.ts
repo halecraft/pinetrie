@@ -151,7 +151,7 @@ export function endedOutcome(
 
 // ── carrying on ───────────────────────────────────────────────
 
-export const CARRY_ON_TYPE = "pinetrie.carry-on"
+const CARRY_ON_TYPE = "pinetrie.carry-on"
 
 const CarryOnDetailsSchema = Type.Object({
   lane: ThreadIdSchema,

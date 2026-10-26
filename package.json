@@ -1,9 +1,28 @@
 {
   "name": "pinetrie",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/halecraft/pinetrie.git"
+  },
+  "homepage": "https://github.com/halecraft/pinetrie#readme",
+  "bugs": "https://github.com/halecraft/pinetrie/issues",
+  "keywords": [
+    "agent",
+    "agentic",
+    "harness",
+    "crdt",
+    "collaborative",
+    "jj",
+    "jujutsu",
+    "pi"
+  ],
+  "publishConfig": {
+    "directory": "dist/pinetrie"
+  },
   "scripts": {
     "format": "biome format . --write",
     "lint": "biome check .",
@@ -26,8 +45,7 @@
     "e2e:observer": "pnpm --filter @pinetrie/app run e2e:observer",
     "vm:build": "pnpm --filter @pinetrie/app run vm:build",
     "build": "pnpm --filter @pinetrie/app run build",
-    "package": "node scripts/package.ts && cd dist && npm pack ./pinetrie",
-    "publish:npm": "pnpm run package && cd dist && npm publish \"pinetrie-$(node -p \"require('../package.json').version\").tgz\"",
+    "package": "node scripts/package.ts",
     "verify": "verify",
     "verify:all": "PINETRIE_VERIFY_ALL=1 verify",
     "verify:fix": "verify --fix",
@@ -38,6 +56,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@halecraft/release": "0.2.0",
     "@halecraft/verify": "^2.0.0",
     "@types/node": "24.10.1",
     "esbuild": "0.28.2",

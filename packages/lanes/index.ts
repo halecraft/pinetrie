@@ -33,7 +33,12 @@ export {
   type UnresolvedMergeOf,
 } from "./history-port.ts"
 export { gatherLinks } from "./host.ts"
-export { checkImage, prepareImages, projectContainerfile } from "./image.ts"
+export {
+  checkImage,
+  hostJjVersion,
+  prepareImages,
+  projectContainerfile,
+} from "./image.ts"
 export type { ImagePlan } from "./image-plan.ts"
 export {
   createQueue,
@@ -71,11 +76,14 @@ export {
   planInnerDockerDataRootSource,
 } from "./nested-data-root.ts"
 export {
+  jjRootAnswer,
   type ProjectDir,
   type ProjectDirRefusal,
+  type ProjectPlan,
   planExclude,
   planProjectDir,
   projectDirWords,
+  projectPlanLine,
   type RootFacts,
 } from "./project-dir.ts"
 export {

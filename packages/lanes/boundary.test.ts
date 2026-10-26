@@ -27,14 +27,9 @@ const JJ_COMMAND = /(?:[[(]\s*"jj"\s*,)|(?:(?:^|[;&|{`'"]\s*)jj\s+-)/m
 
 /**
  * The one exemption: the image check asks the host's jj its version, which
- * the lane's jj is pinned to. It runs jj on no repo.
+ * the lane's jj is pinned to when the host has one. It runs jj on no repo.
  */
-const EXEMPT = new Map([
-  [
-    "image.ts",
-    ['run("jj", ["--version"])', 'describeFailure("jj --version", ran)'],
-  ],
-])
+const EXEMPT = new Map([["image.ts", ['run("jj", ["--version"])']]])
 
 test("@pinetrie/lanes names jj as a command nowhere but its image check", () => {
   const naming = sources().flatMap(file => {

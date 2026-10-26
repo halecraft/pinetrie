@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { OLD_SHAPES, readSources } from "./sources.ts"
+import { readSources } from "./sources.ts"
 import {
   identifierNames,
   phrasesNothingSays,
@@ -38,9 +38,12 @@ describe("the rules", () => {
   })
 
   test("a file of a migration's old shapes may hold a retired name", () => {
-    const [old] = OLD_SHAPES
     expect(
-      retiredNames({ file: old ?? "", text: "const yours = 1" }, ["yours"]),
+      retiredNames(
+        { file: "old.ts", text: "const yours = 1" },
+        ["yours"],
+        ["old.ts"],
+      ),
     ).toEqual([])
   })
 

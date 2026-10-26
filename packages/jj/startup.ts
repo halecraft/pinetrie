@@ -1,18 +1,23 @@
 // jj/startup — your repo as the host finds it at startup, before its owner
-// starts: where the project's root is, and the shared directories excluded
-// in it. pine·trie writes nothing else in your repo.
+// starts: where the project's root is, the shared directories excluded in
+// it, and a git repo made colocated. pine·trie writes nothing else in your
+// repo.
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
-// one. So jj is asked first, git only when jj finds nothing, and
-// no code looks for `.jj` or `.git` itself.
+// one. So jj is asked first, git only when jj finds nothing. A `.jj` or
+// `.git` is looked for only when jj or git does not run, and then says only
+// that version control is there, never where its root is.
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 import {
+  hostJjVersion,
+  jjRootAnswer,
   lines,
   type ProjectDir,
+  type ProjectPlan,
   planExclude,
   planProjectDir,
   planShared,
@@ -26,37 +31,94 @@ import { jjIn } from "./lane/run.ts"
 /** A project whose folder is a jj workspace: the only kind jj's adapter starts on. */
 export type JjProjectDir = Extract<ProjectDir, { readonly kind: "jj" }>
 
+/** The nearest `.jj` or `.git` in `dir` or above it, or null. */
+async function vcsMarker(dir: string): Promise<string | null> {
+  for (let at = path.resolve(dir); ; at = path.dirname(at)) {
+    for (const name of [".jj", ".git"]) {
+      const marker = path.join(at, name)
+      if (
+        await stat(marker).then(
+          () => true,
+          () => false,
+        )
+      )
+        return marker
+    }
+    if (path.dirname(at) === at) return null
+  }
+}
+
 /** Gather whether `dir` is a directory, then what jj, then git, say from it. */
 async function gatherRoot(dir: string): Promise<RootFacts> {
-  const none = { dir, jjRoot: null, gitTop: null, home: homedir() }
+  const none = {
+    dir,
+    home: homedir(),
+    jjVersion: null,
+    jj: null,
+    git: false,
+    gitTop: null,
+    gitBesideJj: false,
+    vcsMarker: null,
+  }
   const found = await stat(dir).catch(() => null)
   if (found?.isDirectory() !== true) return { ...none, isDirectory: false }
-  const root = await jjIn(dir, ["workspace", "root", "--ignore-working-copy"])
-  if (root.ok) return { ...none, isDirectory: true, jjRoot: root.stdout.trim() }
-  const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd: dir })
+  const [jjVersion, git] = await Promise.all([
+    hostJjVersion(),
+    run("git", ["--version"]).then(ran => ran.ok),
+  ])
+  const jj =
+    jjVersion === null
+      ? null
+      : jjRootAnswer(
+          await jjIn(dir, ["workspace", "root", "--ignore-working-copy"]),
+        )
+  const jjRoot = jj?.kind === "root" ? jj.root : null
+  const gitAsk = (args: readonly string[], cwd: string) =>
+    git ? run("git", args, { cwd }) : null
+  const top =
+    jjRoot === null ? await gitAsk(["rev-parse", "--show-toplevel"], dir) : null
+  const beside =
+    jjRoot === null ? null : await gitAsk(["rev-parse", "--git-dir"], jjRoot)
   return {
     ...none,
     isDirectory: true,
-    gitTop: top.ok ? top.stdout.trim() : null,
+    jjVersion,
+    jj,
+    git,
+    gitTop: top?.ok === true ? top.stdout.trim() : null,
+    gitBesideJj: beside?.ok === true,
+    vcsMarker: jjVersion === null || !git ? await vcsMarker(dir) : null,
   }
 }
 
 /**
- * The project's root from `dir`, and its kind; or why `dir` cannot be a
- * project. Writes nothing. A jj repo needs a git directory beside it:
- * lanes' history is fetched into your repo through git.
+ * The project's root from `dir`, its kind, and what must happen before it is
+ * one; or why `dir` cannot be a project. Writes nothing. A jj repo needs a git
+ * directory beside it: lanes' history is fetched into your repo through git.
  */
-export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
-  const planned = planProjectDir(await gatherRoot(dir))
-  if (planned.kind !== "jj") return planned
-  const git = await run("git", ["rev-parse", "--git-dir"], {
-    cwd: planned.root,
-  })
-  return git.ok
-    ? planned
+export const prepareProjectDir = async (
+  dir: string,
+  options: { readonly tools: boolean },
+): Promise<ProjectPlan> => planProjectDir(await gatherRoot(dir), options)
+
+/**
+ * Carry out `plan`: a git repo it names is made colocated, so it is a jj
+ * project; or refused in jj's words, a git worktree among them.
+ */
+export async function settleProjectDir(plan: ProjectPlan): Promise<ProjectDir> {
+  if (plan.kind === "refused") return plan
+  if (plan.kind === "folder") return { kind: "folder", root: plan.root }
+  if (!plan.colocate) return { kind: "jj", root: plan.root }
+  const ran = await jjIn(plan.root, ["git", "init", "--colocate"])
+  return ran.ok
+    ? { kind: "jj", root: plan.root }
     : {
         kind: "refused",
-        refusal: { kind: "not-colocated", root: planned.root },
+        refusal: {
+          kind: "colocate-failed",
+          root: plan.root,
+          said: lines(ran.stderr)[0] ?? `exit ${ran.code}`,
+        },
       }
 }
 

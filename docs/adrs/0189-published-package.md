@@ -11,6 +11,12 @@ Numbered ADR-0186 until 2026-10-19, when two files held ADR-0186.
     packages `deep.ts` reaches from its own list, refuses an `import()` of a
     computed name and a lane helper that reads beside itself; Kyneta's
     peer-only declarations are gone.
+  - 2026-10-26: published by `@halecraft/release` from the root, which is no
+    longer private and names `dist/pinetrie` as its `publishConfig.directory`;
+    the build no longer packs, and copies the root manifest's version,
+    description, license, repository
+    (`https://github.com/halecraft/pinetrie`), homepage, bugs and keywords
+    into the package's manifest.
 - **Amended by:**
   - ADR-0190: the lane helper is the one script built as a bundle, its
     third-party packages inside it; the package is MIT, for macOS and Linux,

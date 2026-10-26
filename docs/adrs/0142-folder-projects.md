@@ -51,6 +51,9 @@
     their content. A rename is inferred only where a file's bytes are
     unchanged, and only to show it. A conflict's version can be chosen on the
     page. A resolution is a state of the lane's own.
+  - ADR-0216: a git repo with no jj is no longer a folder project; it is made
+    colocated at the start and served as a jj project. A folder under no
+    version control is a folder project with no jj installed.
 
 **Context.**
 

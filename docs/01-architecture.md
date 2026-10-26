@@ -330,8 +330,11 @@ work's `pinetrie.json`, less what the lane's own copy gives up: only an
 acceptance widens them. A shared file has a lineage of versions, each a stamp of its
 size and ctime, which the host and a lane read alike: every write, a
 lane's or yours (seen by the host's watcher), is one, and a write based on
-a version another replaced is flagged concurrent. A folder with no jj
-repo is served as a folder project (ADR-0142):
+a version another replaced is flagged concurrent. Version control is
+served through jj (ADR-0216): a git repo with no jj is made colocated at
+the start and served as a jj project, and a folder under jj or git is
+refused while jj or git does not run. A folder under neither is served as
+a folder project (ADR-0142), with no jj installed:
 the folder is its accepted work, a thread starts from it as it is, an
 accept writes into it without replacing a file it has not checked, and
 merge bases come from a graph of states pine·trie keeps. Its first step is
@@ -346,8 +349,8 @@ the kind of the disk it clones; lane work names states by points
 no run starts on a lane of another kind than the project's (`Runs.start`
 takes a proof), each path that would start one refused with words.
 Every session keeps pine·trie's own files in its data directory (ADR-0150),
-whatever the project's kind: pine·trie writes nothing in your project, and
-no exclude line for itself. A turn's classes read `.gitignore` with a pure
+whatever the project's kind: pine·trie writes nothing in your project but
+a git repo's `.jj`, once (ADR-0216), and no exclude line for itself. A turn's classes read `.gitignore` with a pure
 matcher (`@pinetrie/rules/ignores`), and the search tools read it with no
 repo too. The folder's adapter is built (`apps/pinetrie/host/folder/`, the
 only code that touches the project's folder; `@pinetrie/folder` decides for

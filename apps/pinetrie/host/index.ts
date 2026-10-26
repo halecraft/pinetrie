@@ -24,9 +24,9 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { type Install, thisInstall } from "@pinetrie/install"
-import { prepareProjectDir } from "@pinetrie/jj"
+import { prepareProjectDir, settleProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
-import type { LaneFiles } from "@pinetrie/lanes"
+import { type LaneFiles, projectPlanLine } from "@pinetrie/lanes"
 import {
   numbersInForce,
   planStoreCapabilities,
@@ -424,7 +424,12 @@ async function openHost(
   if (toolsIn !== null) progress.begin("lane-machine")
   const sshDir = await prepareSshDir()
   closers.defer(() => rm(sshDir, { recursive: true, force: true }))
-  const projectDir = toolsIn === null ? null : await prepareProjectDir(toolsIn)
+  const projectPlan =
+    toolsIn === null ? null : await prepareProjectDir(toolsIn, { tools: true })
+  const planLine = projectPlan === null ? null : projectPlanLine(projectPlan)
+  if (planLine !== null) log(`[host] ${planLine}`)
+  const projectDir =
+    projectPlan === null ? null : await settleProjectDir(projectPlan)
   // Chosen once, by the project's kind: a folder lanes cannot serve is
   // refused before any runtime is asked.
   const chosen = projectDir === null ? null : projectAdapter(projectDir)

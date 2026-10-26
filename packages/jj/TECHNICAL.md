@@ -73,16 +73,24 @@ translates to.
   command raced it (`isTidyRaced`), the startup line's facts
   (`planTidyHint`), and its gather and steps' runner.
 - `startup.ts`: your repo before its owner starts. `prepareProjectDir`
-  gathers the root's facts (`jj root`, else git's top level) and plans them
-  (`planProjectDir`, `@pinetrie/lanes`), and writes nothing: pine·trie
-  keeps its files in the session's directory (ADR-0150). A jj repo with
-  no git directory beside it (`git rev-parse --git-dir` from its root
-  fails) is refused, `not-colocated` (S108), since lanes' history reaches
-  your repo through git. `server.ts` runs it before the session opens, and
-  `startHost` again (ADR-0086). `prepareShared` is the shell around
+  gathers the root's facts (whether jj and git run, `jj workspace root`,
+  else git's top level) and plans them (`planProjectDir`, `@pinetrie/lanes`),
+  and writes nothing: pine·trie keeps its files in the session's directory
+  (ADR-0150). A `.jj` or `.git` is looked for only when jj or git does not
+  run, to refuse a folder under version control, never to find a root:
+  only jj says where a workspace is (S36, S41). A jj repo with no git
+  directory beside it (`git rev-parse --git-dir` from its root fails) is
+  refused, `not-colocated` (S108), since lanes' history reaches your repo
+  through git. `server.ts` runs it before the session opens, for the root,
+  and `startHost` again with tools (ADR-0086). `settleProjectDir` carries
+  the plan out: a git repo it names is made colocated (`jj git init
+  --colocate`, ADR-0216), which leaves git's branch, index and edits as
+  they were (S348), or is refused in jj's words (a git worktree). Only
+  `startHost` runs it, with tools on. `prepareShared` is the shell around
   `planShared`: jj, not git's index, says what is tracked (in a colocated
   repo the index can lag), and it adds unignored shared directories to the
-  exclude file, the only lines pine·trie writes in your repo. The lanes'
+  exclude file. Those lines and a colocated repo's `.jj` are all pine·trie
+  writes in your repo. The lanes'
   ignore file is the host's, not this package's. It takes one list, the
   settled `lanes.shared`. Your repo's
   names (`RepoConfig`, in core, so the host's adapter and this package share
@@ -349,8 +357,8 @@ update's merge will change.**
   descendants (S57). That is why every read outside the owner is pinned.
 - **Startup reads your repo before the owner exists** (`startup.ts`):
   `prepareProjectDir` and `prepareShared` read it with `jjIn` and git from
-  its root, and only `prepareShared` writes, to its exclude file; nothing
-  else runs yet. The
+  its root; `settleProjectDir` writes a git repo's `.jj` once, and
+  `prepareShared` its exclude file; nothing else runs yet. The
   adapter's `identity` reads your jj config (`user.name`) with `jjIn` too:
   config, not the repo.
 

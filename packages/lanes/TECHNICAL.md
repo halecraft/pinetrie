@@ -225,10 +225,22 @@ paths are its diff." would compare a function with itself.
   `@pinetrie/config`'s. Your repo's startup reads
   and writes are `@pinetrie/jj`'s (`startup.ts`).
 - `planProjectDir` (`project-dir.ts`) decides a project's root and its kind from
-  `RootFacts`: a jj workspace is `jj`, any other folder (a git repo
-  included) `folder`; or it refuses the folder (`ProjectDirRefusal`, worded
-  by `projectDirWords`). The kind is that one fact, read once, where the
-  host chooses the project's adapter (`apps/pinetrie/host/project.ts`).
+  `RootFacts` (ADR-0216): a jj workspace is `jj`; a git repo with no jj
+  workspace is `jj` too, once made colocated (`ProjectPlan`'s `colocate`);
+  any other folder is `folder`, served with no jj installed (`jjMissing`).
+  It refuses (`ProjectDirRefusal`, worded by `projectDirWords`) a folder
+  under jj or git when jj does not run (`jj-missing`), or git does not
+  (`git-missing`), and jj failing in any other way than "no repo"
+  (`jj-failed`). Without tools it decides the root alone. The kind is that
+  one fact, read once, where the host chooses the project's adapter
+  (`apps/pinetrie/host/project.ts`).
+- **Gotcha: jj's "no repo" is read from its words.** `jjRootAnswer` reads
+  exit 1 with stderr starting `Error: There is no jj repo in` as no repo;
+  a config error is exit 1 too (S348). Should jj reword it, a folder in no
+  repo is refused in jj's words, never misread as a repo or a folder.
+- **The lanes' jj is the host's, else `DEFAULT_LANE_JJ_VERSION`**
+  (`laneJjVersion`, `image.ts`): a folder project's host needs no jj, and
+  its lanes' image still carries one.
   `planShared` and `sharedCandidates` decide the shared
   directories, which `@pinetrie/jj`'s `prepareShared` carries out.
   `sessionFiles` is the layout of a session's data directory

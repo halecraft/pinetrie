@@ -11,6 +11,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.15
         version: 2.5.15
+      '@halecraft/release':
+        specifier: 0.2.0
+        version: 0.2.0
       '@halecraft/verify':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@24.10.1)(typescript@7.0.2)
@@ -32,6 +35,7 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@24.10.1)(vite@8.3.4(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
+    publishDirectory: dist/pinetrie
 
   apps/conformance:
     dependencies:
@@ -871,6 +875,10 @@ packages:
     peerDependencies:
       '@earendil-works/pi-ai': '>=0.86.0'
       '@earendil-works/pi-coding-agent': '>=0.86.0'
+
+  '@halecraft/release@0.2.0':
+    resolution: {integrity: sha512-doathm+1sQ87yiSRgOriEpz0KACaFiy/J4tuppjzvCQZ3BJI5JPkT94e4U1Smjwfall2MVcr768z1fzPx3PyGQ==}
+    hasBin: true
 
   '@halecraft/verify@2.0.0':
     resolution: {integrity: sha512-3wktgnfcnfj3duNbpppg3PuNASjFeEdxhNd0vGcgAddklWPqFlsk919IQaGkPSGp6311FP1EQFguHP3pU9enxA==}
@@ -3046,6 +3054,11 @@ snapshots:
     dependencies:
       '@earendil-works/pi-ai': 0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.22.0)(zod@4.6.7)
       '@earendil-works/pi-coding-agent': 0.99.2(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.22.0)(zod@4.6.7)
+
+  '@halecraft/release@0.2.0':
+    dependencies:
+      jiti: 2.7.0
+      picomatch: 4.0.7
 
   '@halecraft/verify@2.0.0(@types/node@24.10.1)(typescript@7.0.2)':
     dependencies:

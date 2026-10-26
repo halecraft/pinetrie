@@ -265,6 +265,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/shared` | shared directories (ADR-0035) |
 | `lanes/store-upkeep` | the disk upkeep under a budget no snapshot fits: a lane's old turns' snapshots evicted, its newest and the base kept, a branch from an evicted turn keeping that turn's files in a jj project, and a folder project's states left to the folder code (ADR-0210) |
 | `lanes/ssh` | a lane's ssh through its host: service identities, the owner's approval, the broker and a revoke (ADR-0140, S174) |
+| `lanes/vcs` | version control at a host's start: with no jj on its `PATH`, a folder project served and accepted into, and a folder under git refused, naming jj; with jj, a git repo made colocated, its branch and your edits as they were (ADR-0216, S348) |
 | `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147), its Docker's cache capped (ADR-0169) |
 | `observer/kernel` | the observer that attributes a lane's file calls to its runs, on the lane VM's own kernel (ADR-0135; S172, S176) |
 | `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the dock's queue (ADR-0113); cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); copy, cut and paste (ADR-0132); the rail's outline of a column (ADR-0058); a second window's presence (ADR-0024); what a reload keeps (ADR-0027) |

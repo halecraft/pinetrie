@@ -246,10 +246,11 @@ const isOutside = (tag: TagLiteral): boolean =>
  */
 export const misspelledTags = (
   tags: readonly TagLiteral[],
+  oldShapes: readonly string[] = OLD_SHAPES,
 ): readonly TagLiteral[] =>
   tags.filter(
     t =>
-      !isTagSpelling(t.value) && !isOutside(t) && !OLD_SHAPES.includes(t.file),
+      !isTagSpelling(t.value) && !isOutside(t) && !oldShapes.includes(t.file),
   )
 
 /** Outside entries no tag needs any more: one renamed, or gone. */

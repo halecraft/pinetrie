@@ -508,8 +508,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes a .pinetrie/ in the project again",
     file: "packages/jj/startup.ts",
-    from: '  const git = await run("git", ["rev-parse", "--git-dir"], {\n',
-    to: '  const git = await run("sh", ["-c", "mkdir -p .pinetrie && git rev-parse --git-dir"], {\n',
+    from: '    git ? run("git", args, { cwd }) : null\n',
+    to: '    git ? run("sh", ["-c", `mkdir -p .pinetrie && git ${args.join(" ")}`], { cwd }) : null\n',
     suite: "lanes",
     scenario: "main",
     expect: "nothing of pine·trie's is written in your project",
@@ -923,7 +923,115 @@ export const mutations: readonly Mutation[] = [
     to: "    false ||\n",
     command: unit,
     expect:
-      "planProjectDir: jj's root, a jj project; else git's, else the folder, a folder project; never missing, your home directory or /",
+      "planProjectDir: jj's root, a jj project; else git's, else the folder; never missing, your home directory or /",
+  },
+  {
+    name: "a jj repo with no git directory beside it is served",
+    file: "packages/lanes/project-dir.ts",
+    from: "    return f.gitBesideJj\n",
+    to: "    return true\n",
+    command: unit,
+    expect:
+      "planProjectDir: a jj repo with no git directory beside it is refused",
+  },
+  {
+    name: "a git repo with no jj workspace is served as a folder",
+    file: "packages/lanes/project-dir.ts",
+    from: '  if (f.gitTop !== null) return { kind: "jj", root, colocate: true }\n',
+    to: "",
+    command: unit,
+    expect:
+      "planProjectDir: a git repo with no jj workspace is a jj project once made colocated",
+  },
+  {
+    name: "a folder under version control is served with no jj",
+    file: "packages/lanes/project-dir.ts",
+    from: "  if (tools && f.jjVersion === null && f.vcsMarker !== null)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "planProjectDir: with no jj, a folder under version control is refused, naming what found it",
+  },
+  {
+    name: "a folder project with no jj is not said so",
+    file: "packages/lanes/project-dir.ts",
+    from: "    jjMissing: f.jjVersion === null,\n",
+    to: "    jjMissing: false,\n",
+    command: unit,
+    expect:
+      "planProjectDir: with no jj, a folder under no version control is a folder project, said so",
+  },
+  {
+    name: "jj failing reads as no repo",
+    file: "packages/lanes/project-dir.ts",
+    from: '  if (tools && f.jj?.kind === "failed")\n',
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "planProjectDir: jj failing is refused in its words, never read as no repo",
+  },
+  {
+    name: "any exit 1 of jj's is no repo",
+    file: "packages/lanes/project-dir.ts",
+    from: '  if (ran.code === 1 && ran.stderr.startsWith("Error: There is no jj repo in"))\n',
+    to: "  if (ran.code === 1)\n",
+    command: unit,
+    expect:
+      "jjRootAnswer: a root; no repo only in jj's own words; any other failure, its first line",
+  },
+  {
+    name: "a jj or git project is served with no git",
+    file: "packages/lanes/project-dir.ts",
+    from: "  if (!f.git && (jjRoot !== null || f.gitTop !== null || f.vcsMarker !== null))\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "planProjectDir: a jj or git project with no git is refused",
+  },
+  {
+    name: "a host without tools refuses and colocates as one with them",
+    file: "packages/lanes/project-dir.ts",
+    from: "  if (!tools)\n    return jjRoot === null ? folder",
+    to: "  if (false)\n    return jjRoot === null ? folder",
+    command: unit,
+    expect:
+      "planProjectDir: without tools, the root alone, nothing refused for jj or git and nothing made colocated",
+  },
+  {
+    name: "a git repo is made colocated without a word",
+    file: "packages/lanes/project-dir.ts",
+    from: '  if (p.kind === "jj" && p.colocate)\n',
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "projectPlanLine: says a git repo is made colocated, and a folder served with no jj",
+  },
+  {
+    name: "the lanes' jj ignores the host's",
+    file: "packages/lanes/image.ts",
+    from: "  host ?? DEFAULT_LANE_JJ_VERSION\n",
+    to: "  DEFAULT_LANE_JJ_VERSION\n",
+    command: unit,
+    expect:
+      "the lanes' jj is the host's, else the version kept for a host with none",
+  },
+  {
+    name: "a host with no jj cannot build its lanes' images",
+    file: "packages/lanes/image.ts",
+    from: "  host ?? DEFAULT_LANE_JJ_VERSION\n",
+    to: '  host ?? (() => { throw new Error("no jj on the host") })()\n',
+    suite: "lanes",
+    scenario: "vcs",
+    expect:
+      "with no jj on the host, a folder project is served, said so, and a lane's proposed changes accepted into it",
+  },
+  {
+    name: "a host with no jj does not look for version control",
+    file: "packages/jj/startup.ts",
+    from: "    vcsMarker: jjVersion === null || !git ? await vcsMarker(dir) : null,\n",
+    to: "    vcsMarker: null,\n",
+    suite: "lanes",
+    scenario: "vcs",
+    expect: "with no jj on the host, a folder under git is refused, naming jj",
   },
   {
     name: "a missing folder can be a project",
@@ -932,7 +1040,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)\n",
     command: unit,
     expect:
-      "planProjectDir: jj's root, a jj project; else git's, else the folder, a folder project; never missing, your home directory or /",
+      "planProjectDir: jj's root, a jj project; else git's, else the folder; never missing, your home directory or /",
   },
   {
     name: "the inner Docker's PATH has no /usr/sbin",

@@ -20,6 +20,8 @@
 - **Amended by:**
   - ADR-0142: the host no longer refuses a folder with no jj or git repo. It
     serves the folder as a folder project.
+  - ADR-0216: a host with tools refuses a folder under jj or git while jj or
+    git does not run, naming which.
 
 **Context.** An agent had two places to work: a lane of its own (ADR-0034),
 or directly in a directory, by default the host's working copy.

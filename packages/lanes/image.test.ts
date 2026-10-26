@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "vitest"
-import { hostJjVersion, prepareImages } from "./image.ts"
+import {
+  DEFAULT_LANE_JJ_VERSION,
+  hostJjVersion,
+  laneJjVersion,
+  prepareImages,
+} from "./image.ts"
 import {
   filesContainerfileCopies,
   type ImagePlan,
@@ -72,7 +77,7 @@ test("the default image's tag follows the files it copies in", async () => {
         sources,
       },
       project: null,
-      jjVersion: await hostJjVersion(),
+      jjVersion: laneJjVersion(await hostJjVersion()),
       playwrightVersion: "1.64.1",
     }).pinetrie.tag
   expect(given.map(p => p.tag)).toEqual([runtimeFrom])
@@ -94,4 +99,9 @@ test("the default image downloads each tool for the machine it is built on, nami
   expect(urls.length).toBeGreaterThan(0)
   for (const url of urls)
     expect(url, url).not.toMatch(/aarch64|x86_64|arm64|amd64/)
+})
+
+test("the lanes' jj is the host's, else the version kept for a host with none", () => {
+  expect(laneJjVersion("0.40.0")).toBe("0.40.0")
+  expect(laneJjVersion(null)).toBe(DEFAULT_LANE_JJ_VERSION)
 })

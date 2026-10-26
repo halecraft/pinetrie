@@ -4,20 +4,12 @@ import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, json, Schema } from "@kyneta/schema"
-import {
-  CONTROL_TOPIC,
-  LIVE_DOC_ID,
-  PLACES_DOC_ID,
-} from "@pinetrie/protocol/messages"
+import { CONTROL_TOPIC, LIVE_DOC_ID } from "@pinetrie/protocol/messages"
 import { afterEach, describe, expect, test } from "vitest"
 import { lineDocPrefix } from "../lines.ts"
-import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
+import { SCHEMA_OF, type StoredKind } from "../policy.ts"
 import { openStore } from "../store.ts"
-import { CARD_TICKED } from "./0026-card-ticked.ts"
-import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
-import { STREAM_STATEMENT } from "./0029-stream-statement.ts"
 import {
-  MIGRATIONS,
   type Migration,
   migrate,
   migrationNameClash,
@@ -84,60 +76,6 @@ describe("the stored schemas", () => {
       attention: "024af7116f828237ae36a7acf7d388c385",
       open: "0234911a0091f81a8124b5fbfa5d339b44",
     })
-  })
-})
-
-describe("0026-card-ticked", () => {
-  test("a places document stored before ticks opens through it, moving no data", () => {
-    expect(
-      planOpen({
-        stored: new Map([[PLACES_DOC_ID, CARD_TICKED.from]]),
-        kindOf: storedKind,
-        hashOf: kind => SCHEMA_OF[kind].schemaHash,
-        migrations: MIGRATIONS,
-      }),
-    ).toEqual({
-      kind: "open",
-      run: [{ migration: CARD_TICKED, docIds: [PLACES_DOC_ID] }],
-      unknown: [],
-    })
-    expect(CARD_TICKED.run).toBeUndefined()
-  })
-})
-
-describe("0027-canvas-state-changed", () => {
-  test("a places document stored before the canvas's flag opens through it, moving no data", () => {
-    expect(
-      planOpen({
-        stored: new Map([[PLACES_DOC_ID, CANVAS_STATE_CHANGED.from]]),
-        kindOf: storedKind,
-        hashOf: kind => SCHEMA_OF[kind].schemaHash,
-        migrations: MIGRATIONS,
-      }),
-    ).toEqual({
-      kind: "open",
-      run: [{ migration: CANVAS_STATE_CHANGED, docIds: [PLACES_DOC_ID] }],
-      unknown: [],
-    })
-    expect(CANVAS_STATE_CHANGED.run).toBeUndefined()
-  })
-})
-
-describe("0029-stream-statement", () => {
-  test("a live document stored before a stream's statement opens through it, moving no data", () => {
-    expect(
-      planOpen({
-        stored: new Map([[LIVE_DOC_ID, STREAM_STATEMENT.from]]),
-        kindOf: storedKind,
-        hashOf: kind => SCHEMA_OF[kind].schemaHash,
-        migrations: MIGRATIONS,
-      }),
-    ).toEqual({
-      kind: "open",
-      run: [{ migration: STREAM_STATEMENT, docIds: [LIVE_DOC_ID] }],
-      unknown: [],
-    })
-    expect(STREAM_STATEMENT.run).toBeUndefined()
   })
 })
 

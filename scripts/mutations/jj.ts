@@ -1316,13 +1316,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a WIP's copy fetches only the WIP's commit",
   },
   {
-    name: "a jj repo with no git directory beside it is served",
+    name: "a git repo planned colocated is left as it was",
     file: "packages/jj/startup.ts",
-    from: '  if (planned.kind !== "jj") return planned\n',
-    to: "  return planned\n",
+    from: '  if (!plan.colocate) return { kind: "jj", root: plan.root }\n',
+    to: '  return { kind: "jj", root: plan.root }\n',
     command: unit,
     expect:
-      "prepareProjectDir: a project's root and kind, written nowhere; a non-colocated repo refused",
+      "settleProjectDir: a git repo is made colocated, its branch and edits as they were",
   },
   {
     name: "a move to accepted work is not fetched",

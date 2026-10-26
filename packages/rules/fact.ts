@@ -126,7 +126,7 @@ const QueuedFactSchema = Type.Union([
   }),
 ])
 
-export const FACT_TYPE = "pinetrie.fact"
+const FACT_TYPE = "pinetrie.fact"
 
 export const FACT = historyMessage(FACT_TYPE, QueuedFactSchema)
 

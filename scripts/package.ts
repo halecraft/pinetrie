@@ -4,6 +4,10 @@
 // to its `.js`. The lane helper alone is one bundled file, its packages
 // inside it, since a lane runs it from the mount where npm may not have put
 // them. Gather (reads), plan (`planPackage`, pure), execute (writes).
+//
+// `release` publishes `dist/pinetrie/` (the root's `publishConfig.directory`),
+// and a pack takes every file there: a tarball left inside would ship in
+// the next one. `writePackage` empties it first.
 
 import {
   cpSync,
@@ -42,9 +46,19 @@ export interface Gathered {
   readonly declared: ReadonlyMap<string, string>
   /** The packages no import names (`UNIMPORTED_PACKAGES`). */
   readonly unimported: readonly string[]
-  /** The root manifest's version and description. */
+  /** What the root manifest says of the package, copied into its manifest. */
+  readonly about: About
+}
+
+/** The root manifest's fields that describe the published package. */
+export interface About {
   readonly version: string
   readonly description: string
+  readonly license: string
+  readonly repository: { readonly type: string; readonly url: string }
+  readonly homepage: string
+  readonly bugs: string
+  readonly keywords: readonly string[]
 }
 
 /** The package, as files to write and files to copy, or why it cannot be made. */
@@ -225,9 +239,7 @@ export function planPackage(g: Gathered): PackagePlan {
     copied: [...copied, "README.md", "LICENSE"],
     manifest: {
       name: "pinetrie",
-      version: g.version,
-      description: g.description,
-      license: "MIT",
+      ...g.about,
       type: "module",
       bin: { pinetrie: "apps/pinetrie/bin.js" },
       engines: { node: ">=24" },
@@ -291,7 +303,7 @@ export function gatherPackage(root: string): Gathered {
   )
   const rootManifest = JSON.parse(
     readFileSync(path.join(root, "package.json"), "utf8"),
-  ) as { readonly version: string; readonly description: string }
+  ) as About
   return {
     entries: ENTRIES,
     sources,
@@ -306,8 +318,15 @@ export function gatherPackage(root: string): Gathered {
     targets,
     declared,
     unimported: UNIMPORTED_PACKAGES,
-    version: rootManifest.version,
-    description: rootManifest.description,
+    about: {
+      version: rootManifest.version,
+      description: rootManifest.description,
+      license: rootManifest.license,
+      repository: rootManifest.repository,
+      homepage: rootManifest.homepage,
+      bugs: rootManifest.bugs,
+      keywords: rootManifest.keywords,
+    },
   }
 }
 

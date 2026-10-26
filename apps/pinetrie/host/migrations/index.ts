@@ -7,10 +7,9 @@
 // reads the store once (`readStored`, and the ledger's names), `planStart`
 // decides everything the start does to it, `prepareStore` deletes and
 // records, and `migrate` runs what was planned before the first `get`. One
-// migration per file here. A hash migration is deleted once Duane's store has
-// passed it, and a store still on its hash is then refused; a one-time one
-// leaves its name in `RETIRED_MIGRATIONS`, and a store that never ran it is
-// refused.
+// migration per file here. A hash migration is kept until a release retires
+// it, and a store still on its hash is then refused; a one-time one leaves
+// its name in `RETIRED_MIGRATIONS`, and a store that never ran it is refused.
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
@@ -18,56 +17,6 @@ import { CONTROL_TOPIC } from "@pinetrie/protocol/messages"
 import { lineDocPrefix } from "../lines.ts"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import type { OpenedStore } from "../store.ts"
-import { REPLY_DIAGNOSTICS } from "./0001-reply-diagnostics.ts"
-import { IMAGE_VERSIONS } from "./0002-image-versions.ts"
-import { ONE_MARGIN } from "./0003-one-margin.ts"
-import { CARD_TITLES } from "./0004-card-titles.ts"
-import { acceptedWorkingCopy } from "./0005-accepted-working-copy.ts"
-import { proposedWorkingCopyEdits } from "./0006-proposed-working-copy-edits.ts"
-import { landMerged } from "./0007-land-merged.ts"
-import { turnDiskPrivateMigration } from "./0008-turn-disk-private.ts"
-import { accessAnswersMigration } from "./0009-access-answers.ts"
-import { sshFactWordsMigration } from "./0010-ssh-fact-words.ts"
-import { carryOnSshAllowedMigration } from "./0011-carry-on-ssh-allowed.ts"
-import { baseGetLatest } from "./0012-base-get-latest.ts"
-import { acceptedGetLatestMigration } from "./0013-accepted-get-latest.ts"
-import { stateGetLatestMigration } from "./0014-state-get-latest.ts"
-import { cardCommandGetLatestMigration } from "./0015-card-command-get-latest.ts"
-import { baseUnfinishedMigration } from "./0016-base-unfinished.ts"
-import { acceptedUnfinished } from "./0017-accepted-unfinished.ts"
-import {
-  behindUnfinished,
-  factUnfinished,
-  updateUnfinished,
-} from "./0018-history-unfinished.ts"
-import { queuedFactUnfinishedMigration } from "./0019-queued-fact-unfinished.ts"
-import { allowanceRecords } from "./0020-allowance-records.ts"
-import {
-  answerAllowance,
-  askCardAllowanceMigration,
-  relayAllowance,
-} from "./0021-relay-allowance.ts"
-import {
-  factAllowanceMigration,
-  queuedFactAllowanceMigration,
-} from "./0022-fact-allowance.ts"
-import { incomingType } from "./0023-incoming.ts"
-import {
-  trashedHistories,
-  trashedRows,
-  trashedTraces,
-} from "./0024-trashed-rows.ts"
-import { runEndReportMigration } from "./0025-run-end-report.ts"
-import { CARD_TICKED } from "./0026-card-ticked.ts"
-import { CANVAS_STATE_CHANGED } from "./0027-canvas-state-changed.ts"
-import { workflowMarks } from "./0028-workflow-marks.ts"
-import { STREAM_STATEMENT } from "./0029-stream-statement.ts"
-import {
-  factInInventoryMigration,
-  queuedFactInInventoryMigration,
-} from "./0030-fact-in-inventory.ts"
-import { bashOutputMigration } from "./0031-bash-output.ts"
-import { conflictAskRunMigration } from "./0032-conflict-ask-run.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -96,18 +45,8 @@ export interface Migration {
   readonly run?: (input: MigrationRun) => Promise<() => Promise<void>>
 }
 
-/**
- * Every migration this build carries, oldest first. A store opens through
- * the one migration from its stored hash. Each one Duane's store ran was
- * deleted; restore one from the revision that deleted it for a store still
- * on its hash.
- */
-export const MIGRATIONS: readonly Migration[] = [
-  IMAGE_VERSIONS,
-  CARD_TICKED,
-  CANVAS_STATE_CHANGED,
-  STREAM_STATEMENT,
-]
+/** Every hash migration this build carries, oldest first: none. */
+export const MIGRATIONS: readonly Migration[] = []
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -126,45 +65,8 @@ export interface RecordMigration {
   readonly run: (input: MigrationRun) => Promise<(() => Promise<void>) | null>
 }
 
-/** Every one-time record migration this build carries, oldest first. */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
-  REPLY_DIAGNOSTICS,
-  ONE_MARGIN,
-  CARD_TITLES,
-  acceptedWorkingCopy,
-  proposedWorkingCopyEdits,
-  landMerged,
-  turnDiskPrivateMigration,
-  accessAnswersMigration,
-  sshFactWordsMigration,
-  carryOnSshAllowedMigration,
-  baseGetLatest,
-  acceptedGetLatestMigration,
-  stateGetLatestMigration,
-  cardCommandGetLatestMigration,
-  baseUnfinishedMigration,
-  acceptedUnfinished,
-  updateUnfinished,
-  behindUnfinished,
-  factUnfinished,
-  queuedFactUnfinishedMigration,
-  allowanceRecords,
-  relayAllowance,
-  answerAllowance,
-  askCardAllowanceMigration,
-  factAllowanceMigration,
-  queuedFactAllowanceMigration,
-  incomingType,
-  trashedRows,
-  trashedHistories,
-  trashedTraces,
-  runEndReportMigration,
-  workflowMarks,
-  factInInventoryMigration,
-  queuedFactInInventoryMigration,
-  bashOutputMigration,
-  conflictAskRunMigration,
-]
+/** Every one-time record migration this build carries, oldest first: none. */
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, planned

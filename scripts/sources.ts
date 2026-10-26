@@ -45,23 +45,7 @@ export interface Source {
  * check lets their identifiers hold a retired name, and the tag check lets
  * their tags keep an old spelling.
  */
-export const OLD_SHAPES: readonly string[] = [
-  "apps/pinetrie/host/migrations/0005-accepted-working-copy.ts",
-  "apps/pinetrie/host/migrations/0005-accepted-working-copy.test.ts",
-  "apps/pinetrie/host/migrations/0006-proposed-working-copy-edits.ts",
-  "apps/pinetrie/host/migrations/0006-proposed-working-copy-edits.test.ts",
-  "apps/pinetrie/host/migrations/0007-land-merged.ts",
-  "apps/pinetrie/host/migrations/0007-land-merged.test.ts",
-  "apps/pinetrie/host/migrations/rewrite.test.ts",
-  "apps/pinetrie/host/migrations/0012-base-get-latest.ts",
-  "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
-  "apps/pinetrie/host/migrations/0013-accepted-get-latest.test.ts",
-  "apps/pinetrie/host/migrations/0017-accepted-unfinished.ts",
-  "apps/pinetrie/host/migrations/0025-run-end-report.ts",
-  "apps/pinetrie/host/migrations/0025-run-end-report.test.ts",
-  "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
-  "apps/pinetrie/host/migrations/0030-fact-in-inventory.test.ts",
-]
+export const OLD_SHAPES: readonly string[] = []
 
 const FILES = ["packages/**/*.{ts,tsx}", "apps/**/*.{ts,tsx}", "scripts/*.ts"]
 const NOT_SOURCE = ["**/node_modules/**", "**/dist/**", "**/*.d.ts"]

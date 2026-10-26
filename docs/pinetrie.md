@@ -549,9 +549,12 @@ Decided, and waiting for their turn:
   jj or git root (ADR-0086). A relative folder is read from the directory
   pnpm was started in (`INIT_CWD`). Each folder is a session of its own, found by
   its real path and named for it (ADR-0149); pine·trie keeps the session's
-  files in its data directory and writes nothing in the project
-  (ADR-0150). A jj repo with no git directory beside it is refused. A
-  folder with no jj repo is served as a folder project (ADR-0142): its
+  files in its data directory and writes nothing in the project but a git
+  repo's `.jj` (ADR-0150, ADR-0216). A jj repo with no git directory beside
+  it is refused. A git repo with no jj is made colocated at the start
+  (`jj git init --colocate`), and git works as before. A folder under jj or
+  git is refused while jj or git does not run. A folder under neither is
+  served as a folder project (ADR-0142), with no jj installed: its
   accepted work is the folder, a thread starts from it as it is, and its
   proposed changes are reviewed as files and accepted into the folder; its
   page shows accepted work's history, restores a kept state, and chooses

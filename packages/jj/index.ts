@@ -61,6 +61,7 @@ export {
   type JjProjectDir,
   prepareProjectDir,
   prepareShared,
+  settleProjectDir,
 } from "./startup.ts"
 export type { RepoStep } from "./step.ts"
 export type { StepPart, StepSplit } from "./step-times.ts"

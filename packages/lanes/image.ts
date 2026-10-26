@@ -3,7 +3,7 @@
 // pine·trie's default image is built from `image/Containerfile`; a project's
 // own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
-// host's jj version for both, and the Playwright version the host names for
+// lanes' jj version for both (`laneJjVersion`), and the Playwright version the host names for
 // pine·trie's (`planImages`). pine·trie's also changes with each file it copies in from
 // beside it (`daemon.json`). The runtime builds and runs them.
 
@@ -14,6 +14,7 @@ import {
   imageRefusal,
   planImages,
 } from "./image-plan.ts"
+import { parsedJjVersion } from "./project-dir.ts"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
@@ -30,14 +31,22 @@ const DEFAULT_CONTAINERFILE = path.join(
 export const projectContainerfile = (root: string): string =>
   path.join(root, "pinetrie.Containerfile")
 
-/** The host's jj version, which the default image's jj is pinned to. */
-export async function hostJjVersion(): Promise<string> {
-  const ran = await run("jj", ["--version"])
-  const m = /jj (\d+\.\d+\.\d+)/.exec(ran.stdout)
-  if (!ran.ok || m?.[1] === undefined)
-    throw new Error(describeFailure("jj --version", ran))
-  return m[1]
-}
+/** The host's jj version, or null when jj does not run. */
+export const hostJjVersion = async (): Promise<string | null> =>
+  parsedJjVersion(await run("jj", ["--version"]))
+
+/**
+ * The jj the images carry when the host has none: a folder project needs
+ * no jj on the host, and its lanes still keep their history with jj.
+ */
+export const DEFAULT_LANE_JJ_VERSION = "0.45.1"
+
+/**
+ * The jj the images carry: the host's, so a lane's repo is one the host's jj
+ * reads, else `DEFAULT_LANE_JJ_VERSION`.
+ */
+export const laneJjVersion = (host: string | null): string =>
+  host ?? DEFAULT_LANE_JJ_VERSION
 
 /**
  * The images a project's lanes need: pine·trie's default, always, since the lane
@@ -51,7 +60,7 @@ export async function prepareImages(
   playwrightVersion: string,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
   const own = projectContainerfile(root)
-  const [jjVersion, pinetrie, project] = await Promise.all([
+  const [hostJj, pinetrie, project] = await Promise.all([
     hostJjVersion(),
     readFile(DEFAULT_CONTAINERFILE, "utf8"),
     readFile(own, "utf8").catch(() => null),
@@ -69,7 +78,7 @@ export async function prepareImages(
     },
     project:
       project === null ? null : { file: own, content: project, sources: [] },
-    jjVersion,
+    jjVersion: laneJjVersion(hostJj),
     playwrightVersion,
   })
   // Both in one call: a build removes the images the runtime has not been

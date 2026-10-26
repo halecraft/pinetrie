@@ -12,6 +12,9 @@
     project, before folder projects are served.
   - ADR-0149: a session's directory holds its store for both kinds, so a
     folder that gains or loses jj keeps its session.
+- **Amended by:**
+  - ADR-0216: pine·trie writes one thing in your folder besides the exclude
+    file's lines: a git repo's `.jj`, made once.
 
 **Context.**
 

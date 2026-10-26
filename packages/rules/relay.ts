@@ -30,9 +30,9 @@ import { RelaySchema } from "./relay-codec.ts"
 import { transcriptLines } from "./request.ts"
 import { foreignLaneWords } from "./set-aside.ts"
 
-export const INCOMING_TYPE = "pinetrie.incoming"
-export const RELAY_TYPE = "pinetrie.relay"
-export const ANSWER_TYPE = "pinetrie.answer"
+const INCOMING_TYPE = "pinetrie.incoming"
+const RELAY_TYPE = "pinetrie.relay"
+const ANSWER_TYPE = "pinetrie.answer"
 
 const IncomingSchema = Type.Object({
   from: ThreadIdSchema,

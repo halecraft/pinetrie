@@ -9,10 +9,15 @@ and what it changes reaches your repo as proposed changes you accept.
 
 ## What it needs
 
-- Node 24 or later, and [jj](https://jj-vcs.github.io/jj/).
+- Node 24 or later.
+- For a project under version control, [jj](https://jj-vcs.github.io/jj/)
+  and git: pine·trie serves a git repo through jj, setting jj up beside
+  git (`jj git init --colocate`) the first time. A folder under neither
+  needs no jj.
 - On macOS: Apple silicon, Xcode's command line tools (the lane VM's
-  launcher is compiled with `swiftc`), and the Docker CLI with buildx. No
-  Docker engine: lanes run in a VM pine·trie starts.
+  launcher is compiled with `swiftc`, and git comes with them), and the
+  Docker CLI with buildx. No Docker engine: lanes run in a VM pine·trie
+  starts.
 - On Linux, arm64 or x86_64: Docker, with pine·trie's lanes directory
   (`$XDG_STATE_HOME/pinetrie/lanes`) on btrfs.
 
@@ -43,19 +48,23 @@ image, builds the lanes' images for a few minutes; once it says
 
 Settings are `pinetrie.json` files: the machine's, yours
 (`~/.config/pinetrie/pinetrie.json`), the project's, and yours for one
-project, from the broadest to the most specific. `docs/pinetrie.md`
-("Your config") says which may set what.
+project, from the broadest to the most specific.
+[`docs/pinetrie.md`](https://github.com/halecraft/pinetrie/blob/main/docs/pinetrie.md) ("Your config") says
+which may set what.
 
 ## Developing pine·trie
 
-From a clone, with pnpm:
+From a clone of
+[github.com/halecraft/pinetrie](https://github.com/halecraft/pinetrie),
+with pnpm:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev [folder]
 ```
 
-Start with `docs/pinetrie.md`, and `AGENTS.md` for how the work is done.
+Start with [`docs/pinetrie.md`](https://github.com/halecraft/pinetrie/blob/main/docs/pinetrie.md), and
+[`AGENTS.md`](https://github.com/halecraft/pinetrie/blob/main/AGENTS.md) for how the work is done.
 
 ## License
 

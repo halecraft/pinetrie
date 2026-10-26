@@ -14,6 +14,7 @@ import { test } from "vitest"
 
 interface Manifest {
   readonly name?: string
+  readonly private?: boolean
   readonly dependencies?: Record<string, string>
   readonly devDependencies?: Record<string, string>
 }
@@ -46,6 +47,8 @@ const allDeps = (m: Manifest) => [
  */
 const ROOT_TOOLING = [
   "@biomejs/biome",
+  // The publish (`release.config.ts`).
+  "@halecraft/release",
   // The gates' runner (`verify.config.ts`), and its parsers' type.
   "@halecraft/verify",
   "@types/node",
@@ -61,6 +64,16 @@ test("the root declares tooling only, so nothing runtime leaks to packages", () 
   const root = read(".")
   assert.deepEqual(deps(root), [], "the root must have no dependencies")
   assert.deepEqual(Object.keys(root.devDependencies ?? {}).sort(), ROOT_TOOLING)
+})
+
+// `release` publishes every workspace package that is not private, so one
+// left public would be published beside `pinetrie`.
+test("the root is the one package published: every workspace package is private", () => {
+  assert.notEqual(read(".").private, true)
+  assert.deepEqual(
+    WORKSPACE.filter(dir => read(dir).private !== true),
+    [],
+  )
 })
 
 test("only the pi adapter and the conformance suite declare pi", () => {

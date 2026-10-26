@@ -91,7 +91,9 @@ export async function runHost(
   }
   const invocation = planInvocation(args, env.INIT_CWD ?? process.cwd())
   if (invocation.kind === "refused") refuse(invocation.refusal)
-  const prepared = await prepareProjectDir(invocation.folder)
+  const tools = env.PINETRIE_TOOLS !== "0"
+  // The root alone: `startHost` acts on the rest of the plan.
+  const prepared = await prepareProjectDir(invocation.folder, { tools })
   if (prepared.kind === "refused")
     refuse({ kind: "project", refusal: prepared.refusal })
   const { root } = prepared
@@ -109,7 +111,6 @@ export async function runHost(
   }
   const files = sessionFiles(opened.dir)
   const store = storeChoice(files.store, env)
-  const tools = env.PINETRIE_TOOLS !== "0"
   const progress = startProgress(
     { out: process.stdout, err: process.stderr, isTTY: process.stdout.isTTY },
     {

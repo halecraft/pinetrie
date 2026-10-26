@@ -163,7 +163,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a migration's old shapes may not hold a retired name",
     file: "scripts/words.ts",
-    from: "  if (OLD_SHAPES.includes(source.file)) return []\n",
+    from: "  if (oldShapes.includes(source.file)) return []\n",
     to: "",
     command: words,
     expect: "a file of a migration's old shapes may hold a retired name",
@@ -840,6 +840,23 @@ export const mutations: readonly Mutation[] = [
     command: imports,
     expect:
       "static imports, re-exports and literal import() calls, each once, at their string's place",
+  },
+  {
+    name: "the package's manifest says nothing of the root's",
+    file: "scripts/package.ts",
+    from: "      ...g.about,\n",
+    to: "      version: g.about.version,\n",
+    command: packageBuild,
+    expect: "the manifest says of the package what the root manifest says",
+  },
+  {
+    name: "a workspace package is left public",
+    file: "packages/core/package.json",
+    from: '  "private": true,\n',
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
+    expect:
+      "the root is the one package published: every workspace package is private",
   },
   {
     name: "the shipped files' imports are left naming .ts",

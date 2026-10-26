@@ -543,14 +543,16 @@ reading the store once, planning once, then acting:
   cut during the start that runs a migration can skip it for good. The
   risk is accepted (ADR-0174).
 - **One file per migration**, named `NNNN-slug.ts`. The numbering starts
-  again at `0001` with the ledger (ADR-0174): the migrations numbered
-  before it were all deleted, and their history is in their ADRs. A name is
-  permanent: the ledger keys a migration by it, so a renamed one runs again
-  on every store (`migrationNameClash` checks the build's names are
-  distinct).
-- **A hash migration is deleted once Duane's store has passed it**; a
-  store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement.
+  again at `0001` with 0.1.0 (ADR-0215), as it did with the ledger
+  (ADR-0174): every migration before it was deleted, its name with it, and
+  its history is in its ADRs. A name is permanent: the ledger keys a
+  migration by it, so a renamed one runs again on every store
+  (`migrationNameClash` checks the build's names are distinct).
+- **A hash migration is kept until a release retires it** (ADR-0215), at a
+  minor version: stores are no longer one person's, so none is deleted
+  because one store has passed it. A store still on a retired one's hash is
+  refused (`refusalLine`). A change that moves no data is a migration with
+  no `run`: registering it is the acknowledgement.
 - **A one-time migration is deleted when its author chooses**: its file and
   mutations go, and its name moves to `RETIRED_MIGRATIONS`, so a store that
   never ran it is refused instead of opened in the old shape.
@@ -570,98 +572,15 @@ reading the store once, planning once, then acting:
   in the old shape, so a run again after a crash finds nothing to do. It
   writes under the document's current schema, so its hash stays. The
   backup is taken after the reads, before the first write. One that reads
-  every root (as one built on `recordDocs` over the roots does) loads them
-  all, once per store.
-- **Registered now**, none retired:
-  - `0001-reply-diagnostics` (ADR-0176): each stored reply's list of the
-    thinking Anthropic dropped becomes its count, by the rule a new reply
-    is stored by (`countedDiagnostics`, `@pinetrie/pi`). It reads every
-    root's entries raw and writes only the rows that change, never an
-    entry's `content`, id or parent; over its own output it plans nothing
-    (`planCountedDiagnostics`).
-  - `0002-image-versions` registers the places document's new hash: its
-    card record gains `versions`, which a stored record without it reads as
-    "" (ADR-0182). It moves no data.
-  - `0003-one-margin` (ADR-0182) rewrites each comment's place from its
-    entry's id and thread to the entry's printed address, in every places
-    row, live or trashed, and every place a card's history or a trace
-    stores (`marginFieldsNow`, `planMarginRows`, `planMarginEvents`). An
-    address holds `/`, an entry's id never does, so over its own output it
-    plans nothing. A Kyneta undo of a comment's move made before it still
-    writes the old row back.
-  - `0004-card-titles` (ADR-0182) moves each `pinetrie.note-column` record
-    to `pinetrie.card-title` under the same id, deleting the old
-    (`planCardTitles`).
-  - ADR-0172's renames: `0005-accepted-working-copy` and
-    `0006-proposed-working-copy-edits` rename accepted work's `yours` and
-    each proposed changes record's `yourEdits`, which an old record would
-    otherwise keep, undecoded, until the host's next observation, or for
-    good where the lane's proposed changes have ended; `0007-land-merged`
-    renames each land message's `details.yours` to `merged`, which
-    `baseKnown` reads; `0008-turn-disk-private` renames each turn record's
-    `disk.local` to `disk.private`; `0009-access-answers` renames each
-    access record's `approved` to `allowed`, and `refused` with `revoked`
-    to `denied` with `takenBack`; `0010-ssh-fact-words` renames each ssh
-    fact's news `refused` to `denied` and `revoked` to `taken-back`, and
-    `0011-carry-on-ssh-allowed` each carry-on's reason `ssh-approved` to
-    `ssh-allowed`, `content` untouched in both; and the rest of the
-    plain-words renames: `0012`–`0015` (*get the latest*: a lane's base,
-    accepted work's preview, a folder state, a card's command), `0016`–`0019`
-    (*unfinished work*: a base, accepted work's list, history messages and
-    queued facts), `0020`–`0022` (*allowance*: its records' namespace,
-    relays, answers and ask cards, and facts), `0023-incoming` (each
-    `pinetrie.heard` message's type) and `0024` (*trash*: a trashed card's
-    place, in the places rows, its history and its trace).
-  - `0025-run-end-report` (ADR-0186) moves each run-end report from
-    `pinetrie.runEndReport` to `pinetrie.run-end-report`, its report's
-    `modelSaid` respelled `model-said` and its urgency `needs-you` or
-    `worth-a-read` (`runEndReportNow`), read raw: the old shape no longer
-    decodes.
-  - `0026-card-ticked` registers the places document's new hash: its card
-    record gains `ticked`, a column's box, which a stored record without it
-    reads as "", unticked (ADR-0198). It moves no data.
-  - `0027-canvas-state-changed` registers the places document's new hash:
-    its card record gains `stateChanged`, which a stored record without it
-    reads as "", so every canvas starts as one an agent's first run moves
-    to Active (ADR-0206). It moves no data.
-  - `0028-workflow-marks` (ADR-0206) marks the stored workflow's states:
-    Topics on the open state named Topics, else the first; Active on the
-    open state named Active, if it is another (`workflowMarksNow`), read
-    raw, since a workflow with no Topics no longer decodes. A workflow with
-    any mark is left alone. It must run before `recover`: an undecodable
-    workflow reads as none, and `planWorkflowSeed` would write a new
-    default whose state ids no canvas is in.
-  - `0030-fact-in-inventory` renames each `undelivered` fact's `why` from
-    `held` with its `by` to `in-inventory` with its `holder`, in every
-    root's history and every queued fact card (`factInInventory`), so
-    "held" names only a paused queue or lane, and `by` only who acted;
-    `content` untouched. The old shape no longer decodes.
-  - `0031-bash-output` moves each `bash` call's stored split from
-    `pinetrie.output-split` to `BASH_OUTPUT`'s namespace as a verdict, a
-    split of the same statements marking no stderr (`bashOutputNow`); a
-    value without the old `statements` moves as stored. The old shape no
-    longer decodes.
-  - `0032-conflict-ask-run` deletes every stored `CONFLICT_ASK` record
-    (`deleteRecords`): an ask now names the run that asked, which the old
-    record, a time, never kept. The old shape no longer decodes.
-- **A migration that only reshapes one namespace's records,** record by
-  record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
-  over `recordDocs`, which any record migration reads a home's documents
-  with), which reads every document the namespace lives in before it
-  writes any. `renamedFields` is the rewrite that renames top-level
-  fields, and `queuedFactRow` lifts a fact's rewrite to the places row of a
-  fact card still queued, whose fact is stored as JSON. Given a `to`, it moves every record there, rewritten or as
-  stored, and deletes it from the old namespace in the same batch, so no
-  run leaves a record in both, and over its own output the old namespace is
-  empty. `deleteRecords` deletes every record of a namespace instead, for
-  an old shape that names nothing the new one could be made from. A
-  migration names an old spelling or word on purpose, so its file
-  and its test are in `OLD_SHAPES` (`scripts/sources.ts`), which the words
-  and tag checks both read.
-- **A migration that only reshapes one kind of history message** is a pure
-  rewrite of its stored `details` over `rewriteHistory`
-  (`planHistoryRewrites`), which reads every root before it writes any and
-  never touches `content`, what the model read.
+  every root loads them all, once per store.
+- **Registered now**: none, and none retired.
+- **The helpers the deleted migrations shared** went with them: the pure
+  rewrites of one namespace's records, and of one kind of history
+  message's `details`, each reading every document before writing any. A
+  migration that needs one restores `migrations/rewrite.ts` from the
+  revision before 0.1.0. A migration names an old spelling or word on
+  purpose, so its file and its test go in `OLD_SHAPES`
+  (`scripts/sources.ts`), which the words and tag checks both read.
 
 ## Blobs hold any file (`blobs.ts`, ADR-0126, ADR-0151)
 
@@ -877,9 +796,13 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   keeps its mode. A suite gives its own store, and each project a session
   directory of its own under the suite's data directory
   (`suiteSessionFiles`, `e2e/lane-hosts.ts`), 0755 so a nested rootless
-  Docker can bind the runtime and ignore file as another user. `startHost` runs
-  `prepareProjectDir` again with tools on, and hands the `ProjectDir` to
-  `findProject` and to the adapter's choice (`project.ts`).
+  Docker can bind the runtime and ignore file as another user. `server.ts`
+  takes only the root from its plan. `startHost` runs `prepareProjectDir`
+  again with tools on, logs what the plan says of it (`projectPlanLine`: a
+  git repo made colocated, a folder served with no jj), carries it out
+  (`settleProjectDir`, before the adapter is chosen, so the suites' hosts
+  colocate too), and hands the `ProjectDir` to `findProject` and to the
+  adapter's choice (`project.ts`).
 - **The lanes' ignore file is the host's** (`openProject`, `setup.ts`):
   written into `project.files`' `laneGit` after each preparing of the
   shared directories, before they are in force, for every kind of
@@ -969,7 +892,9 @@ as it first loads (§ Roots: steps, leases and the upkeep).
     returned, only `shutdown()` closes anything. The refusals: the
     project's, asked first, before any runtime (`ProjectDirRefusal`, worded
     by `projectDirWords`: no such directory, your home directory or the
-    file system's root, a jj repo with no git directory beside it), and
+    file system's root, a jj repo with no git directory beside it, a folder
+    under jj or git with no jj or no git to run, jj failing, a git repo jj
+    would not colocate), and
     the runtime's: no docker CLI or daemon, no buildx, a lanes directory not on
     btrfs with `user_subvol_rm_allowed` (Linux), and on the Mac the VM's
     (no image, no Xcode tools, not Apple silicon or older than macOS 13, a

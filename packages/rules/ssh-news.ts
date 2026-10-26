@@ -10,7 +10,7 @@ import type { AccessNews } from "./access.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { CARRY_ON, type CarryOnMessage } from "./stop.ts"
 
-export const SSH_FACT_TYPE = "pinetrie.ssh-fact"
+const SSH_FACT_TYPE = "pinetrie.ssh-fact"
 
 const SshFactSchema = Type.Object({
   news: Type.Union([

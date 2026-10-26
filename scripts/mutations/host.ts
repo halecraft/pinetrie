@@ -12,14 +12,6 @@ const command = [
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "a moved split's statements mark no stderr field",
-    file: "apps/pinetrie/host/migrations/0031-bash-output.ts",
-    from: "      statements: statements.map(s => (isRaw(s) ? { ...s, stderr: [] } : s)),\n",
-    to: "      statements,\n",
-    command: unit,
-    expect: "a stored split decodes again as a split, marking no stderr",
-  },
-  {
     name: "a split statement's record drops its stderr",
     file: "packages/pi/statement-join.ts",
     from: "            stderr: view.stderr,\n",
@@ -992,15 +984,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the agent's catch_up with nothing new answers nothing new, even with a merge unresolved",
-  },
-  {
-    name: "deleteRecords deletes no record",
-    file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: "            readNamespace(doc, spec.namespace),\n          ).map(key => ({",
-    to: "            {},\n          ).map(key => ({",
-    command: unit,
-    expect:
-      "deleteRecords deletes every record of its namespace in its home, and no other",
   },
   {
     name: "a copy with no conflict is asked about",
@@ -2283,16 +2266,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planShutdown closes intake",
   },
-  // ── the stored schemas, checked at start ──
+  // ── the project's version control, at start ──
   {
-    name: "a places document stored before ticks is refused",
-    file: "apps/pinetrie/host/migrations/index.ts",
-    from: "  CARD_TICKED,\n  CANVAS_STATE_CHANGED,\n",
-    to: "  CANVAS_STATE_CHANGED,\n",
-    command: unit,
+    name: "a git repo planned colocated is served as it is",
+    file: "apps/pinetrie/host/index.ts",
+    from: "    projectPlan === null ? null : await settleProjectDir(projectPlan)\n",
+    to: "    projectPlan\n",
+    suite: "lanes",
+    scenario: "vcs",
     expect:
-      "a places document stored before ticks opens through it, moving no data",
+      "a git repo served is made colocated at the start, said so, its branch and your edits as they were",
   },
+  {
+    name: "the start says nothing of its project's plan",
+    file: "apps/pinetrie/host/index.ts",
+    from: "  if (planLine !== null) log(`[host] ${planLine}`)\n",
+    to: "",
+    suite: "lanes",
+    scenario: "vcs",
+    expect:
+      "with no jj on the host, a folder project is served, said so, and a lane's proposed changes accepted into it",
+  },
+  // ── the stored schemas, checked at start ──
   {
     name: "a stored hash with no migration from it opens anyway",
     file: "apps/pinetrie/host/migrations/index.ts",
@@ -2746,14 +2741,6 @@ export const mutations: readonly Mutation[] = [
     to: '    const kept = await import("node:fs/promises").then(f => f.rm(dir, { recursive: true, force: true })).then(',
     command: unit,
     expect: "a session's directories that gained a file are kept, naming it",
-  },
-  {
-    name: "a record the rewrite leaves is written all the same",
-    file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: "      const value = input.rewrite(contents)\n",
-    to: "      const value = input.rewrite(contents) ?? (contents as object)\n",
-    command: unit,
-    expect: "no step when no record is in the old shape",
   },
   {
     name: "withHistory hands the adapter a lane with no copy",
@@ -3243,146 +3230,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an allowed host with no known key is said at start",
   },
-  {
-    name: "a turn's private paths keep their old name",
-    file: "apps/pinetrie/host/migrations/0008-turn-disk-private.ts",
-    from: 'const renameDisk = renamedFields({ local: "private" })',
-    to: 'const renameDisk = renamedFields({ local: "local" })',
-    command: unit,
-    expect:
-      "a turn's disk in the old shape lists its private paths under their new name",
-  },
-  {
-    name: "a revoke loses that it was taken back",
-    file: "apps/pinetrie/host/migrations/0009-access-answers.ts",
-    from: '      personal: { ...rest, kind: "denied", takenBack: revoked === true },\n',
-    to: '      personal: { ...rest, kind: "denied", takenBack: false },\n',
-    command: unit,
-    expect:
-      "an approval reads as allowed, a refusal as denied, a revoke as taken back",
-  },
-  {
-    name: "a revoked ssh fact keeps its old word",
-    file: "apps/pinetrie/host/migrations/0010-ssh-fact-words.ts",
-    from: '  revoked: "taken-back",\n',
-    to: "",
-    command: unit,
-    expect: "a refusal reads as denied, and a revoke as taken back",
-  },
-  {
-    name: "a carry-on an approval woke keeps its old word",
-    file: "apps/pinetrie/host/migrations/0011-carry-on-ssh-allowed.ts",
-    from: '  return r.kind === "ssh-approved"\n',
-    to: '  return r.kind === "never"\n',
-    command: unit,
-    expect: "a carry-on an approval woke reads as one an allowance woke",
-  },
-  {
-    name: "accepted work's working copy keeps getLatest",
-    file: "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
-    from: "  return renamed === null ? null : { ...contents, workingCopy: renamed }\n",
-    to: "  return renamed === null ? null : { ...contents, workingCopy }\n",
-    command: unit,
-    expect:
-      "accepted work's working copy names what getting the latest would do by its new name",
-  },
-  {
-    name: "a folder state keeps the old word",
-    file: "apps/pinetrie/host/migrations/0014-state-get-latest.ts",
-    from: '    ? { ...contents, made: { ...made, kind: "get-latest" } }\n',
-    to: "    ? { ...contents, made }\n",
-    command: unit,
-    expect: "a state an old catch-up made reads as one getting the latest made",
-  },
-  {
-    name: "a card's parent command keeps the old word",
-    file: "apps/pinetrie/host/migrations/0015-card-command-get-latest.ts",
-    from: '  "catch-up-with-parent": "get-latest-from-parent",\n',
-    to: "",
-    command: unit,
-    expect:
-      "a card's command in the old words is renamed, its other fields kept",
-  },
-  {
-    name: "a base on a WIP keeps the old word",
-    file: "apps/pinetrie/host/migrations/0016-base-unfinished.ts",
-    from: '    ? { ...contents, base: { ...base, kind: "unfinished" } }\n',
-    to: "    ? { ...contents, base }\n",
-    command: unit,
-    expect:
-      "a base on a WIP reads as one on unfinished work, its bookmark kept",
-  },
-  {
-    name: "a history message naming a WIP keeps the old word",
-    file: "apps/pinetrie/host/migrations/0018-history-unfinished.ts",
-    from: '      ? { ...details, [field]: { ...named, kind: "unfinished" } }\n',
-    to: "      ? { ...details }\n",
-    command: unit,
-    expect: "a message naming a WIP names unfinished work, the rest kept",
-  },
-  {
-    name: "a queued fact's row is rewritten without its fact",
-    file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: "    return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }\n",
-    to: "    return renamed === null ? null : { ...row }\n",
-    command: unit,
-    expect:
-      "a queued fact into a WIP is rewritten in its row, the row's other fields kept",
-  },
-  {
-    name: "a moved allowance leaves its old record",
-    file: "apps/pinetrie/host/migrations/0020-allowance-records.ts",
-    from: '    { kind: "delete" as const, target: SESSION_TARGET, namespace: OLD, key },\n',
-    to: "",
-    command: unit,
-    expect:
-      "each stored budget moves to the allowance namespace under its message, the old deleted",
-  },
-  {
-    name: "an ask card's row is rewritten without its relay",
-    file: "apps/pinetrie/host/migrations/0021-relay-allowance.ts",
-    from: "  return renamed === null ? null : { ...row, relay: JSON.stringify(renamed) }\n",
-    to: "  return renamed === null ? null : { ...row }\n",
-    command: unit,
-    expect:
-      "an ask card's relay names its allowance, the row's other fields kept",
-  },
-  {
-    name: "an allowance used up keeps the old kind",
-    file: "apps/pinetrie/host/migrations/0022-fact-allowance.ts",
-    from: '  const kind = rest.kind === "budget-spent" ? "allowance-spent" : rest.kind\n',
-    to: "  const kind = rest.kind\n",
-    command: unit,
-    expect:
-      "a stop by an allowance, and an allowance used up, read in the new words",
-  },
-  {
-    name: "a renamed history message keeps its old type",
-    file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: "      ...(renamedTo === undefined ? {} : { customType: renamedTo }),\n",
-    to: "",
-    command: unit,
-    expect:
-      "a history message of one type takes another, its details and content kept",
-  },
-  {
-    name: "a trashed card's row keeps the old prefix",
-    file: "apps/pinetrie/host/migrations/0024-trashed-rows.ts",
-    from: '    return { ...fields, kind: `trashed-${kind.slice("discarded-".length)}` }\n',
-    to: "    return { ...fields }\n",
-    command: unit,
-    expect:
-      "a trashed card's row in the old words reads as the place it left, in the trash",
-  },
-  {
-    name: "a card's history keeps its trashed places in the old words",
-    file: "apps/pinetrie/host/migrations/0024-trashed-rows.ts",
-    from: "    : { ...history, events: now.map((e, i) => e ?? events[i]) }\n",
-    to: "    : null\n",
-    command: unit,
-    expect:
-      "a history's events and a trace are rewritten whole, and nothing else",
-  },
   // ── a lane's prompt ──
   {
     name: "a run's prompt change is never logged",
@@ -3392,31 +3239,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a run that wrote its lane's prompt anew logs the sections it changed, and one that did not logs none",
-  },
-  {
-    name: "a record moved to another namespace stays in the old one",
-    file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: '        { kind: "delete", target, namespace: from, key },\n',
-    to: "",
-    command: unit,
-    expect:
-      "a record moved to another namespace is rewritten there and leaves the old one",
-  },
-  {
-    name: "the run-end report migration keeps the old urgency",
-    file: "apps/pinetrie/host/migrations/0025-run-end-report.ts",
-    from: '  needsYou: "needs-you",\n',
-    to: "",
-    command: unit,
-    expect: "a model's report and its urgency get the new spellings",
-  },
-  {
-    name: "the reply migration rewrites a counted reply again",
-    file: "apps/pinetrie/host/migrations/0001-reply-diagnostics.ts",
-    from: "    return diagnostics === message.diagnostics\n      ? []\n",
-    to: "    return false\n      ? []\n",
-    command: unit,
-    expect: "a second plan over its own output finds nothing",
   },
   {
     name: "a slow step's line leaves out the rest of its time",
@@ -3449,24 +3271,6 @@ export const mutations: readonly Mutation[] = [
       "a refresh that builds reports its gather, its base record, its steps and its record as parts",
   },
   // ── media columns ──
-  {
-    name: "a margin's old row is left as it was",
-    file: "apps/pinetrie/host/migrations/0003-one-margin.ts",
-    from: '  return { ...fields, at: `e/${lane}/${at}`, lane: "", seen: "" }\n',
-    to: "  return null\n",
-    command: unit,
-    expect:
-      "an entry's margin stored by its entry and thread becomes the entry's address, which reads as its place",
-  },
-  {
-    name: "a note column's title is copied and kept where it was",
-    file: "apps/pinetrie/host/migrations/0004-card-titles.ts",
-    from: '          } as const,\n          {\n            kind: "delete",\n            target: SESSION_TARGET,\n            namespace: OLD,\n            key,\n          } as const,\n        ]\n      : [',
-    to: "          } as const,\n        ]\n      : [",
-    command: unit,
-    expect:
-      "a note column's title is written as its card's title, and deleted where it was",
-  },
   {
     name: "read_card shows no image",
     file: "apps/pinetrie/host/read-card.ts",
@@ -3547,65 +3351,6 @@ export const mutations: readonly Mutation[] = [
     expect: "an unknown command is refused, by its name",
   },
   // ── the move to Active, and its migrations ──
-  {
-    name: "a places document stored before the canvas's flag is refused",
-    file: "apps/pinetrie/host/migrations/index.ts",
-    from: "  CARD_TICKED,\n  CANVAS_STATE_CHANGED,\n",
-    to: "  CARD_TICKED,\n",
-    command: unit,
-    expect:
-      "a places document stored before the canvas's flag opens through it, moving no data",
-  },
-  {
-    name: "the migration marks no Active",
-    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
-    from: '  const active = named("Active")',
-    to: "  const active = -1",
-    command: unit,
-    expect: "marks the states named Topics and Active",
-  },
-  {
-    name: "the migration marks the first state Topics",
-    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
-    from: '  const topics = Math.max(named("Topics"), 0)',
-    to: "  const topics = 0",
-    command: unit,
-    expect: "marks the states named Topics and Active",
-  },
-  {
-    name: "the migration marks a marked workflow again",
-    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
-    from: '  if (states.some(s => "mark" in s)) return null\n',
-    to: "",
-    command: unit,
-    expect: "a marked workflow is left alone",
-  },
-  {
-    name: "the migration's fallback marks nothing",
-    file: "apps/pinetrie/host/migrations/0028-workflow-marks.ts",
-    from: '  const topics = Math.max(named("Topics"), 0)',
-    to: '  const topics = named("Topics")',
-    command: unit,
-    expect: "falls back to the first open state and no Active",
-  },
-  {
-    name: "an undelivered fact to a thread in an inventory keeps its old shape",
-    file: "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
-    from: '  if (whyKind !== "held") return null\n',
-    to: "  return null\n",
-    command: unit,
-    expect:
-      "an undelivered fact to a thread in an inventory decodes again, its holder kept",
-  },
-  {
-    name: "the renamed fact names its holder by",
-    file: "apps/pinetrie/host/migrations/0030-fact-in-inventory.ts",
-    from: '  return { ...fact, why: { ...rest, kind: "in-inventory", holder: by } }\n',
-    to: '  return { ...fact, why: { ...rest, kind: "in-inventory", by } }\n',
-    command: unit,
-    expect:
-      "an undelivered fact to a thread in an inventory decodes again, its holder kept",
-  },
   {
     name: "a resume's run is announced as a prompt's",
     file: "apps/pinetrie/host/runs.ts",

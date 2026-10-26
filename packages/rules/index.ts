@@ -285,7 +285,6 @@ export {
   decodeQueuedFact,
   encodeFact,
   encodeQueuedFact,
-  FACT_TYPE,
   type FactMessage,
   factContent,
   factLine,
@@ -327,12 +326,7 @@ export {
   type SettleFacts,
 } from "./get-latest.ts"
 export { planReorder } from "./in-place.ts"
-export {
-  decodeLand,
-  LAND_TYPE,
-  type LandMessage,
-  type PromptBudget,
-} from "./land.ts"
+export { LAND_TYPE, type LandMessage, type PromptBudget } from "./land.ts"
 export { baseMovedOn, latestSourceName, mergedFrom } from "./latest-from.ts"
 export { addressLink, type LinkedQuote, pastMarkdown } from "./links.ts"
 export { isCurrentReply, planClear, planEndRun, planStream } from "./live.ts"
@@ -457,16 +451,13 @@ export {
 } from "./records.ts"
 export {
   AGENTS_RULE,
-  ANSWER_TYPE,
   type AnswerMessage,
   decodeAnswer,
   decodeRelay,
   encodeAnswer,
   encodeIncoming,
   encodeRelayMessage,
-  INCOMING_TYPE,
   type IncomingEntriesMessage,
-  RELAY_TYPE,
   type RelayRefusal,
   relayLine,
   relayRefusalText,
@@ -567,12 +558,7 @@ export {
 } from "./shares.ts"
 export { planKindSweep, planUndeclaredSweep, RECORD_SPECS } from "./specs.ts"
 export type { SpinOff } from "./spin-off.ts"
-export {
-  decodeSshFact,
-  planSshNews,
-  SSH_FACT_TYPE,
-  type SshFactMessage,
-} from "./ssh-news.ts"
+export { decodeSshFact, planSshNews, type SshFactMessage } from "./ssh-news.ts"
 export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
@@ -593,7 +579,6 @@ export {
   type VerifiedSplit,
 } from "./statement-output.ts"
 export {
-  CARRY_ON_TYPE,
   type CarryOnMessage,
   carryOnState,
   decodeCarryOn,

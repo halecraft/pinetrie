@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import {
+  type About,
   type Gathered,
   HELPER,
   type PackagePlan,
@@ -9,6 +10,16 @@ import {
 } from "./package.ts"
 
 const BIN = "apps/pinetrie/bin.ts"
+
+const ABOUT: About = {
+  version: "1.2.3",
+  description: "d",
+  license: "MIT",
+  repository: { type: "git", url: "git+https://example.com/p.git" },
+  homepage: "https://example.com/p#readme",
+  bugs: "https://example.com/p/issues",
+  keywords: ["k"],
+}
 
 /** A workspace of `sources`, each import resolved by `targets`, every entry the build starts from present. */
 function gathered(
@@ -37,8 +48,7 @@ function gathered(
       "@earendil-works/pi-coding-agent",
       "@gotgenes/pi-anthropic-auth",
     ],
-    version: "1.2.3",
-    description: "d",
+    about: ABOUT,
     ...more,
   }
 }
@@ -123,6 +133,11 @@ describe("planPackage", () => {
       version: "1.2.3",
       bin: { pinetrie: "apps/pinetrie/bin.js" },
     })
+  })
+
+  test("the manifest says of the package what the root manifest says", () => {
+    const plan = made(planPackage(gathered({ [BIN]: "export {}\n" }, {})))
+    expect(plan.manifest).toMatchObject(ABOUT)
   })
 
   test("a package no workspace manifest declares refuses the plan", () => {

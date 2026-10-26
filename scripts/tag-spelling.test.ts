@@ -1,6 +1,6 @@
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { OLD_SHAPES, readSources } from "./sources.ts"
+import { readSources } from "./sources.ts"
 import {
   isTagSpelling,
   misspelledTags,
@@ -97,9 +97,11 @@ describe("tagLiterals", () => {
 
 describe("misspelledTags and spentOutside", () => {
   test("a file of a migration's old shapes is not held to the spelling", () => {
-    const [old] = OLD_SHAPES
     expect(
-      misspelledTags([tag("aB"), tag("cD", old), tag("GET")]).map(t => t.value),
+      misspelledTags(
+        [tag("aB"), tag("cD", "old.ts"), tag("GET")],
+        ["old.ts"],
+      ).map(t => t.value),
     ).toEqual(["aB"])
   })
 

@@ -7,6 +7,9 @@
   - ADR-0096: a one-time record or store migration is skipped on a store whose
     ledger names it, and one deleted from the build leaves its name, so a
     store that never ran it is refused instead of opened.
+- **Amended by:**
+  - ADR-0215: the numbering starts again at `0001` a second time, at 0.1.0;
+    every migration before it is deleted with its name, none retired.
 
 **Context.**
 

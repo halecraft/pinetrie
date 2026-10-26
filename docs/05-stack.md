@@ -61,8 +61,11 @@ macOS on Apple silicon and Linux on arm64 and x86_64 (ADR-0190).
 pine·trie's own files, and the scripts it runs in other processes, are
 found through `@pinetrie/install`, which knows the install's root and
 whether it runs as `.ts` or `.js`. `tsconfig.json` sets
-`erasableSyntaxOnly`, so `tsc` refuses what stripping cannot take. A
-release is `docs/releasing.md`.
+`erasableSyntaxOnly`, so `tsc` refuses what stripping cannot take. It is
+published by `@halecraft/release` from the root, the one workspace package
+that is not private, whose `publishConfig.directory` is `dist/pinetrie/`,
+and whose license, repository, homepage, bugs and keywords the build copies
+into the package's manifest. A release is `docs/releasing.md`.
 
 ## pnpm, with Kyneta from the registry
 

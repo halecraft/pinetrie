@@ -31,7 +31,7 @@ export async function main(args: readonly string[]): Promise<number> {
     return 2
   }
   const { folder, days, dryRun } = invocation
-  const prepared = await prepareProjectDir(folder)
+  const prepared = await prepareProjectDir(folder, { tools: true })
   if (prepared.kind !== "jj") {
     console.error(tidyWords({ kind: "not-jj", folder }))
     return 2
