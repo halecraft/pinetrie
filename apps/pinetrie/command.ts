@@ -39,7 +39,7 @@ export function planCommand(argv: readonly string[]): PlannedCommand {
 }
 
 /** The help: each command, one line. */
-export const COMMAND_USAGE = `${PRODUCT_NAME}: a collaborative agentic harness
+export const COMMAND_USAGE = `${PRODUCT_NAME}: an agent harness for teams
 
 usage: pinetrie <command>
   serve [folder]                       serve the folder, or the current one

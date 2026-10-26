@@ -2,7 +2,7 @@
   "name": "pinetrie",
   "version": "0.1.0",
   "type": "module",
-  "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate.",
+  "description": "An agent harness for teams.",
   "license": "MIT",
   "repository": {
     "type": "git",
