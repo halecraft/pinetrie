@@ -117,7 +117,7 @@ export const FOLDER_WRITE_JOURNAL: RecordSpec<
   namespace: "pinetrie.folder-write",
   home: "session",
   keyOf: j => j.id,
-  encode: ({ id, ...contents }) => structuredClone(contents),
+  encode: ({ id, ...contents }) => contents,
   decode: recordDecoder(WriteJournalSchema, textKey, (r, id) => ({
     id,
     record: r.record,
